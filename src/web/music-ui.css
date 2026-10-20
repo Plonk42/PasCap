@@ -16,7 +16,29 @@
 }
 
 .music-controls .music-recording-row {
+  margin-bottom: 6px;
+}
+
+.music-controls .music-analysis-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
   margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.music-analysis-status > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.music-analysis-status.error > span {
+  color: #f2a7a7;
 }
 
 .music-controls .music-add-row {

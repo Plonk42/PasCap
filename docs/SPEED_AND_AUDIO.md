@@ -447,6 +447,36 @@ It is duration-dependent, not a fixed-GB guarantee; see
 [export storage](UX_HARDENING.md#issue-3-export-storage-and-recovery). Failure or
 cancellation cleans only owned scratch/partials and preserves completed outputs.
 
+### Music analysis
+
+Once music is ready, a **Music analysis** background job (after every other queued job,
+like camera motion analysis) finds its tempo, beats, downbeats, accents, loudness and
+sections. It runs on one worker thread, streaming the PCM cache in 1 MiB blocks as a
+mono float mix (never the whole file): 2,048-sample Hann windows every 480 samples
+(10 ms), 40 mel bands from 30 Hz to 16 kHz, a spectral-flux onset envelope, tempo from
+its autocorrelation over 8 s windows (50–220 BPM; the fastest strong periodicity, with a
+mild prior around 120 BPM), dynamic-programming beat tracking at the local tempo refined
+to the strongest onset within ±20 ms, downbeats from the bar phase (3 or 4 beats) with the
+strongest onsets and kick-band energy, loudness per 100 ms, sections at least 8 s long
+from the novelty of 1 s band-level and pitch-class averages (**quiet**, **build**,
+**peak**, **release** from their loudness and its change), and accents (onset peaks above
+the 90th percentile, at least 150 ms apart). Fewer than four tracked beats is no tempo.
+Every constant is in `MUSIC_ANALYSIS` ([analysis](../src/server/music-analysis.ts)); a
+10-minute song takes about 5 s and a few MB.
+
+The result is cached as `music-v1.json` beside `playback.pcm`, positions in PCM samples,
+tied to the original's content checksum and the cache file's size and modification time:
+re-preparing the cache makes it stale (ignored, never rewritten silently). Music analysed
+before this job existed, or whose analysis is stale, failed or was cancelled, shows
+**Tempo and beats not analysed** with **Analyse music** under **Recording** in
+**Audio → Music**; otherwise that line shows the tempo, meter and beat count, or the job's
+progress. `GET /api/audio/<id>/analysis` returns `{ analysis, job }`;
+`POST /api/audio/<id>/analysis` queues the job. A cancelled or failed analysis leaves the
+PCM cache and playback untouched. Beats map to project frames through each music track's
+placement, source range and loops (`musicBeatFrames`). Validation uses synthetic click
+tracks, modulated noise, swing, a tempo change and loudness steps only; real songs are
+evaluated by the owner.
+
 ## Versioning
 
 The current project schema requires explicit `media.videoIds` and `media.audioIds` arrays,

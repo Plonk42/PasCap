@@ -57,6 +57,7 @@ test.beforeEach(async ({ page, request }) => {
     }
     if (
       (method === 'GET' && pathname.startsWith(`/api/media/${video.id}/`)) ||
+      (method === 'GET' && pathname === `/api/audio/${song.id}/analysis`) ||
       ((method === 'GET' || method === 'HEAD') && pathname === `/api/audio/${song.id}/playback`)
     ) {
       await route.continue();

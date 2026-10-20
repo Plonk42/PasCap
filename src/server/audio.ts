@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { chmod, open, readFile, rename, rm } from 'node:fs/promises';
+import { chmod, open, readFile, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import { audioAssetSchema, type AudioAsset } from '../shared/audio.js';
 import type { MediaJob, SourceFingerprint } from '../shared/media.js';
 import { idSchema } from '../shared/model.js';
+import { MUSIC_ANALYSIS_VERSION, musicAnalysisSchema, type MusicAnalysis } from '../shared/music-analysis.js';
 import { MUSIC_BYTES_PER_SAMPLE, MUSIC_SAMPLE_RATE, MUSIC_SAMPLES_PER_FRAME } from '../shared/music-stream.js';
 import { forEachSerial, whileSerial } from '../shared/serial.js';
 import { parseRate, PROJECT_FPS } from '../shared/timing.js';
@@ -20,6 +21,7 @@ import {
   verifyMovedOriginal,
 } from './files.js';
 import { JobQueue, type JobContext } from './jobs.js';
+import { measureMusic } from './music-analysis.js';
 import { runProcess } from './process.js';
 import type { RelinkCandidate } from './relink.js';
 import { atomicWrite, ensurePrivateDirectory, SerialWriter } from './storage.js';
@@ -201,6 +203,7 @@ export class AudioLibrary {
   readonly #operations = new SerialWriter();
   readonly #preparing = new Map<string, string>();
   readonly #relinking = new Map<string, string>();
+  readonly #analysing = new Map<string, string>();
   constructor(
     readonly config: ServiceConfig,
     readonly jobs: JobQueue,
@@ -279,6 +282,101 @@ export class AudioLibrary {
   playbackPath(asset: AudioAsset): string {
     return path.join(this.assetDir(asset), 'playback.pcm');
   }
+  analysisPath(asset: AudioAsset): string {
+    return path.join(this.assetDir(asset), `music-v${MUSIC_ANALYSIS_VERSION}.json`);
+  }
+  /** The PCM cache an analysis describes: re-preparing it or a changed original makes the analysis stale. */
+  async #cacheIdentity(asset: AudioAsset): Promise<MusicAnalysis['source'] | null> {
+    if (asset.status !== 'ready' || !asset.content) return null;
+    try {
+      const info = await stat(this.playbackPath(asset));
+      return { content: asset.content.digest, bytes: info.size, mtimeMs: info.mtimeMs };
+    } catch (error) {
+      if (isNotFound(error)) return null;
+      throw error;
+    }
+  }
+  /** The analysis of the current PCM cache, or null when it is missing, stale or unreadable. */
+  async analysis(id: string): Promise<MusicAnalysis | null> {
+    const asset = this.get(id);
+    const source = await this.#cacheIdentity(asset);
+    if (!source) return null;
+    let text: string;
+    try {
+      text = await readFile(this.analysisPath(asset), 'utf8');
+    } catch (error) {
+      if (isNotFound(error)) return null;
+      throw error;
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
+    } catch {
+      return null;
+    }
+    // It is only a cache: an unreadable one is analysed again like a missing one.
+    const parsed = musicAnalysisSchema.safeParse(value);
+    if (!parsed.success) return null;
+    const saved = parsed.data.source;
+    return saved.content === source.content && saved.bytes === source.bytes && saved.mtimeMs === source.mtimeMs
+      ? parsed.data
+      : null;
+  }
+  /** The queued or running analysis of this music, if any. */
+  analysisJob(id: string): MediaJob | null {
+    const active = this.#analysing.get(id);
+    return active === undefined ? null : this.jobs.get(active);
+  }
+  /** Queues the tempo, beat and section analysis of prepared music. */
+  analyse(id: string): MediaJob {
+    const active = this.#analysing.get(id);
+    if (active !== undefined) return this.jobs.get(active);
+    const asset = this.get(id);
+    if (asset.status !== 'ready' || !asset.content)
+      throw new ServiceError('Prepare the music before analysing it.', 409);
+    if (this.#preparing.has(id) || this.#relinking.has(id))
+      throw new ServiceError(`${asset.name} is busy. Analyse it once its current job finishes.`, 409);
+    return this.#submitAnalysis(asset);
+  }
+  #submitAnalysis(asset: AudioAsset): MediaJob {
+    const { id } = asset;
+    const message = 'Finding the tempo, beats and sections';
+    const job = this.jobs.submit(
+      'music-analysis',
+      asset.name,
+      async (context) => {
+        const current = await this.assertReady(id);
+        const source = await this.#cacheIdentity(current);
+        if (!source) throw new ServiceError('The music cache is missing. Prepare the music again.', 409);
+        context.update(0.01, message);
+        const measurement = await measureMusic(this.playbackPath(current), context.signal, (fraction) =>
+          context.update(0.01 + 0.97 * fraction, message),
+        );
+        const after = await this.#cacheIdentity(this.get(id));
+        if (after?.mtimeMs !== source.mtimeMs || after.bytes !== source.bytes || after.content !== source.content)
+          throw new ServiceError('The music cache changed while it was analysed. Analyse the music again.', 409);
+        const analysis = musicAnalysisSchema.parse({ version: MUSIC_ANALYSIS_VERSION, source, ...measurement });
+        await atomicWrite(this.analysisPath(current), JSON.stringify(analysis));
+        return analysis.tempo
+          ? `${Math.round(analysis.tempo.bpm)} BPM, ${analysis.beats.length} beats`
+          : 'No steady beat found';
+      },
+      () => {
+        if (this.#analysing.get(id) === job.id) this.#analysing.delete(id);
+        return Promise.resolve();
+      },
+    );
+    this.#analysing.set(id, job.id);
+    return job;
+  }
+  /** Music becomes ready first; its analysis follows as a background job. */
+  async #queueAnalysis(id: string): Promise<void> {
+    try {
+      if (!this.#analysing.has(id) && !(await this.analysis(id))) this.#submitAnalysis(this.get(id));
+    } catch {
+      // The music is ready either way; Audio then offers Analyse music.
+    }
+  }
   async assertReady(id: string): Promise<AudioAsset> {
     const asset = this.get(id);
     const reason = asset.error ? ' ' + asset.error : '';
@@ -356,6 +454,12 @@ export class AudioLibrary {
     const snapshot = this.get(id);
     assertCacheOutsideSource(path.dirname(snapshot.sourcePath), this.config.dataDir);
     await assertSourceIdentity(snapshot.sourcePath, snapshot.fingerprint, true);
+    // Preparing may replace the cache an analysis would read.
+    const analysing = this.#analysing.get(id);
+    if (analysing !== undefined) {
+      this.jobs.cancel(analysing);
+      this.#analysing.delete(id);
+    }
     const current = this.#assets.get(id)!;
     current.status = 'queued';
     current.error = null;
@@ -400,6 +504,7 @@ export class AudioLibrary {
           } finally {
             this.#preparing.delete(id);
           }
+          if (finished.state === 'completed') await this.#queueAnalysis(id);
         }),
     );
     this.#preparing.set(id, job.id);

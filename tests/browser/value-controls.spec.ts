@@ -52,7 +52,7 @@ test.beforeEach(async ({ page, request }) => {
       return;
     }
     const proxy = /^\/api\/media\/([^/]+)\/(proxy|thumbnail\/\d+)$/.exec(pathname);
-    const pcm = /^\/api\/audio\/([^/]+)\/playback$/.exec(pathname);
+    const pcm = /^\/api\/audio\/([^/]+)\/(?:playback|analysis)$/.exec(pathname);
     if (
       (method === 'GET' && proxy && assets.some((asset) => asset.id === proxy[1])) ||
       ((method === 'HEAD' || method === 'GET') && pcm && pcm[1] === music.id)

@@ -6,6 +6,7 @@ import { audioDirectorySchema, footageDirectorySchema, footageRootSchema } from 
 import { jobSchema, mediaAssetSchema } from '../shared/media.js';
 import { motionAnalysisSchema } from '../shared/motion-analysis.js';
 import { idSchema, projectSchema, type ProjectDocument } from '../shared/model.js';
+import { musicAnalysisSchema } from '../shared/music-analysis.js';
 import { projectSummarySchema } from '../shared/projects.js';
 
 export type ApiErrorKind = 'http' | 'network' | 'timeout' | 'response' | 'aborted' | 'request';
@@ -259,6 +260,16 @@ export const api = {
     ),
   /** Queues the camera-motion analysis that steadiest-range suggestions need. */
   analyseMotion: (id: string) => request(`/api/media/${id}/motion`, z.object({ job: jobSchema }), 'POST', {}),
+  /** The tempo, beat and section analysis of the current music cache, or null, and its queued or running job. */
+  musicAnalysis: (id: string, options?: RequestOptions) =>
+    request(
+      `/api/audio/${id}/analysis`,
+      z.object({ analysis: musicAnalysisSchema.nullable(), job: jobSchema.nullable() }),
+      'GET',
+      undefined,
+      options,
+    ),
+  analyseMusic: (id: string) => request(`/api/audio/${id}/analysis`, z.object({ job: jobSchema }), 'POST', {}),
   /** Queues a full-content check of the moved copy; the job's outcome is the answer. */
   relinkMedia: (id: string, path: string) =>
     request(`/api/media/${id}/relink`, z.object({ job: jobSchema }), 'POST', { path }),

@@ -294,6 +294,11 @@ flights.
 
 ## Music analysis
 
+Implemented ahead of the registry (owner, 2026-10-20): the job and cache are served by
+`GET`/`POST /api/audio/<id>/analysis`, described in
+[speed and audio](../SPEED_AND_AUDIO.md#music-analysis); `music_analyse` and
+`music_analysis` will wrap them once the registry exists. The design as proposed:
+
 Runs in a worker thread (as `motion-pool` does), streaming the PCM cache in 1 MiB blocks,
 mono downmix in float; no new dependency (a small radix-2 FFT in TypeScript).
 
