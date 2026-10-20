@@ -83,6 +83,15 @@ and technical paths stay unchanged; this glossary does not change the project sc
   with its reason (`aria-disabled` and tooltip) without a prepared clip of the track at the playhead;
   **Analysing n/7…** with a **Cancel** icon (or Escape) appears only after 250 ms; failures stay inline.
   See [automatic white balance](TEMPERATURE_AND_TINT.md#automatic-white-balance).
+- **Auto adjust** is the **Auto** text button (wand icon) ending the Colour keyframe line; on its own
+  row at the right when the line is narrower than 280 px. It opens a popover with an **Apply to** choice,
+  **Track values** (whole clip) or **Keyframe at playhead** (1 s around it; initial once the track animates a
+  setting Auto sets), that analyses the clip at the playhead (**Analysing n/16 frames…**, **Cancel**), then
+  offers **Intensity** (0–100%, initially 80%, the correction as suggested; above it exaggerates), lists
+  each animated setting Track values leaves unchanged and commits with **Apply**, one Undo step: a Colour
+  edit, or the ten settings keyed at the playhead like their diamonds.
+  The preview shows the result while the popover is open; Cancel, Escape or a click outside restore it.
+  Unavailable with its reason like Auto white balance. See [Auto adjust](AUTO_ADJUST.md).
 - **Vibrance** is a track-owned −1…2 scalar Colour control, neutral 0, last in the **Colour**
   group after Saturation: it scales saturation more for muted colours than strong ones
   (greys and fully saturated colours stay unchanged); a plain slider track, no gradient.
@@ -108,7 +117,8 @@ and technical paths stay unchanged; this glossary does not change the project sc
   **Add default keyframe** in the Colour keyframe line, or **Add default Transform keyframe**
   in Transform's; filled marker and **Default** badge with the diamond-and-return-arrow icon.
 - **Keyframe line**: the first row of an expanded Colour, Speed or Transform section: **N keyframes**, one
-  **Previous/Next** pair over the same set and **Reset**. It is hidden while the section is collapsed.
+  **Previous/Next** pair over the same set and **Reset**; Colour's also holds **Auto** and its default keyframe
+  toggle. It is hidden while the section is collapsed.
   There is no Animate toggle or stored preference; capture diamonds and per-setting arrows are always visible
   (Speed, a single setting, relies on its keyframe-line pair).
 - **Easing**: the visible label for track-keyframe, Transform and custom clip-speed

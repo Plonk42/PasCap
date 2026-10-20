@@ -60,15 +60,19 @@ interface Plane {
   excluded: Uint8Array;
 }
 
-const LINEAR = Float64Array.from({ length: 256 }, (_, code) => decode709(code / 255));
-const LUMA = [0.2126, 0.7152, 0.0722] as const;
+/** Linear BT.709 light of each 8-bit code. */
+export const LINEAR_CODES = Float64Array.from({ length: 256 }, (_, code) => decode709(code / 255));
+export const LUMA = [0.2126, 0.7152, 0.0722] as const;
+
+export interface ContentBox {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
 
 /** Rows and columns at the edges whose brightest code is letterbox-dark are dropped. */
-function contentBox({
-  width,
-  height,
-  data,
-}: AnalysisFrame): { left: number; top: number; right: number; bottom: number } | null {
+export function contentBox({ width, height, data }: AnalysisFrame): ContentBox | null {
   const rows = new Uint8Array(height);
   const columns = new Uint8Array(width);
   for (let y = 0; y < height; y++)
@@ -128,7 +132,7 @@ function linearPlane(frame: AnalysisFrame): Plane | null {
       let luma = 0;
       for (let channel = 0; channel < 3; channel++) {
         const code = frame.data[source + channel]!;
-        const value = LINEAR[code]!;
+        const value = LINEAR_CODES[code]!;
         channels[channel]![target] = value;
         luma += LUMA[channel]! * value;
         if (code >= WHITE_BALANCE.clippedCode) clipped[target] = 1;
@@ -233,7 +237,7 @@ export function frameIlluminant(frame: AnalysisFrame): IlluminantEstimate | null
   return { ...neutralisingWhiteBalance(illuminant), confidence };
 }
 
-function median(values: readonly number[]): number {
+export function median(values: readonly number[]): number {
   const sorted = [...values].sort((left, right) => left - right);
   const middle = sorted.length >> 1;
   return sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;

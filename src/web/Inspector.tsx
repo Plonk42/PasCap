@@ -8,6 +8,7 @@ import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shar
 import { calculateLayout, transitionOffset, type TimelineLayout } from '../shared/timeline.js';
 import { ColourCurvesSection, HslRangesSection } from './AdvancedColour.js';
 import { TrackAnimationControls } from './AnimationControls.js';
+import { AutoAdjust } from './AutoAdjust.js';
 import { AutoWhiteBalance } from './AutoWhiteBalance.js';
 import { ClipSourceRange } from './ClipSourceRange.js';
 import { COLOUR_GROUPS, colourGroupResetCommands, colourResetCommands } from './colour-reset.js';
@@ -399,6 +400,16 @@ function ColourSection({
         >
           <Icon name="default-key" size={16} />
         </button>
+        <AutoAdjust
+          projectId={project.id}
+          layer={layer}
+          layout={layout}
+          assets={assets}
+          frame={frame}
+          selectedClipId={selectedClipId}
+          disabled={disabled}
+          onEdit={onEdit}
+        />
       </TrackAnimationControls>
       <div className="colour-controls">
         {COLOUR_GROUPS.map((group) => (
