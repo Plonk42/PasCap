@@ -2,7 +2,6 @@ import {
   lazy,
   Suspense,
   useCallback,
-  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -53,6 +52,7 @@ import { mediaReady } from './display.js';
 import { Icon } from './icons.js';
 import { PanelRail, toggleSidePanel, type SidePanel } from './PanelToggle.js';
 import { trackPointerFocus, type PointerFocus } from './pointer-focus.js';
+import { useRestingValue } from './use-delayed-flag.js';
 import { chooseProjectFile, readProjectFile } from './project-file.js';
 import type { InspectorMode, InspectorSectionRequest, InspectorSectionTarget } from './InspectorSection.js';
 import { Jobs } from './Jobs.js';
@@ -120,6 +120,8 @@ const ImportDialog = lazy(() => import('./ImportDialog.js').then((module) => ({ 
 const loadInspector = () => import('./Inspector.js').then((module) => ({ default: module.Inspector }));
 const loadDiagnostics = () => import('./Diagnostics.js').then((module) => ({ default: module.Diagnostics }));
 const EMPTY_PROJECT = createProject('preview-lab', 'Untitled');
+/** While scrubbing, Properties shows the playhead once it has rested this long, like the preview's exact frame. */
+const INSPECTOR_REST_MS = 100;
 const SAVE_LABEL: Record<SaveState['state'], string> = {
   saved: 'Saved locally',
   saving: 'Saving…',
@@ -1324,12 +1326,18 @@ export function App() {
       followPlayhead,
     ],
   );
-  // While the ruler is scrubbed, the Inspector catches up whenever the pointer rests instead of slowing every frame.
+  // While the ruler is scrubbed, the Inspector catches up whenever the pointer rests instead of rendering every
+  // frame: a deferred render still completes in idle gaps between frames (every frame in Firefox), slowing scrubbing.
   const playheadFrame = diagnostics?.frame ?? 0;
-  const deferredFrame = useDeferredValue(playheadFrame);
-  const deferredNavigation = useDeferredValue(keyframeNavigation);
-  const inspectorFrame = scrubbing ? deferredFrame : playheadFrame;
-  const inspectorNavigation = scrubbing ? deferredNavigation : keyframeNavigation;
+  const playheadInspection = useMemo(
+    () => ({ frame: playheadFrame, navigation: keyframeNavigation }),
+    [playheadFrame, keyframeNavigation],
+  );
+  const { frame: inspectorFrame, navigation: inspectorNavigation } = useRestingValue(
+    playheadInspection,
+    scrubbing,
+    INSPECTOR_REST_MS,
+  );
   const pausePreview = useCallback(() => engine.current?.pause(), []);
   const openProject = async (id: string): Promise<boolean> =>
     (
