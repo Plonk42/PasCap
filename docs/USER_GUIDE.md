@@ -416,6 +416,8 @@ First choose what it applies to:
 - **Track values** analyses 16 frames spread over the whole clip and sets Temperature, Tint,
   Saturation, Vibrance, Exposure, Brightness, Contrast, Highlights, Shadows, Whites and Blacks
   for the whole track. Settings the track animates are left unchanged, and the popover lists them.
+- **Track values from playhead** sets the same values for the whole track, but from the second
+  around the playhead: choose the moment whose look the whole track should take.
 - **Keyframe at playhead** analyses the second around the playhead and keys those eleven
   settings there. Run it again at other moments of a clip whose light changes: the
   keyframes follow the light between them. Once the track animates any of the eleven, Auto
