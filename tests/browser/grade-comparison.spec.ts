@@ -311,6 +311,10 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
         await route.continue();
         return;
       }
+      if (method === 'GET' && song && path === `/api/audio/${song.id}/analysis`) {
+        await route.continue();
+        return;
+      }
       if (guard.allowPCM && path === `/api/audio/${song!.id}/playback` && (method === 'GET' || method === 'HEAD')) {
         if (method === 'GET') {
           const range = /^bytes=(\d+)-(\d+)$/.exec(request.headers()['range'] ?? '');
