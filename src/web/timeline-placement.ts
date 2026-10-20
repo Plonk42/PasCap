@@ -1,10 +1,20 @@
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { ProjectDocument, VideoClip } from '../shared/model.js';
 import { clipDuration } from '../shared/speed.js';
-import { calculateLayout, layerClips, transitionOffset } from '../shared/timeline.js';
+import { calculateLayout, layerClips, transitionOffset, type PlacedClip } from '../shared/timeline.js';
 
 export type TimelinePayload =
-  { kind: 'clip'; clipId: string; grabFrame: number } | { kind: 'media'; clips: readonly VideoClip[] };
+  | { kind: 'clip'; clipId: string; grabFrame: number }
+  | { kind: 'media'; clips: readonly VideoClip[] }
+  /** Selected clips dragged together by one of them, `clipId`. */
+  | { kind: 'group'; clipIds: readonly string[]; clipId: string; grabFrame: number };
+type SinglePayload = Exclude<TimelinePayload, { kind: 'group' }>;
+export interface DropGhost {
+  clipId: string;
+  layerId: string;
+  start: number;
+  duration: number;
+}
 export interface DropPlan {
   layerId: string;
   start: number;
@@ -14,6 +24,8 @@ export interface DropPlan {
   index: number;
   command: EditCommand | null;
   error: string;
+  /** Every moved clip of a group drag, the dragged one included. */
+  ghosts?: DropGhost[];
 }
 
 /** Match either edge, never pull the moving clip toward its own old boundaries. */
@@ -46,10 +58,14 @@ export function placementSnapPoints(
   excludedClipId: string | null,
   playhead: number,
 ): number[] {
+  return snapPointsWithout(project, new Set(excludedClipId === null ? [] : [excludedClipId]), playhead);
+}
+
+function snapPointsWithout(project: ProjectDocument, excluded: ReadonlySet<string>, playhead: number): number[] {
   const layout = calculateLayout(project);
-  const clips = layout.clips.filter((placed) => placed.clip.id !== excludedClipId);
+  const clips = layout.clips.filter((placed) => !excluded.has(placed.clip.id));
   const transitions = layout.transitions.filter(
-    (region) => region.transition.leftId !== excludedClipId && region.transition.rightId !== excludedClipId,
+    (region) => !excluded.has(region.transition.leftId) && !excluded.has(region.transition.rightId),
   );
   const points = [
     0,
@@ -111,7 +127,7 @@ function rippleSlots(
   });
 }
 
-function candidateDocument(project: ProjectDocument, payload: TimelinePayload, plan: DropPlan): ProjectDocument {
+function candidateDocument(project: ProjectDocument, payload: SinglePayload, plan: DropPlan): ProjectDocument {
   if (payload.kind === 'clip') return applyCommand(project, plan.command!);
   let document = project;
   let cursor = plan.start;
@@ -126,7 +142,7 @@ function candidateDocument(project: ProjectDocument, payload: TimelinePayload, p
   return document;
 }
 
-function draggedClips(project: ProjectDocument, payload: TimelinePayload): readonly VideoClip[] {
+function draggedClips(project: ProjectDocument, payload: SinglePayload): readonly VideoClip[] {
   if (payload.kind === 'media') {
     if (!payload.clips.length) throw new Error('The dragged clip is unavailable.');
     return payload.clips;
@@ -134,6 +150,90 @@ function draggedClips(project: ProjectDocument, payload: TimelinePayload): reado
   const clip = project.clips.find((item) => item.id === payload.clipId);
   if (!clip) throw new Error('The dragged clip is unavailable.');
   return [clip];
+}
+
+/** The delta bringing a moved clip's leading or trailing edge closest to a snap point, within tolerance. */
+function snapGroupDelta(
+  moved: readonly PlacedClip[],
+  requested: number,
+  points: readonly number[],
+  tolerance: number,
+): { delta: number; guide: number | null } {
+  let delta = requested;
+  let guide: number | null = null;
+  let closest = tolerance + 1e-8;
+  for (const point of points)
+    for (const placed of moved)
+      for (const edge of [placed.start, placed.end]) {
+        const candidate = point - edge;
+        if (Math.abs(candidate - requested) < closest && moved.every((item) => item.start + candidate >= 0)) {
+          closest = Math.abs(candidate - requested);
+          delta = candidate;
+          guide = point;
+        }
+      }
+  return { delta, guide };
+}
+
+/**
+ * Selected clips move by the dragged clip's delta. Clips from one track follow the pointer to its track;
+ * clips from several tracks stay on theirs. Ripple-off destinations snap any moved edge; a Ripple
+ * destination places them in its sequence. The shared command validates the whole move.
+ */
+function planGroupDrop(
+  project: ProjectDocument,
+  payload: Extract<TimelinePayload, { kind: 'group' }>,
+  pointerLayerId: string,
+  pointerFrame: number,
+  snapping: boolean,
+  tolerance: number,
+  playhead: number,
+): DropPlan {
+  const layout = calculateLayout(project);
+  const moved = layout.clips.filter((placed) => payload.clipIds.includes(placed.clip.id));
+  const grabbed = moved.find((placed) => placed.clip.id === payload.clipId);
+  if (!grabbed || moved.length !== payload.clipIds.length) throw new Error('The dragged clips are unavailable.');
+  const layerId = new Set(moved.map((placed) => placed.clip.layerId)).size === 1 ? pointerLayerId : null;
+  const destination = (placed: PlacedClip): string => layerId ?? placed.clip.layerId;
+  const rippleOn = (placed: PlacedClip): boolean =>
+    project.layers.find((layer) => layer.id === destination(placed))!.ripple;
+  let delta = Math.round(pointerFrame - payload.grabFrame) - grabbed.start;
+  let guide: number | null = null;
+  const free = moved.filter((placed) => !rippleOn(placed));
+  if (snapping && free.length) {
+    const points = snapPointsWithout(project, new Set(payload.clipIds), playhead);
+    ({ delta, guide } = snapGroupDelta(free, delta, points, tolerance));
+  }
+  const command: EditCommand = { type: 'move-clips', clipIds: [...payload.clipIds], delta, layerId };
+  const requestedGhosts = moved.map((placed) => ({
+    clipId: placed.clip.id,
+    layerId: destination(placed),
+    start: placed.start + delta,
+    duration: placed.duration,
+  }));
+  const plan: DropPlan = {
+    layerId: destination(grabbed),
+    start: grabbed.start + delta,
+    duration: grabbed.duration,
+    guide,
+    mode: rippleOn(grabbed) ? 'ripple' : 'position',
+    index: -1,
+    command,
+    error: '',
+    ghosts: requestedGhosts,
+  };
+  try {
+    const candidate = calculateLayout(applyCommand(project, command)).clips;
+    plan.ghosts = moved.map((placed) => {
+      const next = candidate.find((item) => item.clip.id === placed.clip.id)!;
+      return { clipId: next.clip.id, layerId: next.clip.layerId, start: next.start, duration: next.duration };
+    });
+    plan.start = plan.ghosts.find((ghost) => ghost.clipId === grabbed.clip.id)!.start;
+  } catch (cause) {
+    plan.command = null;
+    plan.error = cause instanceof Error ? cause.message : 'These clips cannot move here.';
+  }
+  return plan;
 }
 
 function durationAt(clips: readonly VideoClip[]): number {
@@ -176,8 +276,22 @@ export function planTimelineDrop(
   tolerance: number,
   playhead: number,
 ): DropPlan {
-  const layer = project.layers.find((item) => item.id === layerId);
-  if (!layer) throw new Error('Choose a video track before dropping.');
+  if (!project.layers.some((item) => item.id === layerId)) throw new Error('Choose a video track before dropping.');
+  return payload.kind === 'group'
+    ? planGroupDrop(project, payload, layerId, pointerFrame, snapping, tolerance, playhead)
+    : planSingleDrop(project, payload, layerId, pointerFrame, snapping, tolerance, playhead);
+}
+
+function planSingleDrop(
+  project: ProjectDocument,
+  payload: SinglePayload,
+  layerId: string,
+  pointerFrame: number,
+  snapping: boolean,
+  tolerance: number,
+  playhead: number,
+): DropPlan {
+  const layer = project.layers.find((item) => item.id === layerId)!;
   const clips = draggedClips(project, payload);
   const first = clips[0]!;
   const requested = Math.max(0, Math.round(pointerFrame - (payload.kind === 'clip' ? payload.grabFrame : 0)));

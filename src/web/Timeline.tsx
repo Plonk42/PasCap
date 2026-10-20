@@ -78,6 +78,10 @@ interface Props {
   assets: MediaAsset[];
   audioAssets: AudioAsset[];
   selectedClipId: string | null;
+  /** Every selected clip once two or more are selected, the primary one included. */
+  selectedClipIds: readonly string[];
+  onToggleClip: (id: string) => void;
+  onSelectTrackClips: (layerId: string) => void;
   selectedLayerId: string;
   onSelectLayer: (id: string) => void;
   selectedMusicId: string | null;
@@ -135,8 +139,33 @@ interface MoveContext {
   playhead: number;
 }
 
+const CLIP_STATES = [
+  ['selected', 'selected'],
+  ['grouped', 'grouped'],
+  ['activeLayer', 'active-layer'],
+  ['disabledLayer', 'disabled-layer'],
+  ['transformAnimated', 'transform-animated'],
+  ['moving', 'moving'],
+] as const;
+
+function clipClassName(state: Readonly<Record<(typeof CLIP_STATES)[number][0], boolean>>): string {
+  return ['timeline-clip', ...CLIP_STATES.filter(([key]) => state[key]).map(([, name]) => name)].join(' ');
+}
+
+function movingClipIds(payload: TimelinePayload | undefined): readonly string[] {
+  if (payload?.kind === 'group') return payload.clipIds;
+  return payload?.kind === 'clip' ? [payload.clipId] : [];
+}
+
+/** The last frame a drop ghost reaches, so the timeline can widen to show it. */
+function dropExtent(plan: DropPlan | null): number {
+  if (!plan) return 0;
+  return Math.max(plan.start + plan.duration, ...(plan.ghosts ?? []).map((ghost) => ghost.start + ghost.duration));
+}
+
 function dropLabel(plan: DropPlan): string {
   if (plan.error) return 'Placement cannot fit';
+  if (plan.ghosts) return `Move ${plan.ghosts.length} clips`;
   if (plan.mode === 'ripple') return 'Ripple insert';
   return plan.guide === null ? 'Move' : 'Snap';
 }
@@ -518,6 +547,8 @@ export function Timeline(props: Readonly<Props>) {
     assets,
     audioAssets,
     selectedClipId,
+    selectedClipIds,
+    onToggleClip,
     selectedLayerId,
     onSelectLayer,
     selectedMusicId,
@@ -732,7 +763,7 @@ export function Timeline(props: Readonly<Props>) {
       Math.max(
         layout.duration,
         musicEnd,
-        (dropPlan?.start ?? 0) + (dropPlan?.duration ?? 0),
+        dropExtent(dropPlan),
         keyframes.draft?.frame ?? 0,
         transformKeys.draft?.frame ?? 0,
         bookmarks.draft?.frame ?? 0,
@@ -1158,6 +1189,7 @@ export function Timeline(props: Readonly<Props>) {
     onRange: props.onTimeRange,
   });
 
+  const groupDrag = movement.current?.payload.kind === 'group' ? movement.current.payload : null;
   const interactionStatus = musicGesture
     ? musicGesture.error || `Music track · ${formatTimecode(musicGesture.start)} · release to apply · Esc cancels`
     : timelineInteractionMessage(
@@ -1202,6 +1234,7 @@ export function Timeline(props: Readonly<Props>) {
           frame={frame}
           disabled={interactionBlocked}
           timeRange={props.timeRange}
+          selectedCount={selectedClipIds.length}
           onSplit={onSplit}
           onDelete={onDelete}
           onQuickTrim={props.onQuickTrim}
@@ -1258,6 +1291,7 @@ export function Timeline(props: Readonly<Props>) {
           disabled={interactionBlocked}
           onScroll={scrollLayers}
           onSelect={onSelectLayer}
+          onSelectClips={props.onSelectTrackClips}
           onEdit={onEdit}
           onAdd={() => {
             const id = crypto.randomUUID();
@@ -1389,6 +1423,7 @@ export function Timeline(props: Readonly<Props>) {
               const currentPlaced = layout.clips.find((item) => item.clip.id === placed.clip.id) ?? placed;
               const clip = currentPlaced.clip;
               const isSelected = clip.id === selectedClipId;
+              const grouped = selectedClipIds.includes(clip.id);
               const offset =
                 drag.current?.edge === 'in' && drag.current.clip.id === clip.id
                   ? placed.duration - currentPlaced.duration
@@ -1397,7 +1432,14 @@ export function Timeline(props: Readonly<Props>) {
               const clipLayer = project.layers.find((layer) => layer.id === clip.layerId);
               return (
                 <div
-                  className={`timeline-clip ${isSelected ? 'selected' : ''} ${clip.layerId === selectedLayerId ? 'active-layer' : ''} ${clipLayer?.enabled ? '' : 'disabled-layer'} ${clipLayer?.transform.keyframes.length ? 'transform-animated' : ''} ${movement.current?.payload.kind === 'clip' && movement.current.payload.clipId === clip.id ? 'moving' : ''}`}
+                  className={clipClassName({
+                    selected: isSelected,
+                    grouped: grouped && !isSelected,
+                    activeLayer: clip.layerId === selectedLayerId,
+                    disabledLayer: !clipLayer?.enabled,
+                    transformAnimated: !!clipLayer?.transform.keyframes.length,
+                    moving: movingClipIds(movement.current?.payload).includes(clip.id),
+                  })}
                   key={clip.id}
                   data-clip-id={clip.id}
                   style={{
@@ -1426,8 +1468,12 @@ export function Timeline(props: Readonly<Props>) {
                         (event.clientX - event.currentTarget.getBoundingClientRect().left) / scale,
                       ),
                     );
+                    // Dragging a clip of the selection moves every selected clip.
+                    const group = grouped ? selectedClipIds : null;
                     movement.current = {
-                      payload: { kind: 'clip', clipId: clip.id, grabFrame },
+                      payload: group
+                        ? { kind: 'group', clipIds: group, clipId: clip.id, grabFrame }
+                        : { kind: 'clip', clipId: clip.id, grabFrame },
                       scale,
                       leading,
                       width,
@@ -1435,7 +1481,7 @@ export function Timeline(props: Readonly<Props>) {
                       playhead: frame,
                     };
                     onPause();
-                    onSelect(clip.id);
+                    if (!group) onSelect(clip.id);
                     event.dataTransfer.setData(CLIP_DRAG_TYPE, clip.id);
                     event.dataTransfer.effectAllowed = 'move';
                   }}
@@ -1457,10 +1503,14 @@ export function Timeline(props: Readonly<Props>) {
                   <button
                     className="timeline-clip-body"
                     aria-label={`Select ${name}, clip ${index + 1}`}
-                    aria-pressed={isSelected}
+                    aria-pressed={isSelected || grouped}
                     disabled={interactionBlocked}
-                    title={`${name} · ${project.layers.find((layer) => layer.id === clip.layerId)?.name} · ${placed.duration} timeline frames`}
+                    title={`${name} · ${project.layers.find((layer) => layer.id === clip.layerId)?.name} · ${placed.duration} timeline frames · Ctrl-click to select several clips`}
                     onClick={(event) => {
+                      if (event.ctrlKey || event.metaKey) {
+                        onToggleClip(clip.id);
+                        return;
+                      }
                       onSelect(clip.id);
                       onSeek(
                         Math.max(
@@ -1663,6 +1713,7 @@ export function Timeline(props: Readonly<Props>) {
                   data-drop-start={dropPlan.start}
                   data-drop-layer={dropPlan.layerId}
                   data-drop-valid={!dropPlan.error}
+                  data-drop-clip={groupDrag?.clipId}
                   style={{
                     top: rowTop(dropPlan.layerId),
                     left: leading + dropPlan.start * scale,
@@ -1673,6 +1724,23 @@ export function Timeline(props: Readonly<Props>) {
                     {dropLabel(dropPlan)} · {formatTimecode(dropPlan.start)}
                   </span>
                 </div>
+                {dropPlan.ghosts
+                  ?.filter((ghost) => ghost.clipId !== groupDrag?.clipId)
+                  .map((ghost) => (
+                    <div
+                      key={ghost.clipId}
+                      className={`timeline-drop-preview group-member ${dropPlan.error ? 'invalid' : ''}`}
+                      data-drop-start={ghost.start}
+                      data-drop-layer={ghost.layerId}
+                      data-drop-valid={!dropPlan.error}
+                      data-drop-clip={ghost.clipId}
+                      style={{
+                        top: rowTop(ghost.layerId),
+                        left: leading + ghost.start * scale,
+                        width: ghost.duration * scale,
+                      }}
+                    />
+                  ))}
                 <div
                   className={`timeline-drop-marker ${dropPlan.error ? 'invalid' : ''}`}
                   style={{

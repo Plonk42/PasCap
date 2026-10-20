@@ -11,6 +11,8 @@ interface Props {
   frame: number;
   disabled: boolean;
   timeRange: TimelineRange | null;
+  /** Clips selected together; deleting removes them all. */
+  selectedCount: number;
   onSplit: () => void;
   onDelete: () => void;
   onQuickTrim: (edge: 'in' | 'out') => void;
@@ -88,6 +90,7 @@ export function RushEditBar({
   frame,
   disabled,
   timeRange,
+  selectedCount,
   onSplit,
   onDelete,
   onQuickTrim,
@@ -100,6 +103,17 @@ export function RushEditBar({
   const canTrimIn = sourceFrame !== null && selected !== undefined && sourceFrame > selected.clip.sourceIn;
   const canTrimOut = sourceFrame !== null && selected !== undefined && sourceFrame + 1 < selected.clip.sourceOut;
   const error = cutRangeError(project, selected, timeRange);
+  let deleteName = 'Delete selected clip';
+  let deleteTitle = 'Remove this clip only; originals remain recoverable · Delete';
+  if (timeRange) {
+    deleteName = 'Delete selected range';
+    deleteTitle =
+      error ||
+      'Remove the selected range from the selected clip in one Undo step; this track’s Ripple setting controls gap closure · Delete';
+  } else if (selectedCount > 1) {
+    deleteName = 'Delete selected clips';
+    deleteTitle = `Remove the ${selectedCount} selected clips in one Undo step; originals remain recoverable · Delete`;
+  }
 
   return (
     <div className="rush-edit-bar" aria-label="Clip editing actions">
@@ -141,13 +155,8 @@ export function RushEditBar({
         <button
           type="button"
           className={`secondary-button small ${timeRange ? 'range-accent' : ''}`}
-          aria-label={timeRange ? 'Delete selected range' : 'Delete selected clip'}
-          title={
-            timeRange
-              ? error ||
-                'Remove the selected range from the selected clip in one Undo step; this track’s Ripple setting controls gap closure · Delete'
-              : 'Remove this clip only; originals remain recoverable · Delete'
-          }
+          aria-label={deleteName}
+          title={deleteTitle}
           disabled={disabled || (timeRange ? !!error : !selected)}
           onClick={timeRange ? onCutRange : onDelete}
         >

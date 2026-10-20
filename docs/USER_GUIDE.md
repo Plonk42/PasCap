@@ -258,6 +258,15 @@ preview transiently, commit once on valid release, and cancel with Escape.
 or the **first Ripple anchor only**. Later Ripple clips expose a tooltip reason:
 drag to reorder, or turn Ripple off in Track options to set an independent start.
 
+To move several clips together, **Ctrl-click** (Cmd-click) them, or use a track header's
+**Select all clips** icon to add a whole track; Ctrl-click a selected clip to remove it. The
+last one clicked is the clip **Clip** properties edit (solid outline). Drag any selected clip:
+clips from one track follow the pointer to another track, clips from several tracks only move
+in time. On a Ripple-on track they slot into the sequence instead of keeping their gaps. Every
+clip shows a ghost, and if any of them cannot go there all ghosts turn red and nothing moves.
+**Delete** removes all the selected clips and **Alt+←/→** nudges them, each in one Undo step.
+A plain click selects one clip again. Details: [timeline editing](TIMELINE_EDITING.md#insertion-reordering-and-history).
+
 **Bookmarks** mark times of interest, such as a beat, so edits snap to them. Press
 **M** or choose **Bookmark** in the timeline toolbar to add one at the playhead; on
 an existing bookmark the button deletes it instead. With a time range selected, the
@@ -831,6 +840,7 @@ storage/render breakdowns remain their existing expandable controls, not help bu
 | Unwanted timeline range                     | Drag on the ruler; Delete cuts; Escape clears the range                               |
 | Bookmarks                                   | M adds at the playhead; Shift+↑/↓ previous/next; focused: arrows move, Delete removes |
 | Clip actions                                | Ctrl+D duplicate (or right-click the clip); Delete/Backspace remove                   |
+| Several clips                               | Ctrl-click adds/removes a clip; drag one to move all; Delete and Alt+←/→ act on all   |
 | Session history                             | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo                                                   |
 | Positioned clip / first Ripple anchor nudge | Alt+←/→ one frame; Alt+Shift+←/→ ten; later Ripple starts require Ripple off          |
 | Focused trim handle                         | Arrows one source frame; Shift ten; left Home/right End restore                       |

@@ -63,6 +63,15 @@ import {
   type KeyframeInspection,
 } from './keyframe-navigation.js';
 import { clipStartRestriction } from './layer-actions.js';
+import {
+  addTrackClips,
+  applyClipSelection,
+  groupNudge,
+  groupWithin,
+  selectedClipIds,
+  toggleClip,
+  useClipGroup,
+} from './clip-selection.js';
 import { registerLivePreview } from './live-preview.js';
 import { MediaLibrary, type ReviewTarget } from './MediaLibrary.js';
 import { nextLayerName } from './move-to-track.js';
@@ -259,6 +268,7 @@ export function App() {
   const sourcePlayback = useRef<SourcePlayback | null>(null);
   const [review, reviews] = useReviewTarget(sourcePlayback);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const clipGroup = useClipGroup();
   const [selectedMusicId, setSelectedMusicId] = useState<string | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState(EMPTY_PROJECT.layers[0]!.id);
   const [keyframeInspection, setKeyframeInspection] = useState<KeyframeInspection | null>(null);
@@ -316,23 +326,43 @@ export function App() {
 
   const togglePanel = useCallback((panel: SidePanel) => toggleSidePanel(latestWorkspace.current, panel), []);
 
-  const select = useCallback((id: string) => {
-    selection.current = id;
-    setSelectedId(id);
-    setViewerMode('timeline');
-    const document = current.current;
-    const layerId = document?.clips.find((clip) => clip.id === id)?.layerId;
-    if (layerId) {
-      if (selectedLayer.current !== layerId) setKeyframeInspection(null);
-      selectedLayer.current = layerId;
-      setSelectedLayerId(layerId);
-    }
-    const transitions = document?.layers.find((item) => item.id === layerId)?.transitions;
-    // Follow the selection: the clip's incoming boundary, else its outgoing one.
-    const boundary =
-      transitions?.find((item) => item.rightId === id) ?? transitions?.find((item) => item.leftId === id);
-    setBoundaryId(boundary?.leftId ?? null);
-  }, []);
+  const select = useCallback(
+    (id: string) => {
+      selection.current = id;
+      setSelectedId(id);
+      clipGroup.set([]);
+      setViewerMode('timeline');
+      const document = current.current;
+      const layerId = document?.clips.find((clip) => clip.id === id)?.layerId;
+      if (layerId) {
+        if (selectedLayer.current !== layerId) setKeyframeInspection(null);
+        selectedLayer.current = layerId;
+        setSelectedLayerId(layerId);
+      }
+      const transitions = document?.layers.find((item) => item.id === layerId)?.transitions;
+      // Follow the selection: the clip's incoming boundary, else its outgoing one.
+      const boundary =
+        transitions?.find((item) => item.rightId === id) ?? transitions?.find((item) => item.leftId === id);
+      setBoundaryId(boundary?.leftId ?? null);
+    },
+    [clipGroup.set],
+  );
+  const toggleClipSelection = useCallback(
+    (id: string): void => {
+      if (drafting.current) return;
+      const next = toggleClip({ primary: selection.current, group: clipGroup.latest.current }, id);
+      applyClipSelection(next, selection.current, select, clipGroup.set);
+    },
+    [select, clipGroup.set, clipGroup.latest],
+  );
+  const selectTrackClips = useCallback(
+    (layerId: string): void => {
+      if (drafting.current || !current.current) return;
+      const selected = { primary: selection.current, group: clipGroup.latest.current };
+      applyClipSelection(addTrackClips(selected, current.current, layerId), selection.current, select, clipGroup.set);
+    },
+    [select, clipGroup.set, clipGroup.latest],
+  );
   const selectMusic = useCallback((id: string): void => {
     if (drafting.current || !current.current?.music.some((track) => track.id === id)) return;
     musicSelection.current = id;
@@ -401,6 +431,7 @@ export function App() {
         setBoundaryId(null);
       }
       const selectedClip = next.clips.find((clip) => clip.id === selection.current);
+      clipGroup.set(groupWithin(clipGroup.latest.current, next));
       if (!selectedClip && selection.current !== null) {
         const first = calculateLayout(next).clips.find((item) => item.clip.layerId === selectedLayer.current);
         if (first) select(first.clip.id);
@@ -418,7 +449,7 @@ export function App() {
         setKeyframeInspection(null);
       }
     },
-    [select],
+    [select, clipGroup.set, clipGroup.latest],
   );
   const commit = useCallback(
     (next: ProjectDocument, removed?: MediaRemoval, keepRange = false) => {
@@ -686,8 +717,9 @@ export function App() {
   }, [commit, timeRange, select]);
   const remove = useCallback(() => {
     if (timeRange) cutRange();
-    else if (selection.current && !drafting.current) edit({ type: 'delete', clipId: selection.current });
-  }, [edit, cutRange, timeRange]);
+    else if (selection.current && !drafting.current)
+      edit(selectedClipIds(clipGroup.latest.current, selection.current).map((clipId) => ({ type: 'delete', clipId })));
+  }, [edit, cutRange, timeRange, clipGroup.latest]);
   const addBookmark = useCallback(() => {
     if (!current.current || drafting.current) return;
     if (!calculateLayout(current.current).duration) {
@@ -732,6 +764,12 @@ export function App() {
   const nudge = useCallback(
     (delta: number) => {
       if (!current.current || !selection.current || drafting.current) return;
+      if (clipGroup.latest.current.length) {
+        const command = groupNudge(current.current, clipGroup.latest.current, delta);
+        if (typeof command === 'string') setError(command);
+        else edit(command);
+        return;
+      }
       const index = current.current.clips.findIndex((clip) => clip.id === selection.current);
       const clip = current.current.clips[index];
       if (!clip) return;
@@ -743,7 +781,7 @@ export function App() {
       const placed = calculateLayout(current.current).clips.find((item) => item.clip.id === clip.id)!;
       edit({ type: 'place', clipId: clip.id, layerId: clip.layerId, start: placed.start + delta, index });
     },
-    [edit],
+    [edit, clipGroup.latest],
   );
   // Slider drags show their value in the preview only: no document, history, autosave or Inspector change.
   const livePending = useRef<{ command: EditCommand | null } | null>(null);
@@ -796,6 +834,7 @@ export function App() {
       setBoundaryId(null);
       selection.current = null;
       setSelectedId(null);
+      clipGroup.set([]);
       musicSelection.current = loaded.music[0]?.id ?? null;
       setSelectedMusicId(musicSelection.current);
       selectedLayer.current = loaded.layers[0]!.id;
@@ -865,6 +904,7 @@ export function App() {
     setBoundaryId(null);
     selection.current = null;
     setSelectedId(null);
+    clipGroup.set([]);
     musicSelection.current = null;
     setSelectedMusicId(null);
     selectedLayer.current = EMPTY_PROJECT.layers[0]!.id;
@@ -1219,6 +1259,7 @@ export function App() {
   const selectLayer = useCallback(
     (id: string): void => {
       if (drafting.current) return;
+      clipGroup.set([]);
       if (selectedLayer.current !== id) setKeyframeInspection(null);
       setViewerMode('timeline');
       selectedLayer.current = id;
@@ -2149,6 +2190,9 @@ export function App() {
             assets={assets}
             audioAssets={audioAssets}
             selectedClipId={selectedId}
+            selectedClipIds={clipGroup.group}
+            onToggleClip={toggleClipSelection}
+            onSelectTrackClips={selectTrackClips}
             selectedLayerId={selectedLayerId}
             onSelectLayer={selectLayer}
             selectedMusicId={selectedMusicId}

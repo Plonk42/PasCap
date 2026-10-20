@@ -120,6 +120,7 @@ export function Layers({
   disabled,
   onScroll,
   onSelect,
+  onSelectClips,
   onEdit,
   onAdd,
 }: Readonly<{
@@ -131,6 +132,8 @@ export function Layers({
   disabled: boolean;
   onScroll: (top: number) => void;
   onSelect: (id: string) => void;
+  /** Adds every clip of the track to the clip selection. */
+  onSelectClips: (id: string) => void;
   onEdit: (command: EditCommand) => void;
   onAdd: () => void;
 }>) {
@@ -229,6 +232,19 @@ export function Layers({
                   onClick={() => onEdit({ type: 'layer-update', layer: { ...layer, ripple: !layer.ripple } })}
                 >
                   <Icon name="ripple" size={15} />
+                </button>
+                <button
+                  className="icon-button layer-select-clips"
+                  aria-label={`Select all clips on ${layer.name}`}
+                  title={
+                    project.clips.some((clip) => clip.layerId === layer.id)
+                      ? 'Add every clip of this track to the selection; drag one to move them together'
+                      : 'This track has no clips to select'
+                  }
+                  disabled={disabled || !project.clips.some((clip) => clip.layerId === layer.id)}
+                  onClick={() => onSelectClips(layer.id)}
+                >
+                  <Icon name="select-all" size={15} />
                 </button>
                 <Popover label={`Track options ${layer.name}`} className="layer-options">
                   {(close) => (

@@ -1,4 +1,5 @@
 import type { ColourSettings } from './colour.js';
+import { arrangeClipGroup } from './clip-group.js';
 import {
   defaultKeyframe,
   EMPTY_KEY_VALUES,
@@ -67,6 +68,8 @@ export type EditCommand =
   | { type: 'layer-remove'; layerId: string }
   | { type: 'layer-order'; layerIds: string[] }
   | { type: 'place'; clipId: string; layerId: string; start: number; index: number }
+  /** Moves selected clips together; see `arrangeClipGroup`. */
+  | { type: 'move-clips'; clipIds: string[]; delta: number; layerId: string | null }
   | { type: 'transition'; transition: Transition }
   | { type: 'fades'; layerId: string; opening: number; closing: number }
   | { type: 'bookmark-add'; frame: number }
@@ -537,6 +540,13 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'place':
       placeClip(next, index, command, before, anchors);
       break;
+    case 'move-clips': {
+      const arrangement = arrangeClipGroup(next, before, command);
+      next.clips = arrangement.clips;
+      repairLayerBoundaries(next, arrangement.layerIds);
+      for (const [layerId, start] of arrangement.anchors) anchors.set(layerId, start);
+      break;
+    }
     case 'transition':
       setTransition(next, command.transition, before);
       break;

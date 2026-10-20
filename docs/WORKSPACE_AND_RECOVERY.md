@@ -139,6 +139,9 @@ preview still block mutations.
 
 **Track options → Ripple** is a native checkbox with contextual help; the track
 header's Ripple toggle icon shows and switches the same setting. New tracks default on.
+The header's **Select all clips** icon adds the track's clips to the clip selection, which
+Ctrl/Cmd-click on clips also builds; Delete and Alt+arrows then act on every selected clip
+([multi-clip moves](TIMELINE_EDITING.md#insertion-reordering-and-history)).
 Track options contains only rename, Ripple,
 raise/lower and delete; visibility remains a separate sidebar control.
 **Track → Colour** contains the single **Opacity** native slider/exact
