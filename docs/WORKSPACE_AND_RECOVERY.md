@@ -601,8 +601,8 @@ whole recording. There are no Mark IN/OUT buttons and no
 static selected/omitted-frame summary: the strip and exact fields show the range,
 while inline text appears only for drag hints and invalid numeric drafts; Escape
 restores unapplied numeric drafts.
-Applied choices are per-project browser-local state; unavailable storage leaves
-valid choices usable for the current session with a warning. All insertion paths
+Applied choices are the recording's kept ranges in the project (`selects`, one Undo step each,
+[kept ranges](TIMELINE_EDITING.md#kept-ranges)); a rejected range stays an inline error. All insertion paths
 copy the latest applied range and create independent clip instances. Changing a
 choice never alters existing clips. **Add clip** leaves the same source chosen
 and open, at the same range/frame, with **Clip added · mark another range** feedback

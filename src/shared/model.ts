@@ -14,6 +14,8 @@ export const MAX_MUSIC_TRACKS = 8;
 /** Clips per music track; with crossfades at most two sound at once on a track. */
 export const MAX_MUSIC_CLIPS = 8;
 export const MAX_BOOKMARKS = 1_000;
+/** Kept ranges per recording. */
+export const MAX_SELECTS = 100;
 export const MAX_TRACK_KEYFRAMES = 256;
 
 export const idSchema = z.string().regex(/^[a-zA-Z0-9_-]{1,100}$/);
@@ -187,8 +189,33 @@ export const bookmarksSchema = z
     message: 'Bookmarks must be unique ascending project frames.',
   });
 
+/** A kept source range of a recording; OUT is exclusive. */
+export const selectRangeSchema = z
+  .object({ sourceIn: frameSchema, sourceOut: frameSchema.positive() })
+  .strict()
+  .refine((range) => range.sourceOut > range.sourceIn, { message: 'Source OUT must be after IN (exclusive).' });
+export type SelectRange = z.infer<typeof selectRangeSchema>;
+
+/** Ascending and separated by at least one frame: touching ranges are one range. */
+export function orderedSelectRanges(ranges: readonly SelectRange[]): boolean {
+  return ranges.every((range, index) => index === 0 || range.sourceIn > ranges[index - 1]!.sourceOut);
+}
+
+/**
+ * The ranges the user kept of each recording in the bin. No entry means the whole recording is
+ * available; an empty list is invalid. Clips may still use other frames; only assistant sessions are bound.
+ */
+export const selectsSchema = z.record(
+  idSchema,
+  z
+    .array(selectRangeSchema)
+    .min(1)
+    .max(MAX_SELECTS)
+    .refine(orderedSelectRanges, { message: 'Selects must be ascending and separated by at least one frame.' }),
+);
+
 /** The only accepted project schema; bump it for every incompatible change. */
-export const PROJECT_SCHEMA_VERSION = 24;
+export const PROJECT_SCHEMA_VERSION = 25;
 
 const baseProjectSchema = z
   .object({
@@ -213,6 +240,7 @@ const baseProjectSchema = z
     clips: z.array(clipSchema).max(1_000),
     music: musicTracksSchema,
     bookmarks: bookmarksSchema,
+    selects: selectsSchema,
     revision: frameSchema,
   })
   .strict();
@@ -227,6 +255,14 @@ export type MusicTransition = z.infer<typeof musicTransitionSchema>;
 export type VideoLayer = ProjectDocument['layers'][number];
 
 export const projectSchema = baseProjectSchema.superRefine((project, context) => {
+  const bin = new Set(project.media.videoIds);
+  for (const mediaId of Object.keys(project.selects)) {
+    if (!bin.has(mediaId))
+      context.addIssue({
+        code: 'custom',
+        message: `Selects refer to ${mediaId}, which is not in the project's recordings.`,
+      });
+  }
   try {
     calculateLayout(project);
   } catch (error) {
@@ -262,6 +298,7 @@ export function createProject(id: string, title: string): ProjectDocument {
     clips: [],
     music: [],
     bookmarks: [],
+    selects: {},
     revision: 0,
   });
 }

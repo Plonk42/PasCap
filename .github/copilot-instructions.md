@@ -127,6 +127,10 @@ edits real projects with it, so saved data must keep working. Details are in
   Navigation never edits,
   saves or creates history. See [speed/audio](../docs/SPEED_AND_AUDIO.md) and
   [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
+- Projects require `selects`: per recording in `media.videoIds`, 1–100 ascending kept source ranges separated by at
+  least one frame (no entry = whole recording, `[]` invalid), set by `select-set`/`select-narrow` and Source preview's
+  applied range (the active range). They never retime, render or export and clips may use other frames. See
+  [timeline](../docs/TIMELINE_EDITING.md#kept-ranges).
 - #143: projects require `bookmarks`: 0–1,000 unique ascending project
   frames, `[]` on new projects. They are extra `snapPoints()` for every snapping gesture,
   slide through `useKeyframeSlide` (a dragged bookmark never snaps to itself) and never

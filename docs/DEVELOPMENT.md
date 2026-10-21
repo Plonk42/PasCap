@@ -566,7 +566,7 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
 - Keep **the strict current schema**: required project `bookmarks` (at most 1,000 unique ascending
-  frames, editing aids only) and complete required video track `colour`, including
+  frames, editing aids only) and `selects` (kept source ranges per recording) and complete required video track `colour`, including
   Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves; reject saved `clip.colour`
   and `clip.correction`. Grade sources once with evaluated track Colour, retaining
   two LUT buffers and existing raw/process budgets. Main Colour controls and keyframes

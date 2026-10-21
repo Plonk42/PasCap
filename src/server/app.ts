@@ -131,8 +131,8 @@ async function assertProjectSources(
   document.media.audioIds.forEach((id) => audio.get(id));
   const sources = new Map<string, { sourcePath: string; fingerprint: SourceFingerprint }>();
   const frameCounts = new Map(
-    document.clips.map((clip) => {
-      const asset = library.get(clip.mediaId);
+    [...document.clips.map((clip) => clip.mediaId), ...Object.keys(document.selects)].map((mediaId) => {
+      const asset = library.get(mediaId);
       return [asset.id, asset.metadata.frameCount] as const;
     }),
   );

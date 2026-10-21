@@ -104,6 +104,25 @@ describe('project compatibility', () => {
     expect(upgrade([null]).music).toEqual([null]);
   });
 
+  it('upgrades schema-24 projects with no kept ranges, so every whole recording stays available', async () => {
+    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-24.json'), 'utf8')) as Record<string, unknown>;
+    const before = structuredClone(saved);
+    const upgraded = projectSchema.parse(upgradeProject(saved));
+    expect(saved).toEqual(before);
+    expect(upgraded.selects).toEqual({});
+    const { selects: _selects, schemaVersion: _version, ...rest } = upgraded;
+    const { schemaVersion: _saved, ...expected } = saved;
+    expect(rest).toEqual(expected);
+  });
+
+  it('keeps the kept ranges of a schema-25 project through the load', async () => {
+    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-25.json'), 'utf8')) as {
+      selects: Record<string, unknown>;
+    };
+    expect(Object.keys(saved.selects).length).toBeGreaterThan(1);
+    expect(projectSchema.parse(upgradeProject(saved)).selects).toEqual(saved.selects);
+  });
+
   it('rejects versions outside the supported range with the reason', () => {
     expect(() => upgradeProject({ schemaVersion: OLDEST_PROJECT_SCHEMA_VERSION - 1 })).toThrow('cannot be upgraded');
     expect(() => upgradeProject({ schemaVersion: PROJECT_SCHEMA_VERSION + 1 })).toThrow(

@@ -39,8 +39,13 @@ function musicTracksWithClips(document: SavedProject): SavedProject {
   };
 }
 
+/** Schema 25: no recording has kept ranges yet, so every whole recording stays available. */
+function withSelects(document: SavedProject): SavedProject {
+  return { ...document, selects: {} };
+}
+
 /** `MIGRATIONS[v]` upgrades a document saved with schema `v` to schema `v + 1`; it never mutates its input. */
-const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = { 23: musicTracksWithClips };
+const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = { 23: musicTracksWithClips, 24: withSelects };
 
 export function supportedProjectVersions(): string {
   return OLDEST_PROJECT_SCHEMA_VERSION === PROJECT_SCHEMA_VERSION
