@@ -1,12 +1,13 @@
 import { z } from 'zod';
 import { clamp01, decode709, encode709, type ColourSettings, type LocalToneSetting } from './colour.js';
+import { described } from './described.js';
 
 /** Clip-owned static detail filters; see docs/design/DETAIL_FILTERS.md. */
 export const detailSchema = z
   .object({
-    sharpen: z.number().min(0).max(2),
-    clarity: z.number().min(-1).max(1),
-    denoise: z.number().min(0).max(1),
+    sharpen: described(z.number().min(0).max(2), 'Fine-edge sharpening, neutral 0.'),
+    clarity: described(z.number().min(-1).max(1), 'Midtone local contrast, neutral 0; negative softens.'),
+    denoise: described(z.number().min(0).max(1), 'Edge-preserving noise reduction, neutral 0.'),
   })
   .strict();
 

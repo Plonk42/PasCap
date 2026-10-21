@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { described } from './described.js';
 import {
   EASING_MISMATCH,
   easingMatchesValues,
@@ -9,7 +10,8 @@ import {
 } from './keyframes.js';
 
 // Zod numbers already reject NaN and infinities; no coercion or persisted defaults.
-const cropFraction = z.number().min(0).max(1);
+const cropFraction = (edge: string) =>
+  described(z.number().min(0).max(1), `Fraction of the recording's ${edge} removed, neutral 0.`);
 
 /**
  * Crop removes source coverage; it never refits or moves the original-centre pivot.
@@ -17,14 +19,23 @@ const cropFraction = z.number().min(0).max(1);
  */
 export const spatialPoseSchema = z
   .object({
-    cropLeft: cropFraction,
-    cropRight: cropFraction,
-    cropTop: cropFraction,
-    cropBottom: cropFraction,
-    scale: z.number().min(0.1).max(8),
-    translateX: z.number().min(-2).max(2),
-    translateY: z.number().min(-2).max(2),
-    rotation: z.number().min(-180).max(180),
+    cropLeft: cropFraction('width from the left'),
+    cropRight: cropFraction('width from the right'),
+    cropTop: cropFraction('height from the top'),
+    cropBottom: cropFraction('height from the bottom'),
+    scale: described(z.number().min(0.1).max(8), 'Uniform scale of the fitted picture, neutral 1.'),
+    translateX: described(
+      z.number().min(-2).max(2),
+      'Horizontal offset in output widths, neutral 0; positive moves right.',
+    ),
+    translateY: described(
+      z.number().min(-2).max(2),
+      'Vertical offset in output heights, neutral 0; positive moves down.',
+    ),
+    rotation: described(
+      z.number().min(-180).max(180),
+      'Clockwise rotation in degrees around the picture centre, neutral 0.',
+    ),
   })
   .strict();
 
@@ -57,11 +68,20 @@ export type SpatialKeyValues = z.infer<typeof spatialKeyValuesSchema>;
 
 export const spatialKeyframeSchema = z
   .object({
-    frame: z.number().int().nonnegative().max(2_147_483_647),
-    values: spatialKeyValuesSchema,
-    easing: easingSchema(SPATIAL_CHANNELS),
+    frame: described(
+      z.number().int().nonnegative().max(2_147_483_647),
+      'Project frame of the keyframe; it may lie after the project end.',
+    ),
+    values: described(
+      spatialKeyValuesSchema,
+      'The value of each setting keyed here, or null for a setting not keyed here; at least one is a number.',
+    ),
+    easing: described(easingSchema(SPATIAL_CHANNELS), 'The Easing of each keyed setting toward its next keyframe.'),
     /** A default keyframe never extends its values to frames before it. */
-    reset: z.boolean(),
+    reset: described(
+      z.boolean(),
+      'True for a default keyframe: its values hold from its frame on and never reach back to earlier frames.',
+    ),
   })
   .strict()
   .refine(easingMatchesValues, { message: EASING_MISMATCH });
@@ -70,11 +90,14 @@ export type SpatialKeyframe = z.infer<typeof spatialKeyframeSchema>;
 
 export const spatialSettingsSchema = z
   .object({
-    base: spatialPoseSchema,
-    keyframes: z
-      .array(spatialKeyframeSchema)
-      .max(256)
-      .refine(orderedKeys, { message: 'Transform keyframes must have unique ascending project frames.' }),
+    base: described(spatialPoseSchema, 'The pose of settings without keyframes.'),
+    keyframes: described(
+      z
+        .array(spatialKeyframeSchema)
+        .max(256)
+        .refine(orderedKeys, { message: 'Transform keyframes must have unique ascending project frames.' }),
+      'Transform keyframes at unique ascending project frames, at most 256.',
+    ),
   })
   .strict();
 

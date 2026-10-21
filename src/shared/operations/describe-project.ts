@@ -1,8 +1,7 @@
 import { z } from 'zod';
+import { described } from '../described.js';
 import { frameSchema, idSchema, musicTransitionSchema, selectRangeSchema, transitionSchema } from '../model.js';
 import { defineOperation } from './spec.js';
-
-const described = <S extends z.ZodType>(schema: S, description: string): S => schema.meta({ description });
 
 const span = {
   start: described(frameSchema, 'First project frame.'),

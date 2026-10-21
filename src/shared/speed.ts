@@ -1,24 +1,31 @@
 import { z } from 'zod';
+import { described } from './described.js';
 import { interpolationSchema, orderedKeys } from './keyframes.js';
 import { compileClipSpeedCurve, curveRateAt } from './speed-curve.js';
 
-const rate = z.number().min(0.1).max(8);
+const rate = described(z.number().min(0.1).max(8), 'Playback rate, 0.1–8; 1 is normal speed.');
 export const MAX_CLIP_SPEED_KEYS = 256;
 export const speedCurveKeyframeSchema = z
   .object({
-    frame: z.number().int().nonnegative().max(2_147_483_647),
+    frame: described(
+      z.number().int().nonnegative().max(2_147_483_647),
+      'Original source frame of the keyframe; it may lie outside the clip range.',
+    ),
     rate,
-    interpolation: interpolationSchema,
+    interpolation: described(interpolationSchema, 'Easing of the rate toward the next keyframe.'),
   })
   .strict();
 export const speedCurveSchema = z
   .object({
     mode: z.literal('curve'),
-    keyframes: z
-      .array(speedCurveKeyframeSchema)
-      .min(1)
-      .max(MAX_CLIP_SPEED_KEYS)
-      .refine(orderedKeys, { message: 'Clip speed keyframes must have unique ascending source frames.' }),
+    keyframes: described(
+      z
+        .array(speedCurveKeyframeSchema)
+        .min(1)
+        .max(MAX_CLIP_SPEED_KEYS)
+        .refine(orderedKeys, { message: 'Clip speed keyframes must have unique ascending source frames.' }),
+      '1–256 keyframes at unique ascending source frames; the first and last rates hold beyond them.',
+    ),
   })
   .strict();
 export type SpeedCurveKeyframe = z.infer<typeof speedCurveKeyframeSchema>;
