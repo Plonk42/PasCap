@@ -1,8 +1,12 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { z, ZodError } from 'zod';
+import { ZodError, type ZodType } from 'zod';
 import { operations } from '../shared/operations/index.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { assertNoSymlinks } from './files.js';
@@ -11,12 +15,11 @@ import { runOperation } from './operations/index.js';
 import { atomicWrite } from './storage.js';
 
 /**
- * A stateless Streamable HTTP MCP endpoint: every request is one JSON-RPC message answered with
- * JSON, no session or event stream. The tools are the operations whose audience includes the
+ * The MCP SDK's server in stateless Streamable HTTP mode: each request gets its own server and
+ * transport, answered with JSON. The tools are the operations whose audience includes the
  * assistant, so the registry stays the only place a capability is described.
  */
 export const MCP_PATH = '/mcp';
-export const MCP_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26'] as const;
 
 const INSTRUCTIONS = [
   'PasCap edits drone-flight video projects. Frames are integers at 30000/1001 fps; outputs also give MM:SS:FF timecodes.',
@@ -26,26 +29,6 @@ const INSTRUCTIONS = [
 ].join(' ');
 
 const assistantOperations = operations.filter((operation) => operation.audience.includes('assistant'));
-
-interface JsonRpcRequest {
-  jsonrpc: '2.0';
-  id: string | number;
-  method: string;
-  params?: Record<string, unknown>;
-}
-interface ToolResult {
-  content: ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[];
-  isError?: boolean;
-}
-
-class JsonRpcError extends Error {
-  constructor(
-    readonly code: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
 
 /** The bearer token MCP clients send; created once in the data directory, readable by its owner only. */
 export async function mcpToken(dataDir: string): Promise<string> {
@@ -76,17 +59,8 @@ function failureText(error: unknown): string {
     : errorMessage(error);
 }
 
-export function mcpTools() {
-  return assistantOperations.map((operation) => ({
-    name: operation.name,
-    description: operation.description,
-    inputSchema: z.toJSONSchema(operation.input, { io: 'input' }),
-    annotations: { readOnlyHint: operation.access === 'read', openWorldHint: false },
-  }));
-}
-
 /** Pictures become image content beside their legend; everything else is JSON text. */
-export function toolResult(output: unknown): ToolResult {
+export function toolResult(output: unknown): CallToolResult {
   if (output && typeof output === 'object' && 'image' in output) {
     const { image, ...rest } = output as { image: { data: string; mimeType: string } };
     return {
@@ -99,50 +73,24 @@ export function toolResult(output: unknown): ToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(output) }] };
 }
 
-async function callTool(context: ServiceContext, params: Record<string, unknown> | undefined): Promise<ToolResult> {
-  const name = params?.['name'];
-  const operation = assistantOperations.find((candidate) => candidate.name === name);
-  if (!operation)
-    throw new JsonRpcError(-32602, `Unknown tool ${typeof name === 'string' ? name : JSON.stringify(name)}.`);
-  try {
-    return toolResult(await runOperation(operation, context, params?.['arguments'] ?? {}));
-  } catch (error) {
-    // The model reads the service's reason and can correct its call.
-    return { content: [{ type: 'text', text: failureText(error) }], isError: true };
+export function mcpServer(context: ServiceContext): McpServer {
+  const server = new McpServer({ name: 'pascap', title: 'PasCap', version: '0.1.0' }, { instructions: INSTRUCTIONS });
+  for (const operation of assistantOperations) {
+    const config = {
+      description: operation.description,
+      inputSchema: operation.input as ZodType,
+      annotations: { readOnlyHint: operation.access === 'read', openWorldHint: false },
+    };
+    server.registerTool(operation.name, config, async (input: unknown) => {
+      try {
+        return toolResult(await runOperation(operation, context, input));
+      } catch (error) {
+        // The model reads the service's reason and can correct its call.
+        return { content: [{ type: 'text', text: failureText(error) }], isError: true };
+      }
+    });
   }
-}
-
-async function answer(context: ServiceContext, message: JsonRpcRequest): Promise<unknown> {
-  switch (message.method) {
-    case 'initialize': {
-      const requested = message.params?.['protocolVersion'];
-      const version = MCP_PROTOCOL_VERSIONS.find((supported) => supported === requested) ?? MCP_PROTOCOL_VERSIONS[0];
-      return {
-        protocolVersion: version,
-        capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: 'pascap', title: 'PasCap', version: '0.1.0' },
-        instructions: INSTRUCTIONS,
-      };
-    }
-    case 'ping':
-      return {};
-    case 'tools/list':
-      return { tools: mcpTools() };
-    case 'tools/call':
-      return callTool(context, message.params);
-    default:
-      throw new JsonRpcError(-32601, `Method ${message.method} is not supported.`);
-  }
-}
-
-function isRequest(message: unknown): message is JsonRpcRequest {
-  return (
-    typeof message === 'object' &&
-    message !== null &&
-    !Array.isArray(message) &&
-    (message as { jsonrpc?: unknown }).jsonrpc === '2.0' &&
-    typeof (message as { method?: unknown }).method === 'string'
-  );
+  return server;
 }
 
 /** `/mcp` for MCP clients: loopback Host and Origin checks as every route, plus the bearer token. */
@@ -150,24 +98,20 @@ export function registerMcp(app: FastifyInstance, context: ServiceContext, token
   app.post(MCP_PATH, async (request, reply) => {
     if (!authorized(request, token))
       return reply.code(401).send({ error: 'Send the PasCap MCP token as Authorization: Bearer <token>.' });
-    const version = request.headers['mcp-protocol-version'];
-    if (
-      version !== undefined &&
-      !(typeof version === 'string' && (MCP_PROTOCOL_VERSIONS as readonly string[]).includes(version))
-    )
-      return reply.code(400).send({ error: `Unsupported MCP protocol version ${String(version)}.` });
-    const message: unknown = request.body;
-    if (!isRequest(message))
-      return reply
-        .code(400)
-        .send({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'Send one JSON-RPC 2.0 message.' } });
-    // Notifications and responses need no answer.
-    if (!('id' in message) || message.id === null) return reply.code(202).send();
+    const server = mcpServer(context);
+    const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });
+    reply.hijack();
+    reply.raw.on('close', () => void server.close());
     try {
-      return { jsonrpc: '2.0', id: message.id, result: await answer(context, message) };
+      // The SDK's own transport type does not satisfy its interface under exactOptionalPropertyTypes.
+      await server.connect(transport as unknown as Transport);
+      await transport.handleRequest(request.raw, reply.raw, request.body);
     } catch (error) {
-      const code = error instanceof JsonRpcError ? error.code : -32603;
-      return { jsonrpc: '2.0', id: message.id, error: { code, message: errorMessage(error) } };
+      request.log.error(error);
+      if (!reply.raw.headersSent)
+        reply.raw
+          .writeHead(500, { 'content-type': 'application/json' })
+          .end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32603, message: errorMessage(error) } }));
     }
   });
   // No server-initiated stream and no session to end.

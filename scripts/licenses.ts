@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { forEachSerial } from '../src/shared/serial.js';
 
-const reviewedLicenses = new Set(['MIT', 'ISC', 'BSD-3-Clause', 'BlueOak-1.0.0']);
+const reviewedLicenses = new Set(['MIT', 'ISC', 'BSD-2-Clause', 'BSD-3-Clause', 'BlueOak-1.0.0']);
 // The current build emits Vite preload and Rolldown module-interop helpers.
 // Retain their upstream notices, not the whole development dependency tree.
 const emittedHelpers = new Set(['node_modules/vite', 'node_modules/rolldown']);
