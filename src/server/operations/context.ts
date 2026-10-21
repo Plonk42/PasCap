@@ -8,7 +8,7 @@ import type { ProjectStore } from '../storage.js';
 
 /** What operations may use of the service. */
 export interface ServiceContext {
-  projects: Pick<ProjectStore, 'load' | 'save'>;
+  projects: Pick<ProjectStore, 'list' | 'load' | 'save'>;
   library: Pick<MediaLibrary, 'get'>;
   audio: Pick<AudioLibrary, 'get'>;
   stills: Pick<StillRenderer, 'still' | 'timelineSheet' | 'recordingSheet'>;

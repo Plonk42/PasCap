@@ -110,6 +110,10 @@ describe('MCP endpoint', () => {
         payload: { title: 'Flight' },
       });
       const projectId = created.json<{ document: { id: string } }>().document.id;
+      const listed = JSON.parse(text(await client.callTool({ name: 'list_projects', arguments: {} })));
+      expect(listed.projects.map((entry: { id: string; title: string }) => [entry.id, entry.title])).toEqual([
+        [projectId, 'Flight'],
+      ]);
       const described = JSON.parse(text(await client.callTool({ name: 'describe_project', arguments: { projectId } })));
       expect(described).toMatchObject({ id: projectId, revision: 1, bookmarks: [] });
 

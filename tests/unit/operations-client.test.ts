@@ -15,14 +15,16 @@ afterEach(() => {
 describe('callOperation', () => {
   it('posts the input to the operation route and returns its validated output', async () => {
     fetchMock.mockResolvedValue(
-      new Response(JSON.stringify({ revision: 3, duration: { frames: 60, timecode: '00:02:00' } }), { status: 200 }),
+      new Response(JSON.stringify({ revision: 3, duration: { frames: 60, seconds: 2, timecode: '00:02:00' } }), {
+        status: 200,
+      }),
     );
     const result = await callOperation('edit', {
       projectId: 'flight',
       expectedRevision: 2,
       commands: [{ type: 'bookmark-add', frame: 30 }],
     });
-    expect(result).toEqual({ revision: 3, duration: { frames: 60, timecode: '00:02:00' } });
+    expect(result).toEqual({ revision: 3, duration: { frames: 60, seconds: 2, timecode: '00:02:00' } });
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe('/api/ops/edit');
     expect(init?.method).toBe('POST');

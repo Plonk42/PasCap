@@ -4,6 +4,7 @@ import { keyframeSettingSchema } from '../keyframes.js';
 import { frameSchema, idSchema, layerSchema } from '../model.js';
 import { SPATIAL_CHANNELS, spatialPoseSchema, type SpatialChannel } from '../spatial.js';
 import { defineOperation } from './spec.js';
+import { timecodeSchema } from './timecode.js';
 
 export const MAX_DESCRIBED_FRAMES = 32;
 
@@ -36,7 +37,7 @@ export const trackDescriptionSchema = z
         z
           .object({
             frame: frameSchema,
-            timecode: z.string(),
+            timecode: timecodeSchema,
             values: described(
               z.record(keyframeSettingSchema, z.number()),
               'Opacity and every scalar Colour setting as they apply at this frame.',
