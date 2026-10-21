@@ -69,19 +69,21 @@ This is not static hosting, LAN/SaaS deployment or a completed container recipe.
 
 ## Configuration and storage
 
-| Variable                            | Meaning                                                                                                                                                                                      |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PASCAP_DATA_DIR`                   | Generated-data directory; defaults to the ignored `.pascap/`                                                                                                                                 |
-| `PASCAP_MEDIA_ROOTS`                | JSON array of up to 32 unique absolute roots shared by footage/music browsing; defaults to the service user's Videos folder; `[]` disables both browsers, not deliberate manual path imports |
-| `PASCAP_PORT`                       | Unprivileged loopback service port, default 4318                                                                                                                                             |
-| `PASCAP_FFMPEG` / `PASCAP_FFPROBE`  | Native executable paths, otherwise resolved from PATH                                                                                                                                        |
-| `PASCAP_MEASURE_URL`                | Editor URL/project used by the optional measurement helper                                                                                                                                   |
-| `PASCAP_CHROME`                     | Browser for the export GPU compositor, otherwise `google-chrome` or `chromium` from PATH                                                                                                     |
-| `PASCAP_GPU_COMPOSITING`            | `auto` (default) composites detail/HDR export groups on a hardware GPU when one starts; `off` always uses the CPU compositor                                                                 |
-| `PASCAP_HW_DECODE`                  | `auto` (default) decodes undamaged originals for proxy encodes with NVDEC when a CUDA device starts; `off` always uses the CPU decoder                                                       |
-| `PASCAP_ASSISTANT_STILL_WIDTH`      | Largest still width and crop side the picture operations render, 160–1280, default 480 ([stills](design/ASSISTANT_MCP.md#stills-and-contact-sheets))                                         |
-| `PASCAP_ASSISTANT_SHEET_CELL_WIDTH` | Width of each contact-sheet cell, 96–640, default 240                                                                                                                                        |
-| `PASCAP_ASSISTANT_SHEET_CELLS`      | Frames per contact sheet, 1–24, default 9                                                                                                                                                    |
+| Variable                            | Meaning                                                                                                                                                                                            |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PASCAP_DATA_DIR`                   | Generated-data directory; defaults to the ignored `.pascap/`                                                                                                                                       |
+| `PASCAP_MEDIA_ROOTS`                | JSON array of up to 32 unique absolute roots shared by footage/music browsing; defaults to the service user's Videos folder; `[]` disables both browsers, not deliberate manual path imports       |
+| `PASCAP_PORT`                       | Unprivileged loopback service port, default 4318                                                                                                                                                   |
+| `PASCAP_FFMPEG` / `PASCAP_FFPROBE`  | Native executable paths, otherwise resolved from PATH                                                                                                                                              |
+| `PASCAP_MEASURE_URL`                | Editor URL/project used by the optional measurement helper                                                                                                                                         |
+| `PASCAP_CHROME`                     | Browser for the export GPU compositor, otherwise `google-chrome` or `chromium` from PATH                                                                                                           |
+| `PASCAP_GPU_COMPOSITING`            | `auto` (default) composites detail/HDR export groups on a hardware GPU when one starts; `off` always uses the CPU compositor                                                                       |
+| `PASCAP_HW_DECODE`                  | `auto` (default) decodes undamaged originals for proxy encodes with NVDEC when a CUDA device starts; `off` always uses the CPU decoder                                                             |
+| `PASCAP_ASSISTANT_STILL_WIDTH`      | Largest still width and crop side the picture operations render, 160–1280, default 480 ([stills](design/ASSISTANT_MCP.md#stills-and-contact-sheets))                                               |
+| `PASCAP_ASSISTANT_SHEET_CELL_WIDTH` | Width of each contact-sheet cell, 96–640, default 240                                                                                                                                              |
+| `PASCAP_ASSISTANT_SHEET_CELLS`      | Frames per contact sheet, 1–24, default 9                                                                                                                                                          |
+| `PASCAP_ASSISTANT_LEASE_MINUTES`    | An assistant session ends after this many minutes without a call on its project, 1–240, default 10 ([sessions](design/ASSISTANT_MCP.md#assistant-session-and-checkpoint-service-files-not-schema)) |
+| `PASCAP_ASSISTANT_CHECKPOINTS`      | Checkpoints kept per project, oldest removed first, 1–50, default 5                                                                                                                                |
 
 For example, start with an explicit approved root (literal `~` is not expanded):
 
@@ -466,9 +468,10 @@ Host and Origin checks. In VS Code, add to `.vscode/mcp.json` (or the user `mcp.
 
 The endpoint is the official MCP SDK v2 handler (`@modelcontextprotocol/server`), serving the
 2026-07-28 protocol revision and stateless 2025-era clients from [mcp.ts](../src/server/mcp.ts);
-the unit tests drive it with the SDK's client in both eras. Assistant sessions do not exist yet: while the editor
-has the same project open, an assistant edit makes the editor's next save stale (it is
-rejected, never overwritten), so try the assistant on a copy. `tsx watch` restarts on source
+the unit tests drive it with the SDK's client in both eras. The assistant edits only inside a
+session it starts with `session_start` ([sessions](design/ASSISTANT_MCP.md#assistant-session-and-checkpoint-service-files-not-schema)):
+meanwhile the editor's saves are refused (423), and the editor cannot take over yet, so wait for
+the assistant's `session_end` or the lease to expire, and try it on a copy. `tsx watch` restarts on source
 edits and drops in-flight tool calls, as it ends exports.
 
 Preview decodes editing proxies with WebCodecs in a worker, using **two decoders and

@@ -4,13 +4,20 @@ import { describeTrack } from './describe-track.js';
 import { edit } from './edit.js';
 import { listProjects } from './list-projects.js';
 import { recordingSheet, still, timelineSheet } from './pictures.js';
+import { checkpoint, checkpointRestore, previewEdits, sessionEnd, sessionStart, sessionStatus } from './sessions.js';
 
 /** Every operation of the service; one that is not listed here does not exist. */
 export const operations = [
   listProjects,
   describeProject,
   describeTrack,
+  sessionStart,
+  sessionStatus,
+  sessionEnd,
   edit,
+  previewEdits,
+  checkpoint,
+  checkpointRestore,
   still,
   timelineSheet,
   recordingSheet,

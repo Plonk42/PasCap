@@ -117,6 +117,18 @@ describe('MCP endpoint', () => {
       const described = JSON.parse(text(await client.callTool({ name: 'describe_project', arguments: { projectId } })));
       expect(described).toMatchObject({ id: projectId, revision: 1, bookmarks: [] });
 
+      const unleased = await client.callTool({
+        name: 'edit',
+        arguments: { projectId, expectedRevision: 1, commands: [{ type: 'bookmark-add', frame: 30 }] },
+      });
+      expect(unleased.isError).toBe(true);
+      expect(text(unleased)).toMatch(/session_start/);
+      const started = await client.callTool({
+        name: 'session_start',
+        arguments: { projectId, expectedRevision: 1, brief: { notes: 'A short flight.' } },
+      });
+      expect(JSON.parse(text(started))).toMatchObject({ active: true, startedBy: 'assistant' });
+
       const edited = await client.callTool({
         name: 'edit',
         arguments: { projectId, expectedRevision: 1, commands: [{ type: 'bookmark-add', frame: 30 }] },

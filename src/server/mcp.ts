@@ -8,7 +8,7 @@ import { ZodError, type ZodType } from 'zod';
 import { operations } from '../shared/operations/index.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { assertNoSymlinks } from './files.js';
-import type { ServiceContext } from './operations/context.js';
+import type { ServiceContext, ServiceResources } from './operations/context.js';
 import { runOperation } from './operations/index.js';
 import { atomicWrite } from './storage.js';
 
@@ -21,8 +21,9 @@ export const MCP_PATH = '/mcp';
 
 const INSTRUCTIONS = [
   'PasCap edits drone-flight video projects. Frames are integers at 30000/1001 fps; outputs also give MM:SS:FF timecodes.',
-  'Start with describe_project, and read a track with describe_track before grading it.',
-  'Change a project only with edit: its commands apply together against the expectedRevision you last read, or not at all, and a rejected command returns its reason.',
+  'Start with list_projects and describe_project, and read a track with describe_track before grading it.',
+  "To change a project, first take it with session_start and the user's brief; the user then cannot save it until you call session_end with notes for them, or stay idle too long.",
+  'Change a project only with edit: its commands apply together against the expectedRevision you last read, or not at all, and a rejected command returns its reason. Clips you add must stay inside the ranges the user kept.',
   'Look at the result with timeline_sheet or still, and choose footage with recording_sheet.',
 ].join(' ');
 
@@ -71,7 +72,8 @@ export function toolResult(output: unknown): CallToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(output) }] };
 }
 
-export function mcpServer(context: ServiceContext): McpServer {
+export function mcpServer(resources: ServiceResources): McpServer {
+  const context: ServiceContext = { ...resources, caller: 'assistant' };
   const server = new McpServer({ name: 'pascap', title: 'PasCap', version: '0.1.0' }, { instructions: INSTRUCTIONS });
   for (const operation of assistantOperations) {
     const config = {
@@ -82,6 +84,8 @@ export function mcpServer(context: ServiceContext): McpServer {
     };
     server.registerTool(operation.name, config, async (input: unknown) => {
       try {
+        const projectId = (input as { projectId?: unknown }).projectId;
+        if (typeof projectId === 'string') await context.sessions.touch(projectId);
         return toolResult(await runOperation(operation, context, input));
       } catch (error) {
         // The model reads the service's reason and can correct its call.
@@ -93,8 +97,8 @@ export function mcpServer(context: ServiceContext): McpServer {
 }
 
 /** `/mcp` for MCP clients: loopback Host and Origin checks as every route, plus the bearer token. */
-export function registerMcp(app: FastifyInstance, context: ServiceContext, token: string): void {
-  const handler = createMcpHandler(() => mcpServer(context), {
+export function registerMcp(app: FastifyInstance, resources: ServiceResources, token: string): void {
+  const handler = createMcpHandler(() => mcpServer(resources), {
     onerror: (error) => app.log.error(error),
   });
   const serve = toNodeHandler(handler, { onerror: (error) => app.log.error(error) });
