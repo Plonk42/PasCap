@@ -4,6 +4,7 @@ import { described } from '../described.js';
 import { frameSchema, idSchema } from '../model.js';
 import { MAX_EDIT_COMMANDS } from './edit.js';
 import { defineOperation } from './spec.js';
+import { timecodeSchema } from './timecode.js';
 
 /** Hard limits; the service's image budget sets the actual ones, at most these. */
 export const MAX_STILL_WIDTH = 1280;
@@ -31,7 +32,7 @@ const timelineLegend = described(
       .object({
         cell: described(z.number().int().nonnegative(), 'Position in the sheet, row by row from the top left, from 0.'),
         frame: frameSchema,
-        timecode: z.string(),
+        timecode: timecodeSchema,
         clipIds: described(z.array(idSchema), 'Clips visible at that frame, bottom track first.'),
       })
       .strict(),
@@ -111,7 +112,9 @@ export const recordingSheet = defineOperation({
     .object({
       image: imageSchema,
       legend: described(
-        z.array(z.object({ cell: z.number().int().nonnegative(), frame: frameSchema, timecode: z.string() }).strict()),
+        z.array(
+          z.object({ cell: z.number().int().nonnegative(), frame: frameSchema, timecode: timecodeSchema }).strict(),
+        ),
         'The source frame and its timecode in the recording, per cell.',
       ),
     })

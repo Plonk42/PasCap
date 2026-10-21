@@ -2,12 +2,14 @@ import { z } from 'zod';
 import { described } from '../described.js';
 import { frameSchema, idSchema, musicTransitionSchema, selectRangeSchema, transitionSchema } from '../model.js';
 import { defineOperation } from './spec.js';
+import { durationSchema, timecodeSchema } from './timecode.js';
 
 const span = {
   start: described(frameSchema, 'First project frame.'),
   end: described(frameSchema, 'Project frame after the last one (exclusive).'),
-  startTimecode: described(z.string(), 'start as MM:SS:FF at 30 nominal frames per second.'),
-  endTimecode: described(z.string(), 'end as MM:SS:FF.'),
+  startTimecode: timecodeSchema,
+  endTimecode: timecodeSchema,
+  seconds: described(z.number().nonnegative(), 'Length in seconds, rounded to hundredths.'),
 };
 const recording = z
   .object({ id: idSchema, name: described(z.string().nullable(), 'File name; null when no longer registered.') })
@@ -18,7 +20,7 @@ export const projectDescriptionSchema = z
     id: idSchema,
     title: z.string(),
     revision: described(frameSchema, 'Saved revision; pass it as expectedRevision to edit.'),
-    duration: z.object({ frames: frameSchema, timecode: z.string() }).strict(),
+    duration: durationSchema,
     videoTracks: described(
       z.array(
         z

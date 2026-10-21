@@ -1,4 +1,5 @@
 import type { describeProject } from '../../shared/operations/describe-project.js';
+import { durationOf } from '../../shared/operations/timecode.js';
 import { calculateLayout } from '../../shared/timeline.js';
 import { formatTimecode } from '../../shared/timing.js';
 import type { OperationRunner, ServiceContext } from './context.js';
@@ -13,7 +14,8 @@ function known<T>(get: () => T): T | null {
 }
 
 function span(start: number, end: number) {
-  return { start, end, startTimecode: formatTimecode(start), endTimecode: formatTimecode(end) };
+  const { seconds } = durationOf(end - start);
+  return { start, end, startTimecode: formatTimecode(start), endTimecode: formatTimecode(end), seconds };
 }
 
 export const runDescribeProject: OperationRunner<typeof describeProject> = async (
@@ -28,7 +30,7 @@ export const runDescribeProject: OperationRunner<typeof describeProject> = async
     id: project.id,
     title: project.title,
     revision: project.revision,
-    duration: { frames: layout.duration, timecode: formatTimecode(layout.duration) },
+    duration: durationOf(layout.duration),
     videoTracks: project.layers.map((layer) => ({
       id: layer.id,
       name: layer.name,
