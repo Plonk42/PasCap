@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProjectDocument } from '../shared/model.js';
 import type { OperationOutput } from '../shared/operations/index.js';
 import { formatTimecode } from '../shared/timing.js';
+import { describeEdit } from './edit-summary.js';
 import { Icon } from './icons.js';
 import { callOperation } from './operations.js';
 
@@ -104,7 +105,7 @@ export function useFollowAssistant({ projectId, revision, idle, load, adopt }: F
 
 function lastEdit(session: Session): string {
   const edit = session.edits.at(-1);
-  return edit ? `last: ${edit.summary}` : 'no edits yet';
+  return edit ? `last: ${describeEdit(edit.summary)}` : 'no edits yet';
 }
 
 function plural(count: number, word: string): string {
@@ -126,7 +127,7 @@ export function AssistantEditingBanner({
       <div>
         <strong>An assistant is editing this project</strong>
         <span>
-          {plural(session.edits.length, 'edit')} · {lastEdit(session)}. You follow its changes; take over to edit again.
+          {plural(session.edits.length, 'edit')} so far · {lastEdit(session)}. Take over to edit it yourself.
         </span>
       </div>
       <button className="primary-button small" disabled={busy} onClick={onTakeOver}>
@@ -174,7 +175,7 @@ export function AssistantEndedBanner({
             <ol>
               {session.edits.map(({ revision, at, summary, frame }) => (
                 <li key={revision}>
-                  {new Date(at).toLocaleTimeString()} · {summary}
+                  {new Date(at).toLocaleTimeString()} · {describeEdit(summary)}
                   {frame !== null && (
                     <button
                       className="text-button"
