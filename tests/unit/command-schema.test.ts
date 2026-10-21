@@ -116,6 +116,22 @@ function descriptionOf(schema: z.ZodType): string | undefined {
   return z.globalRegistry.get(schema)?.description;
 }
 
+/** Paths of object fields without a description on the field or on the value it makes nullable. */
+function undescribedFields(schema: z.ZodType, path: string): string[] {
+  if (schema instanceof z.ZodNullable || schema instanceof z.ZodOptional)
+    return undescribedFields(schema.unwrap() as z.ZodType, path);
+  if (schema instanceof z.ZodArray) return undescribedFields(schema.element as z.ZodType, `${path}[]`);
+  if (schema instanceof z.ZodUnion)
+    return (schema.options as z.ZodType[]).flatMap((option) => undescribedFields(option, path));
+  if (!(schema instanceof z.ZodObject)) return [];
+  return Object.entries(schema.shape as Record<string, z.ZodType>).flatMap(([name, field]) => {
+    const inner = field instanceof z.ZodNullable ? (field.unwrap() as z.ZodType) : field;
+    const own =
+      field instanceof z.ZodLiteral || descriptionOf(field) || descriptionOf(inner) ? [] : [`${path}.${name}`];
+    return [...own, ...undescribedFields(field, `${path}.${name}`)];
+  });
+}
+
 describe('editCommandSchema', () => {
   it('infers exactly the former EditCommand union', () => {
     expectTypeOf<EditCommand>().toEqualTypeOf<FormerEditCommand>();
@@ -134,6 +150,10 @@ describe('editCommandSchema', () => {
         if (field !== 'type') expect(descriptionOf(schema as z.ZodType), `${type}.${field}`).toBeTruthy();
       }
     }
+  });
+
+  it('describes every nested field of the clips, tracks and settings a command carries', () => {
+    expect(undescribedFields(editCommandSchema, 'command')).toEqual([]);
   });
 
   it('converts to a JSON Schema carrying those descriptions', () => {
