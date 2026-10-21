@@ -5,11 +5,15 @@ import type { OperationRunner, OperationRunners, ServiceContext } from './contex
 import { runDescribeProject } from './describe-project.js';
 import { runDescribeTrack } from './describe-track.js';
 import { runEdit } from './edit.js';
+import { runRecordingSheet, runStill, runTimelineSheet } from './pictures.js';
 
 export const runners: OperationRunners = {
   describe_project: runDescribeProject,
   describe_track: runDescribeTrack,
   edit: runEdit,
+  still: runStill,
+  timeline_sheet: runTimelineSheet,
+  recording_sheet: runRecordingSheet,
 };
 
 export async function runOperation(operation: Operation, context: ServiceContext, input: unknown): Promise<unknown> {
