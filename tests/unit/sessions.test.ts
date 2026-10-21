@@ -36,7 +36,7 @@ function clip(id: string, sourceIn: number, sourceOut: number): VideoClip {
   };
 }
 
-async function setup(options: { ready?: boolean; checkpoints?: number } = {}) {
+async function setup(options: { ready?: boolean; checkpoints?: number; leaseMs?: number | null } = {}) {
   const dataDir = await mkdtemp(path.join(os.tmpdir(), 'pascap-sessions-'));
   temporary.push(dataDir);
   let now = Date.parse('2026-10-21T10:00:00.000Z');
@@ -44,7 +44,7 @@ async function setup(options: { ready?: boolean; checkpoints?: number } = {}) {
   const projects = new ProjectStore(dataDir);
   const sessions = new AssistantSessions(
     dataDir,
-    { leaseMs: LEASE, checkpoints: options.checkpoints ?? 5 },
+    { leaseMs: options.leaseMs === undefined ? LEASE : options.leaseMs, checkpoints: options.checkpoints ?? 5 },
     projects,
     () => now,
   );
@@ -139,12 +139,23 @@ describe('assistant sessions', () => {
     clock.advance(2000);
     await expect(
       call('assistant', 'edit', { projectId: 'flight', expectedRevision: 2, commands: [bookmark(60)] }),
-    ).rejects.toThrow(/ended after 10 minutes without activity/);
+    ).rejects.toThrow(/ended after a period without activity/);
     expect((await call('editor', 'session_status', { projectId: 'flight' })).session).toMatchObject({
       active: false,
       endedBy: 'expiry',
     });
     expect((await projects.save(await projects.load('flight'), 2)).revision).toBe(3);
+  });
+
+  it('keeps an idle session without a configured lease until it is ended', async () => {
+    const { call, clock } = await setup({ leaseMs: null });
+    const started = await call('assistant', 'session_start', { projectId: 'flight', expectedRevision: 1 });
+    expect(started).toMatchObject({ active: true, expiresAt: null });
+    clock.advance(7 * 24 * 60 * 60_000);
+    expect((await call('editor', 'session_status', { projectId: 'flight' })).session).toMatchObject({ active: true });
+    expect(
+      await call('assistant', 'edit', { projectId: 'flight', expectedRevision: 1, commands: [bookmark(30)] }),
+    ).toMatchObject({ revision: 2 });
   });
 
   it('refuses to start on a stale revision or beside an active session', async () => {

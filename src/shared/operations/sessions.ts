@@ -13,14 +13,17 @@ const expectedRevision = described(frameSchema, 'Revision you last read, from de
 export const sessionViewSchema = sessionSchema
   .extend({
     active: described(z.boolean(), 'True while the session holds the write lease.'),
-    expiresAt: described(z.string().nullable(), 'When the lease ends without activity; null once ended.'),
+    expiresAt: described(
+      z.string().nullable(),
+      'When the lease ends without activity; null once ended or when it never expires.',
+    ),
   })
   .strict();
 
 export const sessionStart = defineOperation({
   name: 'session_start',
   description:
-    "Take the project's write lease for an assistant session, after checkpointing it, so the editor follows your edits read-only until the user takes over or you call session_end. Required before edit, checkpoint_restore or any write. Pass the user's brief from the conversation. Refused while another session is active or when the revision is stale. The lease ends after some minutes without any call on the project.",
+    "Take the project's write lease for an assistant session, after checkpointing it, so the editor follows your edits read-only until the user takes over or you call session_end. Required before edit, checkpoint_restore or any write. Pass the user's brief from the conversation. Refused while another session is active or when the revision is stale. The session lasts until the user takes over or you call session_end, unless the service ends idle sessions (expiresAt).",
   input: z
     .object({
       projectId,

@@ -22,7 +22,7 @@ export const MCP_PATH = '/mcp';
 const INSTRUCTIONS = [
   'PasCap edits drone-flight video projects. Frames are integers at 30000/1001 fps; outputs also give MM:SS:FF timecodes.',
   'Start with list_projects and describe_project, and read a track with describe_track before grading it.',
-  "To change a project, first take it with session_start and the user's brief; the user then cannot save it until you call session_end with notes for them, or stay idle too long.",
+  "To change a project, first take it with session_start and the user's brief; the user then cannot save it until you call session_end with notes for them or the user takes it back.",
   'Change a project only with edit: its commands apply together against the expectedRevision you last read, or not at all, and a rejected command returns its reason. Clips you add must stay inside the ranges the user kept.',
   'Look at the result with timeline_sheet or still, and choose footage with recording_sheet.',
 ].join(' ');

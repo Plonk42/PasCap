@@ -22,8 +22,8 @@ export interface ServiceConfig {
 }
 
 export interface AssistantSessionLimits {
-  /** A session ends after this long without assistant activity. */
-  leaseMs: number;
+  /** A session ends after this long without assistant activity; null keeps it until the user or assistant ends it. */
+  leaseMs: number | null;
   /** Checkpoints kept per project, oldest removed first. */
   checkpoints: number;
 }
@@ -43,6 +43,10 @@ function integerSetting(name: string, fallback: number, min: number, max: number
   if (!Number.isInteger(value) || value < min || value > max)
     throw new Error(`${name} must be an integer from ${min} to ${max}.`);
   return value;
+}
+
+function leaseMs(minutes: number): number | null {
+  return minutes === 0 ? null : minutes * 60_000;
 }
 
 /** Conservative defaults keep each picture cheap for a model; raise them in the environment. */
@@ -111,7 +115,7 @@ export function createConfig(overrides: Partial<ServiceConfig> = {}): ServiceCon
     allowedHosts: new Set(origins.map((origin) => new URL(origin).host)),
     assistantImages: assistantImageBudget(),
     assistantSessions: {
-      leaseMs: integerSetting('PASCAP_ASSISTANT_LEASE_MINUTES', 10, 1, 240) * 60_000,
+      leaseMs: leaseMs(integerSetting('PASCAP_ASSISTANT_LEASE_MINUTES', 0, 0, 1440)),
       checkpoints: integerSetting('PASCAP_ASSISTANT_CHECKPOINTS', 5, 1, 50),
     },
     ...overrides,

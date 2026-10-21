@@ -806,7 +806,7 @@ client to `http://127.0.0.1:4318/mcp` with the token in `.pascap/mcp-token`
 ([setup](DEVELOPMENT.md#mcp-endpoint)). It never imports, prepares, exports or deletes
 anything. Before editing, the assistant starts a session on the project: PasCap keeps a
 checkpoint of the project as it was, and only the assistant can save it until it finishes or
-stays idle for 10 minutes. You can also start it yourself with **Hand off** in the header:
+you take the project back. You can also start it yourself with **Hand off** in the header:
 write what you want, optionally pick the music track, length, allowed camera movement and
 number of clips, and check what the assistant can use (prepare or analyse missing
 recordings there). Meanwhile a banner says **An assistant is editing this project** and
