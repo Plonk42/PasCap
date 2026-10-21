@@ -268,6 +268,17 @@ Read; for editor and assistant. Read every appearance value of one video track: 
 | `layerId`   | string           | ID of the video track.                                                               |
 | `frames`    | array of integer | Up to 32 project frames at which to report the values that apply; none when omitted. |
 
+#### `describe_recording`
+
+Read; for editor and assistant. Map where a video recording is usable and how its camera moves, measured from its camera motion analysis and the drone's flight data, inside the ranges the user kept: its steady ranges with their length, picture movement (% of the image width per second), roughness, a camera move name (static, pan, tilt, push in, pull out, rotate; a sideways flight looks like a pan) and mean flight data, plus damaged frames and how much of it hovers still. It never says what the footage shows: unless sheet is false, it also returns a contact sheet with the middle frame of each steady range (the longest ones when they do not all fit), for you to judge. Use recording_sheet for any other frames.
+
+| Input             | Type    | Description                                                                                                                                   |
+| ----------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId`       | string  | ID of the saved project, whose kept ranges and session brief apply.                                                                           |
+| `mediaId`         | string  | ID of a video recording in the project, from describe_project.                                                                                |
+| `allowedMovement` | number  | How much the movement may change in a steady range (0.5–6, lower is steadier), as in Source preview; defaults to the session brief's, else 2. |
+| `sheet`           | boolean | False leaves out the contact sheet.                                                                                                           |
+
 #### `session_start`
 
 Write; for editor and assistant. Take the project's write lease for an assistant session, after checkpointing it, so the editor follows your edits read-only until the user takes over or you call session_end. Required before edit, checkpoint_restore or any write. Pass the user's brief from the conversation. Refused while another session is active or when the revision is stale. The session lasts until the user takes over or you call session_end, unless the service ends idle sessions (expiresAt).
@@ -441,7 +452,7 @@ registry; the assistant never sees them.
 | `preview_edits`      | assistant | Dry run of a batch against the saved revision: resulting timeline summary and errors, no save                                                                                                                              |                                                                                        |
 | `describe_project`   | both      | Compact timeline: tracks, clips with timecodes, transitions, music, bookmarks, selects, alignment summary; `detail: summary \| full`                                                                                       |                                                                                        |
 | `describe_track`     | both      | One video track's complete appearance (Colour with HSL and curves, Opacity, Transform, keyframes), its keyed settings and the values that apply at requested frames ([#252](https://github.com/Plonk42/PasCap/issues/252)) | ≤ 32 frames                                                                            |
-| `describe_recording` | both      | Shot descriptors (below) inside the selects, telemetry, damage; `tolerance`                                                                                                                                                | Computed on request, no cache                                                          |
+| `describe_recording` | both      | Shot descriptors (below) inside the selects, flight data, damage, `allowedMovement`, a sheet of each steady range's middle frame ([#239](https://github.com/Plonk42/PasCap/issues/239))                                    | Computed on request, no cache                                                          |
 | `still`              | both      | One composed project frame from the proxies (`frame`, `width`, `crop?`, `commands?` for a candidate), JPEG ([#238](https://github.com/Plonk42/PasCap/issues/238))                                                          | Serial, two waiting; refused (409) while an export or reference job runs; image budget |
 | `timeline_sheet`     | both      | Contact sheet of project frames (`frames[]`, `commands?`), JPEG plus legend                                                                                                                                                | Same as still                                                                          |
 | `recording_sheet`    | both      | Contact sheet of a recording's proxy frames (`mediaId`, `frames[]`), ungraded, JPEG plus legend                                                                                                                            | Same as still                                                                          |
@@ -495,19 +506,32 @@ the GPU worker is not used.
 
 ### Shot descriptors
 
-Derived per recording from the motion analysis and telemetry, without decoding:
+Implemented on the `mcp` branch ([#239](https://github.com/Plonk42/PasCap/issues/239),
+[recording shots](../../src/shared/recording-shots.ts)). PasCap does no pattern recognition
+(owner, 2026-10-21): `describe_recording` maps where a recording is usable and how its camera
+moves; the model judges what it shows from pictures. From the cached motion analysis and
+flight data, without decoding:
 
-- the steady ranges at the brief's tolerance (`smoothRanges`), each with duration, mean
-  and peak camera speed, roughness, a motion class (`static`, `pan left/right`,
-  `tilt up/down`, `push in/out`, `orbit`, `mixed`, from the sign and share of
-  `tx`/`ty`/`zoom`/`rotation`), and telemetry means (height, distance, horizontal and
-  vertical speed) where present;
-- recording-level facts: duration, damage, hovering shares, telemetry extremes, file name;
-- optional picture facts from the five thumbnails (mean luma, colourfulness through
-  `toneStatistics`), cheap and already decoded.
+- the steady ranges at the allowed movement (the request's, else the active session brief's,
+  else 2), as Source preview finds them (`smoothRanges`, damaged frames excluded), cut to the
+  project's kept ranges (pieces under 2 s dropped), in source order; each with its length,
+  mean and peak picture movement (% of image width per second), mean roughness, a camera move
+  name and mean flight data (height, horizontal and vertical speed, distance from home);
+- the camera move is arithmetic on the mean `tx`/`ty`/`zoom`/`rotation` of the range, read as
+  the move that would cause it: content moving right is a pan left, down a tilt up, growing a
+  push in, plus rotation; a component carrying 60 % of the movement names it alone, else the
+  two largest are named; under 0.5 % of the width per second it is `static`. A sideways
+  flight looks like a pan and an orbit like a pan; the names describe the picture, not the
+  flight;
+- recording facts: name, duration, damaged ranges, the share of still frames (hovering)
+  and whether flight data exists;
+- unless `sheet` is false, one contact sheet (`recording_sheet`) of each range's middle
+  frame, the longest ranges first when they do not all fit the image budget, with each
+  range's `cell`.
 
-They are intersected with the project's `selects`, so the LLM only ever sees usable
-ranges.
+The thumbnails' picture facts first proposed (mean luma, colourfulness) were dropped: the
+model sees the pictures. A recording without motion analysis returns no ranges and
+`motionAnalysed: false`; an unprepared one is refused.
 
 ### Server-side Auto adjust, white balance and detail measurement
 

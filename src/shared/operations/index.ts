@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import { describeProject } from './describe-project.js';
+import { describeRecording } from './describe-recording.js';
 import { describeTrack } from './describe-track.js';
 import { edit } from './edit.js';
 import { handOffReadiness } from './hand-off.js';
@@ -20,6 +21,7 @@ export const operations = [
   listProjects,
   describeProject,
   describeTrack,
+  describeRecording,
   sessionStart,
   sessionStatus,
   sessionEnd,
