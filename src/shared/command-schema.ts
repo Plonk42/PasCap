@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { colourSchema } from './colour.js';
 import { described } from './described.js';
 import { detailSchema } from './detail.js';
-import { interpolationSchema, KEYFRAME_SETTINGS, type KeyframeSetting } from './keyframes.js';
+import { interpolationSchema, keyframeSettingSchema } from './keyframes.js';
 import {
   clipSchema,
   frameSchema,
@@ -27,10 +27,7 @@ const newClipId = (use: string) =>
 const sourceIn = described(frameSchema, 'First kept source frame of the recording (inclusive).');
 const sourceOut = described(frameSchema, 'Source frame after the last kept one (exclusive); must be after sourceIn.');
 const keyFrame = described(frameSchema, 'Project frame of the existing track keyframe.');
-const keyframeSetting = described(
-  z.enum(KEYFRAME_SETTINGS.map((setting) => setting.key) as [KeyframeSetting, ...KeyframeSetting[]]),
-  'Track setting: opacity (0–1) or a scalar Colour setting.',
-);
+const keyframeSetting = described(keyframeSettingSchema, 'Track setting: opacity (0–1) or a scalar Colour setting.');
 const mediaId = described(idSchema, 'ID of a video recording of the project.');
 const selectRanges = described(
   z.array(selectRangeSchema).max(MAX_SELECTS),
