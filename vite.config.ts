@@ -8,7 +8,7 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     allowedHosts: ['localhost', '127.0.0.1'],
-    proxy: { '/api': 'http://127.0.0.1:4318' },
+    proxy: { '/api': 'http://127.0.0.1:4318', '/mcp': 'http://127.0.0.1:4318' },
   },
   build: { outDir: 'dist/web', sourcemap: true },
 });
