@@ -20,7 +20,8 @@ import type { VideoLayer } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { TimelineLayout } from '../shared/timeline.js';
 import { frameIlluminant, type AnalysisFrame, type IlluminantEstimate } from '../shared/white-balance.js';
-import { proxyUrl, readyAsset, readyClipAtPlayhead } from './auto-white-balance.js';
+import { proxyUrl } from './api.js';
+import { readyAsset, readyClipAtPlayhead } from './auto-white-balance.js';
 
 /** What Auto analyses: 1 s around the playhead, the whole clip at the playhead, or every clip of the track. */
 export type AutoAdjustSource = 'playhead' | 'clip' | 'track';
