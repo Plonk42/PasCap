@@ -310,6 +310,45 @@
   pointer-events: none;
 }
 
+/* Another kept range of the recording, lifted out of the omitted hatching. */
+.source-range-kept {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: #ffffff33;
+  box-shadow: inset 0 0 0 1px var(--accent);
+  pointer-events: none;
+}
+
+.source-kept {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.source-kept [aria-pressed='true'] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.source-kept button {
+  min-width: 24px;
+}
+
+.source-keep-another[aria-disabled='true'] {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.source-range-numbers .source-keep-another[aria-disabled='true']:hover {
+  background: none;
+}
+
 /* Camera motion controls below the range fields, separated like the Inspector's setting groups. */
 .smooth-panel {
   display: grid;

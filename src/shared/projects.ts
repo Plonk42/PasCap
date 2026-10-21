@@ -67,6 +67,7 @@ export function removeProjectMedia(project: ProjectDocument, removal: MediaRemov
   }
   return projectSchema.parse({
     ...next,
+    selects: Object.fromEntries(Object.entries(next.selects).filter(([id]) => !removal.videoIds.includes(id))),
     media: {
       videoIds: next.media.videoIds.filter((id) => !removal.videoIds.includes(id)),
       audioIds: next.media.audioIds.filter((id) => !removal.audioIds.includes(id)),

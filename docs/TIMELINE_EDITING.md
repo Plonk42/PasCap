@@ -776,7 +776,32 @@ Scrubbing, trimming, marking and numeric range edits pause first; closing, hidin
 recordings/projects or leaving Source preview cancels pending playback and releases
 its sole decoder. Loading/playback failures remain explicit with Retry. Source
 playback never moves the timeline/music, changes clips/track keyframes or saves/history.
-Choices persist per project in that browser and affect future insertions only.
+The applied range is the recording's **kept range** and part of the project (`selects`, below):
+applying one saves with the project, in one Undo step, and affects future insertions only.
+
+### Kept ranges
+
+A project's required `selects` field maps recordings of its bin to the ranges the user keeps of
+them: ascending integer `{ sourceIn, sourceOut }` ranges (OUT exclusive, at least one frame, at most 100,
+separated by at least one frame since touching ranges are one) inside the registered recording. No entry
+means the whole recording is available; an empty list is invalid. A recording that leaves the project with
+**Remove from project** loses its entry. Clips, trims and the timeline may still use any frame: selects
+record what the user kept and never retime, render or export (assistant sessions will be bound by them,
+[ASSISTANT_MCP](design/ASSISTANT_MCP.md#project-selects-schema-bump)). Edits are the commands `select-set`
+(replaces a recording's ranges; an empty list makes the whole recording available again) and
+`select-narrow` (a subset of the existing ranges only).
+
+Source preview edits the **active** kept range, the first by default: setting IN/OUT by handle, numeric field,
+I/O marks or **Use** (steadiest range) creates the entry with its first range and later changes that range;
+**Add clip** copies it. **Reset source range** removes the active range, and the entry with the last one
+(IN = 0, OUT = frame count again). Once a recording keeps a range, **Keep this range too** (plus icon at
+the end of the range fields) starts a further range of 30 frames at the displayed frame, limited by the next
+kept range, and makes it active. It is unavailable, with its reason, within a kept range or one frame of it,
+without room before the next one, and at 100 ranges. With several ranges, numbered **Kept range N** buttons
+choose the active one (moving to its IN), and the others show on the range strip as lighter outlined blocks.
+A range that overlaps or touches another kept range is rejected with an inline error, never merged or clamped.
+Applying never leaves Source preview. The active range is editor-only state; ranges kept before this field
+existed in the browser (`localStorage`) are not read.
 
 ### Camera motion and the steadiest range
 

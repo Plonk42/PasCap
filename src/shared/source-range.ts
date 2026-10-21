@@ -48,6 +48,11 @@ export function validateSourceRanges(project: ProjectDocument, frameCounts: Read
       throw new Error('Clip speed keyframes exceed the registered recording. The edit was not committed.');
     }
   }
+  for (const [mediaId, ranges] of Object.entries(project.selects)) {
+    const count = frameCounts.get(mediaId);
+    if (count === undefined || !Number.isSafeInteger(count) || ranges.some((range) => range.sourceOut > count))
+      throw new Error('Kept ranges exceed the registered recording. The edit was not committed.');
+  }
 }
 
 /** Find an original endpoint whose retimed duration matches a pointer delta. */

@@ -20,10 +20,14 @@ import {
   idSchema,
   layerSchema,
   MAX_BOOKMARKS,
+  MAX_SELECTS,
+  orderedSelectRanges,
   projectSchema,
+  selectRangeSchema,
   transitionSchema,
   type MusicLane,
   type ProjectDocument,
+  type SelectRange,
   type Transition,
   type VideoClip,
   type VideoLayer,
@@ -74,7 +78,11 @@ export type EditCommand =
   | { type: 'fades'; layerId: string; opening: number; closing: number }
   | { type: 'bookmark-add'; frame: number }
   | { type: 'bookmark-move'; frame: number; nextFrame: number }
-  | { type: 'bookmark-remove'; frame: number };
+  | { type: 'bookmark-remove'; frame: number }
+  /** Replaces a recording's kept ranges; an empty list makes the whole recording available again. */
+  | { type: 'select-set'; mediaId: string; ranges: SelectRange[] }
+  /** Replaces them with a subset of the existing ones, which the assistant is limited to. */
+  | { type: 'select-narrow'; mediaId: string; ranges: SelectRange[] };
 
 function repairBoundaries(clips: VideoClip[], previous: Transition[]): Transition[] {
   return clips.slice(0, -1).map((clip, index) => {
@@ -460,6 +468,32 @@ function editBookmark(next: ProjectDocument, command: BookmarkCommand): void {
   next.bookmarks = [...others, command.nextFrame].sort((left, right) => left - right);
 }
 
+type SelectCommand = Extract<EditCommand, { type: 'select-set' | 'select-narrow' }>;
+/** Selects only record what the user keeps; they never retime, render or move a clip. */
+function editSelects(next: ProjectDocument, command: SelectCommand): void {
+  const mediaId = idSchema.parse(command.mediaId);
+  const inBin = next.media.videoIds.includes(mediaId);
+  if (!inBin && !next.clips.some((clip) => clip.mediaId === mediaId))
+    throw new Error('Kept ranges need a recording that belongs to this project.');
+  const ranges = command.ranges.map((range) => ({ ...selectRangeSchema.parse(range) }));
+  if (ranges.length > MAX_SELECTS)
+    throw new Error(`A recording keeps at most ${MAX_SELECTS.toLocaleString('en')} ranges.`);
+  if (!orderedSelectRanges(ranges))
+    throw new Error('Kept ranges must be ascending and separated by at least one frame.');
+  const { [mediaId]: previous, ...others } = next.selects;
+  if (command.type === 'select-narrow') {
+    if (!ranges.length) throw new Error('Narrowing needs at least one range; remove the recording instead.');
+    const outside = ranges.some(
+      (range) =>
+        previous !== undefined &&
+        !previous.some((kept) => range.sourceIn >= kept.sourceIn && range.sourceOut <= kept.sourceOut),
+    );
+    if (outside) throw new Error('Narrowing can only keep frames that are already kept.');
+  }
+  if (!inBin) next.media.videoIds = [...next.media.videoIds, mediaId];
+  next.selects = ranges.length ? { ...others, [mediaId]: ranges } : others;
+}
+
 export function applyCommand(document: ProjectDocument, command: EditCommand): ProjectDocument {
   const next = projectSchema.parse(document);
   // Keep the snapshot attached to the untouched committed document. In-place
@@ -561,6 +595,10 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'bookmark-remove':
       editBookmark(next, command);
       // Editing aids only: never normalize or rewrite stored timing.
+      return projectSchema.parse(next);
+    case 'select-set':
+    case 'select-narrow':
+      editSelects(next, command);
       return projectSchema.parse(next);
     default:
       throw new Error('Unknown edit command.');

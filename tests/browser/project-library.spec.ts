@@ -163,7 +163,6 @@ test('deleting another project requires confirmation, supports cancel, and leave
 test('deleting the current dirty project closes it, clears preview/history/preferences and does not recreate it', async ({
   page,
 }) => {
-  await page.evaluate((id) => localStorage.setItem(`pascap-media-ranges-${id}`, '{}'), initialId);
   const title = page.getByRole('textbox', { name: 'Project title', exact: true });
   await title.fill('Renamed before deletion');
   await title.press('Enter');
@@ -176,12 +175,7 @@ test('deleting the current dirty project closes it, clears preview/history/prefe
   await expect(page.locator('.media-item')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().decoderCount)).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-  expect(
-    await page.evaluate(
-      (id) => [localStorage.getItem('pascap-project'), localStorage.getItem(`pascap-media-ranges-${id}`)],
-      initialId,
-    ),
-  ).toEqual([null, null]);
+  expect(await page.evaluate(() => localStorage.getItem('pascap-project'))).toBeNull();
   expect(() => memory.snapshot(initialId)).toThrow('Unknown memory-only project');
   await page
     .getByRole('dialog', { name: 'Projects', exact: true })

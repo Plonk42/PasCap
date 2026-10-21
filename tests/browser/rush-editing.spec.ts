@@ -171,6 +171,17 @@ async function flush(page: Page): Promise<void> {
   await page.evaluate(() => window.pascapLab!.flush());
 }
 
+/** Kept ranges are project data: a range edit saves them and Undoes, but changes nothing else. */
+function timelineOf(document: ProjectDocument) {
+  const { selects: _selects, revision: _revision, ...rest } = document;
+  return rest;
+}
+
+async function expectOnlyRangesSaved(page: Page, seed: ProjectDocument = sequence()): Promise<void> {
+  await flush(page);
+  expect(timelineOf(memory.snapshot())).toEqual(timelineOf(seed));
+}
+
 /** Reload a memory seed, not setDocument: each fixture starts with an empty Undo stack. */
 async function fixture(page: Page, document: ProjectDocument): Promise<void> {
   await flush(page);
@@ -395,7 +406,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
     await page.keyboard.press('o');
     await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', String(sourceIn));
     await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', String(sourceOut));
-    expect(await current(page)).toEqual(before);
+    expect(timelineOf(await current(page))).toEqual(timelineOf(before));
     ids.push(await addExcerpt(page));
     const next = await current(page);
     expect(next.clips.slice(0, -1)).toEqual(before.clips);
@@ -1167,11 +1178,9 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
   await expect(sourceInput).toHaveValue('10');
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', '30');
   await expectCutOverlay(page, 20, 31);
-  expect(await current(page)).toEqual(before);
+  expect(timelineOf(await current(page))).toEqual(timelineOf(before));
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(30);
-  await flush(page);
-  expect(memory.saves).toBe(0);
-  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await expectOnlyRangesSaved(page);
   await expect(page.locator('.source-add-feedback')).not.toHaveAttribute('data-added-clip-id', /./);
 });
 
@@ -1586,8 +1595,7 @@ test('an overlapping source Add clears stale success feedback but keeps the sour
   expect(memory.saves).toBe(saves);
   expect(memory.snapshot().clips).toEqual(added.clips);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect(await current(page)).toEqual(before);
-  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  expect(timelineOf(await current(page))).toEqual(timelineOf(before));
 });
 
 test('source proxy Play/Pause advances decoded frames and stops at exclusive OUT without project edits', async ({
@@ -1622,11 +1630,9 @@ test('source proxy Play/Pause advances decoded frames and stops at exclusive OUT
   expect(await sourceFrameNow()).toBeGreaterThanOrEqual(12);
   await page.getByRole('button', { name: 'Pause source preview', exact: true }).click();
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
-  expect(await current(page)).toEqual(before);
+  expect(timelineOf(await current(page))).toEqual(timelineOf(before));
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(30);
-  await flush(page);
-  expect(memory.saves).toBe(0);
-  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await expectOnlyRangesSaved(page);
 });
 
 test('Space plays and pauses the displayed preview: the source preview on its tab, the timeline otherwise', async ({
@@ -1655,13 +1661,12 @@ test('Space plays and pauses the displayed preview: the source preview on its ta
   await expect.poll(timelinePlaying).toBe(true);
   await page.keyboard.press('Space');
   await expect.poll(timelinePlaying).toBe(false);
-  expect(await current(page)).toEqual(before);
-  await flush(page);
-  expect(memory.saves).toBe(0);
+  expect(timelineOf(await current(page))).toEqual(timelineOf(before));
+  await expectOnlyRangesSaved(page);
 });
 
 for (const action of ['scrub', 'mark', 'apply', 'reset', 'trim'] as const) {
-  test(`source ${action} pauses proxy playback without timeline history or saves`, async ({ page }) => {
+  test(`source ${action} pauses proxy playback without a timeline edit`, async ({ page }) => {
     const before = await current(page);
     await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
     await sourceRange(page, 10, 110);
@@ -1675,10 +1680,8 @@ for (const action of ['scrub', 'mark', 'apply', 'reset', 'trim'] as const) {
     if (action === 'trim')
       await page.getByRole('slider', { name: 'Trim source start', exact: true }).press('ArrowRight');
     await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
-    expect(await current(page)).toEqual(before);
-    await flush(page);
-    expect(memory.saves).toBe(0);
-    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+    expect(timelineOf(await current(page))).toEqual(timelineOf(before));
+    await expectOnlyRangesSaved(page);
   });
 }
 
@@ -1822,8 +1825,7 @@ test('a source decoder that stops delivering has a bounded failure and reachable
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-status', 'paused');
   await expect(page.getByRole('button', { name: 'Play source preview', exact: true })).toBeEnabled();
   await expect(page.locator('canvas[data-source-decoder]')).toHaveCount(1);
-  await flush(page);
-  expect(memory.saves).toBe(0);
+  await expectOnlyRangesSaved(page);
 });
 
 test('source IN/OUT targets, omitted footage and reversible drafts remain reachable at the minimum viewport', async ({
@@ -1898,8 +1900,7 @@ test('source IN/OUT targets, omitted footage and reversible drafts remain reacha
   await page.getByRole('slider', { name: 'Trim source end', exact: true }).press('End');
   await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-out', '120');
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', '119');
-  await flush(page);
-  expect(memory.saves).toBe(0);
+  await expectOnlyRangesSaved(page);
 });
 
 test('missing source snapshots degrade explicitly without changing the track or starting preparation', async ({
@@ -1920,9 +1921,8 @@ test('missing source snapshots degrade explicitly without changing the track or 
   expect((await strip.boundingBox())!.height).toBe(44);
   await page.getByRole('slider', { name: 'Trim source start', exact: true }).press('Shift+ArrowRight');
   await expect(strip).toHaveAttribute('data-source-in', '10');
-  await flush(page);
-  expect(requests).toEqual([]);
-  expect(memory.saves).toBe(0);
+  await expectOnlyRangesSaved(page);
+  expect(requests).toEqual(['PUT /api/projects/browser-rush-editing']);
 });
 
 /** Where the chart draws a tolerance: its plot spans the lower 70 % of the 0–100 viewBox, up to 8. */
@@ -2099,10 +2099,8 @@ test('the motion timeline shows jolts, allowed movement and the steadiest range;
   await expect(slider).toHaveValue(String(SMOOTH_TOLERANCE.min));
   await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.min)));
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', frameBefore!);
-  expect(await current(page)).toEqual(before);
-  await flush(page);
-  expect(memory.saves).toBe(0);
-  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  expect(timelineOf(await current(page))).toEqual(timelineOf(before));
+  await expectOnlyRangesSaved(page);
 });
 
 test('Add all adds one clip per steady range to the target track in one Undo step', async ({ page }) => {
@@ -2287,8 +2285,7 @@ test('Media thumbnails dim the omitted head/tail of the applied source range, no
   await closeOptions(page);
   await expect(page.locator('.media-items')).toHaveClass('media-items grid');
   await expectZones(20, 100);
-  await flush(page);
-  expect(memory.saves).toBe(0);
+  await expectOnlyRangesSaved(page);
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(0);
 });
 
@@ -2442,8 +2439,7 @@ test('an invalid exact source range keeps its draft, an actionable error and no 
     await expect(field).toHaveAttribute('aria-invalid', 'false');
     await expect(field).not.toHaveAttribute('aria-describedby');
   }
-  await flush(page);
-  expect(memory.saves).toBe(0);
+  await expectOnlyRangesSaved(page);
 });
 
 test('stepping the numeric source IN and OUT applies each step to the range strip at once', async ({ page }) => {
@@ -2492,4 +2488,82 @@ test('with a range selected, Bookmark adds one at each end in a single Undo step
   await expect(bookmark).toBeDisabled();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect((await current(page)).bookmarks).toEqual(before.bookmarks);
+});
+
+test('applied ranges are the recording’s kept ranges: saved with the project, several per recording, one Undo step each', async ({
+  page,
+}) => {
+  const id = assets[0]!.id;
+  const kept = async () => (await current(page)).selects[id];
+  const strip = page.locator('.source-range-strip');
+  const keepAnother = page.getByRole('button', { name: 'Keep this range too', exact: true });
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await expect(keepAnother).toHaveCount(0); // Nothing is kept yet: the whole recording is available.
+  await sourceRange(page, 10, 40);
+  expect(await kept()).toEqual([{ sourceIn: 10, sourceOut: 40 }]);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
+  await expect(page.locator('.source-review')).toBeVisible(); // Applying never leaves Source preview.
+
+  // Another range starts at the displayed frame, outside the kept ones.
+  await sourceFrame(page, 20);
+  await expect(keepAnother).toHaveAttribute('aria-disabled', 'true');
+  await expect(keepAnother).toHaveAccessibleDescription(/outside the kept ranges/);
+  await sourceFrame(page, 60);
+  await expect(keepAnother).toHaveAttribute('aria-disabled', 'false');
+  await keepAnother.click();
+  expect(await kept()).toEqual([
+    { sourceIn: 10, sourceOut: 40 },
+    { sourceIn: 60, sourceOut: 90 },
+  ]);
+  await expect(strip).toHaveAttribute('data-source-in', '60');
+  await expect(strip).toHaveAttribute('data-source-out', '90');
+  await expect(page.getByRole('button', { name: 'Kept range 2', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.source-range-kept')).toHaveCount(1);
+  await sourceRange(page, 62, 80);
+  expect(await kept()).toEqual([
+    { sourceIn: 10, sourceOut: 40 },
+    { sourceIn: 62, sourceOut: 80 },
+  ]);
+
+  // Overlapping the other kept range is rejected, never merged or clamped.
+  await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('30');
+  await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).press('Enter');
+  await expect(page.locator('.source-range-error')).toContainText('separated by at least one frame');
+  await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).press('Escape');
+  expect(await kept()).toEqual([
+    { sourceIn: 10, sourceOut: 40 },
+    { sourceIn: 62, sourceOut: 80 },
+  ]);
+
+  // The kept ranges are in the saved project and survive a reload; clips still copy the applied range.
+  await flush(page);
+  expect(memory.snapshot().selects[id]).toEqual(await kept());
+  await page.reload();
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await expect(strip).toHaveAttribute('data-source-in', '10');
+  await page.getByRole('button', { name: 'Kept range 2', exact: true }).click();
+  await expect(strip).toHaveAttribute('data-source-in', '62');
+  const clipId = await addExcerpt(page);
+  expect((await current(page)).clips.find((item) => item.id === clipId)).toMatchObject({
+    sourceIn: 62,
+    sourceOut: 80,
+  });
+
+  // Reset removes the active kept range, and the entry with the last one; Undo restores each.
+  await page.getByRole('button', { name: 'Reset source range', exact: true }).click();
+  expect(await kept()).toEqual([{ sourceIn: 10, sourceOut: 40 }]);
+  await expect(page.getByRole('button', { name: 'Kept range 1', exact: true })).toHaveCount(0);
+  await expect(strip).toHaveAttribute('data-source-in', '10');
+  await page.getByRole('button', { name: 'Reset source range', exact: true }).click();
+  expect(await kept()).toBeUndefined();
+  await expect(strip).toHaveAttribute('data-source-in', '0');
+  await expect(strip).toHaveAttribute('data-source-out', '120');
+  await expect(keepAnother).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await kept()).toEqual([{ sourceIn: 10, sourceOut: 40 }]);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await kept()).toEqual([
+    { sourceIn: 10, sourceOut: 40 },
+    { sourceIn: 62, sourceOut: 80 },
+  ]);
 });
