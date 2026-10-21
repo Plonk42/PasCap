@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { colourCurveSchema, curvesSchema, hslBandSchema, hslSchema } from './advanced-colour.js';
-import { COLOUR_CONTROLS, colourSchema, type ScalarColourSetting } from './colour.js';
+import { COLOUR_CONTROLS, colourSchema, NEUTRAL_COLOUR, type ScalarColourSetting } from './colour.js';
 import { described } from './described.js';
 import { detailSchema } from './detail.js';
 import { interpolationSchema, keyframeSettingSchema } from './keyframes.js';
@@ -28,7 +28,16 @@ const newClipId = (use: string) =>
 const sourceIn = described(frameSchema, 'First kept source frame of the recording (inclusive).');
 const sourceOut = described(frameSchema, 'Source frame after the last kept one (exclusive); must be after sourceIn.');
 const keyFrame = described(frameSchema, 'Project frame of the existing track keyframe.');
-const keyframeSetting = described(keyframeSettingSchema, 'Track setting: opacity (0–1) or a scalar Colour setting.');
+const neutralNotZero = COLOUR_CONTROLS.filter((control) => NEUTRAL_COLOUR[control.key] !== 0).map(
+  (control) => `${control.key} ${NEUTRAL_COLOUR[control.key]}`,
+);
+/** Each scalar Colour setting's bounds and neutral value, which is not always 0. */
+const colourRanges = COLOUR_CONTROLS.map((control) => `${control.key} ${control.min}–${control.max}`).join(', ');
+const colourBounds = `Bounds: ${colourRanges}. Neutral (no change): ${neutralNotZero.join(', ')}, every other 0; Saturation 0 is greyscale.`;
+const keyframeSetting = described(
+  keyframeSettingSchema,
+  `Track setting: opacity (0–1, neutral 1) or a scalar Colour setting. ${colourBounds}`,
+);
 const mediaId = described(idSchema, 'ID of a video recording of the project.');
 const selectRanges = described(
   z.array(selectRangeSchema).max(MAX_SELECTS),
@@ -36,9 +45,9 @@ const selectRanges = described(
 );
 const colourSetting = described(
   z.enum(COLOUR_CONTROLS.map((control) => control.key) as [ScalarColourSetting, ...ScalarColourSetting[]]),
-  'Scalar Colour setting: temperature, tint, exposure, brightness, contrast, hue, saturation, vibrance, highlights, shadows, whites, blacks, hdr or localContrast.',
+  `Scalar Colour setting. ${colourBounds}`,
 );
-const settingValue = described(z.number(), "New base value, within the setting's bounds (describe_track lists them).");
+const settingValue = described(z.number(), "New base value, within the setting's bounds.");
 
 /** Descriptions are written for an LLM; rules JSON Schema cannot express are stated in them. */
 export const editCommandSchema = z.discriminatedUnion('type', [
@@ -137,7 +146,7 @@ export const editCommandSchema = z.discriminatedUnion('type', [
       layerId,
       setting: described(
         spatialPoseSchema.keyof(),
-        'Transform setting: cropLeft, cropRight, cropTop, cropBottom, scale, translateX, translateY or rotation.',
+        'Transform setting: cropLeft, cropRight, cropTop and cropBottom 0–1 (fractions of the recording), scale 0.1–8, translateX and translateY −2–2 (fractions of the output), rotation −180–180° clockwise. Neutral: scale 1, every other 0.',
       ),
       value: settingValue,
     },
