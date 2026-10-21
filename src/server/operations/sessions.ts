@@ -1,4 +1,3 @@
-import type { ProjectDocument } from '../../shared/model.js';
 import type {
   checkpoint,
   checkpointRestore,
@@ -18,22 +17,8 @@ function view(sessions: ServiceContext['sessions'], session: AssistantSession) {
   return { ...session, active: session.endedAt === null, expiresAt: sessions.expiresAt(session) };
 }
 
-/** A session needs every recording of the project prepared, so its clips can be previewed and checked. */
-function unreadyReason(library: ServiceContext['library'], document: ProjectDocument): string | null {
-  const unready = document.media.videoIds.filter((id) => {
-    try {
-      return library.get(id).status !== 'ready';
-    } catch {
-      return true;
-    }
-  });
-  return unready.length
-    ? `${unready.length} recording(s) of the project are not prepared; prepare them in the editor first.`
-    : null;
-}
-
 export const runSessionStart: OperationRunner<typeof sessionStart> = async (
-  { caller, sessions, library },
+  { caller, sessions },
   { projectId, expectedRevision, brief },
 ) => {
   const session = await sessions.start(
@@ -41,14 +26,20 @@ export const runSessionStart: OperationRunner<typeof sessionStart> = async (
     expectedRevision,
     brief,
     caller === 'assistant' ? 'assistant' : 'user',
-    (document) => unreadyReason(library, document),
   );
   return view(sessions, session);
 };
 
-export const runSessionStatus: OperationRunner<typeof sessionStatus> = async ({ sessions }, { projectId }) => {
+export const runSessionStatus: OperationRunner<typeof sessionStatus> = async (
+  { sessions, projects },
+  { projectId, checkpoints },
+) => {
   const session = await sessions.current(projectId);
-  return { session: session && view(sessions, session), checkpoints: await sessions.checkpoints(projectId) };
+  return {
+    session: session && view(sessions, session),
+    revision: (await projects.load(projectId)).revision,
+    checkpoints: checkpoints ? await sessions.checkpoints(projectId) : [],
+  };
 };
 
 export const runSessionEnd: OperationRunner<typeof sessionEnd> = async ({ caller, sessions }, { projectId, notes }) => {

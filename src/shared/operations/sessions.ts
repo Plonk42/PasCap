@@ -20,7 +20,7 @@ export const sessionViewSchema = sessionSchema
 export const sessionStart = defineOperation({
   name: 'session_start',
   description:
-    "Take the project's write lease for an assistant session, after checkpointing it, so the editor follows your edits read-only until the user takes over or you call session_end. Required before edit, checkpoint_restore or any write. Pass the user's brief from the conversation. Refused while another session is active, when the revision is stale or while a recording of the project is not prepared. The lease ends after some minutes without any call on the project.",
+    "Take the project's write lease for an assistant session, after checkpointing it, so the editor follows your edits read-only until the user takes over or you call session_end. Required before edit, checkpoint_restore or any write. Pass the user's brief from the conversation. Refused while another session is active or when the revision is stale. The lease ends after some minutes without any call on the project.",
   input: z
     .object({
       projectId,
@@ -39,9 +39,20 @@ export const sessionStart = defineOperation({
 export const sessionStatus = defineOperation({
   name: 'session_status',
   description:
-    "Read the project's latest assistant session (null if none): whether it is active, its brief, its edit log and the notes it ended with, and the project's checkpoints, newest first.",
-  input: z.object({ projectId }).strict(),
-  output: z.object({ session: sessionViewSchema.nullable(), checkpoints: z.array(checkpointSummarySchema) }).strict(),
+    "Read the project's latest assistant session (null if none): whether it is active, its brief, its edit log and the notes it ended with, the project's saved revision and its checkpoints, newest first.",
+  input: z
+    .object({
+      projectId,
+      checkpoints: described(z.boolean().default(true), 'False leaves out the checkpoint list.'),
+    })
+    .strict(),
+  output: z
+    .object({
+      session: sessionViewSchema.nullable(),
+      revision: described(frameSchema, "The project's saved revision."),
+      checkpoints: z.array(checkpointSummarySchema),
+    })
+    .strict(),
   access: 'read',
   audience: ['editor', 'assistant'],
 });

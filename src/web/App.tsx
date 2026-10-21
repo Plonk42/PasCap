@@ -49,6 +49,8 @@ import type { AnalysisFrame } from '../shared/white-balance.js';
 import { api, type RequestOptions } from './api.js';
 import { proxyUrl } from './auto-white-balance.js';
 import { Autosave, type SaveState } from './autosave.js';
+import { AssistantEditingBanner, AssistantEndedBanner, useFollowAssistant } from './AssistantSession.js';
+import { callOperation } from './operations.js';
 import { waitForService } from './connection.js';
 import { DeferredPanel } from './DeferredPanel.js';
 import { mediaReady } from './display.js';
@@ -126,6 +128,7 @@ const loadDiagnostics = () => import('./Diagnostics.js').then((module) => ({ def
 const EMPTY_PROJECT = createProject('preview-lab', 'Untitled');
 /** While scrubbing, Properties shows the playhead once it has rested this long, like the preview's exact frame. */
 const INSPECTOR_REST_MS = 100;
+const FOLLOWING_MESSAGE = 'An assistant is editing this project: take over to edit it.';
 const SAVE_LABEL: Record<SaveState['state'], string> = {
   saved: 'Saved locally',
   saving: 'Saving…',
@@ -215,6 +218,19 @@ function withLayer(project: ProjectDocument, layer: VideoLayer): ProjectDocument
   if (project.layers.length >= MAX_VIDEO_LAYERS)
     throw new Error(`A project can have at most ${MAX_VIDEO_LAYERS} video tracks.`);
   return applyCommand(project, { type: 'layer-add', layer });
+}
+
+/** The drop planner's slot for new clips inserted at a frame, as a native drop would place them. */
+function dropSlot(
+  project: ProjectDocument,
+  clips: ReturnType<typeof clipForSource>[],
+  layerId: string,
+  frame: number,
+  playhead: number,
+): { index: number; start: number } {
+  const plan = planTimelineDrop(project, { kind: 'media', clips }, layerId, frame, false, 0, playhead);
+  if (plan.error) throw new Error(plan.error);
+  return { index: plan.index, start: plan.start };
 }
 type ActionResult<T> = { ok: true; value: T } | { ok: false };
 interface ConnectionState {
@@ -317,6 +333,8 @@ export function App() {
   const sourceRanges = useRef<MediaSelections>(ranges);
   sourceRanges.current = ranges;
   const drafting = useRef(false);
+  /** True while an assistant session holds the project: the editor follows it read-only. */
+  const following = useRef(false);
   const requestedFrame = useRef<number | null>(null);
   const restoreFrame = useRef(0);
   const lastPreview = useRef('');
@@ -461,7 +479,7 @@ export function App() {
     [select, clipGroup.set, clipGroup.latest],
   );
   const commit = useCallback(
-    (next: ProjectDocument, removed?: MediaRemoval, keepRange = false) => {
+    (next: ProjectDocument, removed?: MediaRemoval, keepRange = false): boolean => {
       const previous = current.current;
       // Keep imported and previously used sources in the bin even after removing their last excerpt,
       // unless the user explicitly removed them from the project.
@@ -476,7 +494,12 @@ export function App() {
       };
       validate(document);
       if (!history.current) throw new Error('Project has not loaded yet.');
+      if (following.current) {
+        setError(FOLLOWING_MESSAGE);
+        return false;
+      }
       publish(history.current.replace(document), keepRange);
+      return true;
     },
     [publish, validate],
   );
@@ -496,11 +519,14 @@ export function App() {
           const previous = current.current.clips.find((item) => item.id === command.clipId)!;
           requestedFrame.current = previous.sourceIn !== command.sourceIn ? placed.start : placed.end - 1;
         }
-        commit(
-          next,
-          undefined,
-          commands.every((item) => RANGE_KEEPING_COMMANDS.has(item.type)),
-        );
+        if (
+          !commit(
+            next,
+            undefined,
+            commands.every((item) => RANGE_KEEPING_COMMANDS.has(item.type)),
+          )
+        )
+          return;
         setError('');
         if (!keepViewer) setViewerMode('timeline');
       } catch (cause) {
@@ -512,6 +538,10 @@ export function App() {
   const undoRedo = useCallback(
     (direction: 'undo' | 'redo') => {
       if (!history.current || drafting.current) return;
+      if (following.current) {
+        setError(FOLLOWING_MESSAGE);
+        return;
+      }
       try {
         publish(history.current[direction]());
         setTimeRange(null);
@@ -552,18 +582,13 @@ export function App() {
         // intent rather than letting nearest-slot tie-breaking reorder an Add.
         if (layer.ripple && last && start === undefined) position ??= next.clips.length;
         if (position === undefined) {
-          const plan = planTimelineDrop(
+          ({ index: position, start: cursor } = dropSlot(
             next,
-            { kind: 'media', clips: instances },
+            instances,
             targetLayer,
             cursor,
-            false,
-            0,
             engine.current?.diagnostics().frame ?? 0,
-          );
-          if (plan.error) throw new Error(plan.error);
-          position = plan.index;
-          cursor = plan.start;
+          ));
         }
         for (const [offset, clip] of instances.entries()) {
           next = applyCommand(next, { type: 'insert', clip: { ...clip, start: cursor }, index: position + offset });
@@ -572,7 +597,7 @@ export function App() {
         validate(next);
         const first = instances[0]!; // The nonempty sources guard also guarantees a nonempty batch.
         requestedFrame.current = calculateLayout(next).clips.find((item) => item.clip.id === first.id)!.start;
-        commit(next);
+        if (!commit(next)) return null;
         select(first.id);
         if (keepReview) setViewerMode('source');
         setError('');
@@ -664,7 +689,7 @@ export function App() {
         newClipId,
       });
       requestedFrame.current = calculateLayout(next).clips.find((item) => item.clip.id === newClipId)!.start;
-      commit(next);
+      if (!commit(next)) return;
       select(newClipId);
       setError('');
     } catch (cause) {
@@ -700,7 +725,7 @@ export function App() {
         Math.max(timeRange.inFrame, start),
         Math.max(0, calculateLayout(next).duration - 1),
       );
-      commit(next);
+      if (!commit(next)) return;
       if (retained) select(retained.id);
       setTimeRange(null);
       setError('');
@@ -748,7 +773,7 @@ export function App() {
     try {
       const next = applyCommand(current.current, { type: 'duplicate', clipId: selection.current, newClipId });
       requestedFrame.current = calculateLayout(next).clips.find((clip) => clip.clip.id === newClipId)!.start;
-      commit(next);
+      if (!commit(next)) return;
       select(newClipId);
       setError('');
     } catch (cause) {
@@ -853,6 +878,29 @@ export function App() {
     },
     [select],
   );
+  /** A newer saved revision replaces the editor's document without becoming an Undo step or a save. */
+  const adoptSaved = useCallback(
+    (loaded: ProjectDocument) => {
+      autosave.current?.dispose();
+      autosave.current = null;
+      history.current = new EditHistory(loaded);
+      publish(loaded, true);
+      autosave.current = new Autosave(loaded, api.save, setSaveState);
+      setSaveState({ state: 'saved', message: 'Saved on this device', revision: loaded.revision, recovery: null });
+    },
+    [publish],
+  );
+  const savedRevision = useCallback(() => autosave.current?.revision ?? null, []);
+  const editorIdle = useCallback(() => !autosave.current?.dirty && !drafting.current, []);
+  const loadSaved = useCallback(async (id: string) => (await api.load(id)).document, []);
+  const assistant = useFollowAssistant({
+    projectId: project?.id ?? null,
+    revision: savedRevision,
+    idle: editorIdle,
+    load: loadSaved,
+    adopt: adoptSaved,
+  });
+  following.current = assistant.following;
   const clearProject = (): void => {
     engine.current?.pause();
     autosave.current?.dispose();
@@ -1216,8 +1264,7 @@ export function App() {
     if (!command) return;
     const next = applyCommand(current.current, command);
     validate(next);
-    commit(next);
-    setError('');
+    if (commit(next)) setError('');
   };
   const keepAnotherSourceRange = (mediaId: string, frame: number): void => {
     const asset = latestAssets.current.find((item) => item.id === mediaId);
@@ -1609,7 +1656,7 @@ export function App() {
   const removeMedia = (removal: MediaRemoval): boolean => {
     if (!current.current || drafting.current) return false;
     try {
-      commit(removeProjectMedia(current.current, removal), removal);
+      if (!commit(removeProjectMedia(current.current, removal), removal)) return false;
     } catch (cause) {
       setError(message(cause, 'Cannot remove the recording from this project.'));
       return false;
@@ -1643,6 +1690,26 @@ export function App() {
         setError('');
       })
     ).ok;
+  const takeOver = (): void => {
+    void act(async () => {
+      if (!current.current) throw new Error('No project is open.');
+      await callOperation('session_end', { projectId: current.current.id });
+      await assistant.refresh();
+    });
+  };
+  const restoreBeforeSession = (checkpointId: string): void => {
+    void act(async () => {
+      if (!current.current || !autosave.current) throw new Error('No project is open.');
+      const projectId = current.current.id;
+      await callOperation('checkpoint_restore', {
+        projectId,
+        checkpointId,
+        expectedRevision: autosave.current.revision,
+      });
+      adoptSaved((await api.load(projectId)).document);
+      assistant.dismiss();
+    });
+  };
   const reloadEditor = (): void => {
     void act(flushBeforeSwitch).then((result) => {
       if (result.ok) location.reload();
@@ -1896,6 +1963,20 @@ export function App() {
               Review latest save
             </button>
           </div>
+        )}
+        {assistant.following && assistant.session && (
+          <AssistantEditingBanner session={assistant.session} busy={busy} onTakeOver={takeOver} />
+        )}
+        {assistant.ended && (
+          <AssistantEndedBanner
+            session={assistant.ended}
+            busy={busy}
+            restoreReason={
+              saveState.state === 'saved' ? null : 'Save or discard the unsaved changes in this editor first.'
+            }
+            onRestore={() => restoreBeforeSession(assistant.ended!.checkpointId)}
+            onDismiss={assistant.dismiss}
+          />
         )}
         <main
           className="workbench docked-workbench"

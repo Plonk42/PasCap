@@ -470,8 +470,8 @@ The endpoint is the official MCP SDK v2 handler (`@modelcontextprotocol/server`)
 2026-07-28 protocol revision and stateless 2025-era clients from [mcp.ts](../src/server/mcp.ts);
 the unit tests drive it with the SDK's client in both eras. The assistant edits only inside a
 session it starts with `session_start` ([sessions](design/ASSISTANT_MCP.md#assistant-session-and-checkpoint-service-files-not-schema)):
-meanwhile the editor's saves are refused (423), and the editor cannot take over yet, so wait for
-the assistant's `session_end` or the lease to expire, and try it on a copy. `tsx watch` restarts on source
+meanwhile the editor follows its edits read-only, with **Take over** and, afterwards, **Restore
+project before session** ([hand-off](design/ASSISTANT_MCP.md#hand-off-in-the-editor)). `tsx watch` restarts on source
 edits and drops in-flight tool calls, as it ends exports.
 
 Preview decodes editing proxies with WebCodecs in a worker, using **two decoders and

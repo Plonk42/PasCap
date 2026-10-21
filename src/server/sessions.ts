@@ -125,7 +125,6 @@ export class AssistantSessions {
     expectedRevision: number,
     brief: Brief,
     startedBy: SessionStarter,
-    unreadyReason: (document: ProjectDocument) => string | null,
   ): Promise<AssistantSession> {
     return this.projects.exclusive(async () => {
       const document = await this.projects.load(projectId);
@@ -140,8 +139,6 @@ export class AssistantSessions {
           `An assistant session has been active on this project since ${previous.startedAt}.`,
           409,
         );
-      const unready = unreadyReason(document);
-      if (unready) throw new ServiceError(unready, 409);
       const checkpoint = await this.#checkpoint(document, 'session-start', null, null);
       const now = this.now();
       return this.#writer.run(() =>
