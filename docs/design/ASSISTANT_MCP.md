@@ -1,8 +1,9 @@
 # Assistant rough cut through MCP
 
-**Status: design and delivery plan, not implemented.** Nothing below is a current
-contract; the guides it links describe today's behaviour. Phases, routes, tool names and
-constants are proposals for the owner to confirm, amend or reject before work starts.
+**Status: design and delivery plan; Phases 1 and 2 are implemented.** Nothing else below
+is a current contract; the guides it links describe today's behaviour. The owner approved
+Phase 0 on 2026-10-21 (see [decisions](#decisions-to-confirm)); later phases, routes, tool
+names and constants remain proposals to confirm, amend or reject before work starts.
 
 ## Goal
 
@@ -51,6 +52,10 @@ The plan builds on current code; these are the pieces it reuses or must change.
 | Dependencies                 | `fastify`, `@fastify/static`, `react`, `react-dom`, `zod` 4.6 ([package.json](../../package.json)), which has `.meta()` and `z.toJSONSchema()`; locked production-license inventory                                                                                                                   | Adding `@modelcontextprotocol/sdk` is a dependency change: risky route, licence inventory update, zod 4 compatibility check                                                          |
 
 ## Decisions to confirm
+
+Confirmed by the owner on 2026-10-21: the operation registry, existing REST routes migrating
+when touched or on demand, VS Code as the first MCP client, and music analysis shipping
+first (done). The other rows are still proposals.
 
 | Question                           | Proposal                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -168,7 +173,7 @@ From that array:
 
 - **HTTP**: one loop registers `POST /api/ops/:name` per operation (parse `input`, call
   `run`, send `output`); the existing REST routes stay as they are and migrate one at a
-  time when touched.
+  time when touched or when an operation needs them.
 - **MCP**: one loop registers one tool per operation whose `audience` includes
   `assistant`, with `z.toJSONSchema(op.input)` and `op.description`; image outputs
   become MCP image content plus the legend as text.
@@ -470,15 +475,15 @@ Each phase is one or more issues; routes follow [the workflow](../GITHUB_WORKFLO
 Persisted formats, service routes and the new dependency are risky (PR with
 auto-merge); editor UI and docs are routine.
 
-| Phase | Work                                                                                                                                                                                                                           | Route              | Validation                                                                                                                                                                                              |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Foundations, no behaviour change: `editCommandSchema` with descriptions (type-equality test), the operation registry with its HTTP loop, typed web client and catalogue script, first operations `describe_project` and `edit` | Routine (refactor) | Unit: registry drift gates, HTTP contract test, `applyCommand` suite unchanged; `npm run check` catalogue check                                                                                         |
-| 1     | **Implemented:** Project `selects` (schema bump, migration, fixture, `select-set`/`select-narrow` commands), Source preview applies to selects, **Keep this range too**                                                        | Risky (schema)     | Unit: schema/migration/commands; browser: source range round trip; fixture compatibility                                                                                                                |
-| 2     | Music analysis job, cache, `music_analyse`/`music_analysis`/`beats_to_bookmarks`, beat ticks on music lanes, **Beats → bookmarks**                                                                                             | Risky (format)     | Unit: synthetic beat/tempo/section gates, worker bounds, cancellation; browser: ticks and bookmarks action; `test:media` for the PCM reader                                                             |
-| 3     | Session operations (lease, checkpoint, brief, 423/409 paths, selects and permission enforcement in `edit`), editor **Hand off**/follow mode/**Take over**/**Restore checkpoint**                                               | Risky (routes)     | Unit: lease, atomic batch, enforcement; browser: hand-off dialog, follow mode, take-over, restore                                                                                                       |
-| 4     | `still`, `timeline_sheet`, `source_frame`, `describe_recording`, `estimate` (Auto adjust/AWB/detail), `check_alignment`, `snap_cuts_to_beats`                                                                                  | Risky (native)     | Unit: still equals the layered-export frame for the same project (same compositor), sheet legend, estimator tolerance against the browser path, snap-cuts arithmetic                                    |
-| 5     | MCP endpoint: SDK dependency and licence inventory, registry-to-tools loop, resources and guide, `/mcp` transport and token, docs (USER_GUIDE, DEVELOPMENT, DEPLOYMENT, this guide becomes the contract)                       | Risky (deps)       | Unit: in-memory MCP client runs a scripted session end to end against a memory service through the registry; the contract test covers every assistant operation over both surfaces; no real model in CI |
-| 6     | Owner evaluation on real flights (consent): playbook and heuristic tuning, image budgets, timings; decide progress notifications and Phase 2 of Auto adjust                                                                    | —                  | Evidence in the issue, not CI                                                                                                                                                                           |
+| Phase | Work                                                                                                                                                                                                                                                           | Route                                                             | Validation                                                                                                                                                                                              |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Foundations, no behaviour change: `editCommandSchema` with descriptions (type-equality test), the operation registry with its HTTP loop, typed web client and catalogue script, first operations `describe_project` and `edit`                                 | #228 routine (refactor); #229 PR (new route family, check script) | Unit: registry drift gates, HTTP contract test, `applyCommand` suite unchanged; `npm run check` catalogue check                                                                                         |
+| 1     | **Implemented:** Project `selects` (schema bump, migration, fixture, `select-set`/`select-narrow` commands), Source preview applies to selects, **Keep this range too**                                                                                        | Risky (schema)                                                    | Unit: schema/migration/commands; browser: source range round trip; fixture compatibility                                                                                                                |
+| 2     | **Implemented:** music analysis job, cache, REST routes `/api/audio/:id/analysis`, beat ticks on music lanes, **Beats → bookmarks**; the `music_analyse`/`music_analysis`/`beats_to_bookmarks` operations come with the registry when the assistant needs them | Risky (format)                                                    | Unit: synthetic beat/tempo/section gates, worker bounds, cancellation; browser: ticks and bookmarks action; `test:media` for the PCM reader                                                             |
+| 3     | Session operations (lease, checkpoint, brief, 423/409 paths, selects and permission enforcement in `edit`), editor **Hand off**/follow mode/**Take over**/**Restore checkpoint**                                                                               | Risky (routes)                                                    | Unit: lease, atomic batch, enforcement; browser: hand-off dialog, follow mode, take-over, restore                                                                                                       |
+| 4     | `still`, `timeline_sheet`, `source_frame`, `describe_recording`, `estimate` (Auto adjust/AWB/detail), `check_alignment`, `snap_cuts_to_beats`                                                                                                                  | Risky (native)                                                    | Unit: still equals the layered-export frame for the same project (same compositor), sheet legend, estimator tolerance against the browser path, snap-cuts arithmetic                                    |
+| 5     | MCP endpoint: SDK dependency and licence inventory, registry-to-tools loop, resources and guide, `/mcp` transport and token, docs (USER_GUIDE, DEVELOPMENT, DEPLOYMENT, this guide becomes the contract)                                                       | Risky (deps)                                                      | Unit: in-memory MCP client runs a scripted session end to end against a memory service through the registry; the contract test covers every assistant operation over both surfaces; no real model in CI |
+| 6     | Owner evaluation on real flights (consent): playbook and heuristic tuning, image budgets, timings; decide progress notifications and Phase 2 of Auto adjust                                                                                                    | —                                                                 | Evidence in the issue, not CI                                                                                                                                                                           |
 
 Phase 0 is a refactor that pays for itself in the editor (typed operations, bulk actions)
 and removes the MCP's maintenance cost before it exists. Phases 2 and 4 are useful without
@@ -501,13 +506,14 @@ endpoint, token and loopback), [EDITOR_CONTROLS](EDITOR_CONTROLS.md) (new contro
    except several tracks)?
 3. Which LLM client first (VS Code, Claude Code, Codex, Claude Desktop through
    `mcp-remote`)? The dialog's configuration snippet targets the first one.
+   **Answered: VS Code.**
 4. Do the user's first-pass ranges also need **exclusions** (ranges to avoid inside a
    kept range), or are several kept ranges enough (proposed)?
 5. Should `Beats → bookmarks` and beat ticks ship before anything assistant-related
-   (proposed: yes, Phase 1 is user-facing on its own)?
+   (proposed: yes, Phase 1 is user-facing on its own)? **Answered: yes; shipped.**
 6. Image budget: default 640 × 360 and 12-cell sheets, or smaller to save tokens?
 7. Should the editor's existing REST routes migrate to operations when touched (proposed),
-   or stay as they are indefinitely?
+   or stay as they are indefinitely? **Answered: when touched, or on demand.**
 
 ## Risks and limits
 
