@@ -87,7 +87,7 @@ describe('MCP endpoint', () => {
   ] as const)(
     'serves the assistant operations to the official $protocol client, end to end',
     async ({ protocol, version }) => {
-      const { app, mcpToken } = await service();
+      const { app, mcpToken, dataDir } = await service();
       const client = await connect(app, mcpToken, protocol);
       expect(client.getNegotiatedProtocolVersion()).toBe(version);
       expect(client.getServerVersion()?.name).toBe('pascap');
@@ -119,6 +119,20 @@ describe('MCP endpoint', () => {
         payload: { title: 'Flight' },
       });
       const projectId = created.json<{ document: { id: string } }>().document.id;
+      // The Hand off dialog shows the client that called and how to connect one.
+      const readiness = await app.inject({
+        method: 'POST',
+        url: '/api/ops/hand_off_readiness',
+        headers: { host, 'x-pascap-client': 'preview-lab' },
+        payload: { projectId },
+      });
+      const { connection } = readiness.json<{ connection: { lastCall: string | null } }>();
+      expect(connection).toMatchObject({
+        url: 'http://127.0.0.1:4318/mcp',
+        tokenFile: path.join(dataDir, 'mcp-token'),
+        client: 'pascap-test',
+      });
+      expect(Date.parse(connection.lastCall!)).toBeGreaterThan(Date.now() - 60_000);
       const listed = JSON.parse(text(await client.callTool({ name: 'list_projects', arguments: {} })));
       expect(listed.projects.map((entry: { id: string; title: string }) => [entry.id, entry.title])).toEqual([
         [projectId, 'Flight'],

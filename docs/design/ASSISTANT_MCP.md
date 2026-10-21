@@ -392,7 +392,7 @@ Write; for editor. Save one of the project's checkpoints as a new project with i
 
 #### `hand_off_readiness`
 
-Read; for editor. What an assistant can use in a project: each video recording of its bin with its proxy and camera motion analysis, each music recording with its playback cache and tempo analysis, and whether an export is running (stills wait for it).
+Read; for editor. What an assistant can use in a project: each video recording of its bin with its proxy and camera motion analysis, each music recording with its playback cache and tempo analysis, whether an export is running (stills wait for it), and how an MCP client connects.
 
 | Input       | Type   | Description              |
 | ----------- | ------ | ------------------------ |
@@ -801,9 +801,14 @@ Follow mode, Take over, restore and the Hand off dialog are implemented on the `
   hand-off (decided 2026-10-21: the assistant works with what is ready). Confirm flushes
   autosave and calls `session_start` with the brief.
 
-Still planned: the dialog showing the client configuration and whether an MCP client has
-connected (the client is started outside PasCap) and placing a music recording from the
-dialog.
+- **Assistant connection**, below the readiness list, says whether an MCP client has called
+  PasCap with the token since the service started (`hand_off_readiness.connection`: the last
+  call's time and the name the client gave, from `initialize` or the 2026 revision's
+  `io.modelcontextprotocol/clientInfo` meta), refreshed every 5 s. **How to connect** gives the
+  endpoint, the token file and a VS Code `mcp.json` entry that prompts for the token, with
+  **Copy configuration**; the token itself never reaches the editor.
+
+Still planned: placing a music recording from the dialog.
 
 ## Assistant playbook (the `pascap://guide` resource)
 

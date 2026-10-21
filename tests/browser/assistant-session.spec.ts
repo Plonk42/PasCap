@@ -195,6 +195,12 @@ test('hands off with a brief after showing what the assistant can use, then open
     ],
     music: [],
     exportRunning: true,
+    connection: {
+      url: 'http://127.0.0.1:4318/mcp',
+      tokenFile: '/data/mcp-token',
+      lastCall: new Date().toISOString(),
+      client: 'Visual Studio Code',
+    },
   };
   const analysed: string[] = [];
   await page.route('**/api/media/*/motion', async (route) => {
@@ -235,6 +241,13 @@ test('hands off with a brief after showing what the assistant can use, then open
   await readiness.getByRole('button', { name: 'Analyse 1' }).click();
   await expect(readiness).toContainText('1 analysing');
   expect(analysed).toEqual([assets[1]!.id]);
+  const connection = dialog.getByRole('region', { name: 'Assistant connection' });
+  await expect(connection).toContainText('Visual Studio Code called PasCap just now');
+  await connection.getByText('How to connect').click();
+  await expect(connection).toContainText('Point an MCP client at http://127.0.0.1:4318/mcp');
+  await expect(connection.getByLabel('VS Code MCP configuration')).toContainText(
+    '"Authorization": "Bearer ${input:pascap-token}"',
+  );
 
   await dialog.getByLabel('What should it make?').fill('A calm cut of the lake');
   await dialog.getByLabel('Target length (s)').fill('30');
