@@ -7,6 +7,7 @@ import {
   musicSampleRanges,
   nearestBeat,
   snapCutsToBeats,
+  type SnapSources,
 } from '../../src/shared/beat-alignment.js';
 import {
   createClip,
@@ -43,6 +44,10 @@ const beats: PlacedBeat[] = Array.from({ length: 13 }, (_, index) => ({
   downbeat: index % 4 === 0,
   strength: 0.5,
 }));
+
+function sources(frameCount: number, kept?: { sourceIn: number; sourceOut: number }[]): SnapSources {
+  return { frameCount: () => frameCount, kept: () => kept };
+}
 
 describe('beat alignment', () => {
   it('places music samples at project frames across loops', () => {
@@ -99,32 +104,63 @@ describe('beat alignment', () => {
     expect(nearestBeat([], 10)).toBeNull();
   });
 
-  it('shortens left clips so each boundary lands on the beat at or before it', () => {
-    const snapped = snapCutsToBeats(project(), 'video-1', beats, false, 30);
+  it('moves each boundary to the nearest beat, lengthening the left clip when its recording allows', () => {
+    const snapped = snapCutsToBeats(project(), 'video-1', beats, false, 30, sources(200));
     expect(snapped.boundaries.map((item) => [item.before, item.beat, item.after, item.skipped])).toEqual([
+      [60, 65, 65, null],
+      // b moved to 65–125, and 125 is a beat.
+      [125, 125, 125, null],
+    ]);
+    expect(snapped.commands).toEqual([{ type: 'trim', clipId: 'a', sourceIn: 0, sourceOut: 65 }]);
+    const after = snapped.commands.reduce((document, command) => applyCommand(document, command), project());
+    expect(boundaries(after).map((item) => item.frame)).toEqual([65, 125]);
+  });
+
+  it('falls back to the earlier beat without footage or outside the kept ranges', () => {
+    const expected = [
       [60, 50, 50, null],
       // b moved to 50–110, and 110 is a beat.
       [110, 110, 110, null],
-    ]);
-    expect(snapped.commands).toEqual([{ type: 'trim', clipId: 'a', sourceIn: 0, sourceOut: 50 }]);
-    const after = snapped.commands.reduce((document, command) => applyCommand(document, command), project());
-    expect(boundaries(after).map((item) => item.frame)).toEqual([50, 110]);
+    ];
+    const short = snapCutsToBeats(project(), 'video-1', beats, false, 30, sources(60));
+    expect(short.boundaries.map((item) => [item.before, item.beat, item.after, item.skipped])).toEqual(expected);
+    expect(short.commands).toEqual([{ type: 'trim', clipId: 'a', sourceIn: 0, sourceOut: 50 }]);
+    const kept = snapCutsToBeats(
+      project(),
+      'video-1',
+      beats,
+      false,
+      30,
+      sources(200, [{ sourceIn: 0, sourceOut: 60 }]),
+    );
+    expect(kept.boundaries.map((item) => [item.before, item.beat, item.after, item.skipped])).toEqual(expected);
+  });
+
+  it('lengthens a reversed clip by lowering its source IN', () => {
+    const reversed = applyCommand(
+      applyCommand(project(), { type: 'trim', clipId: 'a', sourceIn: 40, sourceOut: 100 }),
+      { type: 'reverse', clipId: 'a', reverse: true },
+    );
+    const snapped = snapCutsToBeats(reversed, 'video-1', beats, false, 30, sources(200));
+    expect(snapped.commands[0]).toEqual({ type: 'trim', clipId: 'a', sourceIn: 35, sourceOut: 100 });
+    expect(snapped.boundaries[0]!.after).toBe(65);
   });
 
   it('snaps to downbeats only, keeps clips at their minimum length and needs Ripple', () => {
-    const downbeats = snapCutsToBeats(project(), 'video-1', beats, true, 1);
-    // Downbeats at 5, 65, 125, 185: a shrinks to 5 frames and b, now 5–65, already ends on one.
+    const downbeats = snapCutsToBeats(project(), 'video-1', beats, true, 1, sources(200));
+    // Downbeats at 5, 65, 125, 185: a grows to 65 frames and b, now 65–125, already ends on one.
     expect(downbeats.boundaries.map((item) => [item.beat, item.after, item.skipped])).toEqual([
-      [5, 5, null],
       [65, 65, null],
+      [125, 125, null],
     ]);
-    const minimum = snapCutsToBeats(project(), 'video-1', beats, true, 30);
+    // Without footage to grow, the earlier downbeats would leave a and b under 30 frames.
+    const minimum = snapCutsToBeats(project(), 'video-1', beats, true, 30, sources(60));
     expect(minimum.commands).toEqual([]);
     expect(minimum.boundaries.map((item) => [item.beat, item.after, item.skipped !== null])).toEqual([
-      [5, 60, true],
-      [65, 120, true],
+      [65, 60, true],
+      [125, 120, true],
     ]);
-    expect(() => snapCutsToBeats(project(false), 'video-1', beats, false, 30)).toThrow(/Ripple/);
-    expect(() => snapCutsToBeats(project(), 'video-9', beats, false, 30)).toThrow(/video-9/);
+    expect(() => snapCutsToBeats(project(false), 'video-1', beats, false, 30, sources(200))).toThrow(/Ripple/);
+    expect(() => snapCutsToBeats(project(), 'video-9', beats, false, 30, sources(200))).toThrow(/video-9/);
   });
 });
