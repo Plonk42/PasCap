@@ -29,7 +29,9 @@ import {
   type VideoLayer,
 } from './model.js';
 import { detailSchema } from './detail.js';
-import { spatialSettingsSchema } from './spatial.js';
+import { colourCurveSchema, hslBandSchema } from './advanced-colour.js';
+import { colourSchema } from './colour.js';
+import { spatialPoseSchema, spatialSettingsSchema } from './spatial.js';
 import { clipDuration } from './speed.js';
 import { calculateLayout, layerClips, transitionOffset, type TimelineLayout } from './timeline.js';
 
@@ -53,6 +55,48 @@ function requiredLayer(next: ProjectDocument, layerId: string): VideoLayer {
   const layer = next.layers.find((item) => item.id === layerId);
   if (!layer) throw new Error('Track no longer exists.');
   return layer;
+}
+
+type TrackSettingCommand = Extract<
+  EditCommand,
+  { type: 'colour-setting' | 'hsl-band' | 'colour-curve' | 'transform-setting' }
+>;
+
+function followsKeyframes(layer: VideoLayer, setting: string, keys: number, list: string): void {
+  if (keys)
+    throw new Error(
+      `${setting} follows ${keys} ${list} keyframe${keys === 1 ? '' : 's'} on ${layer.name}, so its base value is not used; change ${keys === 1 ? 'that keyframe' : 'those keyframes'} instead.`,
+    );
+}
+
+/** Changes one appearance setting of a track, keeping every other one as saved. */
+function editTrackSetting(layer: VideoLayer, command: TrackSettingCommand): void {
+  const { colour, transform } = layer;
+  switch (command.type) {
+    case 'colour-setting':
+      followsKeyframes(layer, command.setting, keyCount(layer.keyframes, command.setting), 'track');
+      layer.colour = { ...colour, [command.setting]: colourSchema.shape[command.setting].parse(command.value) };
+      break;
+    case 'hsl-band':
+      layer.colour = { ...colour, hsl: { ...colour.hsl, [command.band]: hslBandSchema.parse(command.values) } };
+      break;
+    case 'colour-curve': {
+      const points = colourCurveSchema.parse(command.points).map((point) => ({ ...point }));
+      layer.colour = { ...colour, curves: { ...colour.curves, [command.channel]: points } };
+      break;
+    }
+    case 'transform-setting':
+      followsKeyframes(layer, command.setting, keyCount(transform.keyframes, command.setting), 'Transform');
+      layer.transform = {
+        ...transform,
+        base: { ...transform.base, [command.setting]: spatialPoseSchema.shape[command.setting].parse(command.value) },
+      };
+      break;
+  }
+}
+
+function keyCount<K extends string>(keyframes: readonly { values: Record<K, number | null> }[], setting: K): number {
+  return keyframes.filter((key) => key.values[setting] !== null).length;
 }
 
 function repairLayerBoundaries(next: ProjectDocument, layerIds: readonly string[]): void {
@@ -501,6 +545,12 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
       return projectSchema.parse(next);
     case 'detail':
       next.clips[index] = { ...next.clips[index]!, detail: detailSchema.parse(command.detail) };
+      return projectSchema.parse(next);
+    case 'colour-setting':
+    case 'hsl-band':
+    case 'colour-curve':
+    case 'transform-setting':
+      editTrackSetting(requiredLayer(next, command.layerId), command);
       return projectSchema.parse(next);
     case 'music':
       next.music = command.music;

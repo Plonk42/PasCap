@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { colourSchema } from './colour.js';
+import { colourCurveSchema, curvesSchema, hslBandSchema, hslSchema } from './advanced-colour.js';
+import { COLOUR_CONTROLS, colourSchema, type ScalarColourSetting } from './colour.js';
 import { described } from './described.js';
 import { detailSchema } from './detail.js';
 import { interpolationSchema, keyframeSettingSchema } from './keyframes.js';
@@ -13,7 +14,7 @@ import {
   selectRangeSchema,
   transitionSchema,
 } from './model.js';
-import { spatialSettingsSchema } from './spatial.js';
+import { spatialPoseSchema, spatialSettingsSchema } from './spatial.js';
 import { speedSchema } from './speed.js';
 
 function command<const T extends string, S extends z.ZodRawShape>(type: T, description: string, shape: S) {
@@ -33,6 +34,11 @@ const selectRanges = described(
   z.array(selectRangeSchema).max(MAX_SELECTS),
   `Kept source ranges (OUT exclusive), ascending and separated by at least one frame, at most ${MAX_SELECTS}.`,
 );
+const colourSetting = described(
+  z.enum(COLOUR_CONTROLS.map((control) => control.key) as [ScalarColourSetting, ...ScalarColourSetting[]]),
+  'Scalar Colour setting: temperature, tint, exposure, brightness, contrast, hue, saturation, vibrance, highlights, shadows, whites, blacks, hdr or localContrast.',
+);
+const settingValue = described(z.number(), "New base value, within the setting's bounds (describe_track lists them).");
 
 /** Descriptions are written for an LLM; rules JSON Schema cannot express are stated in them. */
 export const editCommandSchema = z.discriminatedUnion('type', [
@@ -101,6 +107,39 @@ export const editCommandSchema = z.discriminatedUnion('type', [
         colourSchema,
         'Every Colour setting of the track: twelve scalar settings, hdr, localContrast, hsl and curves.',
       ),
+    },
+  ),
+  command(
+    'colour-setting',
+    'Set one scalar Colour setting of a video track, keeping every other one. Rejected while the setting has track keyframes, which it then follows: change those with layer-key-value.',
+    { layerId, setting: colourSetting, value: settingValue },
+  ),
+  command('hsl-band', "Set one HSL range of a video track's Colour, keeping the other ranges and settings.", {
+    layerId,
+    band: described(hslSchema.keyof(), 'Colour range: red, orange, yellow, green, cyan, blue, purple or magenta.'),
+    values: described(
+      hslBandSchema,
+      'Hue shift −30–30°, saturation −1–1 and lightness −0.5–0.5 of the range; all 0 is neutral.',
+    ),
+  }),
+  command('colour-curve', "Replace one curve of a video track's Colour, keeping the other curves and settings.", {
+    layerId,
+    channel: described(curvesSchema.keyof(), 'Curve: master, red, green or blue.'),
+    points: described(
+      colourCurveSchema,
+      '2–16 control nodes {x, y} in 0–1 with inputs strictly ascending from 0 to 1; identity is (0,0), (0.5,0.5), (1,1).',
+    ),
+  }),
+  command(
+    'transform-setting',
+    'Set one Transform base setting of a video track, keeping the others. Rejected while the setting has Transform keyframes, which it then follows.',
+    {
+      layerId,
+      setting: described(
+        spatialPoseSchema.keyof(),
+        'Transform setting: cropLeft, cropRight, cropTop, cropBottom, scale, translateX, translateY or rotation.',
+      ),
+      value: settingValue,
     },
   ),
   command(

@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
-import type { ColourSettings } from '../../src/shared/colour.js';
+import type { ColourCurvePoint, CurveChannel, HslBand } from '../../src/shared/advanced-colour.js';
+import type { ColourSettings, ScalarColourSetting } from '../../src/shared/colour.js';
 import { createColourSettings } from '../../src/shared/colour.js';
 import { editCommandSchema, type EditCommand } from '../../src/shared/commands.js';
 import { createDetailSettings, type DetailSettings } from '../../src/shared/detail.js';
@@ -14,11 +15,18 @@ import {
   type VideoClip,
   type VideoLayer,
 } from '../../src/shared/model.js';
-import { createSpatialSettings, type SpatialSettings } from '../../src/shared/spatial.js';
+import { createSpatialSettings, type SpatialChannel, type SpatialSettings } from '../../src/shared/spatial.js';
 import type { SpeedSettings } from '../../src/shared/speed.js';
 
-/** The hand-written union `editCommandSchema` replaced (#228); the inferred type must stay identical. */
+/**
+ * The hand-written union `editCommandSchema` replaced (#228), plus the partial track settings (#252);
+ * the inferred type must stay identical.
+ */
 type FormerEditCommand =
+  | { type: 'colour-setting'; layerId: string; setting: ScalarColourSetting; value: number }
+  | { type: 'hsl-band'; layerId: string; band: HslBand; values: { hue: number; saturation: number; lightness: number } }
+  | { type: 'colour-curve'; layerId: string; channel: CurveChannel; points: ColourCurvePoint[] }
+  | { type: 'transform-setting'; layerId: string; setting: SpatialChannel; value: number }
   | { type: 'insert'; clip: VideoClip; index: number }
   | { type: 'delete'; clipId: string }
   | { type: 'reorder'; clipIds: string[] }
@@ -76,6 +84,18 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
   },
   duplicate: { type: 'duplicate', clipId: 'clip-1', newClipId: 'clip-3' },
   colour: { type: 'colour', layerId: 'video-1', colour: createColourSettings() },
+  'colour-setting': { type: 'colour-setting', layerId: 'video-1', setting: 'exposure', value: 0.5 },
+  'hsl-band': { type: 'hsl-band', layerId: 'video-1', band: 'blue', values: { hue: 5, saturation: 0.2, lightness: 0 } },
+  'colour-curve': {
+    type: 'colour-curve',
+    layerId: 'video-1',
+    channel: 'master',
+    points: [
+      { x: 0, y: 0.05 },
+      { x: 1, y: 0.95 },
+    ],
+  },
+  'transform-setting': { type: 'transform-setting', layerId: 'video-1', setting: 'scale', value: 1.2 },
   speed: { type: 'speed', clipId: 'clip-1', speed: { mode: 'constant', rate: 2 } },
   reverse: { type: 'reverse', clipId: 'clip-1', reverse: true },
   transform: { type: 'transform', layerId: 'video-1', transform: createSpatialSettings() },
