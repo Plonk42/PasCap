@@ -463,9 +463,9 @@ Host and Origin checks. In VS Code, add to `.vscode/mcp.json` (or the user `mcp.
 }
 ```
 
-The endpoint is stateless (JSON responses, no session or event stream) and implemented in
-[mcp.ts](../src/server/mcp.ts); the official `@modelcontextprotocol/sdk` client is a
-development dependency that tests it. Assistant sessions do not exist yet: while the editor
+The endpoint runs the official `@modelcontextprotocol/sdk` server in stateless mode (JSON
+responses, no session or event stream) from [mcp.ts](../src/server/mcp.ts); the unit tests
+drive it with the SDK's client. Assistant sessions do not exist yet: while the editor
 has the same project open, an assistant edit makes the editor's next save stale (it is
 rejected, never overwritten), so try the assistant on a copy. `tsx watch` restarts on source
 edits and drops in-flight tool calls, as it ends exports.
