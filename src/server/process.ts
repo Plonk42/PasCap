@@ -6,6 +6,8 @@ interface ProcessOptions {
   cwd?: string;
   onProgress?: (fields: Record<string, string>) => void;
   maxBytes?: number;
+  /** Written to the child's stdin, which is then closed. */
+  input?: Buffer;
 }
 
 /** No shell, bounded output, cancellable child process. All arguments remain separate. */
@@ -17,9 +19,12 @@ export function runProcess(binary: string, args: string[], options: ProcessOptio
     }
     const child = spawn(binary, args, {
       shell: false,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
       ...(options.cwd ? { cwd: options.cwd } : {}),
     });
+    // A child that exits early closes the pipe; its exit status reports the failure.
+    child.stdin.on('error', () => undefined);
+    child.stdin.end(options.input);
     const chunks: Buffer[] = [];
     let size = 0;
     let stderr = '';

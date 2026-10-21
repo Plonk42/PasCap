@@ -7,15 +7,14 @@ import { errorMessage, ServiceError } from './errors.js';
 import { assertSourceIdentity } from './files.js';
 import type { MediaLibrary } from './library.js';
 
-/** Saved projects may only reference registered, unchanged recordings and music within their frames. */
-export async function assertProjectSources(
+/** Clips, kept ranges and music fit their registered recordings; no file is read. */
+export function assertSourceRanges(
   document: ProjectDocument,
   library: Pick<MediaLibrary, 'get'>,
   audio: Pick<AudioLibrary, 'get'>,
-): Promise<void> {
+): void {
   document.media.videoIds.forEach((id) => library.get(id));
   document.media.audioIds.forEach((id) => audio.get(id));
-  const sources = new Map<string, { sourcePath: string; fingerprint: SourceFingerprint }>();
   const frameCounts = new Map(
     [...document.clips.map((clip) => clip.mediaId), ...Object.keys(document.selects)].map((mediaId) => {
       const asset = library.get(mediaId);
@@ -28,15 +27,29 @@ export async function assertProjectSources(
     throw new ServiceError(errorMessage(error), 422);
   }
   for (const clip of document.clips) {
-    const asset = library.get(clip.mediaId);
-    if (clip.sourceOut > asset.metadata.frameCount)
+    if (clip.sourceOut > library.get(clip.mediaId).metadata.frameCount)
       throw new ServiceError(`Clip ${clip.id} exceeds its registered source frames.`, 422);
+  }
+  for (const track of musicClips(document.music)) {
+    if (track.sourceOut > audio.get(track.mediaId).metadata.frameCount)
+      throw new ServiceError('Music exceeds its registered source frames.', 422);
+  }
+}
+
+/** Saved projects may only reference registered, unchanged recordings and music within their frames. */
+export async function assertProjectSources(
+  document: ProjectDocument,
+  library: Pick<MediaLibrary, 'get'>,
+  audio: Pick<AudioLibrary, 'get'>,
+): Promise<void> {
+  assertSourceRanges(document, library, audio);
+  const sources = new Map<string, { sourcePath: string; fingerprint: SourceFingerprint }>();
+  for (const clip of document.clips) {
+    const asset = library.get(clip.mediaId);
     sources.set(`video:${asset.id}`, asset);
   }
   for (const track of musicClips(document.music)) {
     const asset = audio.get(track.mediaId);
-    if (track.sourceOut > asset.metadata.frameCount)
-      throw new ServiceError('Music exceeds its registered source frames.', 422);
     sources.set(`audio:${asset.id}`, asset);
   }
   await [...sources.values()].reduce(async (previous, asset) => {

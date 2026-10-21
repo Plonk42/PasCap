@@ -2,9 +2,10 @@ import type { z } from 'zod';
 import { describeProject } from './describe-project.js';
 import { describeTrack } from './describe-track.js';
 import { edit } from './edit.js';
+import { recordingSheet, still, timelineSheet } from './pictures.js';
 
 /** Every operation of the service; one that is not listed here does not exist. */
-export const operations = [describeProject, describeTrack, edit] as const;
+export const operations = [describeProject, describeTrack, edit, still, timelineSheet, recordingSheet] as const;
 
 export type Operation = (typeof operations)[number];
 export type OperationName = Operation['name'];

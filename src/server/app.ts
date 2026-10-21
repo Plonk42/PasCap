@@ -22,6 +22,7 @@ import { assertProjectSources } from './project-sources.js';
 import { submitFolderRelink } from './relink.js';
 import { MediaLibrary, MediaQueueError } from './library.js';
 import { startReference } from './reference.js';
+import { StillRenderer } from './stills.js';
 import { ensurePrivateDirectory, ProjectStore } from './storage.js';
 
 const idParams = z.object({ id: idSchema });
@@ -329,7 +330,13 @@ export async function createApp(config = createConfig()) {
     }
     return reply.code(201).send({ document: await projects.save(document, 0) });
   });
-  registerOperations(app, { projects, library, audio });
+  registerOperations(app, {
+    projects,
+    library,
+    audio,
+    stills: new StillRenderer(config, library, jobs),
+    images: config.assistantImages,
+  });
   app.get('/api/jobs', (_request, reply) => reply.send({ jobs: jobs.list() }));
   app.get('/api/jobs/:id', (request, reply) => reply.send({ job: jobs.get(idParams.parse(request.params).id) }));
   app.post('/api/jobs/:id/cancel', (request, reply) => {

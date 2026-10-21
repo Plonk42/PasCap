@@ -1,0 +1,309 @@
+import type { MediaAsset } from '../shared/media.js';
+import type { ProjectDocument } from '../shared/model.js';
+import { forEachSerial } from '../shared/serial.js';
+import { calculateLayout, sampleSlots, sampleTimeline, type TimelineLayout } from '../shared/timeline.js';
+import { framesToSeconds } from '../shared/timing.js';
+import type { AssistantImageBudget, ServiceConfig } from './config.js';
+import { ServiceError } from './errors.js';
+import type { JobQueue } from './jobs.js';
+import { ColourLutCache } from './layered-colour.js';
+import { sourceOverGroup } from './layered-export.js';
+import { composeLayerFrame, fittedContent, type LayerFrameSource } from './layered-frame.js';
+import { CompositorPool } from './layered-pool.js';
+import type { MediaLibrary } from './library.js';
+import { runProcess } from './process.js';
+
+/** Stills compose at the 720p proxy size, the size the preview shows. */
+export const STILL_SIZE = Object.freeze({ width: 1280, height: 720 });
+const PIXELS = STILL_SIZE.width * STILL_SIZE.height;
+const MAX_IMAGE_BYTES = 1024 * 1024;
+const MAX_WAITING = 2;
+const RENDER_TIMEOUT_MS = 120_000;
+
+export interface Crop {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+export interface JpegImage {
+  mimeType: 'image/jpeg';
+  data: string;
+  width: number;
+  height: number;
+}
+type DecodeFrame = (asset: MediaAsset, sourceFrame: number, signal: AbortSignal) => Promise<Buffer>;
+
+/** Exactly proxy frame `sourceFrame`, fitted and padded like the layered export's decode, as RGB8. */
+export function proxyFrameArgs(proxy: string, asset: MediaAsset, sourceFrame: number): string[] {
+  const bounds = fittedContent(asset.metadata, STILL_SIZE);
+  // A quarter frame early: accurate seeking keeps the first frame at or after the time, never one later.
+  const seek = sourceFrame > 0 ? ['-ss', framesToSeconds(sourceFrame - 0.25).toFixed(9)] : [];
+  return [
+    '-hide_banner',
+    '-loglevel',
+    'error',
+    '-nostdin',
+    '-threads',
+    '2',
+    ...seek,
+    '-i',
+    proxy,
+    '-map',
+    '0:v:0',
+    '-frames:v',
+    '1',
+    '-an',
+    '-vf',
+    `scale=${bounds.width}:${bounds.height}:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:` +
+      `in_range=tv:out_range=pc,format=rgb24,` +
+      `pad=${STILL_SIZE.width}:${STILL_SIZE.height}:${bounds.x}:${bounds.y}:black,setsar=1`,
+    '-f',
+    'rawvideo',
+    'pipe:1',
+  ];
+}
+
+export interface ComposeContext {
+  assetOf: (mediaId: string) => MediaAsset;
+  decode: DecodeFrame;
+  cache: ColourLutCache;
+  signal: AbortSignal;
+  pool?: CompositorPool | null;
+}
+
+/**
+ * Project frame `frame` as the layered export composes it: each enabled track one group,
+ * source-over the tracks below, over opaque black; returns premultiplied RGBA16.
+ * With a pool, every frame buffer is shared memory, as the workers require.
+ */
+export async function composeProjectFrame(
+  document: ProjectDocument,
+  layout: TimelineLayout,
+  frame: number,
+  { assetOf, decode, cache, signal, pool = null }: ComposeContext,
+): Promise<Buffer> {
+  const allocate = (bytes: number): Buffer => (pool ? Buffer.from(new SharedArrayBuffer(bytes)) : Buffer.alloc(bytes));
+  const shared = (frame: Buffer): Buffer => {
+    if (!pool) return frame;
+    const copy = allocate(frame.length);
+    frame.copy(copy);
+    return copy;
+  };
+  const accumulator = allocate(PIXELS * 8);
+  const group = allocate(PIXELS * 8);
+  const samples = sampleTimeline(document, frame, layout);
+  const slots = sampleSlots(document, frame, layout);
+  // A timeslot draws geometry and coverage only: brightness 0 never reads its pixels.
+  const blank = allocate(PIXELS * 3);
+  const source = (sample: LayerFrameSource['sample'], rgb: Buffer): LayerFrameSource => {
+    const { width, height } = assetOf(sample.mediaId).metadata;
+    return { sample, rgb, original: { width, height }, bounds: fittedContent({ width, height }, STILL_SIZE) };
+  };
+  await forEachSerial(document.layers, async (layer) => {
+    const sources: LayerFrameSource[] = [];
+    await forEachSerial(
+      samples.filter((sample) => sample.layerId === layer.id),
+      async (sample) => {
+        const decoded = await decode(assetOf(sample.mediaId), sample.sourceFrame, signal);
+        sources.push(source(sample, shared(decoded)));
+      },
+    );
+    sources.push(...slots.filter((sample) => sample.layerId === layer.id).map((sample) => source(sample, blank)));
+    if (!sources.length) return;
+    group.fill(0);
+    await composeLayerFrame(group, STILL_SIZE, sources, cache, signal, pool);
+    await sourceOverGroup(accumulator, group, signal);
+  });
+  return accumulator;
+}
+
+/** Drops coverage: over opaque black, premultiplied RGB is the picture. */
+export function rgba16ToRgb8(frame: Buffer): Buffer {
+  const input = new Uint16Array(frame.buffer, frame.byteOffset, frame.length / 2);
+  const output = Buffer.alloc((input.length / 4) * 3);
+  for (let pixel = 0, offset = 0; offset < input.length; pixel += 3, offset += 4) {
+    output[pixel] = Math.round(input[offset]! / 257);
+    output[pixel + 1] = Math.round(input[offset + 1]! / 257);
+    output[pixel + 2] = Math.round(input[offset + 2]! / 257);
+  }
+  return output;
+}
+
+export function cropRgb8(frame: Buffer, crop: Crop): Buffer {
+  if (crop.x + crop.width > STILL_SIZE.width || crop.y + crop.height > STILL_SIZE.height)
+    throw new ServiceError(`The crop must lie within the ${STILL_SIZE.width} × ${STILL_SIZE.height} composition.`, 422);
+  const output = Buffer.alloc(crop.width * crop.height * 3);
+  for (let row = 0; row < crop.height; row++) {
+    const start = ((crop.y + row) * STILL_SIZE.width + crop.x) * 3;
+    frame.copy(output, row * crop.width * 3, start, start + crop.width * 3);
+  }
+  return output;
+}
+
+/** Columns and rows of a contact sheet: as square as possible, filled row by row. */
+export function sheetGrid(cells: number): { columns: number; rows: number } {
+  const columns = Math.ceil(Math.sqrt(cells));
+  return { columns, rows: Math.ceil(cells / columns) };
+}
+
+const SHEET_PADDING = 4;
+
+function scaledHeight(width: number, source: { width: number; height: number }): number {
+  return Math.max(2, Math.round((source.height * width) / source.width / 2) * 2);
+}
+
+/** Serial still and contact-sheet rendering from verified proxies; never decodes an original. */
+export class StillRenderer {
+  readonly #cache = new ColourLutCache();
+  #tail: Promise<unknown> = Promise.resolve();
+  #pending = 0;
+  constructor(
+    private readonly config: Pick<ServiceConfig, 'ffmpeg'>,
+    private readonly library: Pick<MediaLibrary, 'get' | 'proxyPath'>,
+    private readonly jobs: Pick<JobQueue, 'list'>,
+  ) {}
+
+  /** One render at a time and at most two waiting; refused while an export or reference job runs. */
+  #run<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    const busy = this.jobs
+      .list()
+      .find((job) => job.state === 'running' && (job.kind === 'export' || job.kind === 'reference'));
+    if (busy) throw new ServiceError(`Pictures wait while “${busy.label}” renders; try again when it finishes.`, 409);
+    if (this.#pending > MAX_WAITING) throw new ServiceError('Too many pictures are rendering; try again shortly.', 503);
+    this.#pending++;
+    const result = this.#tail.then(() => task(AbortSignal.timeout(RENDER_TIMEOUT_MS)));
+    this.#tail = result.catch(() => undefined);
+    return result.finally(() => {
+      this.#pending--;
+    });
+  }
+
+  readyAsset(mediaId: string): MediaAsset {
+    const asset = this.library.get(mediaId);
+    if (asset.status !== 'ready' || !asset.prepared)
+      throw new ServiceError(`Recording ${asset.name} has no verified proxy yet; prepare it first.`, 409);
+    return asset;
+  }
+
+  readonly #decode: DecodeFrame = async (asset, sourceFrame, signal) => {
+    if (sourceFrame >= asset.metadata.frameCount)
+      throw new ServiceError(`Recording ${asset.name} has ${asset.metadata.frameCount} frames.`, 422);
+    const rgb = await runProcess(
+      this.config.ffmpeg,
+      proxyFrameArgs(this.library.proxyPath(asset), asset, sourceFrame),
+      { signal, maxBytes: PIXELS * 3 },
+    );
+    if (rgb.length !== PIXELS * 3)
+      throw new ServiceError(`The proxy of ${asset.name} did not deliver source frame ${sourceFrame}.`, 500);
+    return rgb;
+  };
+
+  /** RGB8 compositions of project frames, decoded from the proxies of the clips they show. */
+  async #projectFrames(document: ProjectDocument, frames: readonly number[], signal: AbortSignal): Promise<Buffer[]> {
+    const layout = calculateLayout(document);
+    const outside = frames.find((frame) => frame >= layout.duration);
+    if (outside !== undefined)
+      throw new ServiceError(`Frame ${outside} is outside the project, which has ${layout.duration} frames.`, 422);
+    const pictures: Buffer[] = [];
+    // Local tone and Detail cost about 3 s per 720p frame in process, 1 s on the pool.
+    const pool = CompositorPool.forHost();
+    try {
+      await forEachSerial(frames, async (frame) => {
+        const composed = await composeProjectFrame(document, layout, frame, {
+          assetOf: (mediaId) => this.readyAsset(mediaId),
+          decode: this.#decode,
+          cache: this.#cache,
+          signal,
+          pool,
+        });
+        pictures.push(rgba16ToRgb8(composed));
+      });
+    } finally {
+      await pool?.close();
+    }
+    return pictures;
+  }
+
+  async #encode(
+    pictures: readonly Buffer[],
+    size: { width: number; height: number },
+    cellWidth: number,
+    signal: AbortSignal,
+  ): Promise<JpegImage> {
+    const cellHeight = scaledHeight(cellWidth, size);
+    const { columns, rows } = sheetGrid(pictures.length);
+    const tiled = pictures.length > 1;
+    const filters = [`scale=${cellWidth}:${cellHeight}:flags=area`];
+    if (tiled) filters.push(`tile=${columns}x${rows}:padding=${SHEET_PADDING}:color=black`);
+    const jpeg = await runProcess(
+      this.config.ffmpeg,
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-f',
+        'rawvideo',
+        '-pix_fmt',
+        'rgb24',
+        '-s',
+        `${size.width}x${size.height}`,
+        '-i',
+        'pipe:0',
+        '-vf',
+        filters.join(','),
+        '-frames:v',
+        '1',
+        '-c:v',
+        'mjpeg',
+        '-pix_fmt',
+        'yuvj420p',
+        '-q:v',
+        '4',
+        '-f',
+        'image2',
+        'pipe:1',
+      ],
+      { signal, input: Buffer.concat(pictures), maxBytes: MAX_IMAGE_BYTES },
+    );
+    return {
+      mimeType: 'image/jpeg',
+      data: jpeg.toString('base64'),
+      width: tiled ? columns * cellWidth + (columns - 1) * SHEET_PADDING : cellWidth,
+      height: tiled ? rows * cellHeight + (rows - 1) * SHEET_PADDING : cellHeight,
+    };
+  }
+
+  /** One project frame at `width`, or a 1:1 crop of its composition. */
+  still(document: ProjectDocument, frame: number, width: number, crop: Crop | null): Promise<JpegImage> {
+    return this.#run(async (signal) => {
+      const [picture] = await this.#projectFrames(document, [frame], signal);
+      if (!crop) return this.#encode([picture!], STILL_SIZE, width, signal);
+      return this.#encode([cropRgb8(picture!, crop)], crop, crop.width, signal);
+    });
+  }
+
+  /** A contact sheet of project frames; a single frame renders at `stillWidth`. */
+  timelineSheet(
+    document: ProjectDocument,
+    frames: readonly number[],
+    budget: AssistantImageBudget,
+  ): Promise<JpegImage> {
+    return this.#run(async (signal) => {
+      const pictures = await this.#projectFrames(document, frames, signal);
+      return this.#encode(pictures, STILL_SIZE, frames.length > 1 ? budget.sheetCellWidth : budget.stillWidth, signal);
+    });
+  }
+
+  /** A contact sheet of a recording's proxy frames, without track appearance. */
+  recordingSheet(mediaId: string, frames: readonly number[], budget: AssistantImageBudget): Promise<JpegImage> {
+    return this.#run(async (signal) => {
+      const asset = this.readyAsset(mediaId);
+      const pictures: Buffer[] = [];
+      await forEachSerial(frames, async (frame) => {
+        pictures.push(await this.#decode(asset, frame, signal));
+      });
+      return this.#encode(pictures, STILL_SIZE, frames.length > 1 ? budget.sheetCellWidth : budget.stillWidth, signal);
+    });
+  }
+}

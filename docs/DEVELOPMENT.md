@@ -69,16 +69,19 @@ This is not static hosting, LAN/SaaS deployment or a completed container recipe.
 
 ## Configuration and storage
 
-| Variable                           | Meaning                                                                                                                                                                                      |
-| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `PASCAP_DATA_DIR`                  | Generated-data directory; defaults to the ignored `.pascap/`                                                                                                                                 |
-| `PASCAP_MEDIA_ROOTS`               | JSON array of up to 32 unique absolute roots shared by footage/music browsing; defaults to the service user's Videos folder; `[]` disables both browsers, not deliberate manual path imports |
-| `PASCAP_PORT`                      | Unprivileged loopback service port, default 4318                                                                                                                                             |
-| `PASCAP_FFMPEG` / `PASCAP_FFPROBE` | Native executable paths, otherwise resolved from PATH                                                                                                                                        |
-| `PASCAP_MEASURE_URL`               | Editor URL/project used by the optional measurement helper                                                                                                                                   |
-| `PASCAP_CHROME`                    | Browser for the export GPU compositor, otherwise `google-chrome` or `chromium` from PATH                                                                                                     |
-| `PASCAP_GPU_COMPOSITING`           | `auto` (default) composites detail/HDR export groups on a hardware GPU when one starts; `off` always uses the CPU compositor                                                                 |
-| `PASCAP_HW_DECODE`                 | `auto` (default) decodes undamaged originals for proxy encodes with NVDEC when a CUDA device starts; `off` always uses the CPU decoder                                                       |
+| Variable                            | Meaning                                                                                                                                                                                      |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PASCAP_DATA_DIR`                   | Generated-data directory; defaults to the ignored `.pascap/`                                                                                                                                 |
+| `PASCAP_MEDIA_ROOTS`                | JSON array of up to 32 unique absolute roots shared by footage/music browsing; defaults to the service user's Videos folder; `[]` disables both browsers, not deliberate manual path imports |
+| `PASCAP_PORT`                       | Unprivileged loopback service port, default 4318                                                                                                                                             |
+| `PASCAP_FFMPEG` / `PASCAP_FFPROBE`  | Native executable paths, otherwise resolved from PATH                                                                                                                                        |
+| `PASCAP_MEASURE_URL`                | Editor URL/project used by the optional measurement helper                                                                                                                                   |
+| `PASCAP_CHROME`                     | Browser for the export GPU compositor, otherwise `google-chrome` or `chromium` from PATH                                                                                                     |
+| `PASCAP_GPU_COMPOSITING`            | `auto` (default) composites detail/HDR export groups on a hardware GPU when one starts; `off` always uses the CPU compositor                                                                 |
+| `PASCAP_HW_DECODE`                  | `auto` (default) decodes undamaged originals for proxy encodes with NVDEC when a CUDA device starts; `off` always uses the CPU decoder                                                       |
+| `PASCAP_ASSISTANT_STILL_WIDTH`      | Largest still width and crop side the picture operations render, 160–1280, default 480 ([stills](design/ASSISTANT_MCP.md#stills-and-contact-sheets))                                         |
+| `PASCAP_ASSISTANT_SHEET_CELL_WIDTH` | Width of each contact-sheet cell, 96–640, default 240                                                                                                                                        |
+| `PASCAP_ASSISTANT_SHEET_CELLS`      | Frames per contact sheet, 1–24, default 9                                                                                                                                                    |
 
 For example, start with an explicit approved root (literal `~` is not expanded):
 
