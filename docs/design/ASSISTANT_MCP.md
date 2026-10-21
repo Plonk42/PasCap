@@ -482,23 +482,24 @@ beats; the action reports when it would exceed the limit and offers downbeats on
 ## MCP server
 
 Implemented on the `mcp` branch ([#242](https://github.com/Plonk42/PasCap/issues/242),
-[mcp.ts](../../src/server/mcp.ts)): `/mcp` on the service's loopback port is a **stateless**
-Streamable HTTP endpoint. Each `POST` carries one JSON-RPC message and gets one JSON response:
-`initialize` (protocol versions 2025-11-25, 2025-06-18 and 2025-03-26, with short
-instructions), `ping`, `tools/list` and `tools/call`; notifications get 202, and `GET` and
-`DELETE` 405, since there is no session or server-initiated stream. The tools are generated in
-a loop from the operations whose `audience` includes `assistant`: name, description, input
-JSON Schema and a read-only hint from `access`. A call runs the same `runOperation` as the
-HTTP route; pictures become image content beside a JSON text legend, other outputs JSON text,
-and a rejected call is a tool error carrying the service's reason, so the model can correct it.
+[mcp.ts](../../src/server/mcp.ts)) with the official `@modelcontextprotocol/sdk`: `/mcp` on
+the service's loopback port runs its `McpServer` over its Streamable HTTP transport in
+**stateless** mode, a new server and transport per `POST`, answered with JSON. The Fastify
+route checks the token, then hands the raw request and its parsed body to the transport
+(`reply.hijack()`); the SDK handles initialization and protocol versions, `ping`,
+`tools/list` and `tools/call`, notifications and JSON-RPC errors. `GET` and `DELETE` answer
+405, since there is no session or server-initiated stream. The tools are registered in a loop
+from the operations whose `audience` includes `assistant`: name, description, the zod input
+schema (the SDK publishes it as JSON Schema, nested descriptions included, and validates
+calls against it) and a read-only hint from `access`. A call runs the same `runOperation` as
+the HTTP route; pictures become image content beside a JSON text legend, other outputs JSON
+text, and a rejected call is a tool error carrying the service's reason, so the model can
+correct it.
 
-The endpoint is written in the service instead of using `@modelcontextprotocol/sdk` (chosen
-on 2026-10-21): the SDK's server would add 91 production packages, including Express,
-Hono and an unreviewed BSD-2-Clause licence, beside Fastify, for a protocol subset of about
-150 lines here. The SDK's official client is a development dependency, and the unit tests
-drive the endpoint through it, so conformance is checked against the reference
-implementation. Resources, progress notifications or sessions can be added the same way, or
-the SDK adopted later without touching the registry.
+The owner preferred the standard SDK to a hand-written endpoint (2026-10-21): it follows the
+protocol as it evolves, and resources, prompts, progress or sessions come with it. It adds
+81 production installations (Express and Hono among them, loaded but never listening) and
+one new reviewed licence family, BSD-2-Clause ([licensing](../LICENSING.md)).
 
 Authentication is a bearer token generated at the first startup and kept in
 `<dataDir>/mcp-token` (owner-only, like the rest of the data directory); `/mcp` is exempt
@@ -658,10 +659,9 @@ endpoint, token and loopback), [EDITOR_CONTROLS](EDITOR_CONTROLS.md) (new contro
   the browser and FFmpeg scale differently.
 - Stills are proxy-resolution compositions; fine detail at 4K is judged at export, as in
   the preview today.
-- The MCP SDK is a new production dependency of the service: its zod 4 compatibility,
-  licence, size and Fastify integration (raw request hijack) must be checked before
-  Phase 5. A `tsx watch` restart during development ends an MCP session, as it ends an
-  export.
+- The MCP SDK is a production dependency of the service, mounted on Fastify through a raw
+  request hijack; upgrading it follows the risky route. A `tsx watch` restart during
+  development drops in-flight tool calls, as it ends an export.
 - Automatic exposure is not automatic guidance: a new command appears in `edit` by itself,
   but the playbook may need a sentence, and `.refine()` rules are invisible in JSON Schema
   until the model reads the error message.
