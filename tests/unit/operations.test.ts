@@ -360,8 +360,6 @@ describe('operation routes', () => {
       },
       sessions: {
         current: async () => ({ endedAt: null, brief: { allowedMovement: 3 } }),
-        assertPictures: async () => {},
-        countPictures: async () => 15,
       },
       stills: {
         recordingSheet: async (_: string, frames: number[]) => {
@@ -369,7 +367,7 @@ describe('operation routes', () => {
           return { mimeType: 'image/jpeg', data: 'jpeg', width: 240, height: 135 };
         },
       },
-      images: { stillWidth: 480, sheetCellWidth: 240, sheetCells: 2, sessionPictures: 16 },
+      images: { stillWidth: 480, sheetCellWidth: 240, sheetCells: 2 },
     } as unknown as Parameters<typeof runners.describe_recording>[0];
     const described = await runners.describe_recording(context, { projectId: 'shots', mediaId: 'rec-1', sheet: true });
     expect(described.allowedMovement).toBe(3);
@@ -383,7 +381,6 @@ describe('operation routes', () => {
     expect(ranges.map((range) => range.cell)).toEqual([null, 0, 1]);
     expect(sheets).toEqual([ranges.slice(1).map((range) => Math.floor((range.sourceIn + range.sourceOut) / 2))]);
     expect(described.image).toMatchObject({ mimeType: 'image/jpeg' });
-    expect(described.picturesLeft).toBe(15);
     const bare = await runners.describe_recording(context, {
       projectId: 'shots',
       mediaId: 'rec-1',
@@ -429,14 +426,14 @@ describe('operation routes', () => {
               }
             : null,
       },
-      sessions: { current: async () => null, assertPictures: async () => {}, countPictures: async () => null },
+      sessions: { current: async () => null },
       stills: {
         sourceSheet: async (cells: unknown, columns: number | null) => {
           sheets.push({ cells, columns });
           return { mimeType: 'image/jpeg', data: 'jpeg', width: 484, height: 274 };
         },
       },
-      images: { stillWidth: 480, sheetCellWidth: 240, sheetCells: 6, sessionPictures: 16 },
+      images: { stillWidth: 480, sheetCellWidth: 240, sheetCells: 6 },
     } as unknown as Parameters<typeof runners.compare_recordings>[0];
     const described = await runners.describe_recording(
       context as unknown as Parameters<typeof runners.describe_recording>[0],
