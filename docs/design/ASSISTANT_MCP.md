@@ -220,6 +220,13 @@ added later for the editor is exposed to the assistant the moment it is in the u
 
 <!-- Generated from src/shared/operations by `npm run operations:catalogue`; edit the definitions, not this text. -->
 
+#### `list_projects`
+
+Read; for editor and assistant. List the saved projects, most recently saved first, with their title, revision, number of clips and duration. Use it to find the ID of the project the user means; ask when several could match. A project that cannot be opened carries the reason.
+
+| Input | Type | Description |
+| ----- | ---- | ----------- |
+
 #### `describe_project`
 
 Read; for editor and assistant. Summarise a saved project: its revision, duration, video tracks with their clips in timeline order (project frames and timecodes, source ranges, speed, direction), transitions, music tracks, the recordings with the ranges the user kept, and bookmarks. Frames are integers at 30000/1001 fps. Read it before editing and after each edit batch.

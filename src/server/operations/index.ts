@@ -5,9 +5,11 @@ import type { OperationRunner, OperationRunners, ServiceContext } from './contex
 import { runDescribeProject } from './describe-project.js';
 import { runDescribeTrack } from './describe-track.js';
 import { runEdit } from './edit.js';
+import { runListProjects } from './list-projects.js';
 import { runRecordingSheet, runStill, runTimelineSheet } from './pictures.js';
 
 export const runners: OperationRunners = {
+  list_projects: runListProjects,
   describe_project: runDescribeProject,
   describe_track: runDescribeTrack,
   edit: runEdit,

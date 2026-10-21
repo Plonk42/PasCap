@@ -11,6 +11,7 @@ import { createColourSettings } from '../../src/shared/colour.js';
 import { createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import type { TrackDescription } from '../../src/shared/operations/describe-track.js';
 import { operations } from '../../src/shared/operations/index.js';
+import { durationOf } from '../../src/shared/operations/timecode.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 
 const headers = { host: '127.0.0.1:4318', 'x-pascap-client': 'preview-lab' };
@@ -102,7 +103,7 @@ describe('operation routes', () => {
       ],
     });
     expect(edited.statusCode).toBe(200);
-    expect(edited.json()).toEqual({ revision: 2, duration: { frames: 0, timecode: '00:00:00' } });
+    expect(edited.json()).toEqual({ revision: 2, duration: { frames: 0, seconds: 0, timecode: '00:00:00' } });
 
     const after = (await call(app, 'describe_project', { projectId: project.id })).json<{
       revision: number;
@@ -164,6 +165,26 @@ describe('operation routes', () => {
     expect(anonymous.statusCode).toBe(403);
   });
 
+  it('lists saved projects with their duration in frames, seconds and timecode', async () => {
+    const { app, project } = await service();
+    const listed = await call(app, 'list_projects', {});
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json()).toEqual({
+      projects: [
+        {
+          id: project.id,
+          title: 'Flight',
+          revision: 1,
+          clipCount: 0,
+          duration: { frames: 0, seconds: 0, timecode: '00:00:00' },
+          updatedAt: expect.any(String),
+          error: null,
+        },
+      ],
+    });
+    expect(durationOf(386)).toEqual({ frames: 386, seconds: 12.88, timecode: '00:12:26' });
+  });
+
   it('describes clips with their recording, timecodes and kept ranges', async () => {
     const project: ProjectDocument = projectSchema.parse({
       ...createProject('clips', 'Clips'),
@@ -199,6 +220,7 @@ describe('operation routes', () => {
         end: 30,
         startTimecode: '00:00:00',
         endTimecode: '00:01:00',
+        seconds: 1,
         sourceIn: 30,
         sourceOut: 90,
         speed: '2×',

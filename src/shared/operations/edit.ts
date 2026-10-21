@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { editCommandSchema } from '../command-schema.js';
 import { frameSchema, idSchema } from '../model.js';
 import { defineOperation } from './spec.js';
+import { durationSchema } from './timecode.js';
 
 export const MAX_EDIT_COMMANDS = 64;
 
@@ -24,7 +25,7 @@ export const edit = defineOperation({
   output: z
     .object({
       revision: frameSchema.meta({ description: 'The new saved revision.' }),
-      duration: z.object({ frames: frameSchema, timecode: z.string() }).strict(),
+      duration: durationSchema,
     })
     .strict(),
   access: 'write',
