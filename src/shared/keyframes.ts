@@ -16,6 +16,9 @@ export const KEYFRAME_SETTINGS = Object.freeze(
     ] as const
   ).map((setting) => Object.freeze(setting)),
 ) satisfies readonly { key: KeyframeSetting; label: string; min: number; max: number; step: number }[];
+export const keyframeSettingSchema = z.enum(
+  KEYFRAME_SETTINGS.map((setting) => setting.key) as [KeyframeSetting, ...KeyframeSetting[]],
+);
 
 const layerKeyValuesSchema = z
   .object({

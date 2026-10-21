@@ -7,8 +7,11 @@ import { CATALOGUE_DOCUMENT, withCatalogue } from '../../scripts/operation-catal
 import { createApp } from '../../src/server/app.js';
 import { createConfig } from '../../src/server/config.js';
 import { runners } from '../../src/server/operations/index.js';
+import { createColourSettings } from '../../src/shared/colour.js';
 import { createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import type { TrackDescription } from '../../src/shared/operations/describe-track.js';
 import { operations } from '../../src/shared/operations/index.js';
+import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 
 const headers = { host: '127.0.0.1:4318', 'x-pascap-client': 'preview-lab' };
 const temporary: string[] = [];
@@ -205,5 +208,53 @@ describe('operation routes', () => {
     expect(description.recordings).toEqual([
       { id: 'rec-1', name: 'DJI_0001.MP4', frameCount: 300, ready: true, kept: [{ sourceIn: 0, sourceOut: 120 }] },
     ]);
+  });
+
+  it('reads a whole track, its keyed settings and the values that apply at frames', async () => {
+    const { app, project } = await service();
+    const edited = await call(app, 'edit', {
+      projectId: project.id,
+      expectedRevision: 1,
+      commands: [
+        { type: 'colour', layerId: 'video-1', colour: { ...createColourSettings(), shadows: 0.3, contrast: 1.2 } },
+        {
+          type: 'transform',
+          layerId: 'video-1',
+          transform: { base: { ...NEUTRAL_SPATIAL_POSE, scale: 1.5 }, keyframes: [] },
+        },
+        { type: 'layer-key-toggle', layerId: 'video-1', frame: 30, setting: 'exposure', value: 1 },
+        { type: 'layer-key-toggle', layerId: 'video-1', frame: 90, setting: 'exposure', value: 0 },
+      ],
+    });
+    expect(edited.statusCode).toBe(200);
+
+    const response = await call(app, 'describe_track', {
+      projectId: project.id,
+      layerId: 'video-1',
+      frames: [0, 60, 120],
+    });
+    expect(response.statusCode).toBe(200);
+    const description = response.json<TrackDescription>();
+    const saved = (await call(app, 'describe_project', { projectId: project.id })).json<{ revision: number }>();
+    expect(description.revision).toBe(saved.revision);
+    expect(description.track.colour).toMatchObject({ shadows: 0.3, contrast: 1.2, exposure: 0 });
+    expect(description.track.keyframes.map((key) => [key.frame, key.values.exposure])).toEqual([
+      [30, 1],
+      [90, 0],
+    ]);
+    expect(description.keyed).toEqual({ colour: ['exposure'], transform: [] });
+    expect(
+      description.at.map(({ frame, timecode, values }) => [frame, timecode, values.exposure, values.shadows]),
+    ).toEqual([
+      [0, '00:00:00', 1, 0.3],
+      [60, '00:02:00', 0.5, 0.3],
+      [120, '00:04:00', 0, 0.3],
+    ]);
+    expect(description.at[1]!.values.opacity).toBe(1);
+    expect(description.at[1]!.transform.scale).toBe(1.5);
+
+    const unknown = await call(app, 'describe_track', { projectId: project.id, layerId: 'video-9' });
+    expect(unknown.statusCode).toBe(404);
+    expect(unknown.json<{ error: string }>().error).toBe('The project has no video track video-9.');
   });
 });
