@@ -692,16 +692,22 @@ outputs also carry `MM:SS:FF` timecode (30 fps NDF, as the editor shows); every 
 the new revision; validation failures are tool errors with the service's message (for
 example an overlap or an invalid fade), never exceptions.
 
-### Resources
+### Resources and prompt
 
-| URI                              | Content                                                                                                                                                |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pascap://session`               | Session state, brief, elapsed time, edit count, last notes                                                                                             |
-| `pascap://project`               | Compact timeline: tracks (name, Ripple, fades, Colour summary, Transform summary), clips with timecodes, transitions, music tracks, bookmarks, selects |
-| `pascap://recordings`            | Bin recordings: id, name, duration, frames, damage, selects, telemetry summary, analysis availability                                                  |
-| `pascap://recordings/{id}/shots` | Shot descriptors at the brief's tolerance                                                                                                              |
-| `pascap://music/{id}/analysis`   | Tempo, meter, sections, beat count, accents; beats on request                                                                                          |
-| `pascap://guide`                 | The assistant playbook below, so the client needs no custom system prompt                                                                              |
+Implemented: one resource, `pascap://guide` (Markdown), holding the playbook below
+([assistant-guide.ts](../../src/server/assistant-guide.ts) is its text), and one prompt,
+`rough_cut { request? }`, which hands the playbook to the model with the user's request. The
+server instructions point to both. Clients differ: VS Code shows the prompt as
+`/mcp.pascap.rough_cut` and lets the user attach the resource, but its model cannot read a
+resource on its own, so the instructions also name the key tools.
+
+The other resources first proposed are not built: each duplicated an operation the model calls
+anyway (`session_status`, `describe_project`, `describe_recording`, `music_analysis`), and
+resources need the client's cooperation to reach the model.
+
+| URI              | Content                                                                   |
+| ---------------- | ------------------------------------------------------------------------- |
+| `pascap://guide` | The assistant playbook below, so the client needs no custom system prompt |
 
 ### Tools
 
@@ -795,6 +801,11 @@ The LLM is told what good looks like and what PasCap can do; the tools do the ar
 6. **Verify**: a full `timeline_sheet`, the alignment report, the duration against the
    target, every clip inside its selects, music fades; then `session_end` with notes
    naming the structure, the choices and anything the user should look at.
+
+The served text ([assistant-guide.ts](../../src/server/assistant-guide.ts)) follows these
+steps with the tools that exist: footage from `describe_recording` and `recording_sheet`, the
+music from `music_analysis`, `preview_edits` before a batch, and grading from `describe_track`
+with candidate `still`s, since `estimate` (#240) is not built yet.
 
 ## Delivery plan
 

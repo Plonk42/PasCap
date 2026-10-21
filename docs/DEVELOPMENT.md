@@ -447,7 +447,9 @@ descriptions; the `edit` operation then accepts it.
 The service answers MCP clients at `http://127.0.0.1:4318/mcp` ([MCP server](design/ASSISTANT_MCP.md#mcp-server);
 `npm run dev` also proxies it at `http://127.0.0.1:5173/mcp`):
 every operation whose audience includes `assistant` is a tool, with its description and input
-JSON Schema; stills and sheets come back as image content. Requests need the bearer token the
+JSON Schema; stills and sheets come back as image content. The playbook is the resource
+`pascap://guide` and the prompt `rough_cut` (in VS Code chat, `/mcp.pascap.rough_cut`).
+Requests need the bearer token the
 service writes at startup to `<data directory>/mcp-token` (owner-only), and keep the loopback
 Host and Origin checks. In VS Code, add to `.vscode/mcp.json` (or the user `mcp.json`):
 
