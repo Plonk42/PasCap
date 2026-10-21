@@ -10,8 +10,9 @@ what the footage shows from its pictures.
   recordings of the bin with the ranges the user kept, and bookmarks.
 - session_status: an active session started by the user's Hand off carries their brief (notes,
   music track, target length, allowed movement, most clips). Follow it.
-- music_analysis: tempo, sections (quiet, build, peak, release), beats and downbeats at project
-  frames. The target length is the music clip's length unless the brief says otherwise.
+- music_analysis: tempo, key, sections (quiet, build, peak, release) with their loudness and tone,
+  swells, silences, beats and downbeats at project frames. The target length is the music clip's
+  length unless the brief says otherwise.
 
 ## 2. Take the project
 - session_start with the revision you read and the user's brief, unless a session is already
@@ -43,6 +44,10 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   sections.
 - Plan clip lengths from the sections and the beat grid: longer clips on slow or quiet music,
   shorter ones and cuts on downbeats at peaks. Two to eight beats per clip is a usual range.
+- Read the music's character too: a minor key, little high-frequency content and soft sections
+  suit slow, calm movements; bright, loud sections suit faster, dramatic ones. Let a crescendo
+  build with the movement (a rise, a push in), cut or reveal on a sudden swell, and place
+  transitions through black, or the end of the cut, in silences.
 
 ## 5. Build
 - One Ripple video track, filled with one edit batch of insert commands in timeline order.

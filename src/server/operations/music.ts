@@ -102,17 +102,49 @@ function describeMusicClip(
       .filter((accent) => inWindow(accent.frame))
       .sort((left, right) => left.frame - right.frame)
       .slice(0, MAX_LISTED_BEATS),
+    key: analysis?.key ?? null,
     sections: (analysis?.sections ?? [])
       .flatMap((section) =>
         musicSampleRanges(track, section.fromSample, section.toSample).map((range) => ({
           ...range,
           kind: section.kind,
           loudnessDb: rounded(section.loudnessDb, 1),
+          tone: sectionTone(analysis!, section),
         })),
       )
       .filter((section) => section.end > window.from && section.start < window.to)
       .sort((left, right) => left.start - right.start),
+    swells: (analysis?.swells ?? [])
+      .flatMap(({ fromSample, toSample, kind, changeDb, sudden }) =>
+        musicSampleRanges(track, fromSample, toSample).map((range) => ({ ...range, kind, changeDb, sudden })),
+      )
+      .filter((swell) => swell.end > window.from && swell.start < window.to)
+      .sort((left, right) => left.start - right.start),
+    silences: (analysis?.silences ?? [])
+      .flatMap(({ fromSample, toSample }) => musicSampleRanges(track, fromSample, toSample))
+      .filter((silence) => silence.end > window.from && silence.start < window.to)
+      .sort((left, right) => left.start - right.start),
   };
+}
+
+/** Energy-mean low, mid and high levels over a section's seconds. */
+function sectionTone(
+  analysis: MusicAnalysis,
+  section: { fromSample: number; toSample: number },
+): { lowDb: number; midDb: number; highDb: number } {
+  const seconds = analysis.tone.slice(
+    Math.floor(section.fromSample / analysis.sampleRate),
+    Math.max(
+      Math.floor(section.fromSample / analysis.sampleRate) + 1,
+      Math.ceil(section.toSample / analysis.sampleRate),
+    ),
+  );
+  const level = (band: number): number => {
+    if (!seconds.length) return -120;
+    const power = seconds.reduce((sum, second) => sum + 10 ** (second[band]! / 10), 0) / seconds.length;
+    return rounded(Math.max(-120, 10 * Math.log10(power)), 1);
+  };
+  return { lowDb: level(0), midDb: level(1), highDb: level(2) };
 }
 
 export const runMusicAnalysis: OperationRunner<typeof musicAnalysis> = async (
