@@ -32,7 +32,10 @@ export interface ServiceContext {
   library: Pick<MediaLibrary, 'get' | 'motion' | 'motionJob'>;
   audio: Pick<AudioLibrary, 'get' | 'analysis' | 'analysisJob'>;
   jobs: Pick<JobQueue, 'list'>;
-  stills: Pick<StillRenderer, 'still' | 'timelineSheet' | 'recordingSheet' | 'analysisFrames' | 'lumaFrames'>;
+  stills: Pick<
+    StillRenderer,
+    'still' | 'timelineSheet' | 'recordingSheet' | 'sourceSheet' | 'analysisFrames' | 'lumaFrames'
+  >;
   assistant: Pick<AssistantConnection, 'url' | 'tokenFile' | 'lastClient' | 'seen'>;
   images: AssistantImageBudget;
 }

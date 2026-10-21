@@ -21,7 +21,11 @@ what the footage shows from its pictures.
 ## 3. Choose footage
 - describe_recording for each recording: its steady ranges inside the kept ranges, with the
   camera move (pan, tilt, push in…), picture speed and flight data, plus a contact sheet of
-  their middle frames. Judge composition, light and subject from the pictures.
+  their middle frames. Judge composition, light and subject from the pictures. With many
+  recordings, read them with sheet false first and look at them with compare_recordings.
+- compare_recordings puts candidates from several recordings in one sheet: their longest steady
+  ranges, or ranges you name. Flights hold several similar takes of one subject; compare them
+  and keep only the best. frames 3 shows how each movement starts, develops and ends.
 - recording_sheet with a range's start, middle and end frames shows whether its movement
   completes. Prefer whole camera movements to fragments; skip damaged and hovering stretches.
 - Clips must stay inside the kept ranges; edits that leave them are refused.

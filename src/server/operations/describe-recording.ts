@@ -5,7 +5,7 @@ import { recordingShots, type SteadyShot } from '../../shared/recording-shots.js
 import { SMOOTH_TOLERANCE } from '../../shared/motion-analysis.js';
 import { formatTimecode, framesToSeconds, PROJECT_FPS } from '../../shared/timing.js';
 import { ServiceError } from '../errors.js';
-import type { OperationRunner } from './context.js';
+import type { OperationRunner, ServiceContext } from './context.js';
 
 const FPS = PROJECT_FPS.numerator / PROJECT_FPS.denominator;
 
@@ -18,6 +18,16 @@ function pictured(shots: readonly SteadyShot[], cells: number): SteadyShot[] {
   return shots.filter((shot) => longest.has(shot));
 }
 
+/** The allowed movement asked for, else the active session's, else the editor's initial one. */
+export async function allowedMovementFor(
+  sessions: ServiceContext['sessions'],
+  projectId: string,
+  asked?: number,
+): Promise<number> {
+  const session = await sessions.current(projectId);
+  return asked ?? (session?.endedAt === null ? session.brief.allowedMovement : null) ?? SMOOTH_TOLERANCE.initial;
+}
+
 export const runDescribeRecording: OperationRunner<typeof describeRecording> = async (
   { projects, library, sessions, stills, images },
   { projectId, mediaId, allowedMovement, sheet },
@@ -28,9 +38,7 @@ export const runDescribeRecording: OperationRunner<typeof describeRecording> = a
   const asset = library.get(mediaId);
   if (asset.status !== 'ready')
     throw new ServiceError(`${asset.name} is not prepared yet, so it cannot be described or shown.`, 409);
-  const session = await sessions.current(projectId);
-  const tolerance =
-    allowedMovement ?? (session?.endedAt === null ? session.brief.allowedMovement : null) ?? SMOOTH_TOLERANCE.initial;
+  const tolerance = await allowedMovementFor(sessions, projectId, allowedMovement);
   const analysis = await library.motion(mediaId);
   const kept = project.selects[mediaId];
   const { shots, stillShare } = analysis
