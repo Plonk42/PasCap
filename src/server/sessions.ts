@@ -269,4 +269,18 @@ export class AssistantSessions {
       return this.projects.writeExclusive({ ...restored, revision: current.revision }, current.revision, writer);
     });
   }
+
+  /** Saves a checkpoint as a new project, leaving the project it belongs to unchanged. */
+  async copy(
+    projectId: string,
+    checkpointId: string,
+    title: string,
+    assertSources: (document: ProjectDocument) => Promise<void>,
+  ): Promise<ProjectDocument> {
+    const { document } = await this.#readCheckpoint(projectId, checkpointId);
+    const copy = this.projects.decodeFile(document);
+    const titled = { ...copy, title };
+    await assertSources(titled);
+    return this.projects.save(titled, 0);
+  }
 }

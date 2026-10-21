@@ -279,4 +279,41 @@ describe('operation routes', () => {
     expect(unknown.statusCode).toBe(404);
     expect(unknown.json<{ error: string }>().error).toBe('The project has no video track video-9.');
   });
+
+  it('reports what an assistant can use: caches, analyses and a running export', async () => {
+    const project: ProjectDocument = projectSchema.parse({
+      ...createProject('ready', 'Ready'),
+      media: { videoIds: ['rec-1', 'rec-2', 'rec-3'], audioIds: ['song-1'] },
+    });
+    const videos: Record<string, { name: string; status: string }> = {
+      'rec-1': { name: 'A.MP4', status: 'ready' },
+      'rec-2': { name: 'B.MP4', status: 'queued' },
+      'rec-3': { name: 'C.MP4', status: 'error' },
+    };
+    const context = {
+      projects: { load: async () => project },
+      library: {
+        get: (id: string) => videos[id],
+        motionJob: (id: string) => (id === 'rec-2' ? { id: 'job' } : null),
+        motion: async (id: string) => (id === 'rec-1' ? { frames: [] } : null),
+      },
+      audio: {
+        get: () => ({ name: 'song.wav', status: 'ready' }),
+        analysisJob: () => null,
+        analysis: async () => {
+          throw new Error('unreadable cache');
+        },
+      },
+      jobs: { list: () => [{ kind: 'export', state: 'running' }] },
+    } as unknown as Parameters<typeof runners.hand_off_readiness>[0];
+    expect(await runners.hand_off_readiness(context, { projectId: project.id })).toEqual({
+      recordings: [
+        { id: 'rec-1', name: 'A.MP4', preparation: 'ready', cameraMotion: 'analysed' },
+        { id: 'rec-2', name: 'B.MP4', preparation: 'preparing', cameraMotion: 'analysing' },
+        { id: 'rec-3', name: 'C.MP4', preparation: 'unprepared', cameraMotion: 'missing' },
+      ],
+      music: [{ id: 'song-1', name: 'song.wav', preparation: 'ready', beats: 'missing' }],
+      exportRunning: true,
+    });
+  });
 });

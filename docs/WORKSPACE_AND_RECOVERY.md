@@ -38,7 +38,7 @@ clip detail filters before grading; see [detail filters](design/DETAIL_FILTERS.m
 same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
 
 - Header: project picker/title, Undo/Redo, save state, keyboard help,
-  **Workspace options** and Export. Workspace options holds layout reset and
+  **Workspace options**, **Hand off** and Export. Workspace options holds layout reset and
   Diagnostics.
 - Panels are bordered tiles separated by 6 px gutters, also below the header and above the
   Activity bar but not at the window sides; corners on the window edges are square, the others rounded 4 px.
@@ -717,6 +717,35 @@ Music-only preview is naturally black; export still requires a retained video cl
 All music contributions sum after their per-clip gain/fades and hard-clamp
 to [−1, 1] once after all sources. No normalisation, ducking, effects or video audio.
 See [MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md) for strict fields, bounds and pending acceptance.
+
+## Assistant sessions
+
+**Hand off** (header, beside Export, **Hand off to an assistant**) opens a dialog for the
+brief an assistant connected through MCP receives: **What should it make?** (up to 2,000
+characters), **Music track** (Any or a placed music track), **Target length (s)**, **Allowed
+movement** (0.5–6) and **Most clips**, all optional; an invalid number keeps an inline error
+and disables **Hand off**. **What the assistant can use** lists the bin's video recordings
+prepared, their camera motion analysed, the music prepared and analysed and a running export
+(stills wait for it), each with a check or warning and, where jobs are missing, **Prepare N**
+or **Analyse N** (queued like the Media actions, shown in Activity); the list refreshes while
+they run. None of them blocks the hand-off; a save error or an active gesture does. Confirm
+saves pending changes, then starts the session (`session_start`, which checkpoints the
+project).
+
+While a session is active (started here or by the assistant itself), a banner **An assistant
+is editing this project** shows the edit count and the last command with **Take over**, and
+the editor follows the saved project read-only: edits and Undo/Redo are refused with the
+reason; each newer saved revision replaces the document and its history whenever no draft,
+gesture or save is pending. A draft from before the session stays, its saves refused, for
+the user to download or discard. **Take over** ends the session at once.
+
+When a session the editor followed ends (Take over, the assistant finishing, or the lease
+expiring), a summary shows who ended it, the edit count, the assistant's notes and an **Edit
+log** disclosure, with **Open as new project** (the checkpoint taken at the start, saved as
+"… (before assistant)" and opened; the assistant's version stays) and **Restore project
+before session** (replaces the project in one revision after checkpointing it), both
+unavailable with the reason while changes are unsaved, and × to dismiss. See
+[the assistant design](design/ASSISTANT_MCP.md#hand-off-in-the-editor).
 
 ## Projects, service connection and errors
 

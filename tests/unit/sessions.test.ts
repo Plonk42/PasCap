@@ -231,6 +231,27 @@ describe('assistant sessions', () => {
     expect(await readdir(path.join(dataDir, 'projects'))).toEqual(['flight.json']);
     expect((await projects.list()).map((entry) => entry.id)).toEqual(['flight']);
   });
+
+  it('opens a checkpoint as a new project, leaving the project and its session unchanged', async () => {
+    const { call, projects, file } = await setup();
+    const started = await call('editor', 'session_start', { projectId: 'flight', expectedRevision: 1 });
+    await call('assistant', 'edit', { projectId: 'flight', expectedRevision: 1, commands: [bookmark(30)] });
+    const saved = await readFile(file, 'utf8');
+    const copy = await call('editor', 'checkpoint_copy', {
+      projectId: 'flight',
+      checkpointId: started.checkpointId,
+      title: 'Flight before the assistant',
+    });
+    expect(copy).toMatchObject({ title: 'Flight before the assistant' });
+    const opened = await projects.load(copy.projectId as string);
+    expect(opened).toMatchObject({ title: 'Flight before the assistant', revision: 1, bookmarks: [] });
+    expect(opened.id).not.toBe('flight');
+    expect(await readFile(file, 'utf8')).toBe(saved);
+    expect((await call('editor', 'session_status', { projectId: 'flight' })).session).toMatchObject({ active: true });
+    await expect(
+      call('editor', 'checkpoint_copy', { projectId: 'flight', checkpointId: 'missing', title: 'Copy' }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
 });
 
 describe('session rules', () => {

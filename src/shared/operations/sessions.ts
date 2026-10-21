@@ -96,6 +96,22 @@ export const checkpointRestore = defineOperation({
   audience: ['editor', 'assistant'],
 });
 
+export const checkpointCopy = defineOperation({
+  name: 'checkpoint_copy',
+  description:
+    "Save one of the project's checkpoints as a new project with its own ID, leaving the project unchanged; returns the new project.",
+  input: z
+    .object({
+      projectId,
+      checkpointId: described(z.string(), 'ID from session_status.'),
+      title: described(z.string().trim().min(1).max(200), 'Title of the new project.'),
+    })
+    .strict(),
+  output: z.object({ projectId: idSchema, title: z.string() }).strict(),
+  access: 'write',
+  audience: ['editor'],
+});
+
 export const previewEdits = defineOperation({
   name: 'preview_edits',
   description: `Try up to ${MAX_EDIT_COMMANDS} edit commands against the saved project without saving: the same checks as edit, including the session rules, and the resulting duration and clip count, or the first rejected command's reason.`,
