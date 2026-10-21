@@ -140,8 +140,12 @@ the paired numeric fields, which apply together on Enter or when you leave both;
 Escape restores an unapplied draft. OUT is exclusive; **O** includes
 the displayed frame. Drag a handle back to an edge (or press **Home**/**End** on it)
 to restore that edge, or use the reset icon after **OUT** to restore the full recording.
-These choices are per-project, browser-local state,
-not portable project-document fields.
+The applied range is a **kept range** of the recording, saved with the project (so it follows
+the project file, one Undo step each). Once a range is kept, **Keep this range too** (the plus after the
+range fields) keeps another range of the same recording, starting at the displayed frame; numbered
+**Kept range** buttons then choose which one the handles edit, and the reset icon removes the chosen one.
+Ranges cannot overlap or touch. Clips can still use any frame of the recording.
+Details: [kept ranges](TIMELINE_EDITING.md#kept-ranges).
 
 The source range strip under the image shows snapshots across the whole recording, like
 a timeline clip. Its **IN / OUT** handles restore omitted footage as well as trim;

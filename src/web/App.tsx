@@ -29,6 +29,7 @@ import {
   MAX_VIDEO_LAYERS,
   projectSchema,
   type ProjectDocument,
+  type SelectRange,
   type VideoLayer,
 } from '../shared/model.js';
 import { musicClips } from '../shared/music-lanes.js';
@@ -40,6 +41,7 @@ import {
   type ProjectSummary,
 } from '../shared/projects.js';
 import { removeSelectedRange, splitSourceFrame, trimAtPlayhead, type TimelineRange } from '../shared/rush-editing.js';
+import { activeSelectIndex, appliedSelections, applySelectRange, keepAnotherRange } from '../shared/selects.js';
 import { forEachSerial } from '../shared/serial.js';
 import { validateSourceRanges } from '../shared/source-range.js';
 import { calculateLayout, layerClips } from '../shared/timeline.js';
@@ -159,6 +161,7 @@ function timingKey(project: ProjectDocument): string {
 }
 /** Transition and fade edits may shift clips, but the ruler range keeps its project frames. */
 const RANGE_KEEPING_COMMANDS: ReadonlySet<EditCommand['type']> = new Set(['transition', 'fades']);
+const NO_SELECTS: readonly SelectRange[] = [];
 
 function rangeWithin(range: TimelineRange | null, duration: number): TimelineRange | null {
   if (!range || range.inFrame >= duration) return null;
@@ -280,7 +283,11 @@ export function App() {
   const sourceInspected = useRef(false);
   const seekLayout = useRef<{ document: ProjectDocument; duration: number } | null>(null);
   const [scrubbing, setScrubbing] = useState(false);
-  const [ranges, setRanges] = useState<MediaSelections>({});
+  const [activeSelects, setActiveSelects] = useState<Readonly<Record<string, number>>>({});
+  const ranges = useMemo(
+    () => appliedSelections(project?.selects ?? {}, activeSelects),
+    [project?.selects, activeSelects],
+  );
   const [boundaryId, setBoundaryId] = useState<string | null>(null);
   const pointerFocus = useRef<PointerFocus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -307,7 +314,8 @@ export function App() {
   const selection = useRef<string | null>(null);
   const musicSelection = useRef<string | null>(null);
   const selectedLayer = useRef(EMPTY_PROJECT.layers[0]!.id);
-  const sourceRanges = useRef<MediaSelections>({});
+  const sourceRanges = useRef<MediaSelections>(ranges);
+  sourceRanges.current = ranges;
   const drafting = useRef(false);
   const requestedFrame = useRef<number | null>(null);
   const restoreFrame = useRef(0);
@@ -473,7 +481,7 @@ export function App() {
     [publish, validate],
   );
   const edit = useCallback(
-    (input: EditCommand | readonly EditCommand[]): void => {
+    (input: EditCommand | readonly EditCommand[], keepViewer = false): void => {
       if (!current.current) return;
       try {
         const commands = 'type' in input ? [input] : input;
@@ -494,7 +502,7 @@ export function App() {
           commands.every((item) => RANGE_KEEPING_COMMANDS.has(item.type)),
         );
         setError('');
-        setViewerMode('timeline');
+        if (!keepViewer) setViewerMode('timeline');
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Invalid edit');
       }
@@ -828,36 +836,7 @@ export function App() {
       setMusicBoundary(null);
       selectedLayer.current = loaded.layers[0]!.id;
       setSelectedLayerId(selectedLayer.current);
-      let choices: MediaSelections = {};
-      try {
-        const stored: unknown = JSON.parse(localStorage.getItem(`pascap-media-ranges-${loaded.id}`) ?? '{}');
-        if (typeof stored !== 'object' || stored === null || Array.isArray(stored))
-          throw new Error('Invalid range choices.');
-        for (const [id, value] of Object.entries(stored)) {
-          const asset = latestAssets.current.find((item) => item.id === id);
-          if (!asset) continue;
-          if (
-            typeof value !== 'object' ||
-            value === null ||
-            !('mediaId' in value) ||
-            !('sourceIn' in value) ||
-            !('sourceOut' in value)
-          )
-            throw new Error('Invalid stored range.');
-          const candidate = value as MediaSelection;
-          validateMediaSelection(candidate, asset.metadata.frameCount);
-          if (candidate.mediaId !== id) throw new Error('Range refers to a different recording.');
-          choices = { ...choices, [id]: candidate };
-        }
-      } catch (cause) {
-        setError(
-          cause instanceof Error
-            ? `${cause.message} Range choices were not loaded; originals remain intact.`
-            : 'Cannot read range choices.',
-        );
-      }
-      sourceRanges.current = choices;
-      setRanges(choices);
+      setActiveSelects({});
       reviews.close();
       setViewerMode('timeline');
       const first = calculateLayout(loaded).clips[0];
@@ -898,8 +877,7 @@ export function App() {
     setSelectedMusicId(null);
     selectedLayer.current = EMPTY_PROJECT.layers[0]!.id;
     setSelectedLayerId(selectedLayer.current);
-    sourceRanges.current = {};
-    setRanges({});
+    setActiveSelects({});
     setDraggedMediaIds(null);
     reviews.close();
     setViewerMode('timeline');
@@ -1229,20 +1207,26 @@ export function App() {
   if (inspection !== keyframeInspection) setKeyframeInspection(inspection);
   const referenceBusy = jobs.some((job) => job.kind === 'reference' && ['running', 'queued'].includes(job.state));
   const setSourceRange = (range: MediaSelection): void => {
-    try {
-      const asset = latestAssets.current.find((item) => item.id === range.mediaId);
-      if (!asset || !current.current)
-        throw new Error('Load a project and register this recording before selecting a range.');
-      validateMediaSelection(range, asset.metadata.frameCount);
-      const next = { ...sourceRanges.current, [range.mediaId]: { ...range } };
-      sourceRanges.current = next;
-      setRanges(next);
-      if (!writePreference(`pascap-media-ranges-${current.current.id}`, JSON.stringify(next)))
-        setError(
-          'This range is available for this session, but browser storage could not remember it. Existing clips and originals are unchanged.',
-        );
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Cannot save range choices.');
+    const asset = latestAssets.current.find((item) => item.id === range.mediaId);
+    if (!asset || !current.current)
+      throw new Error('Load a project and register this recording before selecting a range.');
+    validateMediaSelection(range, asset.metadata.frameCount);
+    const kept = current.current.selects[range.mediaId] ?? [];
+    const command = applySelectRange(kept, activeSelects[range.mediaId], range, asset.metadata.frameCount);
+    if (!command) return;
+    const next = applyCommand(current.current, command);
+    validate(next);
+    commit(next);
+    setError('');
+  };
+  const keepAnotherSourceRange = (mediaId: string, frame: number): void => {
+    const asset = latestAssets.current.find((item) => item.id === mediaId);
+    const result = asset && keepAnotherRange(current.current?.selects[mediaId] ?? [], frame, asset.metadata.frameCount);
+    if (!result) return;
+    if ('reason' in result) setError(result.reason);
+    else {
+      edit({ type: 'select-set', mediaId, ranges: result.ranges }, true);
+      setActiveSelects((chosen) => ({ ...chosen, [mediaId]: result.index }));
     }
   };
   const selectLayer = useCallback(
@@ -1401,7 +1385,6 @@ export function App() {
           setError('');
         }
         try {
-          localStorage.removeItem(`pascap-media-ranges-${entry.id}`);
           if (localStorage.getItem('pascap-project') === entry.id) localStorage.removeItem('pascap-project');
         } catch {
           setError('The project was deleted, but this browser could not clear its saved project preference.');
@@ -2044,6 +2027,13 @@ export function App() {
                     asset={reviewAsset}
                     frame={review.frame}
                     range={resolveMediaSelection(reviewAsset.id, reviewAsset.metadata.frameCount, ranges)}
+                    kept={project?.selects[reviewAsset.id] ?? NO_SELECTS}
+                    activeKept={activeSelectIndex(
+                      project?.selects[reviewAsset.id] ?? NO_SELECTS,
+                      activeSelects[reviewAsset.id],
+                    )}
+                    onActivateKept={(index) => setActiveSelects((chosen) => ({ ...chosen, [reviewAsset.id]: index }))}
+                    onKeepAnother={(frame) => keepAnotherSourceRange(reviewAsset.id, frame)}
                     excerpts={reviewExcerpts}
                     disabled={!project || busy || draft !== null}
                     onFrame={(frame) => reviews.displayed({ mediaId: reviewAsset.id, frame })}

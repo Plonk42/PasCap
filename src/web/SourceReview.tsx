@@ -21,6 +21,8 @@ import {
   type MediaSelectionEdge,
 } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
+import type { SelectRange } from '../shared/model.js';
+import { keepAnotherRange } from '../shared/selects.js';
 import { formatTimecode } from '../shared/timing.js';
 import { DamageMarks } from './DamageMarks.js';
 import { mediaReady, sourceSeconds } from './display.js';
@@ -49,9 +51,16 @@ interface Props {
   asset: MediaAsset;
   frame: number;
   range: MediaSelection;
+  /** The recording's kept ranges (empty: the whole recording) and the one the range editor shows. */
+  kept: readonly SelectRange[];
+  activeKept: number;
+  onActivateKept: (index: number) => void;
+  /** Keeps a further range starting at the given displayed frame. */
+  onKeepAnother: (frame: number) => void;
   excerpts: readonly RushExcerpt[];
   disabled: boolean;
   onFrame: (frame: number) => void;
+  /** Applies a range to the active kept range; throws when the project rejects it, for the editor to show. */
   onRange: (range: MediaSelection) => void;
   onClose: () => void;
   /** Adds the applied range, or the given ranges in one Undo step; returns the first new clip. */
@@ -74,11 +83,18 @@ interface Observation {
 }
 interface RangeCommands {
   mark: (edge: MediaSelectionEdge) => void;
+  /** Applies a range as the editor's own edit, so a rejection shows inline. */
+  apply: (range: MediaSelection) => void;
   cancel: () => boolean;
 }
 interface RangeProps {
   asset: MediaAsset;
   range: MediaSelection;
+  /** The other kept ranges are drawn on the strip. */
+  kept: readonly SelectRange[];
+  activeKept: number;
+  onActivateKept: (index: number) => void;
+  onKeepAnother: (frame: number) => void;
   frame: number;
   observedFrame: number | null;
   disabled: boolean;
@@ -117,6 +133,10 @@ export function SourceReview({
   asset,
   frame,
   range,
+  kept,
+  activeKept,
+  onActivateKept,
+  onKeepAnother,
   excerpts,
   disabled,
   onFrame,
@@ -399,6 +419,10 @@ export function SourceReview({
         ref={commands}
         asset={asset}
         range={range}
+        kept={kept}
+        activeKept={activeKept}
+        onActivateKept={onActivateKept}
+        onKeepAnother={onKeepAnother}
         frame={shownFrame}
         observedFrame={observedFrame}
         disabled={disabled}
@@ -442,7 +466,7 @@ export function SourceReview({
           disabled={disabled || rangeDraft}
           onApply={(suggestion) => {
             scrub(suggestion.sourceIn);
-            onRange({ mediaId: asset.id, ...suggestion });
+            commands.current?.apply({ mediaId: asset.id, ...suggestion });
           }}
           targetLayer={targetLayer}
           addDisabled={insertDisabled || rangeDraft}
@@ -552,6 +576,10 @@ function SourceExcerpts({
 function SourceRangeEditor({
   asset,
   range,
+  kept,
+  activeKept,
+  onActivateKept,
+  onKeepAnother,
   frame,
   observedFrame,
   disabled,
@@ -651,7 +679,7 @@ function SourceRangeEditor({
     if (disabled || observedFrame === null || drag.current) return;
     commit(markMediaSelection(range, edge, observedFrame, count));
   };
-  useImperativeHandle(ref, () => ({ mark, cancel }));
+  useImperativeHandle(ref, () => ({ mark, apply: commit, cancel }));
 
   const commitNumbers = (): void => {
     if (!numbersDirty || draft !== null) return;
@@ -667,6 +695,15 @@ function SourceRangeEditor({
     resetBlocked = 'The range already covers the whole recording.';
   const resetRange = (): void => {
     if (resetBlocked === null && !drag.current) commit({ mediaId: asset.id, sourceIn: 0, sourceOut: count });
+  };
+  const plan = keepAnotherRange(kept, frame, count);
+  let keepBlocked = 'reason' in plan ? plan.reason : '';
+  if (disabled || draft !== null) keepBlocked = 'Finish the current edit before keeping another range.';
+  const keepAnotherNow = (): void => {
+    if (keepBlocked === '' && !drag.current) {
+      onPause();
+      onKeepAnother(frame);
+    }
   };
 
   const changeNumber = (event: ChangeEvent<HTMLInputElement>, edge: MediaSelectionEdge): void => {
@@ -798,6 +835,19 @@ function SourceRangeEditor({
               aria-hidden="true"
             />
             <DamageMarks damage={asset.damage} count={count} className="source-range-damaged" />
+            {kept.map((item, index) =>
+              index === activeKept ? null : (
+                <span
+                  key={`${item.sourceIn}-${item.sourceOut}`}
+                  className="source-range-kept"
+                  style={{
+                    left: `${(item.sourceIn / count) * 100}%`,
+                    width: `${((item.sourceOut - item.sourceIn) / count) * 100}%`,
+                  }}
+                  aria-hidden="true"
+                />
+              ),
+            )}
             <span
               className="source-range-selection"
               style={{
@@ -864,6 +914,30 @@ function SourceRangeEditor({
       </div>
       <div className="source-range-row">
         {readout}
+        {kept.length > 1 && (
+          <fieldset className="source-kept">
+            <legend className="sr-only">Kept ranges</legend>
+            {kept.map((item, index) => (
+              <button
+                key={`${item.sourceIn}-${item.sourceOut}`}
+                type="button"
+                className="secondary-button small"
+                aria-label={`Kept range ${index + 1}`}
+                aria-pressed={index === activeKept}
+                title={`Kept range ${index + 1}: ${formatTimecode(item.sourceIn, asset.metadata.frameRate)} → ${formatTimecode(item.sourceOut, asset.metadata.frameRate)}`}
+                disabled={disabled || draft !== null}
+                onKeyDown={onKeyDown}
+                onClick={() => {
+                  onPause();
+                  onActivateKept(index);
+                  onFrame(item.sourceIn);
+                }}
+              >
+                {index + 1}
+              </button>
+            ))}
+          </fieldset>
+        )}
         <form
           className="source-range-numbers"
           onSubmit={(event) => event.preventDefault()}
@@ -924,6 +998,20 @@ function SourceRangeEditor({
           >
             <Icon name="reset" size={13} />
           </button>
+          {kept.length > 0 && (
+            <button
+              type="button"
+              className="icon-button source-keep-another"
+              aria-label="Keep this range too"
+              aria-disabled={keepBlocked !== ''}
+              tabIndex={keepBlocked === '' ? 0 : -1}
+              title={keepBlocked || 'Keep another range of this recording, starting at the displayed frame'}
+              onKeyDown={onKeyDown}
+              onClick={keepAnotherNow}
+            >
+              <Icon name="plus" size={13} />
+            </button>
+          )}
         </form>
       </div>
       {error && (

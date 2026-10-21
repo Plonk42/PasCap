@@ -536,9 +536,9 @@ files or full proxies. The viewer stays out of list flow so hovering cannot move
 the recording card or disrupt a media drag. Timeline insertion/selection returns to Timeline preview;
 the source remains available through its tab until closed or the project changes.
 
-Choices are validated per-project browser-local editor state, separate from
-autosave/undo/rendered documents. They survive reload in that browser, reset on a
-new project, and do not follow a project copied to another browser. Close/hidden/
+The applied range is the recording's active kept range in the project's `selects`
+([kept ranges](TIMELINE_EDITING.md#kept-ranges)): it autosaves and Undoes like any edit, travels with
+the project file and never alters clips, track keyframes or rendering. Close/hidden/
 offscreen/unmount/project-switch releases the review decoder.
 
 ## Properties panel and resource limits
