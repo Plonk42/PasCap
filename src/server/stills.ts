@@ -1,8 +1,10 @@
 import type { MediaAsset } from '../shared/media.js';
+import type { LumaFrame } from '../shared/detail-estimate.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
 import { calculateLayout, sampleSlots, sampleTimeline, type TimelineLayout } from '../shared/timeline.js';
 import { framesToSeconds } from '../shared/timing.js';
+import { analysisSize, type AnalysisFrame } from '../shared/white-balance.js';
 import type { AssistantImageBudget, ServiceConfig } from './config.js';
 import { ServiceError } from './errors.js';
 import type { JobQueue } from './jobs.js';
@@ -37,6 +39,35 @@ type DecodeFrame = (asset: MediaAsset, sourceFrame: number, signal: AbortSignal)
 /** Exactly proxy frame `sourceFrame`, fitted and padded like the layered export's decode, as RGB8. */
 export function proxyFrameArgs(proxy: string, asset: MediaAsset, sourceFrame: number): string[] {
   const bounds = fittedContent(asset.metadata, STILL_SIZE);
+  return decodeArgs(
+    proxy,
+    sourceFrame,
+    `scale=${bounds.width}:${bounds.height}:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:` +
+      `in_range=tv:out_range=pc,format=rgb24,` +
+      `pad=${STILL_SIZE.width}:${STILL_SIZE.height}:${bounds.x}:${bounds.y}:black,setsar=1`,
+  );
+}
+
+/**
+ * Exactly proxy frame `sourceFrame` for analysis: RGBA at the size the editor reads it (`analysisSize`), as
+ * the browser draws a decoded frame into a canvas, or full-range luma at the proxy's own size.
+ */
+export function analysisFrameArgs(
+  proxy: string,
+  size: { width: number; height: number },
+  sourceFrame: number,
+  format: 'rgba' | 'gray',
+): string[] {
+  // Full chroma interpolation with accurate rounding comes closest to the browser's canvas readback.
+  return decodeArgs(
+    proxy,
+    sourceFrame,
+    `scale=${size.width}:${size.height}:flags=area+accurate_rnd+full_chroma_int:` +
+      `in_color_matrix=bt709:out_color_matrix=bt709:in_range=tv:out_range=pc,format=${format}`,
+  );
+}
+
+function decodeArgs(proxy: string, sourceFrame: number, filter: string): string[] {
   // A quarter frame early: accurate seeking keeps the first frame at or after the time, never one later.
   const seek = sourceFrame > 0 ? ['-ss', framesToSeconds(sourceFrame - 0.25).toFixed(9)] : [];
   return [
@@ -55,9 +86,7 @@ export function proxyFrameArgs(proxy: string, asset: MediaAsset, sourceFrame: nu
     '1',
     '-an',
     '-vf',
-    `scale=${bounds.width}:${bounds.height}:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:` +
-      `in_range=tv:out_range=pc,format=rgb24,` +
-      `pad=${STILL_SIZE.width}:${STILL_SIZE.height}:${bounds.x}:${bounds.y}:black,setsar=1`,
+    filter,
     '-f',
     'rawvideo',
     'pipe:1',
@@ -186,18 +215,29 @@ export class StillRenderer {
     return asset;
   }
 
-  readonly #decode: DecodeFrame = async (asset, sourceFrame, signal) => {
+  readonly #decode: DecodeFrame = async (asset, sourceFrame, signal) =>
+    this.#decodeRaw(
+      asset,
+      sourceFrame,
+      proxyFrameArgs(this.library.proxyPath(asset), asset, sourceFrame),
+      PIXELS * 3,
+      signal,
+    );
+
+  async #decodeRaw(
+    asset: MediaAsset,
+    sourceFrame: number,
+    args: string[],
+    bytes: number,
+    signal: AbortSignal,
+  ): Promise<Buffer> {
     if (sourceFrame >= asset.metadata.frameCount)
       throw new ServiceError(`Recording ${asset.name} has ${asset.metadata.frameCount} frames.`, 422);
-    const rgb = await runProcess(
-      this.config.ffmpeg,
-      proxyFrameArgs(this.library.proxyPath(asset), asset, sourceFrame),
-      { signal, maxBytes: PIXELS * 3 },
-    );
-    if (rgb.length !== PIXELS * 3)
+    const raw = await runProcess(this.config.ffmpeg, args, { signal, maxBytes: bytes });
+    if (raw.length !== bytes)
       throw new ServiceError(`The proxy of ${asset.name} did not deliver source frame ${sourceFrame}.`, 500);
-    return rgb;
-  };
+    return raw;
+  }
 
   /** RGB8 compositions of project frames, decoded from the proxies of the clips they show. */
   async #projectFrames(document: ProjectDocument, frames: readonly number[], signal: AbortSignal): Promise<Buffer[]> {
@@ -304,6 +344,36 @@ export class StillRenderer {
         pictures.push(await this.#decode(asset, frame, signal));
       });
       return this.#encode(pictures, STILL_SIZE, frames.length > 1 ? budget.sheetCellWidth : budget.stillWidth, signal);
+    });
+  }
+
+  /** Each distinct source frame of a recording's proxy as the editor's analyses read it, in RGBA. */
+  analysisFrames(mediaId: string, sourceFrames: readonly number[]): Promise<Map<number, AnalysisFrame>> {
+    return this.#run(async (signal) => {
+      const asset = this.readyAsset(mediaId);
+      const { width, height } = analysisSize(asset.prepared!.width, asset.prepared!.height);
+      const frames = new Map<number, AnalysisFrame>();
+      await forEachSerial([...new Set(sourceFrames)], async (frame) => {
+        const args = analysisFrameArgs(this.library.proxyPath(asset), { width, height }, frame, 'rgba');
+        const data = await this.#decodeRaw(asset, frame, args, width * height * 4, signal);
+        frames.set(frame, { width, height, data });
+      });
+      return frames;
+    });
+  }
+
+  /** Source frames of a recording's proxy as full-range luma at the proxy's size. */
+  lumaFrames(mediaId: string, sourceFrames: readonly number[]): Promise<LumaFrame[]> {
+    return this.#run(async (signal) => {
+      const asset = this.readyAsset(mediaId);
+      const size = { width: asset.prepared!.width, height: asset.prepared!.height };
+      const frames: LumaFrame[] = [];
+      await forEachSerial(sourceFrames, async (frame) => {
+        const args = analysisFrameArgs(this.library.proxyPath(asset), size, frame, 'gray');
+        const data = await this.#decodeRaw(asset, frame, args, size.width * size.height, signal);
+        frames.push({ ...size, data });
+      });
+      return frames;
     });
   }
 }

@@ -16,7 +16,7 @@ import {
   type AnalysisFrame,
   type WhiteBalance,
 } from '../../src/shared/white-balance.js';
-import { whiteBalanceCommands } from '../../src/web/auto-white-balance.js';
+import { whiteBalanceCommands } from '../../src/shared/auto-colour.js';
 import { expandedInspectorPreferences, inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 

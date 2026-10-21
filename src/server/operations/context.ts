@@ -31,7 +31,7 @@ export interface ServiceContext {
   library: Pick<MediaLibrary, 'get' | 'motion' | 'motionJob'>;
   audio: Pick<AudioLibrary, 'get' | 'analysis' | 'analysisJob'>;
   jobs: Pick<JobQueue, 'list'>;
-  stills: Pick<StillRenderer, 'still' | 'timelineSheet' | 'recordingSheet'>;
+  stills: Pick<StillRenderer, 'still' | 'timelineSheet' | 'recordingSheet' | 'analysisFrames' | 'lumaFrames'>;
   images: AssistantImageBudget;
 }
 

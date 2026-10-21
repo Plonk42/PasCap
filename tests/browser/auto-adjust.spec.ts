@@ -16,18 +16,20 @@ import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import type { AnalysisFrame } from '../../src/shared/white-balance.js';
-import { autoAdjustCommand, autoAdjustCommands, autoAdjustTarget } from '../../src/web/auto-adjust.js';
+import { analysisSize, frameIlluminant, poolWhiteBalance, type AnalysisFrame } from '../../src/shared/white-balance.js';
+import { analysisFrameArgs } from '../../src/server/stills.js';
+import { autoAdjustCommand } from '../../src/shared/auto-colour.js';
+import { autoAdjustCommands, autoAdjustTarget } from '../../src/web/auto-adjust.js';
 import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 /**
  * A disposable proxy in the editing-proxy format: 30 black frames, then 90 frames of coloured patches
  * (40 × 36, aligned with the 4:2:0 chroma) shot flat, with lifted blacks and lowered whites, under a
- * blue cast. It replaces pattern-a's proxy in this spec.
+ * blue cast. It replaces pattern-a's proxy in this spec. `scale` enlarges it, keeping the patches aligned.
  */
-async function flatProxy(directory: string): Promise<Buffer> {
-  const output = path.join(directory, 'flat-patches.mp4');
+async function flatProxy(directory: string, scale = 1): Promise<Buffer> {
+  const output = path.join(directory, `flat-patches-${scale}.mp4`);
   const patch = 'floor(X/40)*5+floor(Y/36)*3';
   await promisify(execFile)(process.env['PASCAP_FFMPEG'] ?? 'ffmpeg', [
     ...['-hide_banner', '-loglevel', 'error', '-nostdin', '-n'],
@@ -39,6 +41,7 @@ async function flatProxy(directory: string): Promise<Buffer> {
       'format=rgb24',
       'colorchannelmixer=rr=0.86:bb=1.14',
       "drawbox=c=black:t=fill:enable='lt(n\\,30)'",
+      `scale=${320 * scale}:${180 * scale}:flags=neighbor`,
       'scale=out_color_matrix=bt709:out_range=tv',
       'format=yuv420p',
       'setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709',
@@ -183,8 +186,8 @@ async function checksum(page: Page): Promise<number> {
   });
 }
 
-/** The pixels the analysis reads, decoded in the page, and the correction the shared estimator fits to them. */
-async function expectedCorrection(page: Page, frames = autoAdjustFrames(30, 120)): Promise<AutoCorrection> {
+/** The pixels the analysis reads, decoded in the page. */
+async function pageFrames(page: Page, frames: readonly number[]): Promise<Map<number, AnalysisFrame>> {
   const encoded = await page.evaluate(
     async ({ mediaId, sources }) => {
       const sampled = await window.pascapLab!.sampleFrames(mediaId, sources);
@@ -197,12 +200,17 @@ async function expectedCorrection(page: Page, frames = autoAdjustFrames(30, 120)
     },
     { mediaId: assets[0]!.id, sources: frames },
   );
-  const images = new Map<number, AnalysisFrame>(
+  return new Map<number, AnalysisFrame>(
     encoded.map(({ source, width, height, data }) => [
       source,
       { width, height, data: new Uint8ClampedArray(Buffer.from(data, 'base64')) },
     ]),
   );
+}
+
+/** The correction the shared estimator fits to the pixels the page decodes. */
+async function expectedCorrection(page: Page, frames = autoAdjustFrames(30, 120)): Promise<AutoCorrection> {
+  const images = await pageFrames(page, frames);
   const correction = analyseAutoAdjust(frames.map((source) => images.get(source)!));
   if (!correction) throw new Error('Expected a correction for these frames.');
   return correction;
@@ -230,6 +238,88 @@ const choice = (page: Page, name: 'Playhead' | 'Clip' | 'Track' | 'Track values'
 
 function applied(document: ProjectDocument, correction: AutoCorrection, intensity: number): ProjectDocument {
   return applyCommand(document, autoAdjustCommand(document.layers[0]!, correction, intensity)!);
+}
+
+test('the service reads the same pixels as the page for the estimate operation, and fits the same correction', async ({
+  page,
+}) => {
+  const frames = autoAdjustFrames(30, 120);
+  const small = proxy;
+  const large = await flatProxy(directory, 4);
+  try {
+    await compareDecodes(page, frames, [
+      [1, small],
+      [4, large],
+    ]);
+  } finally {
+    proxy = small;
+  }
+});
+
+async function compareDecodes(
+  page: Page,
+  frames: number[],
+  proxies: readonly (readonly [number, Buffer])[],
+): Promise<void> {
+  for (const [scale, bytes] of proxies) {
+    proxy = bytes;
+    const browser = await pageFrames(page, frames);
+    const size = analysisSize(320 * scale, 180 * scale);
+    const service = new Map<number, AnalysisFrame>();
+    for (const frame of frames) {
+      const { stdout } = await promisify(execFile)(
+        process.env['PASCAP_FFMPEG'] ?? 'ffmpeg',
+        analysisFrameArgs(path.join(directory, `flat-patches-${scale}.mp4`), size, frame, 'rgba'),
+        { encoding: 'buffer', maxBuffer: size.width * size.height * 4 + 1 },
+      );
+      service.set(frame, { ...size, data: new Uint8Array(stdout) });
+    }
+    let difference = 0;
+    for (const frame of frames) {
+      const [left, right] = [browser.get(frame)!, service.get(frame)!];
+      expect([right.width, right.height]).toEqual([left.width, left.height]);
+      for (let index = 0; index < left.data.length; index++)
+        difference += Math.abs(left.data[index]! - right.data[index]!);
+    }
+    // Colour conversion and chroma upsampling round differently, and Chrome's unscaled readback (libyuv)
+    // approximates BT.709's blue coefficient (2.0 for 2.112): RGB codes differ by about one on average.
+    const meanDifference = difference / (frames.length * size.width * size.height * 3);
+    expect(meanDifference, `mean RGB code difference at ${scale}×`).toBeLessThan(1.5);
+    const ordered = (images: Map<number, AnalysisFrame>) => frames.map((frame) => images.get(frame)!);
+    const fromBrowser = analyseAutoAdjust(ordered(browser))!;
+    const fromService = analyseAutoAdjust(ordered(service))!;
+    for (const setting of AUTO_ADJUST_SETTINGS)
+      expect(Math.abs(fromService[setting] - fromBrowser[setting]), `${setting} at ${scale}×`).toBeLessThanOrEqual(
+        0.07,
+      );
+    const balanceBrowser = poolWhiteBalance(ordered(browser).map(frameIlluminant))!;
+    const balanceService = poolWhiteBalance(ordered(service).map(frameIlluminant))!;
+    expect(Math.abs(balanceService.temperature - balanceBrowser.temperature)).toBeLessThanOrEqual(0.07);
+    expect(Math.abs(balanceService.tint - balanceBrowser.tint)).toBeLessThanOrEqual(0.03);
+    if (scale === 1) await expectExactConversion(service.get(frames[8]!)!, frames[8]!);
+  }
+}
+
+/** The service's pixels at the patch centres are the exact BT.709 limited-range conversion of the proxy's codes. */
+async function expectExactConversion(image: AnalysisFrame, frame: number): Promise<void> {
+  const { stdout: yuv } = await promisify(execFile)(
+    process.env['PASCAP_FFMPEG'] ?? 'ffmpeg',
+    analysisFrameArgs(path.join(directory, 'flat-patches-1.mp4'), { width: 320, height: 180 }, frame, 'rgba').map(
+      (arg) => (arg.startsWith('scale=') ? 'format=yuv420p' : arg),
+    ),
+    { encoding: 'buffer', maxBuffer: 320 * 180 * 2 },
+  );
+  for (let y = 18; y < 180; y += 36)
+    for (let x = 20; x < 320; x += 40) {
+      const chroma = (y >> 1) * 160 + (x >> 1);
+      const luma = (yuv[y * 320 + x]! - 16) / 219;
+      const [cb, cr] = [yuv[320 * 180 + chroma]!, yuv[320 * 225 + chroma]!].map((code) => (code - 128) / 224);
+      const exact = [luma + 1.5748 * cr!, luma - 0.18732 * cb! - 0.46812 * cr!, luma + 1.8556 * cb!];
+      for (const [channel, value] of exact.entries())
+        expect(
+          Math.abs(image.data[(y * 320 + x) * 4 + channel]! - Math.min(255, Math.max(0, value * 255))),
+        ).toBeLessThanOrEqual(1);
+    }
 }
 
 test('previews the analysed correction, and Apply sets the eleven settings in one Undo step', async ({ page }) => {

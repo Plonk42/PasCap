@@ -37,6 +37,15 @@ export interface AnalysisFrame {
   readonly data: Uint8ClampedArray | Uint8Array;
 }
 
+/** Pixels read per analysed frame: a 720p proxy is read at 320 × 180. */
+export const ANALYSIS_PIXELS = 320 * 180;
+
+/** The size a decoded proxy frame is read at for analysis, in the editor and the service alike. */
+export function analysisSize(width: number, height: number): { width: number; height: number } {
+  const scale = Math.min(1, Math.sqrt(ANALYSIS_PIXELS / (width * height)));
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
+}
+
 /** One frame's light: the Temperature and Tint that neutralise it exactly, and how far to trust them. */
 export interface IlluminantEstimate {
   temperature: number;

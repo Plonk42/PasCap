@@ -10,7 +10,8 @@ import {
   type ProjectDocument,
 } from '../../src/shared/model.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
-import { clipAtPlayhead, whiteBalanceCommands, whiteBalanceTarget } from '../../src/web/auto-white-balance.js';
+import { whiteBalanceCommands } from '../../src/shared/auto-colour.js';
+import { clipAtPlayhead, whiteBalanceTarget } from '../../src/web/auto-white-balance.js';
 import { analysisAsset as asset } from './analysis-asset.js';
 
 /** Clip A (source 100–400, 1×) then B (reversed 2×, source 0–300) after a 10-frame dissolve. */
