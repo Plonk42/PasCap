@@ -103,6 +103,10 @@ describe('MCP endpoint', () => {
       expect(JSON.stringify(edit.inputSchema)).toContain('Project frame without a bookmark.');
       expect(edit.annotations).toEqual({ readOnlyHint: false, openWorldHint: false });
       expect(tools.find((tool) => tool.name === 'still')!.annotations?.readOnlyHint).toBe(true);
+      // Only edit publishes the whole command schema; previews and pictures refer to it.
+      for (const name of ['still', 'timeline_sheet', 'preview_edits'])
+        expect(JSON.stringify(tools.find((tool) => tool.name === name)).length, name).toBeLessThan(5_000);
+      expect(JSON.stringify(tools).length).toBeLessThan(150_000);
 
       expect(client.getInstructions()).toContain('pascap://guide');
       const { resources } = await client.listResources();

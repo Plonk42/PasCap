@@ -245,6 +245,12 @@ scalar Colour settings), `hsl-band` (one HSL range), `colour-curve` (one curve) 
 setting its base is rejected with the keyframe count; the assistant changes the keyframes with
 `layer-key-value` instead. The editor keeps sending whole `colour` and `transform` commands.
 
+Only `edit` publishes the whole command schema (about 99 KB of JSON Schema). `preview_edits`,
+`still` and `timeline_sheet` take the same commands but publish them as `referencedEditCommandSchema`:
+a command `type` plus its fields, validated exactly like `edit`'s. Each embedded the whole schema
+before, so the tool list a client loads for every conversation was 413 KB; it is now about
+113 KB ([#243](https://github.com/Plonk42/PasCap/issues/243)).
+
 ### Operation catalogue
 
 <!-- operation-catalogue:start -->

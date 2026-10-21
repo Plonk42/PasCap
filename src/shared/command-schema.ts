@@ -289,3 +289,15 @@ export const editCommandSchema = z.discriminatedUnion('type', [
 ]);
 
 export type EditCommand = z.infer<typeof editCommandSchema>;
+
+const commandTypes = editCommandSchema.options.map((option) => option.shape.type.value);
+
+/**
+ * A command for tools other than edit (previews and pictures): published as a type plus fields, so each tool
+ * does not repeat edit's whole schema, and validated exactly like edit.
+ */
+export const referencedEditCommandSchema = z
+  .object({ type: described(z.enum(commandTypes as [EditCommand['type'], ...EditCommand['type'][]]), 'Command type.') })
+  .catchall(z.unknown())
+  .meta({ description: "An edit command exactly as the edit tool takes it: its type and that command's fields." })
+  .pipe(editCommandSchema);

@@ -4,6 +4,7 @@ import type { ColourCurvePoint, CurveChannel, HslBand } from '../../src/shared/a
 import type { ColourSettings, ScalarColourSetting } from '../../src/shared/colour.js';
 import { createColourSettings } from '../../src/shared/colour.js';
 import { editCommandSchema, type EditCommand } from '../../src/shared/commands.js';
+import { referencedEditCommandSchema } from '../../src/shared/command-schema.js';
 import { createDetailSettings, type DetailSettings } from '../../src/shared/detail.js';
 import type { Interpolation, KeyframeSetting } from '../../src/shared/keyframes.js';
 import {
@@ -191,5 +192,16 @@ describe('editCommandSchema', () => {
     expect(editCommandSchema.safeParse({ ...samples['select-narrow'], ranges: [] }).success).toBe(false);
     const error = editCommandSchema.safeParse({ ...samples.trim, sourceIn: -1 }).error;
     expect(error?.issues[0]?.path).toEqual(['sourceIn']);
+  });
+
+  it('validates commands other tools refer to exactly like edit, publishing only their type', () => {
+    for (const sample of Object.values(samples))
+      expect(referencedEditCommandSchema.parse(sample)).toEqual(editCommandSchema.parse(sample));
+    expect(referencedEditCommandSchema.safeParse({ ...samples.delete, clip: 'clip-1' }).success).toBe(false);
+    expect(referencedEditCommandSchema.safeParse({ ...samples['bookmark-add'], frame: 1.5 }).success).toBe(false);
+    expect(referencedEditCommandSchema.safeParse({ type: 'export' }).success).toBe(false);
+    const published = JSON.stringify(z.toJSONSchema(referencedEditCommandSchema, { io: 'input' }));
+    expect(published).toContain('colour-setting');
+    expect(published.length).toBeLessThan(1_500);
   });
 });
