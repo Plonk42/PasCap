@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { RGB } from './colour.js';
+import { described } from './described.js';
 
 export const HSL_BANDS = ['red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'magenta'] as const;
 export const HSL_CENTRES = [0, 30, 60, 120, 180, 240, 270, 300] as const;
@@ -8,24 +9,30 @@ export type HslBand = (typeof HSL_BANDS)[number];
 export type CurveChannel = (typeof CURVE_CHANNELS)[number];
 const bandSchema = z
   .object({
-    hue: z.number().min(-30).max(30),
-    saturation: z.number().min(-1).max(1),
-    lightness: z.number().min(-0.5).max(0.5),
+    hue: described(z.number().min(-30).max(30), 'Hue shift of the range in degrees, neutral 0.'),
+    saturation: described(z.number().min(-1).max(1), 'Saturation change of the range, neutral 0; −1 removes it.'),
+    lightness: described(z.number().min(-0.5).max(0.5), 'Lightness change of the range, neutral 0.'),
   })
   .strict();
+const band = (name: HslBand, centre: number) => described(bandSchema, `The ${name} range, centred on ${centre}°.`);
 export const hslSchema = z
   .object({
-    red: bandSchema,
-    orange: bandSchema,
-    yellow: bandSchema,
-    green: bandSchema,
-    cyan: bandSchema,
-    blue: bandSchema,
-    purple: bandSchema,
-    magenta: bandSchema,
+    red: band('red', 0),
+    orange: band('orange', 30),
+    yellow: band('yellow', 60),
+    green: band('green', 120),
+    cyan: band('cyan', 180),
+    blue: band('blue', 240),
+    purple: band('purple', 270),
+    magenta: band('magenta', 300),
   })
   .strict();
-export const curvePointSchema = z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) }).strict();
+export const curvePointSchema = z
+  .object({
+    x: described(z.number().min(0).max(1), 'Input value, 0 (black) to 1 (white).'),
+    y: described(z.number().min(0).max(1), 'Output value for that input.'),
+  })
+  .strict();
 export const colourCurveSchema = z
   .array(curvePointSchema)
   .min(2)
@@ -37,8 +44,13 @@ export const colourCurveSchema = z
       points.every((point, index) => index === 0 || point.x > points[index - 1]!.x),
     { message: 'Colour curve control node inputs must strictly ascend from 0 to 1.' },
   );
+const curve = (channel: CurveChannel) =>
+  described(
+    colourCurveSchema,
+    `The ${channel} curve: 2–16 control nodes with inputs ascending from 0 to 1; identity is (0,0), (0.5,0.5), (1,1).`,
+  );
 export const curvesSchema = z
-  .object({ master: colourCurveSchema, red: colourCurveSchema, green: colourCurveSchema, blue: colourCurveSchema })
+  .object({ master: curve('master'), red: curve('red'), green: curve('green'), blue: curve('blue') })
   .strict();
 export type HslSettings = z.infer<typeof hslSchema>;
 export type ColourCurvePoint = z.infer<typeof curvePointSchema>;

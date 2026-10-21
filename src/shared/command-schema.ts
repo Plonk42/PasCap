@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { colourSchema } from './colour.js';
+import { described } from './described.js';
 import { detailSchema } from './detail.js';
 import { interpolationSchema, KEYFRAME_SETTINGS, type KeyframeSetting } from './keyframes.js';
 import {
@@ -14,8 +15,6 @@ import {
 } from './model.js';
 import { spatialSettingsSchema } from './spatial.js';
 import { speedSchema } from './speed.js';
-
-const described = <S extends z.ZodType>(schema: S, description: string): S => schema.meta({ description });
 
 function command<const T extends string, S extends z.ZodRawShape>(type: T, description: string, shape: S) {
   return described(z.object({ type: z.literal(type), ...shape }).strict(), description);

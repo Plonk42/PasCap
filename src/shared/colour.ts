@@ -9,25 +9,38 @@ import {
   isIdentityCurve,
   isNeutralHsl,
 } from './advanced-colour.js';
+import { described } from './described.js';
 
 export const colourSchema = z
   .object({
-    temperature: z.number().min(-2).max(2),
-    tint: z.number().min(-1).max(1),
-    exposure: z.number().min(-3).max(3),
-    brightness: z.number().min(-0.5).max(0.5),
-    contrast: z.number().min(0).max(2),
-    hue: z.number().min(-180).max(180),
-    saturation: z.number().min(0).max(2),
-    vibrance: z.number().min(-1).max(2),
-    highlights: z.number().min(-1).max(1),
-    shadows: z.number().min(-1).max(1),
-    whites: z.number().min(-1).max(1),
-    blacks: z.number().min(-1).max(1),
-    hdr: z.number().min(0).max(1),
-    localContrast: z.number().min(-1).max(1),
-    hsl: hslSchema,
-    curves: curvesSchema,
+    temperature: described(z.number().min(-2).max(2), 'White balance, neutral 0: positive warms, negative cools.'),
+    tint: described(z.number().min(-1).max(1), 'Neutral 0: positive adds magenta, negative adds green.'),
+    exposure: described(z.number().min(-3).max(3), 'Exposure in stops, neutral 0.'),
+    brightness: described(z.number().min(-0.5).max(0.5), 'Neutral 0: raises or lowers the midtones.'),
+    contrast: described(z.number().min(0).max(2), 'Neutral 1: above 1 deepens shadows and brightens highlights.'),
+    hue: described(z.number().min(-180).max(180), 'Hue rotation in degrees, neutral 0.'),
+    saturation: described(z.number().min(0).max(2), 'Colour intensity, neutral 1; 0 is greyscale.'),
+    vibrance: described(z.number().min(-1).max(2), 'Neutral 0: raises muted colours more than strong ones.'),
+    highlights: described(z.number().min(-1).max(1), 'Neutral 0: brightens or (negative) darkens bright areas.'),
+    shadows: described(z.number().min(-1).max(1), 'Neutral 0: opens or (negative) deepens dark areas.'),
+    whites: described(z.number().min(-1).max(1), 'White point, neutral 0: lower dims the brightest tones.'),
+    blacks: described(
+      z.number().min(-1).max(1),
+      'Black point, neutral 0: lower crushes dark tones, higher lifts them to a matte look.',
+    ),
+    hdr: described(
+      z.number().min(0).max(1),
+      'Neutral 0: local tone mapping that opens shadows and recovers highlights.',
+    ),
+    localContrast: described(
+      z.number().min(-1).max(1),
+      'Neutral 0: strengthens or (negative) flattens detail against its surroundings.',
+    ),
+    hsl: described(hslSchema, 'Static adjustments of eight colour ranges; all 0 is neutral.'),
+    curves: described(
+      curvesSchema,
+      'Static tone curves on encoded values: master first, then each of red, green and blue.',
+    ),
   })
   .strict();
 

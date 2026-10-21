@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { ColourSettings, LocalToneSetting, ScalarColourSetting } from './colour.js';
 import { COLOUR_CONTROLS, colourSchema, LOCAL_TONE_SETTINGS, NEUTRAL_COLOUR } from './colour.js';
+import { described } from './described.js';
 
 export const interpolationSchema = z.enum(['hold', 'linear', 'ease-in', 'ease-out', 'smooth']);
 export type Interpolation = z.infer<typeof interpolationSchema>;
@@ -18,7 +19,7 @@ export const KEYFRAME_SETTINGS = Object.freeze(
 
 const layerKeyValuesSchema = z
   .object({
-    opacity: z.number().min(0).max(1).nullable(),
+    opacity: described(z.number().min(0).max(1), 'Opacity, 0 (transparent) to 1 (opaque).').nullable(),
     temperature: colourSchema.shape.temperature.nullable(),
     tint: colourSchema.shape.tint.nullable(),
     exposure: colourSchema.shape.exposure.nullable(),
@@ -58,10 +59,15 @@ export const EMPTY_KEY_VALUES: Readonly<LayerKeyValues> = Object.freeze({
 export function easingSchema<K extends string>(settings: readonly K[]) {
   return z
     .object(
-      Object.fromEntries(settings.map((key) => [key, interpolationSchema.nullable()])) as Record<
-        K,
-        z.ZodNullable<typeof interpolationSchema>
-      >,
+      Object.fromEntries(
+        settings.map((key) => [
+          key,
+          described(
+            interpolationSchema.nullable(),
+            `Easing of ${key} toward its next keyframe; null exactly when ${key} is null in values.`,
+          ),
+        ]),
+      ) as Record<K, z.ZodNullable<typeof interpolationSchema>>,
     )
     .strict();
 }
@@ -78,11 +84,20 @@ export const EASING_MISMATCH = 'Each enabled setting needs its own Easing, and a
 const frame = z.number().int().nonnegative().max(2_147_483_647);
 export const layerKeyframeSchema = z
   .object({
-    frame,
-    values: layerKeyValuesSchema,
-    easing: easingSchema(Object.keys(EMPTY_KEY_VALUES) as KeyframeSetting[]),
+    frame: described(frame, 'Project frame of the keyframe; it may lie after the project end.'),
+    values: described(
+      layerKeyValuesSchema,
+      'The value of each setting keyed here, or null for a setting not keyed here; at least one is a number.',
+    ),
+    easing: described(
+      easingSchema(Object.keys(EMPTY_KEY_VALUES) as KeyframeSetting[]),
+      'The Easing of each keyed setting toward its next keyframe.',
+    ),
     /** A default keyframe never extends its values to frames before it. */
-    reset: z.boolean(),
+    reset: described(
+      z.boolean(),
+      'True for a default keyframe: its values hold from its frame on and never reach back to earlier frames.',
+    ),
   })
   .strict()
   .refine((key) => Object.values(key.values).some((value) => value !== null), {
