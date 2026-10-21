@@ -810,7 +810,8 @@ stays idle for 10 minutes. You can also start it yourself with **Hand off** in t
 write what you want, optionally pick the music track, length, allowed camera movement and
 number of clips, and check what the assistant can use (prepare or analyse missing
 recordings there). Meanwhile a banner says **An assistant is editing this project** and
-the editor follows its changes without letting you edit; **Take over** ends the session and
+the editor follows its changes without letting you edit, moving the preview to what it just
+changed; **Take over** ends the session and
 gives the project back to you. When the session ends, the banner shows the assistant's notes,
 and **Restore project before session** returns the project to how it was when the session
 started (the assistant's version is kept as a checkpoint too); **Open as new project** opens

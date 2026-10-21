@@ -117,7 +117,7 @@ describe('assistant sessions', () => {
     const status = await call('editor', 'session_status', { projectId: 'flight' });
     expect(status.session).toMatchObject({
       active: true,
-      edits: [{ revision: 2, commands: 2, summary: 'bookmark-add, bookmark-add' }],
+      edits: [{ revision: 2, commands: 2, summary: 'bookmark-add, bookmark-add', frame: 30 }],
     });
 
     expect(await call('editor', 'session_end', { projectId: 'flight' })).toMatchObject({
