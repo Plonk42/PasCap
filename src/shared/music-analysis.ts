@@ -2,7 +2,8 @@ import { z } from 'zod';
 import { MAX_BOOKMARKS, type MusicTrack } from './model.js';
 import { MUSIC_SAMPLE_RATE, MUSIC_SAMPLES_PER_FRAME } from './music-format.js';
 
-export const MUSIC_ANALYSIS_VERSION = 1;
+/** Version 2 (#254) changed beats, downbeats and sections; `music-v1.json` caches are ignored, never deleted. */
+export const MUSIC_ANALYSIS_VERSION = 2;
 /** Feature rate: one onset-envelope value every 10 ms. */
 export const MUSIC_ANALYSIS_HOP = 480;
 
@@ -12,7 +13,7 @@ const bpm = z.number().positive();
 
 export const sectionKinds = ['quiet', 'build', 'peak', 'release'] as const;
 
-/** `music-v1.json` beside the PCM cache; positions are samples of that 48 kHz cache. */
+/** `music-v2.json` beside the PCM cache; positions are samples of that 48 kHz cache. */
 export const musicAnalysisSchema = z
   .object({
     version: z.literal(MUSIC_ANALYSIS_VERSION),
