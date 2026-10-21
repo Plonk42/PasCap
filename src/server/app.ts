@@ -143,6 +143,7 @@ export async function createApp(config = createConfig()) {
     sessions: new AssistantSessions(config.dataDir, config.assistantSessions, projects),
     library,
     audio,
+    jobs,
     stills: new StillRenderer(config, library, jobs),
     images: config.assistantImages,
   };

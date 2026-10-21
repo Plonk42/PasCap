@@ -1,5 +1,6 @@
 import type {
   checkpoint,
+  checkpointCopy,
   checkpointRestore,
   previewEdits,
   sessionEnd,
@@ -58,6 +59,16 @@ export const runCheckpointRestore: OperationRunner<typeof checkpointRestore> = a
     assertProjectSources(document, library, audio),
   );
   return { revision: restored.revision, duration: durationOf(calculateLayout(restored).duration) };
+};
+
+export const runCheckpointCopy: OperationRunner<typeof checkpointCopy> = async (
+  { sessions, library, audio },
+  { projectId, checkpointId, title },
+) => {
+  const copy = await sessions.copy(projectId, checkpointId, title, (document) =>
+    assertProjectSources(document, library, audio),
+  );
+  return { projectId: copy.id, title: copy.title };
 };
 
 export const runPreviewEdits: OperationRunner<typeof previewEdits> = async (context, { projectId, commands }) => {

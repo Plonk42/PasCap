@@ -2,9 +2,18 @@ import type { z } from 'zod';
 import { describeProject } from './describe-project.js';
 import { describeTrack } from './describe-track.js';
 import { edit } from './edit.js';
+import { handOffReadiness } from './hand-off.js';
 import { listProjects } from './list-projects.js';
 import { recordingSheet, still, timelineSheet } from './pictures.js';
-import { checkpoint, checkpointRestore, previewEdits, sessionEnd, sessionStart, sessionStatus } from './sessions.js';
+import {
+  checkpoint,
+  checkpointCopy,
+  checkpointRestore,
+  previewEdits,
+  sessionEnd,
+  sessionStart,
+  sessionStatus,
+} from './sessions.js';
 
 /** Every operation of the service; one that is not listed here does not exist. */
 export const operations = [
@@ -18,6 +27,8 @@ export const operations = [
   previewEdits,
   checkpoint,
   checkpointRestore,
+  checkpointCopy,
+  handOffReadiness,
   still,
   timelineSheet,
   recordingSheet,

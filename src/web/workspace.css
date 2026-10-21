@@ -800,6 +800,19 @@ body {
   white-space: pre-wrap;
 }
 
+.assistant-edits > summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.assistant-edits > ol {
+  max-height: 96px;
+  margin: 4px 0 0;
+  padding-left: 22px;
+  overflow: auto;
+  font-variant-numeric: tabular-nums;
+}
+
 .danger-button {
   min-height: 32px;
   padding: 6px 12px;

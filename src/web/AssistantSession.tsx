@@ -130,39 +130,67 @@ export function AssistantEndedBanner({
   busy,
   restoreReason,
   onRestore,
+  onOpenCopy,
   onDismiss,
 }: Readonly<{
   session: Session;
   busy: boolean;
-  /** Why restoring is unavailable, or null. */
+  /** Why restoring or opening the earlier project is unavailable, or null. */
   restoreReason: string | null;
   onRestore: () => void;
+  onOpenCopy: () => void;
   onDismiss: () => void;
 }>) {
+  const unavailable = busy || restoreReason !== null;
   return (
-    <output className="assistant-banner ended">
+    <section className="assistant-banner ended" aria-label="Assistant session summary">
       <div>
         <strong>
           {ENDED[session.endedBy ?? 'assistant']} · {plural(session.edits.length, 'edit')}
         </strong>
         {session.notes && <span className="assistant-notes">{session.notes}</span>}
+        {session.edits.length > 0 && (
+          <details className="assistant-edits">
+            <summary>Edit log</summary>
+            <ol>
+              {session.edits.map((edit) => (
+                <li key={edit.revision}>
+                  {new Date(edit.at).toLocaleTimeString()} · {edit.summary}
+                </li>
+              ))}
+            </ol>
+          </details>
+        )}
       </div>
       {session.edits.length > 0 && (
-        <button
-          className="secondary-button small"
-          aria-disabled={busy || restoreReason !== null}
-          title={restoreReason ?? 'Replace the project with the checkpoint taken when the session started'}
-          onClick={() => {
-            if (!busy && restoreReason === null) onRestore();
-          }}
-        >
-          <Icon name="undo" size={15} />
-          Restore project before session
-        </button>
+        <>
+          <button
+            className="secondary-button small"
+            aria-disabled={unavailable}
+            title={restoreReason ?? 'Open the project as it was when the session started, as a new project'}
+            onClick={() => {
+              if (!unavailable) onOpenCopy();
+            }}
+          >
+            <Icon name="folder" size={15} />
+            Open as new project
+          </button>
+          <button
+            className="secondary-button small"
+            aria-disabled={unavailable}
+            title={restoreReason ?? 'Replace the project with the checkpoint taken when the session started'}
+            onClick={() => {
+              if (!unavailable) onRestore();
+            }}
+          >
+            <Icon name="undo" size={15} />
+            Restore project before session
+          </button>
+        </>
       )}
       <button className="icon-button" aria-label="Dismiss assistant session summary" onClick={onDismiss}>
         <Icon name="x" size={16} />
       </button>
-    </output>
+    </section>
   );
 }
