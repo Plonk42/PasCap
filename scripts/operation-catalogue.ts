@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { format, resolveConfig } from 'prettier';
 import { z } from 'zod';
-import { editCommandSchema } from '../src/shared/command-schema.js';
+import { assistantEditCommandSchema } from '../src/shared/command-schema.js';
 import { operations } from '../src/shared/operations/index.js';
 
 export const CATALOGUE_DOCUMENT = path.join(
@@ -63,7 +63,7 @@ export function operationCatalogue(): string {
       ...fieldRows(operation.input),
     ].join('\n'),
   );
-  const commands = editCommandSchema.options.map((option) => {
+  const commands = assistantEditCommandSchema.options.map((option) => {
     const fields = Object.keys(option.shape)
       .filter((name) => name !== 'type')
       .map(code)

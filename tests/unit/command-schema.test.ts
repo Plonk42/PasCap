@@ -4,7 +4,7 @@ import type { ColourCurvePoint, CurveChannel, HslBand } from '../../src/shared/a
 import type { ColourSettings, ScalarColourSetting } from '../../src/shared/colour.js';
 import { createColourSettings } from '../../src/shared/colour.js';
 import { editCommandSchema, type EditCommand } from '../../src/shared/commands.js';
-import { referencedEditCommandSchema } from '../../src/shared/command-schema.js';
+import { assistantEditCommandSchema, referencedEditCommandSchema } from '../../src/shared/command-schema.js';
 import { createDetailSettings, type DetailSettings } from '../../src/shared/detail.js';
 import type { Interpolation, KeyframeSetting } from '../../src/shared/keyframes.js';
 import {
@@ -57,6 +57,14 @@ type FormerEditCommand =
     }
   | { type: 'layer-add'; layer: VideoLayer }
   | { type: 'layer-update'; layer: VideoLayer }
+  | { type: 'layer-create'; layerId: string; name: string }
+  | {
+      type: 'layer-options';
+      layerId: string;
+      name?: string | undefined;
+      enabled?: boolean | undefined;
+      ripple?: boolean | undefined;
+    }
   | { type: 'layer-remove'; layerId: string }
   | { type: 'layer-order'; layerIds: string[] }
   | { type: 'place'; clipId: string; layerId: string; start: number; index: number }
@@ -117,6 +125,8 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
   },
   'layer-add': { type: 'layer-add', layer: createLayer('video-2', 'Track 2') },
   'layer-update': { type: 'layer-update', layer: createLayer('video-1', 'Renamed', false) },
+  'layer-create': { type: 'layer-create', layerId: 'video-3', name: 'Overlay' },
+  'layer-options': { type: 'layer-options', layerId: 'video-1', ripple: false },
   'layer-remove': { type: 'layer-remove', layerId: 'video-2' },
   'layer-order': { type: 'layer-order', layerIds: ['video-2', 'video-1'] },
   place: { type: 'place', clipId: 'clip-1', layerId: 'video-2', start: 30, index: 0 },
@@ -195,7 +205,10 @@ describe('editCommandSchema', () => {
   });
 
   it('validates commands other tools refer to exactly like edit, publishing only their type', () => {
-    for (const sample of Object.values(samples))
+    const assistant = Object.values(samples).filter(
+      (sample) => sample.type !== 'layer-add' && sample.type !== 'layer-update',
+    );
+    for (const sample of assistant)
       expect(referencedEditCommandSchema.parse(sample)).toEqual(editCommandSchema.parse(sample));
     expect(referencedEditCommandSchema.safeParse({ ...samples.delete, clip: 'clip-1' }).success).toBe(false);
     expect(referencedEditCommandSchema.safeParse({ ...samples['bookmark-add'], frame: 1.5 }).success).toBe(false);
@@ -203,5 +216,16 @@ describe('editCommandSchema', () => {
     const published = JSON.stringify(z.toJSONSchema(referencedEditCommandSchema, { io: 'input' }));
     expect(published).toContain('colour-setting');
     expect(published.length).toBeLessThan(1_500);
+  });
+
+  it('offers the assistant every command but the two carrying a whole track', () => {
+    const types = assistantEditCommandSchema.options.map((option) => option.shape.type.value);
+    expect(types).toHaveLength(editCommandSchema.options.length - 2);
+    expect(types).not.toContain('layer-add');
+    expect(types).not.toContain('layer-update');
+    expect(assistantEditCommandSchema.safeParse(samples['layer-update']).success).toBe(false);
+    expect(referencedEditCommandSchema.safeParse(samples['layer-add']).success).toBe(false);
+    expect(assistantEditCommandSchema.parse(samples['layer-create'])).toEqual(samples['layer-create']);
+    expect(JSON.stringify(z.toJSONSchema(assistantEditCommandSchema, { io: 'input' })).length).toBeLessThan(60_000);
   });
 });

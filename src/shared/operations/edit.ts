@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { editCommandSchema } from '../command-schema.js';
+import { assistantEditCommandSchema } from '../command-schema.js';
 import { frameSchema, idSchema } from '../model.js';
 import { defineOperation } from './spec.js';
 import { durationSchema } from './timecode.js';
@@ -16,7 +16,7 @@ export const edit = defineOperation({
         description: 'Revision the commands were written against, from describe_project.',
       }),
       commands: z
-        .array(editCommandSchema)
+        .array(assistantEditCommandSchema)
         .min(1)
         .max(MAX_EDIT_COMMANDS)
         .meta({ description: 'Commands applied in order; each sees the result of the previous one.' }),
