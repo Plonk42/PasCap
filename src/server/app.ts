@@ -21,6 +21,7 @@ import { registerOperations } from './operations/index.js';
 import { assertProjectSources } from './project-sources.js';
 import { submitFolderRelink } from './relink.js';
 import { MediaLibrary, MediaQueueError } from './library.js';
+import { MCP_PATH, mcpToken, registerMcp } from './mcp.js';
 import { startReference } from './reference.js';
 import { StillRenderer } from './stills.js';
 import { ensurePrivateDirectory, ProjectStore } from './storage.js';
@@ -54,7 +55,9 @@ function validateLocalRequest(request: FastifyRequest, reply: FastifyReply, conf
   ) {
     throw new ServiceError('Only trusted loopback Host and Origin values are accepted.', 403);
   }
-  if (!['GET', 'HEAD'].includes(request.method) && request.headers['x-pascap-client'] !== 'preview-lab')
+  // MCP clients authenticate with the bearer token instead (see mcp.ts).
+  const mcp = request.url.split('?')[0] === MCP_PATH;
+  if (!mcp && !['GET', 'HEAD'].includes(request.method) && request.headers['x-pascap-client'] !== 'preview-lab')
     throw new ServiceError('Local JSON requests must identify the PasCap client.', 403);
   reply.header('X-Content-Type-Options', 'nosniff').header('Cross-Origin-Resource-Policy', 'same-origin');
 }
@@ -130,9 +133,17 @@ export async function createApp(config = createConfig()) {
   const audio = new AudioLibrary(config, jobs);
   const projects = new ProjectStore(config.dataDir);
   await ensurePrivateDirectory(config.dataDir);
+  const mcp = await mcpToken(config.dataDir);
   await library.initialise();
   await audio.initialise();
   const archiveWarnings = await restoreExports(config, jobs);
+  const operationContext = {
+    projects,
+    library,
+    audio,
+    stills: new StillRenderer(config, library, jobs),
+    images: config.assistantImages,
+  };
   archiveWarnings.forEach((message) => app.log.warn({ message }, 'Skipped invalid export receipt'));
   app.addHook('onRequest', async (request, reply) => validateLocalRequest(request, reply, config));
   app.addHook('onClose', async () => jobs.close());
@@ -330,13 +341,8 @@ export async function createApp(config = createConfig()) {
     }
     return reply.code(201).send({ document: await projects.save(document, 0) });
   });
-  registerOperations(app, {
-    projects,
-    library,
-    audio,
-    stills: new StillRenderer(config, library, jobs),
-    images: config.assistantImages,
-  });
+  registerOperations(app, operationContext);
+  registerMcp(app, operationContext, mcp);
   app.get('/api/jobs', (_request, reply) => reply.send({ jobs: jobs.list() }));
   app.get('/api/jobs/:id', (request, reply) => reply.send({ job: jobs.get(idParams.parse(request.params).id) }));
   app.post('/api/jobs/:id/cancel', (request, reply) => {
@@ -392,5 +398,5 @@ export async function createApp(config = createConfig()) {
       reply.send({ name: 'PasCap', message: 'Use the Vite development page, or build the frontend first.' }),
     );
   }
-  return { app, library, audio, jobs, projects, config };
+  return { app, library, audio, jobs, projects, config, mcpToken: mcp };
 }

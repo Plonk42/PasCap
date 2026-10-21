@@ -481,33 +481,37 @@ beats; the action reports when it would exceed the limit and offers downbeats on
 
 ## MCP server
 
-`src/server/mcp.ts` registers the endpoint on the Fastify app: one `McpServer` from
-`@modelcontextprotocol/sdk` whose tools and resources are built from the registry in a
-loop, and a Streamable HTTP transport served at `/mcp`. The SDK's transport works on raw
-Node request/response objects, so the route hijacks the reply and hands `request.raw`/
-`reply.raw` to it; sessions follow the SDK's `Mcp-Session-Id` header. Authentication is a
-bearer token generated at startup and written to `<dataDir>/mcp-token` (owner-only
-permissions, like the rest of the data directory); `/mcp` is exempt from the
-`x-pascap-client` rule and keeps the Host/loopback and Origin checks. The Hand off dialog
-shows the client configuration, for example in VS Code:
+Implemented on the `mcp` branch ([#242](https://github.com/Plonk42/PasCap/issues/242),
+[mcp.ts](../../src/server/mcp.ts)): `/mcp` on the service's loopback port is a **stateless**
+Streamable HTTP endpoint. Each `POST` carries one JSON-RPC message and gets one JSON response:
+`initialize` (protocol versions 2025-11-25, 2025-06-18 and 2025-03-26, with short
+instructions), `ping`, `tools/list` and `tools/call`; notifications get 202, and `GET` and
+`DELETE` 405, since there is no session or server-initiated stream. The tools are generated in
+a loop from the operations whose `audience` includes `assistant`: name, description, input
+JSON Schema and a read-only hint from `access`. A call runs the same `runOperation` as the
+HTTP route; pictures become image content beside a JSON text legend, other outputs JSON text,
+and a rejected call is a tool error carrying the service's reason, so the model can correct it.
 
-```json
-{
-  "servers": {
-    "pascap": { "type": "http", "url": "http://127.0.0.1:4318/mcp", "headers": { "Authorization": "Bearer …" } }
-  }
-}
-```
+The endpoint is written in the service instead of using `@modelcontextprotocol/sdk` (chosen
+on 2026-10-21): the SDK's server would add 91 production packages, including Express,
+Hono and an unreviewed BSD-2-Clause licence, beside Fastify, for a protocol subset of about
+150 lines here. The SDK's official client is a development dependency, and the unit tests
+drive the endpoint through it, so conformance is checked against the reference
+implementation. Resources, progress notifications or sessions can be added the same way, or
+the SDK adopted later without touching the registry.
 
-Clients that only launch stdio servers use `npx mcp-remote http://127.0.0.1:4318/mcp
---header "Authorization: Bearer …"`; PasCap ships no process of its own.
+Authentication is a bearer token generated at the first startup and kept in
+`<dataDir>/mcp-token` (owner-only, like the rest of the data directory); `/mcp` is exempt
+from the `x-pascap-client` rule and keeps the Host/loopback and Origin checks. The VS Code
+configuration is in [development](../DEVELOPMENT.md#mcp-endpoint); the Hand off dialog will
+show it. Clients that only launch stdio servers use `npx mcp-remote
+http://127.0.0.1:4318/mcp --header "Authorization: Bearer …"`; PasCap ships no process of
+its own.
 
-Conventions enforced by the loop, not per tool: frames are authoritative and every output
-also carries `MM:SS:FF` timecode (30 fps NDF, as the editor shows), inputs accept either
-(a shared `frameOrTimecode` schema); every write returns the new revision and a one-line
-summary; validation failures are tool errors with the service's message (for example an
-overlap or an invalid fade), never exceptions; large outputs are paged (`offset`/`limit`)
-and summarised by default.
+Conventions, by the operations rather than the endpoint: frames are authoritative and
+outputs also carry `MM:SS:FF` timecode (30 fps NDF, as the editor shows); every write returns
+the new revision; validation failures are tool errors with the service's message (for
+example an overlap or an invalid fade), never exceptions.
 
 ### Resources
 
