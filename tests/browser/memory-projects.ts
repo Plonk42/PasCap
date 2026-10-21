@@ -1,12 +1,21 @@
 import type { Page } from '@playwright/test';
 import { createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import type { OperationOutput } from '../../src/shared/operations/index.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 
 export interface MemoryProjects {
   snapshot: (id?: string) => ProjectDocument;
   /** Replace a fixture before reload, without a request or a history entry. */
   seed: (document: ProjectDocument) => void;
+  /** The assistant session session_status reports, null for none; Take over and restore update it. */
+  session: MemorySession | null;
   readonly saves: number;
+}
+
+export interface MemorySession {
+  view: OperationOutput<'session_status'>['session'];
+  /** The project as it was when the session started, for checkpoint_restore. */
+  checkpoint: ProjectDocument;
 }
 
 /** Strict current-schema project CRUD and optimistic revisions, never the on-disk project store. */
@@ -14,6 +23,45 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
   const documents = new Map([[initial.id, projectSchema.parse(initial)]]);
   let saves = 0;
   let serial = 0;
+  let session: MemorySession | null = null;
+  await page.route(/\/api\/ops\/(session_status|session_end|checkpoint_restore)$/, async (route) => {
+    const name = new URL(route.request().url()).pathname.slice('/api/ops/'.length);
+    const body = route.request().postDataJSON() as { projectId: string; expectedRevision?: number };
+    const saved = documents.get(body.projectId);
+    if (!saved) {
+      await route.fulfill({ status: 404, json: { error: 'Memory-only project not found.' } });
+      return;
+    }
+    if (name === 'session_end' && session?.view?.active) {
+      session.view = {
+        ...session.view,
+        active: false,
+        endedAt: '2026-10-21T10:05:00.000Z',
+        endedBy: 'user',
+        expiresAt: null,
+      };
+    }
+    if (name === 'session_end') {
+      await route.fulfill({ json: { session: session?.view ?? null } });
+      return;
+    }
+    if (name === 'checkpoint_restore') {
+      if (!session || body.expectedRevision !== saved.revision) {
+        await route.fulfill({ status: 409, json: { error: 'The memory-only project revision changed.' } });
+        return;
+      }
+      const restored = projectSchema.parse({ ...session.checkpoint, revision: saved.revision + 1 });
+      documents.set(restored.id, restored);
+      await route.fulfill({
+        json: {
+          revision: restored.revision,
+          duration: { frames: calculateLayout(restored).duration, seconds: 0, timecode: '00:00:00' },
+        },
+      });
+      return;
+    }
+    await route.fulfill({ json: { session: session?.view ?? null, revision: saved.revision, checkpoints: [] } });
+  });
   await page.route(/\/api\/projects(?:\?.*)?$/, async (route) => {
     const method = route.request().method();
     if (method === 'GET') {
@@ -107,6 +155,12 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
     },
     seed: (document) => {
       documents.set(document.id, projectSchema.parse(document));
+    },
+    get session() {
+      return session;
+    },
+    set session(next) {
+      session = next;
     },
     get saves() {
       return saves;
