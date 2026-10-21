@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { editCommandSchema } from '../command-schema.js';
+import { referencedEditCommandSchema } from '../command-schema.js';
 import { described } from '../described.js';
 import { frameSchema, idSchema } from '../model.js';
 import { MAX_EDIT_COMMANDS } from './edit.js';
@@ -23,7 +23,7 @@ export const imageSchema = described(
 );
 const projectId = described(idSchema, 'ID of the saved project.');
 const commands = described(
-  z.array(editCommandSchema).min(1).max(MAX_EDIT_COMMANDS).optional(),
+  z.array(referencedEditCommandSchema).min(1).max(MAX_EDIT_COMMANDS).optional(),
   'Edit commands applied in memory to the saved project before rendering, to compare a candidate change without saving it.',
 );
 const timelineLegend = described(

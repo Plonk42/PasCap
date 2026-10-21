@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { briefSchema, checkpointSummarySchema, MAX_SESSION_NOTES, sessionSchema } from '../assistant-session.js';
-import { editCommandSchema } from '../command-schema.js';
+import { referencedEditCommandSchema } from '../command-schema.js';
 import { described } from '../described.js';
 import { frameSchema, idSchema } from '../model.js';
 import { MAX_EDIT_COMMANDS } from './edit.js';
@@ -122,7 +122,7 @@ export const previewEdits = defineOperation({
     .object({
       projectId,
       commands: z
-        .array(editCommandSchema)
+        .array(referencedEditCommandSchema)
         .min(1)
         .max(MAX_EDIT_COMMANDS)
         .meta({ description: 'Commands applied in order.' }),
