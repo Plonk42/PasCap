@@ -27,7 +27,7 @@ export type SessionStarter = 'user' | 'assistant';
  * Assistant sessions and checkpoints, stored beside the projects in `<dataDir>/assistant/<id>/`,
  * outside the project document. An active session holds the project's write lease: the user's
  * writes are refused (423) and only the assistant may write, until the user takes over, the
- * assistant finishes or the lease expires.
+ * assistant finishes or an optional idle lease expires.
  */
 export class AssistantSessions {
   readonly #writer = new SerialWriter();
@@ -78,14 +78,16 @@ export class AssistantSessions {
   async #current(projectId: string): Promise<AssistantSession | null> {
     const session = await this.read(projectId);
     if (session?.endedAt !== null) return session;
-    const expiry = Date.parse(session.lastActivityAt) + this.limits.leaseMs;
-    if (this.clock() < expiry) return session;
+    const expiry = this.#expiry(session);
+    if (expiry === null || this.clock() < expiry) return session;
     return this.write({ ...session, endedAt: new Date(expiry).toISOString(), endedBy: 'expiry' });
   }
+  #expiry(session: AssistantSession): number | null {
+    return this.limits.leaseMs === null ? null : Date.parse(session.lastActivityAt) + this.limits.leaseMs;
+  }
   expiresAt(session: AssistantSession): string | null {
-    return session.endedAt === null
-      ? new Date(Date.parse(session.lastActivityAt) + this.limits.leaseMs).toISOString()
-      : null;
+    const expiry = session.endedAt === null ? this.#expiry(session) : null;
+    return expiry === null ? null : new Date(expiry).toISOString();
   }
 
   async #guard(projectId: string, writer: ProjectWriter): Promise<void> {
@@ -106,8 +108,7 @@ export class AssistantSessions {
     const restart = 'Start a new session with session_start to edit it again.';
     if (session === null) return 'Start an assistant session with session_start before editing this project.';
     if (session.endedBy === 'user') return `The user took the project back. ${restart}`;
-    if (session.endedBy === 'expiry')
-      return `The assistant session ended after ${this.limits.leaseMs / 60_000} minutes without activity. ${restart}`;
+    if (session.endedBy === 'expiry') return `The assistant session ended after a period without activity. ${restart}`;
     return `The assistant session has ended. ${restart}`;
   }
 
