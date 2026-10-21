@@ -764,6 +764,42 @@ body {
   font-size: 13px;
 }
 
+.assistant-banner {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid #3f5f7a;
+  background: #1d2a36;
+  color: #cfe0ee;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.assistant-banner.ended {
+  border-color: #4d6856;
+  background: #223229;
+  color: #c1d6c7;
+}
+
+.assistant-banner > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.assistant-banner strong {
+  font-size: 13px;
+}
+
+.assistant-notes {
+  max-height: 72px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
 .danger-button {
   min-height: 32px;
   padding: 6px 12px;

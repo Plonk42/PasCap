@@ -132,7 +132,8 @@ receipts or compatibility rules; a checkpoint is upgraded and validated like a p
 when restored.
 
 `session_start` (the editor, or the assistant itself from what the user asked, decided on
-2026-10-21) checks the revision the starter read and that every bin recording is prepared,
+2026-10-21) checks the revision the starter read (unprepared recordings in the bin do not block
+it: describe_project marks them, and stills cannot show them),
 checkpoints the project and takes its write lease. While it is active every write of the user
 (editor saves, renames, deletes, imports into the bin, `edit` from the editor) is refused with
 423, and the assistant's writes are allowed; without an active session the assistant cannot
@@ -266,7 +267,7 @@ Read; for editor and assistant. Read every appearance value of one video track: 
 
 #### `session_start`
 
-Write; for editor and assistant. Take the project's write lease for an assistant session, after checkpointing it, so the editor follows your edits read-only until the user takes over or you call session_end. Required before edit, checkpoint_restore or any write. Pass the user's brief from the conversation. Refused while another session is active, when the revision is stale or while a recording of the project is not prepared. The lease ends after some minutes without any call on the project.
+Write; for editor and assistant. Take the project's write lease for an assistant session, after checkpointing it, so the editor follows your edits read-only until the user takes over or you call session_end. Required before edit, checkpoint_restore or any write. Pass the user's brief from the conversation. Refused while another session is active or when the revision is stale. The lease ends after some minutes without any call on the project.
 
 | Input              | Type    | Description                                                      |
 | ------------------ | ------- | ---------------------------------------------------------------- |
@@ -276,11 +277,12 @@ Write; for editor and assistant. Take the project's write lease for an assistant
 
 #### `session_status`
 
-Read; for editor and assistant. Read the project's latest assistant session (null if none): whether it is active, its brief, its edit log and the notes it ended with, and the project's checkpoints, newest first.
+Read; for editor and assistant. Read the project's latest assistant session (null if none): whether it is active, its brief, its edit log and the notes it ended with, the project's saved revision and its checkpoints, newest first.
 
-| Input       | Type   | Description              |
-| ----------- | ------ | ------------------------ |
-| `projectId` | string | ID of the saved project. |
+| Input         | Type    | Description                           |
+| ------------- | ------- | ------------------------------------- |
+| `projectId`   | string  | ID of the saved project.              |
+| `checkpoints` | boolean | False leaves out the checkpoint list. |
 
 #### `session_end`
 
@@ -410,7 +412,7 @@ registry; the assistant never sees them.
 
 | Operation            | Audience  | Purpose                                                                                                                                                                                                                    | Bounds                                                                                 |
 | -------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `session_start`      | editor    | Start an assistant session: checkpoint, brief, lease token; refuses when a session is active, recordings in the bin are not ready, or autosave is dirty (the editor flushes first)                                         | One session per project                                                                |
+| `session_start`      | editor    | Start an assistant session: checkpoint, brief, lease token; refuses when a session is active or the revision is stale (the editor flushes autosave first)                                                                  | One session per project                                                                |
 | `session_status`     | both      | State, brief, edit log, notes (editor banner and LLM resource)                                                                                                                                                             |                                                                                        |
 | `session_end`        | both      | Take over (editor) or finish with notes (assistant); the notes appear in the editor's hand-off dialog                                                                                                                      |                                                                                        |
 | `checkpoint`         | both      | Named checkpoint of the current document; `checkpoint_restore` (editor only) replaces the document in one revision after checkpointing the current state                                                                   | Last 5 per project                                                                     |
@@ -633,25 +635,33 @@ which command (for example static grades unless the brief wants animation).
 
 ## Hand-off in the editor
 
+Follow mode, Take over and restore are implemented on the `mcp` branch
+([#236](https://github.com/Plonk42/PasCap/issues/236), [AssistantSession.tsx](../../src/web/AssistantSession.tsx)):
+
+- While the page is visible the editor polls `session_status` (without checkpoints) every
+  1.5 s. During an active session it shows a banner, **An assistant is editing this project**,
+  with the edit count, the last command and **Take over**. Edits and Undo/Redo are refused
+  with a message; whenever the editor is idle (no draft, gesture or pending save) it adopts
+  each newer saved revision, replacing its history like a project switch. A draft the user
+  had before the session stays in the editor, its saves refused (423) until the session ends.
+- **Take over** calls `session_end`. When a session the editor saw ends (Take over, the
+  assistant's `session_end` with notes, or expiry), the editor adopts the latest revision once
+  and shows who ended it, the edit count and the notes, with **Restore project before
+  session**: `checkpoint_restore` of the session's start checkpoint, after checkpointing the
+  current state, in one revision; the editor reloads it with a fresh history. The summary is
+  dismissed with ×.
+
+Still planned:
+
 1. **Hand off** (header, beside Export) opens a dialog: music (a placed music track, or a
    ready music recording to place at frame 0), target length, allowed camera movement,
-   permissions (speed, several tracks, picture-in-picture), notes, and a readiness list:
-   every bin recording prepared and analysed, the music prepared and analysed (queue the
-   missing jobs from the dialog and wait), autosave clean, no running export.
-2. Confirm flushes autosave, writes the checkpoint and starts the session. The editor
-   enters **follow mode**: a banner "Assistant is editing · N edits · last: …" with
-   **Take over**; controls are read-only; the document reloads on each new revision
-   (polling `GET /api/projects/:id` about once per second, with the preview following the
-   last edited frame); history is cleared on take-over like a project switch.
-3. **Take over**, the assistant's `session_end` or expiry returns to normal editing on the latest
-   revision. The dialog then shows the assistant's notes, the edit log and **Restore
-   checkpoint** (replaces the document in one revision; the current state is checkpointed
-   first) beside **Open checkpoint as new project**.
-4. The MCP client is started by the user outside PasCap (its own window); the dialog shows
-   the client configuration with the token and whether an MCP session has connected.
-
-Keyboard, focus and Undo contracts of the editor are unchanged outside follow mode; follow
-mode is a new read-only state tested like a disabled preview.
+   notes, and a readiness list: every bin recording prepared and analysed, the music
+   prepared and analysed (queue the missing jobs from the dialog and wait), no running
+   export. Confirm flushes autosave and calls `session_start` with that brief.
+2. The dialog shows the client configuration with the token and whether an MCP session has
+   connected; the MCP client is started by the user outside PasCap (its own window).
+3. **Open checkpoint as new project** beside Restore, and the preview following the last
+   edited frame.
 
 ## Assistant playbook (the `pascap://guide` resource)
 

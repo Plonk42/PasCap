@@ -147,7 +147,7 @@ describe('assistant sessions', () => {
     expect((await projects.save(await projects.load('flight'), 2)).revision).toBe(3);
   });
 
-  it('refuses to start on a stale revision, beside an active session or with unprepared recordings', async () => {
+  it('refuses to start on a stale revision or beside an active session', async () => {
     const stale = await setup();
     await expect(
       stale.call('assistant', 'session_start', { projectId: 'flight', expectedRevision: 0 }),
@@ -158,10 +158,6 @@ describe('assistant sessions', () => {
     await expect(
       stale.call('assistant', 'session_start', { projectId: 'flight', expectedRevision: 1 }),
     ).rejects.toThrow(/already|been active/);
-    const unready = await setup({ ready: false });
-    await expect(
-      unready.call('assistant', 'session_start', { projectId: 'flight', expectedRevision: 1 }),
-    ).rejects.toThrow(/not prepared/);
   });
 
   it('keeps assistant clips inside the kept ranges and only narrows them, leaving the project unchanged otherwise', async () => {
