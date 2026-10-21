@@ -22,6 +22,7 @@ import { assertProjectSources } from './project-sources.js';
 import { submitFolderRelink } from './relink.js';
 import { MediaLibrary, MediaQueueError } from './library.js';
 import { MCP_PATH, mcpToken, registerMcp } from './mcp.js';
+import { AssistantConnection } from './assistant-connection.js';
 import { AssistantSessions } from './sessions.js';
 import { startReference } from './reference.js';
 import { StillRenderer } from './stills.js';
@@ -145,6 +146,7 @@ export async function createApp(config = createConfig()) {
     audio,
     jobs,
     stills: new StillRenderer(config, library, jobs),
+    assistant: new AssistantConnection(config.port, config.dataDir),
     images: config.assistantImages,
   };
   archiveWarnings.forEach((message) => app.log.warn({ message }, 'Skipped invalid export receipt'));

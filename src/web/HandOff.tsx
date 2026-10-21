@@ -13,6 +13,8 @@ import './hand-off.css';
 type Readiness = OperationOutput<'hand_off_readiness'>;
 
 const POLL_MS = 2000;
+/** While nothing is preparing, the dialog still notices an MCP client connecting. */
+const IDLE_POLL_MS = 5000;
 
 interface Props {
   project: ProjectDocument;
@@ -56,7 +58,7 @@ function useReadiness(projectId: string): { readiness: Readiness | null; error: 
         const pending =
           next.recordings.some((item) => item.preparation === 'preparing' || item.cameraMotion === 'analysing') ||
           next.music.some((item) => item.preparation === 'preparing' || item.beats === 'analysing');
-        if (pending) timer = setTimeout(() => setTick((value) => value + 1), POLL_MS);
+        timer = setTimeout(() => setTick((value) => value + 1), pending ? POLL_MS : IDLE_POLL_MS);
       })
       .catch((cause: unknown) => {
         if (!cancelled) setError(cause instanceof Error ? cause.message : 'Cannot read what the project is ready for.');
@@ -163,6 +165,75 @@ function musicLine({ music }: Readiness): ReadinessLine {
 
 function readinessLines(readiness: Readiness): ReadinessLine[] {
   return [...recordingLines(readiness), musicLine(readiness)];
+}
+
+function ago(iso: string, now: number): string {
+  const minutes = Math.floor((now - Date.parse(iso)) / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  return `at ${new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+/** The VS Code `mcp.json` entry for this service, asking for the token rather than storing it. */
+function vsCodeConfiguration(url: string): string {
+  const configuration = {
+    inputs: [
+      {
+        id: 'pascap-token',
+        type: 'promptString',
+        description: 'Contents of the PasCap MCP token file',
+        password: true,
+      },
+    ],
+    servers: {
+      pascap: { type: 'http', url, headers: { Authorization: 'Bearer ${input:pascap-token}' } },
+    },
+  };
+  return JSON.stringify(configuration, null, 2);
+}
+
+/** Whether an MCP client has called PasCap, and how to connect one. */
+function Connection({ connection }: Readonly<{ connection: Readiness['connection'] }>) {
+  const id = useId();
+  const [copied, setCopied] = useState('');
+  const configuration = vsCodeConfiguration(connection.url);
+  const caller = connection.client ?? 'An MCP client';
+  const copy = (): void => {
+    navigator.clipboard.writeText(configuration).then(
+      () => setCopied('Copied'),
+      () => setCopied('Select the text and copy it'),
+    );
+  };
+  return (
+    <section className="hand-off-readiness hand-off-connection" aria-labelledby={`${id}-title`}>
+      <h3 id={`${id}-title`}>Assistant connection</h3>
+      <ul>
+        <li className={connection.lastCall ? 'ready' : 'idle'}>
+          <Icon name={connection.lastCall ? 'check' : 'link'} size={15} />
+          <span>
+            {connection.lastCall
+              ? `${caller} called PasCap ${ago(connection.lastCall, Date.now())}`
+              : 'No assistant has called PasCap since it started'}
+          </span>
+        </li>
+      </ul>
+      <details>
+        <summary>How to connect</summary>
+        <p>
+          Point an MCP client at <code>{connection.url}</code>, sending the token in <code>{connection.tokenFile}</code>{' '}
+          as <code>Authorization: Bearer</code>. In VS Code, add this to <code>.vscode/mcp.json</code>; it asks for the
+          token when it starts.
+        </p>
+        <pre aria-label="VS Code MCP configuration">{configuration}</pre>
+        <div className="hand-off-copy">
+          <button className="secondary-button small" onClick={copy}>
+            Copy configuration
+          </button>
+          <output>{copied}</output>
+        </div>
+      </details>
+    </section>
+  );
 }
 
 /** Starts an assistant session with the user's brief, after showing what the assistant can use. */
@@ -357,6 +428,7 @@ export function HandOffDialog({
           </ul>
         )}
       </section>
+      {readiness && <Connection connection={readiness.connection} />}
     </Modal>
   );
 }

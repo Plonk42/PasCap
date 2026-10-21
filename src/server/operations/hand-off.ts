@@ -24,7 +24,7 @@ async function analysis(job: unknown, read: () => Promise<unknown>): Promise<Ana
 }
 
 export const runHandOffReadiness: OperationRunner<typeof handOffReadiness> = async (
-  { projects, library, audio, jobs }: ServiceContext,
+  { projects, library, audio, jobs, assistant }: ServiceContext,
   { projectId },
 ) => {
   const project = await projects.load(projectId);
@@ -52,5 +52,11 @@ export const runHandOffReadiness: OperationRunner<typeof handOffReadiness> = asy
     recordings,
     music,
     exportRunning: jobs.list().some((job) => job.kind === 'export' && ['queued', 'running'].includes(job.state)),
+    connection: {
+      url: assistant.url,
+      tokenFile: assistant.tokenFile,
+      lastCall: assistant.lastClient()?.at ?? null,
+      client: assistant.lastClient()?.name ?? null,
+    },
   };
 };

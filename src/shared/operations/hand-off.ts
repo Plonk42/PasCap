@@ -15,13 +15,27 @@ const analysis = described(
 export const handOffReadiness = defineOperation({
   name: 'hand_off_readiness',
   description:
-    'What an assistant can use in a project: each video recording of its bin with its proxy and camera motion analysis, each music recording with its playback cache and tempo analysis, and whether an export is running (stills wait for it).',
+    'What an assistant can use in a project: each video recording of its bin with its proxy and camera motion analysis, each music recording with its playback cache and tempo analysis, whether an export is running (stills wait for it), and how an MCP client connects.',
   input: z.object({ projectId: described(idSchema, 'ID of the saved project.') }).strict(),
   output: z
     .object({
       recordings: z.array(z.object({ id: idSchema, name: z.string(), preparation, cameraMotion: analysis }).strict()),
       music: z.array(z.object({ id: idSchema, name: z.string(), preparation, beats: analysis }).strict()),
       exportRunning: z.boolean(),
+      connection: described(
+        z
+          .object({
+            url: described(z.string(), 'The MCP endpoint clients connect to.'),
+            tokenFile: described(z.string(), 'File holding the bearer token clients send.'),
+            lastCall: described(
+              z.string().nullable(),
+              'When an MCP client last called PasCap since the service started (ISO time); null if none has.',
+            ),
+            client: described(z.string().nullable(), 'The name that client gave, if any.'),
+          })
+          .strict(),
+        'How to connect an MCP client, and whether one has.',
+      ),
     })
     .strict(),
   access: 'read',
