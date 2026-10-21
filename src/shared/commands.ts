@@ -1,5 +1,5 @@
-import type { ColourSettings } from './colour.js';
 import { arrangeClipGroup } from './clip-group.js';
+import type { EditCommand } from './command-schema.js';
 import {
   defaultKeyframe,
   EMPTY_KEY_VALUES,
@@ -10,8 +10,6 @@ import {
   layerKeyframeSchema,
   upsertKey,
   withEasing,
-  type Interpolation,
-  type KeyframeSetting,
   type LayerKeyframe,
 } from './keyframes.js';
 import {
@@ -25,64 +23,17 @@ import {
   projectSchema,
   selectRangeSchema,
   transitionSchema,
-  type MusicLane,
   type ProjectDocument,
-  type SelectRange,
   type Transition,
   type VideoClip,
   type VideoLayer,
 } from './model.js';
-import { detailSchema, type DetailSettings } from './detail.js';
-import { spatialSettingsSchema, type SpatialSettings } from './spatial.js';
-import { clipDuration, type SpeedSettings } from './speed.js';
+import { detailSchema } from './detail.js';
+import { spatialSettingsSchema } from './spatial.js';
+import { clipDuration } from './speed.js';
 import { calculateLayout, layerClips, transitionOffset, type TimelineLayout } from './timeline.js';
 
-export type EditCommand =
-  | { type: 'insert'; clip: VideoClip; index: number }
-  | { type: 'delete'; clipId: string }
-  | { type: 'reorder'; clipIds: string[] }
-  | { type: 'trim'; clipId: string; sourceIn: number; sourceOut: number }
-  | { type: 'trim-place'; clipId: string; sourceIn: number; sourceOut: number; start: number }
-  | { type: 'split'; clipId: string; sourceFrame: number; newClipId: string }
-  | { type: 'remove-source-range'; clipId: string; sourceIn: number; sourceOut: number; newClipId: string }
-  | { type: 'duplicate'; clipId: string; newClipId: string }
-  | { type: 'colour'; layerId: string; colour: ColourSettings }
-  | { type: 'speed'; clipId: string; speed: SpeedSettings }
-  | { type: 'reverse'; clipId: string; reverse: boolean }
-  | { type: 'transform'; layerId: string; transform: SpatialSettings }
-  | { type: 'detail'; clipId: string; detail: DetailSettings }
-  | { type: 'music'; music: MusicLane[] }
-  | { type: 'opacity'; layerId: string; opacity: number }
-  | { type: 'layer-key-toggle'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
-  | { type: 'layer-key-value'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
-  | { type: 'layer-key-move'; layerId: string; frame: number; nextFrame: number }
-  | { type: 'layer-key-remove'; layerId: string; frame: number }
-  /** Adds a default keyframe, or removes the one already at this frame. */
-  | { type: 'layer-key-default'; layerId: string; frame: number }
-  | {
-      type: 'layer-key-easing';
-      layerId: string;
-      frame: number;
-      /** Null sets every enabled setting of the keyframe. */
-      setting: KeyframeSetting | null;
-      interpolation: Interpolation;
-    }
-  | { type: 'layer-add'; layer: VideoLayer }
-  | { type: 'layer-update'; layer: VideoLayer }
-  | { type: 'layer-remove'; layerId: string }
-  | { type: 'layer-order'; layerIds: string[] }
-  | { type: 'place'; clipId: string; layerId: string; start: number; index: number }
-  /** Moves selected clips together; see `arrangeClipGroup`. */
-  | { type: 'move-clips'; clipIds: string[]; delta: number; layerId: string | null }
-  | { type: 'transition'; transition: Transition }
-  | { type: 'fades'; layerId: string; opening: number; closing: number }
-  | { type: 'bookmark-add'; frame: number }
-  | { type: 'bookmark-move'; frame: number; nextFrame: number }
-  | { type: 'bookmark-remove'; frame: number }
-  /** Replaces a recording's kept ranges; an empty list makes the whole recording available again. */
-  | { type: 'select-set'; mediaId: string; ranges: SelectRange[] }
-  /** Replaces them with a subset of the existing ones, which the assistant is limited to. */
-  | { type: 'select-narrow'; mediaId: string; ranges: SelectRange[] };
+export { editCommandSchema, type EditCommand } from './command-schema.js';
 
 function repairBoundaries(clips: VideoClip[], previous: Transition[]): Transition[] {
   return clips.slice(0, -1).map((clip, index) => {

@@ -1,0 +1,155 @@
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import { z } from 'zod';
+import type { ColourSettings } from '../../src/shared/colour.js';
+import { createColourSettings } from '../../src/shared/colour.js';
+import { editCommandSchema, type EditCommand } from '../../src/shared/commands.js';
+import { createDetailSettings, type DetailSettings } from '../../src/shared/detail.js';
+import type { Interpolation, KeyframeSetting } from '../../src/shared/keyframes.js';
+import {
+  createClip,
+  createLayer,
+  type MusicLane,
+  type SelectRange,
+  type Transition,
+  type VideoClip,
+  type VideoLayer,
+} from '../../src/shared/model.js';
+import { createSpatialSettings, type SpatialSettings } from '../../src/shared/spatial.js';
+import type { SpeedSettings } from '../../src/shared/speed.js';
+
+/** The hand-written union `editCommandSchema` replaced (#228); the inferred type must stay identical. */
+type FormerEditCommand =
+  | { type: 'insert'; clip: VideoClip; index: number }
+  | { type: 'delete'; clipId: string }
+  | { type: 'reorder'; clipIds: string[] }
+  | { type: 'trim'; clipId: string; sourceIn: number; sourceOut: number }
+  | { type: 'trim-place'; clipId: string; sourceIn: number; sourceOut: number; start: number }
+  | { type: 'split'; clipId: string; sourceFrame: number; newClipId: string }
+  | { type: 'remove-source-range'; clipId: string; sourceIn: number; sourceOut: number; newClipId: string }
+  | { type: 'duplicate'; clipId: string; newClipId: string }
+  | { type: 'colour'; layerId: string; colour: ColourSettings }
+  | { type: 'speed'; clipId: string; speed: SpeedSettings }
+  | { type: 'reverse'; clipId: string; reverse: boolean }
+  | { type: 'transform'; layerId: string; transform: SpatialSettings }
+  | { type: 'detail'; clipId: string; detail: DetailSettings }
+  | { type: 'music'; music: MusicLane[] }
+  | { type: 'opacity'; layerId: string; opacity: number }
+  | { type: 'layer-key-toggle'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
+  | { type: 'layer-key-value'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
+  | { type: 'layer-key-move'; layerId: string; frame: number; nextFrame: number }
+  | { type: 'layer-key-remove'; layerId: string; frame: number }
+  | { type: 'layer-key-default'; layerId: string; frame: number }
+  | {
+      type: 'layer-key-easing';
+      layerId: string;
+      frame: number;
+      setting: KeyframeSetting | null;
+      interpolation: Interpolation;
+    }
+  | { type: 'layer-add'; layer: VideoLayer }
+  | { type: 'layer-update'; layer: VideoLayer }
+  | { type: 'layer-remove'; layerId: string }
+  | { type: 'layer-order'; layerIds: string[] }
+  | { type: 'place'; clipId: string; layerId: string; start: number; index: number }
+  | { type: 'move-clips'; clipIds: string[]; delta: number; layerId: string | null }
+  | { type: 'transition'; transition: Transition }
+  | { type: 'fades'; layerId: string; opening: number; closing: number }
+  | { type: 'bookmark-add'; frame: number }
+  | { type: 'bookmark-move'; frame: number; nextFrame: number }
+  | { type: 'bookmark-remove'; frame: number }
+  | { type: 'select-set'; mediaId: string; ranges: SelectRange[] }
+  | { type: 'select-narrow'; mediaId: string; ranges: SelectRange[] };
+
+const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> } = {
+  insert: { type: 'insert', clip: createClip('clip-2', 'rec-1', 0, 30), index: 1 },
+  delete: { type: 'delete', clipId: 'clip-1' },
+  reorder: { type: 'reorder', clipIds: ['clip-2', 'clip-1'] },
+  trim: { type: 'trim', clipId: 'clip-1', sourceIn: 5, sourceOut: 20 },
+  'trim-place': { type: 'trim-place', clipId: 'clip-1', sourceIn: 5, sourceOut: 20, start: 10 },
+  split: { type: 'split', clipId: 'clip-1', sourceFrame: 12, newClipId: 'clip-3' },
+  'remove-source-range': {
+    type: 'remove-source-range',
+    clipId: 'clip-1',
+    sourceIn: 5,
+    sourceOut: 8,
+    newClipId: 'clip-3',
+  },
+  duplicate: { type: 'duplicate', clipId: 'clip-1', newClipId: 'clip-3' },
+  colour: { type: 'colour', layerId: 'video-1', colour: createColourSettings() },
+  speed: { type: 'speed', clipId: 'clip-1', speed: { mode: 'constant', rate: 2 } },
+  reverse: { type: 'reverse', clipId: 'clip-1', reverse: true },
+  transform: { type: 'transform', layerId: 'video-1', transform: createSpatialSettings() },
+  detail: { type: 'detail', clipId: 'clip-1', detail: createDetailSettings() },
+  music: { type: 'music', music: [] },
+  opacity: { type: 'opacity', layerId: 'video-1', opacity: 0.5 },
+  'layer-key-toggle': { type: 'layer-key-toggle', layerId: 'video-1', frame: 4, setting: 'exposure', value: 0.5 },
+  'layer-key-value': { type: 'layer-key-value', layerId: 'video-1', frame: 4, setting: 'opacity', value: 0.2 },
+  'layer-key-move': { type: 'layer-key-move', layerId: 'video-1', frame: 4, nextFrame: 9 },
+  'layer-key-remove': { type: 'layer-key-remove', layerId: 'video-1', frame: 4 },
+  'layer-key-default': { type: 'layer-key-default', layerId: 'video-1', frame: 4 },
+  'layer-key-easing': {
+    type: 'layer-key-easing',
+    layerId: 'video-1',
+    frame: 4,
+    setting: null,
+    interpolation: 'smooth',
+  },
+  'layer-add': { type: 'layer-add', layer: createLayer('video-2', 'Track 2') },
+  'layer-update': { type: 'layer-update', layer: createLayer('video-1', 'Renamed', false) },
+  'layer-remove': { type: 'layer-remove', layerId: 'video-2' },
+  'layer-order': { type: 'layer-order', layerIds: ['video-2', 'video-1'] },
+  place: { type: 'place', clipId: 'clip-1', layerId: 'video-2', start: 30, index: 0 },
+  'move-clips': { type: 'move-clips', clipIds: ['clip-1', 'clip-2'], delta: -3, layerId: null },
+  transition: {
+    type: 'transition',
+    transition: { leftId: 'clip-1', rightId: 'clip-2', type: 'cross-dissolve', duration: 10 },
+  },
+  fades: { type: 'fades', layerId: 'video-1', opening: 15, closing: 0 },
+  'bookmark-add': { type: 'bookmark-add', frame: 30 },
+  'bookmark-move': { type: 'bookmark-move', frame: 30, nextFrame: 45 },
+  'bookmark-remove': { type: 'bookmark-remove', frame: 45 },
+  'select-set': { type: 'select-set', mediaId: 'rec-1', ranges: [] },
+  'select-narrow': { type: 'select-narrow', mediaId: 'rec-1', ranges: [{ sourceIn: 3, sourceOut: 9 }] },
+};
+
+function descriptionOf(schema: z.ZodType): string | undefined {
+  return z.globalRegistry.get(schema)?.description;
+}
+
+describe('editCommandSchema', () => {
+  it('infers exactly the former EditCommand union', () => {
+    expectTypeOf<EditCommand>().toEqualTypeOf<FormerEditCommand>();
+  });
+
+  it('accepts one valid command of every type unchanged', () => {
+    expect(editCommandSchema.options).toHaveLength(Object.keys(samples).length);
+    for (const sample of Object.values(samples)) expect(editCommandSchema.parse(sample)).toEqual(sample);
+  });
+
+  it('describes every command and every field for an LLM', () => {
+    for (const option of editCommandSchema.options) {
+      const type = option.shape.type.value;
+      expect(descriptionOf(option), type).toBeTruthy();
+      for (const [field, schema] of Object.entries(option.shape)) {
+        if (field !== 'type') expect(descriptionOf(schema as z.ZodType), `${type}.${field}`).toBeTruthy();
+      }
+    }
+  });
+
+  it('converts to a JSON Schema carrying those descriptions', () => {
+    const json = z.toJSONSchema(editCommandSchema) as { oneOf?: { description?: string }[]; anyOf?: unknown[] };
+    const variants = (json.oneOf ?? json.anyOf) as { description?: string; properties: Record<string, unknown> }[];
+    expect(variants).toHaveLength(editCommandSchema.options.length);
+    for (const variant of variants) expect(variant.description).toBeTruthy();
+  });
+
+  it('rejects unknown types, unknown fields and invalid values with a reason', () => {
+    expect(editCommandSchema.safeParse({ type: 'export' }).success).toBe(false);
+    expect(editCommandSchema.safeParse({ ...samples.delete, clip: 'clip-1' }).success).toBe(false);
+    expect(editCommandSchema.safeParse({ ...samples['bookmark-add'], frame: 1.5 }).success).toBe(false);
+    expect(editCommandSchema.safeParse({ ...samples['layer-key-value'], setting: 'gamma' }).success).toBe(false);
+    expect(editCommandSchema.safeParse({ ...samples['select-narrow'], ranges: [] }).success).toBe(false);
+    const error = editCommandSchema.safeParse({ ...samples.trim, sourceIn: -1 }).error;
+    expect(error?.issues[0]?.path).toEqual(['sourceIn']);
+  });
+});
