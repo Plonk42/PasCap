@@ -382,4 +382,97 @@ describe('operation routes', () => {
       runners.describe_recording(context, { projectId: 'shots', mediaId: 'rec-9', sheet: false }),
     ).rejects.toMatchObject({ statusCode: 404 });
   });
+
+  it('reads the music at project frames, measures the cuts against its beats and proposes snapped trims', async () => {
+    const samplesPerFrame = (48_000 * 1_001) / 30_000;
+    const base = createProject('music', 'Music');
+    const project: ProjectDocument = projectSchema.parse({
+      ...base,
+      media: { videoIds: ['rec-1'], audioIds: ['song-1'] },
+      clips: ['a', 'b'].map((id, index) => ({
+        id,
+        mediaId: 'rec-1',
+        layerId: base.layers[0]!.id,
+        start: index * 60,
+        sourceIn: 0,
+        sourceOut: 60,
+        speed: { mode: 'constant', rate: 1 },
+        reverse: false,
+        detail: { sharpen: 0, clarity: 0, denoise: 0 },
+      })),
+      layers: [{ ...base.layers[0]!, transitions: [{ leftId: 'a', rightId: 'b', type: 'cut', duration: 0 }] }],
+      music: [
+        {
+          id: 'track-1',
+          gainDb: 0,
+          ripple: true,
+          openingFade: 0,
+          closingFade: 0,
+          clips: [
+            { id: 'song-clip', mediaId: 'song-1', sourceIn: 0, sourceOut: 300, start: 0, duration: 120, loop: false },
+          ],
+          transitions: [],
+        },
+      ],
+    });
+    // A beat every 20 frames from frame 10 of the song; every other one a downbeat.
+    const beats = Array.from({ length: 15 }, (_, index) => ({
+      sample: Math.round((10 + index * 20) * samplesPerFrame),
+      strength: 0.5,
+      downbeat: index % 2 === 0,
+    }));
+    const context = {
+      projects: { load: async () => project },
+      audio: {
+        get: () => ({ id: 'song-1', name: 'song.wav' }),
+        analysisJob: () => null,
+        analysis: async () => ({
+          tempo: { bpm: 89.91, confidence: 0.8, curve: [{ fromSample: 0, bpm: 89.91 }] },
+          meter: { beatsPerBar: 4, confidence: 0.6 },
+          beats,
+          accents: [{ sample: Math.round(70 * samplesPerFrame), strength: 0.9 }],
+          sections: [{ fromSample: 0, toSample: Math.round(200 * samplesPerFrame), kind: 'build', loudnessDb: -14 }],
+        }),
+      },
+    } as unknown as Parameters<typeof runners.music_analysis>[0];
+
+    const music = await runners.music_analysis(context, { projectId: 'music', fromFrame: 0, toFrame: 60 });
+    expect(music.clips[0]).toMatchObject({
+      musicClipId: 'song-clip',
+      trackId: 'track-1',
+      analysis: 'analysed',
+      tempo: { bpm: 89.9 },
+      accents: [],
+      sections: [{ start: 0, end: 120, kind: 'build' }],
+    });
+    expect(music.clips[0]!.beats.map((beat) => [beat.frame, beat.downbeat])).toEqual([
+      [10, true],
+      [30, false],
+      [50, true],
+    ]);
+
+    const report = await runners.check_alignment(context, { projectId: 'music' });
+    expect(report.boundaries).toMatchObject([{ frame: 60, beat: { frame: 50, offset: 10 }, downbeat: { frame: 50 } }]);
+    expect(report.summary).toEqual({ boundaries: 1, onBeat: 0, onDownbeat: 0, meanOffset: 10 });
+
+    const proposal = await runners.snap_cuts_to_beats(context, {
+      projectId: 'music',
+      layerId: base.layers[0]!.id,
+      prefer: 'beat',
+      minimumSeconds: 1,
+      apply: false,
+    });
+    expect(proposal.commands).toEqual([{ type: 'trim', clipId: 'a', sourceIn: 0, sourceOut: 50 }]);
+    expect(proposal.boundaries).toMatchObject([{ before: 60, beat: 50, after: 50, skipped: null }]);
+    expect(proposal.applied).toBeNull();
+    await expect(
+      runners.snap_cuts_to_beats(context, {
+        projectId: 'music',
+        layerId: base.layers[0]!.id,
+        prefer: 'beat',
+        minimumSeconds: 1,
+        apply: true,
+      }),
+    ).rejects.toMatchObject({ statusCode: 422 });
+  });
 });

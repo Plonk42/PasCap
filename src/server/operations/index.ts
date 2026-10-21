@@ -8,6 +8,7 @@ import { runDescribeTrack } from './describe-track.js';
 import { runEdit } from './edit.js';
 import { runHandOffReadiness } from './hand-off.js';
 import { runListProjects } from './list-projects.js';
+import { runCheckAlignment, runMusicAnalysis, runSnapCutsToBeats } from './music.js';
 import { runRecordingSheet, runStill, runTimelineSheet } from './pictures.js';
 import {
   runCheckpoint,
@@ -24,6 +25,9 @@ export const runners: OperationRunners = {
   describe_project: runDescribeProject,
   describe_track: runDescribeTrack,
   describe_recording: runDescribeRecording,
+  music_analysis: runMusicAnalysis,
+  check_alignment: runCheckAlignment,
+  snap_cuts_to_beats: runSnapCutsToBeats,
   session_start: runSessionStart,
   session_status: runSessionStatus,
   session_end: runSessionEnd,
