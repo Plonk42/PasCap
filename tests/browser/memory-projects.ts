@@ -34,7 +34,6 @@ function startedSession(projectId: string, brief: Brief): NonNullable<MemorySess
     endedAt: null,
     endedBy: null,
     notes: null,
-    pictures: 0,
     active: true,
     expiresAt: '2026-10-21T10:10:00.000Z',
   };

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { described } from '../described.js';
 import { SMOOTH_TOLERANCE } from '../motion-analysis.js';
 import { frameSchema, idSchema } from '../model.js';
-import { imageSchema, picturesLeftSchema } from './pictures.js';
+import { imageSchema } from './pictures.js';
 import { defineOperation } from './spec.js';
 import { durationSchema, timecodeSchema } from './timecode.js';
 
@@ -23,7 +23,7 @@ export const describeRecording = defineOperation({
       ),
       sheet: described(
         z.boolean().default(false),
-        'True adds a contact sheet of the steady ranges, one of the pictures the session may show.',
+        'True adds a contact sheet of the middle frames of the steady ranges.',
       ),
     })
     .strict(),
@@ -89,7 +89,6 @@ export const describeRecording = defineOperation({
           .strict(),
       ),
       image: imageSchema.optional(),
-      picturesLeft: picturesLeftSchema.optional(),
     })
     .strict(),
   access: 'read',

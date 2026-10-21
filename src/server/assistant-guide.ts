@@ -9,8 +9,7 @@ what the footage shows from its pictures.
 - list_projects, then describe_project: video tracks and clips, transitions, music tracks, the
   recordings of the bin with the ranges the user kept, and bookmarks.
 - session_status: an active session started by the user's Hand off carries their brief (notes,
-  music track, target length, allowed movement, most clips). Follow it. In a new conversation
-  continuing an active session, pass newConversation true.
+  music track, target length, allowed movement, most clips). Follow it.
 - music_analysis: tempo, sections (quiet, build, peak, release), beats and downbeats at project
   frames. The target length is the music clip's length unless the brief says otherwise.
 
@@ -19,13 +18,13 @@ what the footage shows from its pictures.
   active. While it lasts the user watches and cannot edit; every edit you save is a revision,
   and they can restore the project as it was before the session.
 
-## Pictures are scarce
-Every picture stays in the conversation, and the client refuses requests carrying too many
-(often 20, the user's included); past that the conversation cannot continue. A session may show
-16 by default, and each picture's output says how many are left (picturesLeft). Plan for about
-six: two or three compare_recordings sheets to choose footage, one timeline_sheet of the cut,
-one or two stills or sheets for the grade. Put many cells in one sheet rather than one sheet
-per question; never look at candidates one by one.
+## Pictures
+Every picture stays in the conversation, and many clients limit how many one conversation may
+hold (VS Code with Claude: 20, the user's included); past that it cannot continue. Know your
+client's limit and spend pictures where they decide something: a compare_recordings sheet of
+many candidates rather than one sheet per shot, one timeline_sheet of the cut, a still or two
+for the grade. If your client can start subagents with their own conversations, give each group
+of similar recordings to one that looks and returns the chosen ranges with reasons.
 
 ## 3. Choose footage
 - describe_recording for each recording, without its sheet: its steady ranges inside the kept

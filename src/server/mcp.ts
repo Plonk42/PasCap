@@ -27,7 +27,7 @@ const INSTRUCTIONS = [
   'PasCap edits drone-flight video projects. Frames are integers at 30000/1001 fps; outputs also give MM:SS:FF timecodes.',
   `Before building or changing a cut, follow the playbook in the ${GUIDE_URI} resource (also the rough_cut prompt).`,
   'Start with list_projects and describe_project; choose footage with describe_recording (without its sheet) and compare_recordings, and follow the music with music_analysis, check_alignment and snap_cuts_to_beats. Read a track with describe_track before grading it, and start a grade from estimate.',
-  'Pictures are scarce: every picture stays in the conversation and clients refuse requests with too many, so a session shows about 16 (picturesLeft); put many cells in one sheet rather than looking at shots one by one.',
+  'Every picture stays in the conversation and many clients limit how many it may hold: put many cells in one sheet rather than looking at shots one by one.',
   "To change a project, first take it with session_start and the user's brief; the user then cannot save it until you call session_end with notes for them or the user takes it back.",
   'Change a project only with edit: its commands apply together against the expectedRevision you last read, or not at all, and a rejected command returns its reason. Clips you add must stay inside the ranges the user kept.',
   'Look at the result with timeline_sheet or still.',

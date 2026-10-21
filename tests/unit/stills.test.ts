@@ -165,7 +165,7 @@ describe('project stills', () => {
 
 describe('still renderer bounds', () => {
   const library = { get: (id: string) => asset(id), proxyPath: () => '/cache/proxy.mp4' };
-  const budget = { stillWidth: 480, sheetCellWidth: 240, sheetCells: 9, sessionPictures: 16 };
+  const budget = { stillWidth: 480, sheetCellWidth: 240, sheetCells: 9 };
 
   it('refuses pictures while an export renders', () => {
     const jobs = { list: () => [{ kind: 'export', state: 'running', label: 'Flight · 4K' } as MediaJob] };

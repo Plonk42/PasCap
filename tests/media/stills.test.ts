@@ -31,7 +31,7 @@ async function fixture() {
     port: 4318,
     allowedHosts: new Set(['127.0.0.1:4318']),
     allowedOrigins: new Set(['http://127.0.0.1:4318']),
-    assistantImages: { stillWidth: 480, sheetCellWidth: 240, sheetCells: 9, sessionPictures: 16 },
+    assistantImages: { stillWidth: 480, sheetCellWidth: 240, sheetCells: 9 },
   });
   const service = await createApp(config);
   services.push(service);
@@ -231,7 +231,7 @@ describe.skipIf(!enabled)('project stills · disposable native fixture', () => {
       method: 'POST',
       url: '/api/ops/recording_sheet',
       headers,
-      payload: { projectId: project.id, mediaId: asset.id, frames: [0, 30, 59] },
+      payload: { mediaId: asset.id, frames: [0, 30, 59] },
     });
     expect(recordingSheet.statusCode, recordingSheet.body).toBe(200);
     expect(recordingSheet.json<Picture>().image.width).toBe(2 * 240 + 4);
