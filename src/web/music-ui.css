@@ -48,56 +48,52 @@
   color: #f2a7a7;
 }
 
-button.music-beat-bookmarks,
-.music-controls .music-beat-bookmarks > summary.editor-popover-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.music-controls .music-beat-bookmarks > summary.editor-popover-trigger {
-  width: auto;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
+/* The analysis' sections, swells and silences, listed with their timeline positions. */
+.music-controls .music-structure {
+  width: 100%;
   font-size: 12px;
-  white-space: nowrap;
 }
 
-button.music-beat-bookmarks[aria-disabled='true'] {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.music-beat-choices {
-  display: grid;
-  gap: 6px;
-  max-width: 260px;
-}
-
-.music-beat-choices > p {
-  margin: 0;
+.music-structure > summary {
+  cursor: pointer;
   color: var(--muted);
-  font-size: 12px;
 }
 
-.music-beat-choice {
+.music-structure h4 {
+  margin: 8px 0 2px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.music-structure ul {
   display: grid;
-  justify-items: start;
   gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.music-beat-choice > button[aria-disabled='true'] {
-  opacity: 0.45;
-  cursor: default;
+.music-structure li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
 }
 
-.music-beat-choice > small {
-  color: var(--muted);
-  font-size: 11px;
+.music-structure li > .text-button {
+  flex: none;
+  padding: 0;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Beat ticks along the bottom of a music clip; downbeats are taller and brighter. */
+.music-structure li > span {
+  min-width: 0;
+  color: #c9d1ec;
+}
+
+/* Beat ticks above the tone strip of a music clip; downbeats are taller and brighter. */
 .music-body .music-beats {
   position: absolute;
   inset: 0;
@@ -118,6 +114,143 @@ button.music-beat-bookmarks[aria-disabled='true'] {
 
 .music-beats .downbeat {
   stroke: rgb(243 217 164 / 95%);
+}
+
+.music-instance-lane .music-body svg.music-waveform {
+  top: 14px;
+  height: calc(100% - 24px);
+}
+
+/* Sections tint the clip behind the waveform, labelled at their top right when wide enough. */
+.music-body .music-section {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-top: 2px solid var(--section);
+  background: color-mix(in srgb, var(--section) 16%, transparent);
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--section) 45%, transparent);
+  pointer-events: none;
+}
+
+.music-section > span {
+  position: absolute;
+  top: 2px;
+  right: 3px;
+  color: var(--section);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.music-section.quiet {
+  --section: #8d9fd0;
+}
+
+.music-section.build {
+  --section: #e2b065;
+}
+
+.music-section.peak {
+  --section: #ee7893;
+}
+
+.music-section.release {
+  --section: #6cc2b5;
+}
+
+.music-body .music-silence {
+  position: absolute;
+  top: 0;
+  bottom: 9px;
+  min-width: 2px;
+  background: repeating-linear-gradient(135deg, #0b0e16d9 0 3px, #0b0e1659 3px 6px);
+  pointer-events: none;
+}
+
+/* Crescendo and decrescendo hairpins; a sudden swell is a filled wedge. */
+.music-body svg.music-swells {
+  top: 17px;
+  height: 10px;
+  overflow: visible;
+  opacity: 1;
+  pointer-events: none;
+}
+
+.music-swells path {
+  fill: none;
+  stroke-width: 1.2;
+}
+
+.music-swells .crescendo {
+  stroke: #f3c77f;
+}
+
+.music-swells .decrescendo {
+  stroke: #9fc3f0;
+}
+
+.music-swells .crescendo.sudden {
+  fill: #f3c77f;
+}
+
+.music-swells .decrescendo.sudden {
+  fill: #9fc3f0;
+}
+
+/* Low, mid and high frequencies, each brighter where it is louder. */
+.music-body svg.music-tone {
+  top: auto;
+  bottom: 0;
+  height: 9px;
+  opacity: 1;
+  pointer-events: none;
+}
+
+.music-tone .low {
+  fill: #ff9b73;
+}
+
+.music-tone .mid {
+  fill: #b6e388;
+}
+
+.music-tone .high {
+  fill: #8cc7ff;
+}
+
+.music-tone .step-1 {
+  opacity: 0.17;
+}
+
+.music-tone .step-2 {
+  opacity: 0.33;
+}
+
+.music-tone .step-3 {
+  opacity: 0.5;
+}
+
+.music-tone .step-4 {
+  opacity: 0.67;
+}
+
+.music-tone .step-5 {
+  opacity: 0.83;
+}
+
+.music-readout {
+  position: absolute;
+  bottom: calc(100% + 3px);
+  z-index: 6;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #0d1018ee;
+  color: #e3e8fa;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
 }
 
 .music-controls .music-add-row {
@@ -272,7 +405,7 @@ button.music-beat-bookmarks[aria-disabled='true'] {
 }
 
 .music-lane-wrapper.music-instance-lane {
-  height: 48px;
+  height: 64px;
   border-bottom: 1px solid #414963;
   background: #191d2d;
 }
@@ -283,6 +416,7 @@ button.music-beat-bookmarks[aria-disabled='true'] {
 
 .music-lane-wrapper.music-instance-lane .music-timeline-clip {
   top: 3px;
+  height: 58px;
 }
 
 .music-instance-lane .music-body {
@@ -316,7 +450,7 @@ button.music-beat-bookmarks[aria-disabled='true'] {
 .music-instance-lane .music-transition-slot {
   position: absolute;
   top: 3px;
-  height: 42px;
+  height: 58px;
   border: 1px dashed #5d6894;
   border-radius: 4px;
   background: #0d1018;

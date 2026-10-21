@@ -25,7 +25,7 @@ import {
 } from '../shared/model.js';
 import { insertMusicClip, musicClips, musicTracks, musicTransitionOffset } from '../shared/music-lanes.js';
 import type { TimelineRange } from '../shared/rush-editing.js';
-import { snapFrame, snapPoints } from '../shared/snap.js';
+import { snapFrame, snapPoints, type BeatSnap } from '../shared/snap.js';
 import { trimOnTimeline, type TrimEdge } from '../shared/source-range.js';
 import { spatialKeyChannels } from '../shared/spatial.js';
 import { clipDuration } from '../shared/speed.js';
@@ -63,6 +63,7 @@ import { MusicTimeline, type MusicTimelineGesture } from './MusicTimeline.js';
 import { RulerRange, RushEditBar, TimelineCutOverlay } from './RushEditBar.js';
 import { useRulerRange } from './ruler-range.js';
 import { adjacentBookmark, bookmarkKind, bookmarkTargets, rangeBookmarkCommands } from './timeline-bookmarks.js';
+import { BeatSnapControl, RulerBeats, useBeatSnap } from './timeline-beats.js';
 import './timeline-bookmarks.css';
 import { trackKeyframeKind, transformKeyframeKind } from './timeline-keyframes.js';
 import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timeline-placement.js';
@@ -417,6 +418,7 @@ function TimelineMusicLanes(
       width: number;
       viewport: { current: HTMLDivElement | null };
       snapping: boolean;
+      beats: BeatSnap;
       disabled: boolean;
       onGesture: (gesture: MusicTimelineGesture | null) => void;
     }
@@ -454,6 +456,7 @@ function TimelineMusicLanes(
             viewport={props.viewport}
             frame={props.frame}
             snapping={props.snapping}
+            beats={props.beats}
             disabled={props.disabled}
             onSelect={props.onSelectMusic}
             onPause={props.onPause}
@@ -657,6 +660,8 @@ export function Timeline(props: Readonly<Props>) {
     onScrub,
   } = props;
   const [snapping, setSnapping] = useState(true);
+  const beatSnap = useBeatSnap(audioAssets, snapping);
+  const beats = beatSnap.beats;
   const [clipMenu, setClipMenu] = useState<ClipMenuAnchor | null>(null);
   const closeClipMenu = useCallback((restoreFocus: boolean): void => {
     setClipMenu(null);
@@ -702,6 +707,7 @@ export function Timeline(props: Readonly<Props>) {
     width: baselineWidth,
     disabled: keyframeNavigation.disabled || musicGesture !== null,
     snapping,
+    beats,
     viewport: scroll,
     onPause,
     onPreview,
@@ -721,6 +727,7 @@ export function Timeline(props: Readonly<Props>) {
     width: baselineWidth,
     disabled: keyframeNavigation.disabled || musicGesture !== null || keyframes.active,
     snapping,
+    beats,
     viewport: scroll,
     onPause,
     onPreview,
@@ -735,6 +742,7 @@ export function Timeline(props: Readonly<Props>) {
     width: baselineWidth,
     disabled: keyframeNavigation.disabled || musicGesture !== null || keyframes.active || transformKeys.active,
     snapping,
+    beats,
     viewport: scroll,
     onPause,
     onPreview,
@@ -750,6 +758,7 @@ export function Timeline(props: Readonly<Props>) {
     width: baselineWidth,
     disabled: keyframeNavigation.disabled || musicGesture !== null || gestureActive,
     snapping,
+    beats,
     viewport: scroll,
     onPause,
     onPreview,
@@ -988,7 +997,7 @@ export function Timeline(props: Readonly<Props>) {
     if (snapping && !bypassSnap.current) {
       const placed = calculateLayout(active.base).clips.find((item) => item.clip.id === active.clip.id)!;
       const edge = active.edge === 'in' ? placed.start : placed.end;
-      const targets = snapPoints(active.base)
+      const targets = snapPoints(active.base, beats)
         .filter((point) => point !== edge)
         .concat([active.playhead]);
       const snapped = snapFrame(edge + delta, targets, 8 / active.scale);
@@ -1122,7 +1131,7 @@ export function Timeline(props: Readonly<Props>) {
   };
   const seekAt = (event: PointerEvent): void => {
     let position = frameAt(event.clientX);
-    if (snapping && !event.altKey) position = snapFrame(position, snapPoints(visible), 8 / scale);
+    if (snapping && !event.altKey) position = snapFrame(position, snapPoints(visible, beats), 8 / scale);
     onSeek(Math.max(0, Math.min(layout.duration - 1, position)));
   };
   const beginSeek = (event: PointerEvent): void => {
@@ -1171,7 +1180,7 @@ export function Timeline(props: Readonly<Props>) {
       context.payload,
       layerId,
       position,
-      snapping && !pointer.alt,
+      snapping && !pointer.alt && beats,
       8 / context.scale,
       context.playhead,
     );
@@ -1268,6 +1277,7 @@ export function Timeline(props: Readonly<Props>) {
     leading,
     scale,
     snapping,
+    beats,
     disabled: interactionBlocked || drag.current !== null,
     surface,
     viewport: scroll,
@@ -1307,6 +1317,12 @@ export function Timeline(props: Readonly<Props>) {
           <Icon name="magnet" size={15} />
           <span className="timeline-action-label">Snap</span>
         </button>
+        <BeatSnapControl
+          mode={beatSnap.mode}
+          snapping={snapping}
+          disabled={interactionBlocked}
+          onChange={beatSnap.choose}
+        />
         <BookmarkButton
           project={project}
           frame={frame}
@@ -1431,6 +1447,16 @@ export function Timeline(props: Readonly<Props>) {
                 leading={leading}
                 scale={scale}
               />
+              {beatSnap.active && (
+                <RulerBeats
+                  project={visible}
+                  beatsOf={beatSnap.beatsOf}
+                  downbeatsOnly={beatSnap.mode === 'downbeats'}
+                  leading={leading}
+                  scale={scale}
+                  width={width}
+                />
+              )}
               {layout.duration > 0 && (
                 <div className="timeline-ruler-playhead" style={{ left: leading + frame * scale }}>
                   <button
@@ -1884,6 +1910,7 @@ export function Timeline(props: Readonly<Props>) {
               viewport={scroll}
               frame={frame}
               snapping={snapping}
+              beats={beats}
               disabled={interactionBlocked || dropPlan !== null}
               onPause={onPause}
               onEdit={onEdit}

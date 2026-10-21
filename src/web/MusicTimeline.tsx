@@ -14,51 +14,25 @@ import type { EditCommand } from '../shared/commands.js';
 import type { MusicTrack, ProjectDocument } from '../shared/model.js';
 import { musicBeatFrames, type MusicAnalysis } from '../shared/music-analysis.js';
 import { removeMusicClips } from '../shared/music-lanes.js';
-import { snapFrame } from '../shared/snap.js';
+import { snapFrame, type BeatSnap } from '../shared/snap.js';
 import { formatTimecode } from '../shared/timing.js';
 import './music-ui.css';
 import { planMusicGesture, type MusicGestureKind } from './music-ui.js';
 import { useMusicAnalysis } from './MusicAnalysis.js';
+import { describeMusicMoment, MusicStructure } from './music-structure.js';
 import { placementSnapPoints, snapPlacement } from './timeline-placement.js';
 import type { DraftPreview } from './Timeline.js';
-
-/** Ticks closer than this fall back to downbeats only, then to none. */
-const MIN_TICK_PX = 4;
-
-interface BeatTicks {
-  beats: string;
-  downbeats: string;
-  beatCount: number;
-  downbeatCount: number;
-}
-
-function meanSpacing(frames: readonly number[], scale: number): number {
-  return frames.length < 2 ? Infinity : ((frames.at(-1)! - frames[0]!) / (frames.length - 1)) * scale;
-}
+import { beatTickPaths, type BeatTicks } from './timeline-beats.js';
 
 /** SVG paths of a music track's beats within its clip, at the clip's scale. */
 function beatTicks(music: MusicTrack, beats: MusicAnalysis['beats'] | null, scale: number): BeatTicks | null {
   if (!beats?.length) return null;
-  const placed = musicBeatFrames(music, beats);
-  const downbeats = placed.filter((beat) => beat.downbeat).map((beat) => beat.frame);
-  const showBeats =
-    meanSpacing(
-      placed.map((beat) => beat.frame),
-      scale,
-    ) >= MIN_TICK_PX;
-  const showDownbeats = meanSpacing(downbeats, scale) >= MIN_TICK_PX;
-  const ticks: BeatTicks = { beats: '', downbeats: '', beatCount: 0, downbeatCount: 0 };
-  for (const beat of placed) {
-    const x = Math.round((beat.frame - music.start) * scale) + 0.5;
-    if (beat.downbeat && showDownbeats) {
-      ticks.downbeats += `M${x} 20V40`;
-      ticks.downbeatCount++;
-    } else if (showBeats) {
-      ticks.beats += `M${x} 30V40`;
-      ticks.beatCount++;
-    }
-  }
-  return ticks;
+  return beatTickPaths(
+    musicBeatFrames(music, beats),
+    (frame) => (frame - music.start) * scale,
+    { downbeat: 26, beat: 36, bottom: 46 },
+    scale,
+  );
 }
 
 export interface MusicTimelineGesture {
@@ -87,6 +61,7 @@ interface Props {
   viewport: RefObject<HTMLDivElement | null>;
   frame: number;
   snapping: boolean;
+  beats: BeatSnap;
   disabled: boolean;
   onSelect: (id: string) => void;
   onPause: () => void;
@@ -119,6 +94,7 @@ export function MusicTimeline(props: Readonly<Props>) {
   const latest = useRef(props);
   latest.current = props;
   const [candidate, setCandidate] = useState<ReturnType<typeof planMusicGesture> | null>(null);
+  const [hover, setHover] = useState<{ x: number; text: string } | null>(null);
   const drag = useRef<MusicDrag | null>(null);
   const animation = useRef(0);
   const clear = useCallback((restoreScroll: boolean): MusicDrag | null => {
@@ -162,8 +138,12 @@ export function MusicTimeline(props: Readonly<Props>) {
   const name = `music track ${index + 1}${clipLabel}: ${recording}`;
   const { phase } = useMusicAnalysis(asset);
   const clipScale = drag.current?.scale ?? scale;
-  const analysed = phase.kind === 'ready' ? phase.analysis.beats : null;
-  const ticks = useMemo(() => beatTicks(music, analysed, clipScale), [music, analysed, clipScale]);
+  const analysed = phase.kind === 'ready' ? phase.analysis : null;
+  const ticks = useMemo(() => beatTicks(music, analysed?.beats ?? null, clipScale), [music, analysed, clipScale]);
+  const structure = useMemo(
+    () => analysed && <MusicStructure music={music} analysis={analysed} scale={clipScale} />,
+    [music, analysed, clipScale],
+  );
   const peaks = asset
     ? Array.from({ length: 128 }, (_, index) => {
         const source = musicSourceFrame(
@@ -246,6 +226,7 @@ export function MusicTimeline(props: Readonly<Props>) {
     event.stopPropagation();
     props.onSelect(props.music.id);
     props.onPause();
+    setHover(null);
     const plan = planMusicGesture(project, props.music.id, kind, 0);
     drag.current = {
       pointerId: event.pointerId,
@@ -262,7 +243,7 @@ export function MusicTimeline(props: Readonly<Props>) {
       frame: props.frame,
       alt: event.altKey,
       moved: false,
-      targets: placementSnapPoints(project, props.music.id, props.frame),
+      targets: placementSnapPoints(project, props.music.id, props.frame, props.beats),
       plan,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -284,7 +265,11 @@ export function MusicTimeline(props: Readonly<Props>) {
   };
   const move = (event: PointerEvent<HTMLButtonElement>): void => {
     const active = drag.current;
-    if (event.pointerId !== active?.pointerId) return;
+    if (!active) {
+      readout(event);
+      return;
+    }
+    if (event.pointerId !== active.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
     active.pointerX = event.clientX;
@@ -326,6 +311,13 @@ export function MusicTimeline(props: Readonly<Props>) {
     else if (plan.command) props.onEdit(plan.command);
   };
   const handlers = { onPointerMove: move, onPointerUp: finish, onPointerCancel: cancel, onLostPointerCapture: cancel };
+  function readout(event: PointerEvent<HTMLButtonElement>): void {
+    const clip = event.currentTarget.parentElement;
+    if (!analysed || !clip || event.currentTarget.className !== 'music-body') return setHover(null);
+    const x = event.clientX - clip.getBoundingClientRect().left;
+    const at = music.start + Math.max(0, Math.min(music.duration - 1, Math.floor(x / clipScale)));
+    setHover({ x, text: describeMusicMoment(music, analysed, at) });
+  }
   return (
     <div
       className={`music-timeline-clip ${selected ? 'selected' : ''} ${candidate?.error ? 'invalid' : ''}`}
@@ -347,9 +339,17 @@ export function MusicTimeline(props: Readonly<Props>) {
         onPointerDown={(event) => start(event, 'move')}
         onClick={() => props.onSelect(music.id)}
         onKeyDown={(event) => keyboard(event, 'move')}
+        onPointerLeave={() => setHover(null)}
         {...handlers}
       >
-        <svg viewBox="0 0 512 45" preserveAspectRatio="none" aria-label={`Waveform for ${name}`} role="img">
+        {structure}
+        <svg
+          className="music-waveform"
+          viewBox="0 0 512 45"
+          preserveAspectRatio="none"
+          aria-label={`Waveform for ${name}`}
+          role="img"
+        >
           {peaks.map(({ x, peak }) => (
             <path
               key={x}
@@ -375,6 +375,11 @@ export function MusicTimeline(props: Readonly<Props>) {
           {music.loop ? ' · loop' : ''}
         </span>
       </button>
+      {hover && !drag.current && (
+        <span className="music-readout" aria-hidden="true" style={{ left: hover.x }}>
+          {hover.text}
+        </span>
+      )}
       <button
         className="trim-handle in"
         aria-label={`Trim music start, track ${index + 1}${clipLabel}: ${recording}`}

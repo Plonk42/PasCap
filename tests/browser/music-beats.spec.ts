@@ -9,7 +9,12 @@ import {
   type MusicTrack,
   type ProjectDocument,
 } from '../../src/shared/model.js';
-import { MUSIC_ANALYSIS_VERSION, musicBeatFrames, type MusicAnalysis } from '../../src/shared/music-analysis.js';
+import {
+  MUSIC_ANALYSIS_VERSION,
+  musicBeatFrames,
+  musicSpans,
+  type MusicAnalysis,
+} from '../../src/shared/music-analysis.js';
 import { MUSIC_SAMPLES_PER_FRAME } from '../../src/shared/music-format.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { singleClipLane } from '../music-lanes.js';
@@ -59,6 +64,32 @@ function synthetic(): MusicAnalysis {
     silences: [],
     swells: [],
     sections: [],
+  };
+}
+
+const at = (frame: number): number => Math.round(frame * MUSIC_SAMPLES_PER_FRAME);
+
+/** A quiet half then a build, a gradual crescendo, a sudden drop and a short silence. */
+function structured(): MusicAnalysis {
+  return {
+    ...synthetic(),
+    key: { tonic: 'C', mode: 'minor', confidence: 0.6 },
+    loudness: Array.from({ length: 40 }, (_, index) => (index < 20 ? -24 : -12)),
+    tone: [
+      [-20, -30, -50],
+      [-12, -24, -44],
+      [-8, -18, -36],
+      [-6, -14, -30],
+    ],
+    sections: [
+      { fromSample: 0, toSample: at(60), kind: 'quiet', loudnessDb: -24 },
+      { fromSample: at(60), toSample: at(120), kind: 'build', loudnessDb: -12 },
+    ],
+    swells: [
+      { fromSample: at(20), toSample: at(50), kind: 'crescendo', changeDb: 9, sudden: false },
+      { fromSample: at(100), toSample: at(104), kind: 'decrescendo', changeDb: -12, sudden: true },
+    ],
+    silences: [{ fromSample: at(50), toSample: at(55) }],
   };
 }
 
@@ -136,13 +167,26 @@ const expected = (downbeats: boolean): number[] =>
     .filter((beat) => !downbeats || beat.downbeat)
     .map((beat) => beat.frame);
 
-async function openBeats(page: Page): Promise<void> {
-  await page.locator('summary[aria-label="Beats → bookmarks"]').click();
+async function frameX(page: Page, frame: number): Promise<number> {
+  const surface = page.locator('.timeline-surface');
+  const { left, leading, scale } = await surface.evaluate((element) => ({
+    left: element.getBoundingClientRect().left,
+    leading: Number(element.getAttribute('data-leading')),
+    scale: Number(element.getAttribute('data-pixels-per-frame')),
+  }));
+  return left + leading + frame * scale;
 }
 
-test('beat ticks follow the music track placement and loops, and Beats → bookmarks adds them in one Undo step', async ({
-  page,
-}) => {
+const playhead = (page: Page): Promise<number> => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame);
+
+/** Clicks the lower half of the time ruler at `frame` and expects the playhead at `landing`. */
+async function clickRuler(page: Page, frame: number, landing: number): Promise<void> {
+  const ruler = (await page.locator('.timeline-ruler').boundingBox())!;
+  await page.mouse.click(await frameX(page, frame), ruler.y + ruler.height - 5);
+  await expect.poll(() => playhead(page)).toBe(landing);
+}
+
+test('beat ticks follow the music track placement and loops', async ({ page }) => {
   analysis = synthetic();
   await open(page);
   await expect(page.getByRole('status').filter({ hasText: '120 BPM · 4/4 · 12 beats' })).toBeVisible();
@@ -161,59 +205,138 @@ test('beat ticks follow the music track placement and loops, and Beats → bookm
   const frames = positions.map((x) => TRACK.start + (x - 0.5) / scale).sort((a, b) => a - b);
   expect(frames).toHaveLength(expected(false).length);
   frames.forEach((frame, index) => expect(Math.abs(frame - expected(false)[index]!)).toBeLessThanOrEqual(1));
-
-  await openBeats(page);
-  await page.getByRole('button', { name: `All beats · ${expected(false).length}`, exact: true }).click();
-  expect((await current(page)).bookmarks).toEqual(expected(false));
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect((await current(page)).bookmarks).toEqual([]);
-  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
-
-  await openBeats(page);
-  await page.getByRole('button', { name: `Downbeats only · ${expected(true).length}`, exact: true }).click();
-  expect((await current(page)).bookmarks).toEqual(expected(true));
-
-  // Existing bookmarks are skipped, never duplicated or merged.
-  await openBeats(page);
-  const downbeats = page.getByRole('button', { name: 'Downbeats only · 0', exact: true });
-  await expect(downbeats).toHaveAttribute('aria-disabled', 'true');
-  await expect(downbeats).toHaveAccessibleDescription('Every downbeat of this music clip is already a bookmark.');
-  const beats = expected(false).length - expected(true).length;
-  await page.getByRole('button', { name: `All beats · ${beats}`, exact: true }).click();
-  expect((await current(page)).bookmarks).toEqual(expected(false));
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect((await current(page)).bookmarks).toEqual(expected(true));
+  // Without sections, swells, silences or tone, the clip shows none of them.
+  await expect(clip.locator('.music-section, .music-silence, .music-swells, .music-tone')).toHaveCount(0);
+  await expect(page.getByText('Music structure', { exact: true })).toHaveCount(0);
 });
 
-test('Beats → bookmarks reports the bookmark limit and still offers downbeats only', async ({ page }) => {
-  analysis = synthetic();
-  const crowded = Array.from({ length: 995 }, (_, index) => 1_000 + index);
-  await open(page, crowded);
-  await openBeats(page);
-  const all = page.getByRole('button', { name: `All beats · ${expected(false).length}`, exact: true });
-  await expect(all).toHaveAttribute('aria-disabled', 'true');
-  await expect(all).toHaveAccessibleDescription(
-    `${expected(false).length} beats would exceed 1,000 bookmarks (995 already set). Add downbeats only instead.`,
-  );
-  // An unavailable choice is focusable but does nothing.
-  await all.focus();
-  await page.keyboard.press('Enter');
-  expect((await current(page)).bookmarks).toEqual(crowded);
-  await page.getByRole('button', { name: `Downbeats only · ${expected(true).length}`, exact: true }).click();
-  expect((await current(page)).bookmarks).toEqual([...expected(true), ...crowded]);
-});
-
-test('without an analysis there are no ticks and Beats → bookmarks explains why it is unavailable', async ({
+test('Snap to beats snaps to the beats or downbeats where the music plays now, without editing the project', async ({
   page,
 }) => {
+  analysis = synthetic();
+  await open(page);
+  const toggle = page.getByRole('button', { name: 'Snap to beats', exact: true });
+  const rulerBeats = page.locator('.timeline-ruler-beats');
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await expect(rulerBeats).toHaveCount(0);
+  // 68 is three frames from the beat at 65, away from every clip edge.
+  await clickRuler(page, 68, 68);
+
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(rulerBeats).toHaveAttribute('data-downbeats', String(expected(true).length));
+  await expect(rulerBeats).toHaveAttribute('data-beats', String(expected(false).length - expected(true).length));
+  await clickRuler(page, 68, 65);
+  // Alt bypasses beats like every other target.
+  await page.keyboard.down('Alt');
+  await clickRuler(page, 68, 68);
+  await page.keyboard.up('Alt');
+
+  await page.getByRole('group', { name: 'Beat snapping' }).locator('summary').click();
+  await page.getByRole('radio', { name: 'Downbeats only', exact: true }).check();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(rulerBeats).toHaveAttribute('data-beats', '0');
+  await expect(rulerBeats).toHaveAttribute('data-downbeats', String(expected(true).length));
+  await clickRuler(page, 98, 95);
+  await clickRuler(page, 68, 68);
+
+  // Moving the music clip moves the beats it snaps to.
+  await page.getByRole('button', { name: /^Move music track 1/ }).focus();
+  await page.keyboard.press('Shift+ArrowRight');
+  await expect(page.locator('[data-music-id="beats-music"]')).toHaveAttribute('data-music-start', '40');
+  await clickRuler(page, 108, 105);
+
+  // Snap off turns beat snapping off too and explains why.
+  await page.getByRole('button', { name: 'Toggle snapping', exact: true }).click();
+  await expect(toggle).toHaveAttribute('aria-disabled', 'true');
+  await expect(toggle).toHaveAttribute('title', 'Turn on Snap to snap to beats.');
+  await expect(rulerBeats).toHaveCount(0);
+  await clickRuler(page, 108, 108);
+  await page.getByRole('button', { name: 'Toggle snapping', exact: true }).click();
+
+  // The toggle returns to the last choice; the choice is a browser preference, not project data.
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await expect(rulerBeats).toHaveCount(0);
+  await toggle.click();
+  await expect(rulerBeats).toHaveAttribute('data-beats', '0');
+  const document = await current(page);
+  expect(document.bookmarks).toEqual([]);
+  expect(document.music[0]!.clips[0]!.start).toBe(40);
+  await page.evaluate(() => window.pascapLab!.flush());
+  await page.goto(`/?project=${document.id}`);
+  await expect(page.getByRole('button', { name: 'Snap to beats', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+});
+
+test('the music clip and Audio tab show the key, sections, swells, silences and tone where they play', async ({
+  page,
+}) => {
+  const data = structured();
+  analysis = data;
+  await open(page);
+  await expect(page.getByRole('status').filter({ hasText: '120 BPM · 4/4 · C minor · 12 beats' })).toBeVisible();
+  const music = { ...TRACK, mediaId: song.id };
+  const clip = page.locator('[data-music-id="beats-music"]');
+  const sections = data.sections.flatMap((section) =>
+    musicSpans(music, section.fromSample, section.toSample).map((span) => ({ ...span, kind: section.kind })),
+  );
+  expect(sections.map((section) => section.kind).sort()).toEqual(['build', 'build', 'quiet', 'quiet']);
+  const drawn = await clip.locator('.music-section').evaluateAll((elements) =>
+    elements.map((element) => ({
+      start: Number(element.getAttribute('data-start')),
+      end: Number(element.getAttribute('data-end')),
+      kind: element.getAttribute('data-section'),
+    })),
+  );
+  expect(drawn).toEqual([...sections].sort((left, right) => left.start - right.start));
+  const silences = await clip
+    .locator('.music-silence')
+    .evaluateAll((elements) =>
+      elements.map((element) => [
+        Number(element.getAttribute('data-silence')),
+        Number(element.getAttribute('data-end')),
+      ]),
+    );
+  expect(silences).toEqual(
+    musicSpans(music, data.silences[0]!.fromSample, data.silences[0]!.toSample).map((span) => [span.start, span.end]),
+  );
+  // The gradual crescendo repeats with the loop; the sudden drop's second repeat falls after the clip.
+  const swells = clip.locator('.music-swells path');
+  await expect(swells).toHaveCount(3);
+  await expect(clip.locator('.music-swells path[data-sudden="true"]')).toHaveAttribute('data-swell', 'decrescendo');
+  await expect(clip.locator('.music-tone path').first()).toBeAttached();
+
+  // Hovering reads the music at the pointer.
+  const body = (await clip.locator('.music-body').boundingBox())!;
+  await page.mouse.move(await frameX(page, 100), body.y + body.height / 2);
+  await expect(clip.locator('.music-readout')).toContainText('00:03:10 · build · −12 dB');
+  await page.mouse.move(await frameX(page, 82), body.y + body.height / 2);
+  await expect(clip.locator('.music-readout')).toContainText('silence');
+  await page.mouse.move(body.x + body.width / 2, body.y - 40);
+  await expect(clip.locator('.music-readout')).toHaveCount(0);
+
+  // The same information is reachable by keyboard, and its timecodes seek.
+  await page.getByText('Music structure', { exact: true }).click();
+  const list = page.getByRole('region', { name: 'Sections' });
+  await expect(list.getByRole('listitem')).toHaveCount(4);
+  await expect(list.getByRole('listitem').nth(1)).toContainText('build to 00:05:00 · −12 dB · low −7 dB');
+  await page.getByRole('region', { name: 'Swells' }).getByRole('button', { name: '00:04:10', exact: true }).click();
+  await expect.poll(() => playhead(page)).toBe(130);
+  await expect(page.getByRole('region', { name: 'Silences' }).getByRole('listitem')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
+test('without an analysis there are no ticks, structure or beats to snap to', async ({ page }) => {
   await open(page);
   await expect(page.getByRole('status').filter({ hasText: 'Tempo and beats not analysed' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Analyse music', exact: true })).toBeVisible();
-  const action = page.getByRole('button', { name: 'Beats → bookmarks', exact: true });
-  await expect(action).toHaveAttribute('aria-disabled', 'true');
-  await expect(action).toHaveAccessibleDescription('Analyse the music first to find its beats.');
-  await expect(page.locator('.music-beats')).toHaveCount(0);
-  await action.focus();
-  await page.keyboard.press('Enter');
+  await expect(page.locator('.music-beats, .music-section, .music-tone')).toHaveCount(0);
+  await expect(page.getByText('Music structure', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Snap to beats', exact: true }).click();
+  await expect(page.locator('.timeline-ruler-beats')).toHaveCount(0);
+  await clickRuler(page, 68, 68);
   expect((await current(page)).bookmarks).toEqual([]);
 });

@@ -1,8 +1,13 @@
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { ProjectDocument, VideoClip } from '../shared/model.js';
 import { musicClips } from '../shared/music-lanes.js';
+import { NO_BEATS, type BeatSnap } from '../shared/snap.js';
 import { clipDuration } from '../shared/speed.js';
 import { calculateLayout, layerClips, transitionOffset, type PlacedClip } from '../shared/timeline.js';
+
+/** Off, on, or on with the beats to snap to as well. */
+export type PlacementSnapping = boolean | BeatSnap;
+const beatsOf = (snapping: PlacementSnapping): BeatSnap => (typeof snapping === 'function' ? snapping : NO_BEATS);
 
 export type TimelinePayload =
   | { kind: 'clip'; clipId: string; grabFrame: number }
@@ -58,11 +63,17 @@ export function placementSnapPoints(
   project: ProjectDocument,
   excludedClipId: string | null,
   playhead: number,
+  beats: BeatSnap = NO_BEATS,
 ): number[] {
-  return snapPointsWithout(project, new Set(excludedClipId === null ? [] : [excludedClipId]), playhead);
+  return snapPointsWithout(project, new Set(excludedClipId === null ? [] : [excludedClipId]), playhead, beats);
 }
 
-function snapPointsWithout(project: ProjectDocument, excluded: ReadonlySet<string>, playhead: number): number[] {
+function snapPointsWithout(
+  project: ProjectDocument,
+  excluded: ReadonlySet<string>,
+  playhead: number,
+  beats: BeatSnap,
+): number[] {
   const layout = calculateLayout(project);
   const clips = layout.clips.filter((placed) => !excluded.has(placed.clip.id));
   const transitions = layout.transitions.filter(
@@ -79,6 +90,7 @@ function snapPointsWithout(project: ProjectDocument, excluded: ReadonlySet<strin
       .filter((clip) => !excluded.has(clip.id))
       .flatMap((clip) => [clip.start, clip.start + clip.duration]),
     ...project.bookmarks,
+    ...beats(project, excluded),
   );
   return [...new Set(points)].filter((point) => point >= 0).sort((left, right) => left - right);
 }
@@ -191,7 +203,7 @@ function planGroupDrop(
   payload: Extract<TimelinePayload, { kind: 'group' }>,
   pointerLayerId: string,
   pointerFrame: number,
-  snapping: boolean,
+  snapping: PlacementSnapping,
   tolerance: number,
   playhead: number,
 ): DropPlan {
@@ -207,7 +219,7 @@ function planGroupDrop(
   let guide: number | null = null;
   const free = moved.filter((placed) => !rippleOn(placed));
   if (snapping && free.length) {
-    const points = snapPointsWithout(project, new Set(payload.clipIds), playhead);
+    const points = snapPointsWithout(project, new Set(payload.clipIds), playhead, beatsOf(snapping));
     ({ delta, guide } = snapGroupDelta(free, delta, points, tolerance));
   }
   const command: EditCommand = { type: 'move-clips', clipIds: [...payload.clipIds], delta, layerId };
@@ -278,7 +290,7 @@ export function planTimelineDrop(
   payload: TimelinePayload,
   layerId: string,
   pointerFrame: number,
-  snapping: boolean,
+  snapping: PlacementSnapping,
   tolerance: number,
   playhead: number,
 ): DropPlan {
@@ -293,7 +305,7 @@ function planSingleDrop(
   payload: SinglePayload,
   layerId: string,
   pointerFrame: number,
-  snapping: boolean,
+  snapping: PlacementSnapping,
   tolerance: number,
   playhead: number,
 ): DropPlan {
@@ -325,7 +337,7 @@ function planSingleDrop(
       const snapped = snapRowPlacement(
         clips,
         requested,
-        placementSnapPoints(project, payload.kind === 'clip' ? payload.clipId : null, playhead),
+        placementSnapPoints(project, payload.kind === 'clip' ? payload.clipId : null, playhead, beatsOf(snapping)),
         tolerance,
       );
       start = snapped.start;
