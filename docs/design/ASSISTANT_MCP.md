@@ -662,6 +662,12 @@ Follow mode, Take over, restore and the Hand off dialog are implemented on the `
   with a message; whenever the editor is idle (no draft, gesture or pending save) it adopts
   each newer saved revision, replacing its history like a project switch. A draft the user
   had before the session stays in the editor, its saves refused (423) until the session ends.
+- The preview follows the assistant: each `edit` records in the session's edit log the
+  earliest project frame it changed (`editedFrame` in [edited-frame.ts](../../src/shared/edited-frame.ts):
+  clips and their placement, transitions, fades, keyframes, bookmarks and music clips), and
+  adopting a revision seeks to the latest such frame, unless the preview is playing. Changes
+  without a particular frame (a whole track's Colour, Opacity or Transform, kept ranges, the
+  title) leave the playhead where it is.
 - **Take over** calls `session_end`. When a session the editor saw ends (Take over, the
   assistant's `session_end` with notes, or expiry), the editor adopts the latest revision once
   and shows who ended it, the edit count and the notes, with **Restore project before
@@ -669,7 +675,8 @@ Follow mode, Take over, restore and the Hand off dialog are implemented on the `
   current state, in one revision; the editor reloads it with a fresh history. **Open as new
   project** (`checkpoint_copy`, editor only) saves that checkpoint as a new project titled
   "… (before assistant)" and opens it, leaving the assistant's version as it is. An **Edit
-  log** disclosure lists the session's batches. The summary is dismissed with ×.
+  log** disclosure lists the session's batches, each with a timecode button seeking to the frame
+  it changed. The summary is dismissed with ×.
 - **Hand off** (header, beside Export; [HandOff.tsx](../../src/web/HandOff.tsx)) opens a
   dialog with the brief's fields (notes, a placed music track or Any, target length, allowed
   movement, most clips) and **What the assistant can use**, from `hand_off_readiness`
@@ -680,8 +687,8 @@ Follow mode, Take over, restore and the Hand off dialog are implemented on the `
   autosave and calls `session_start` with the brief.
 
 Still planned: the dialog showing the client configuration and whether an MCP client has
-connected (the client is started outside PasCap), placing a music recording from the dialog,
-and the preview following the last edited frame.
+connected (the client is started outside PasCap) and placing a music recording from the
+dialog.
 
 ## Assistant playbook (the `pascap://guide` resource)
 

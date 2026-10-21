@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ProjectDocument } from '../shared/model.js';
 import type { OperationOutput } from '../shared/operations/index.js';
+import { formatTimecode } from '../shared/timing.js';
 import { Icon } from './icons.js';
 import { callOperation } from './operations.js';
 
@@ -14,7 +15,7 @@ export function useAssistantSession(projectId: string | null): {
   status: SessionStatus | null;
   refresh: () => Promise<SessionStatus | null>;
 } {
-  const [status, setStatus] = useState<SessionStatus | null>(null);
+  const [polled, setPolled] = useState<{ projectId: string; status: SessionStatus } | null>(null);
   const latest = useRef(projectId);
   latest.current = projectId;
   const refresh = useCallback(async (): Promise<SessionStatus | null> => {
@@ -22,7 +23,7 @@ export function useAssistantSession(projectId: string | null): {
     if (id === null) return null;
     try {
       const next = await callOperation('session_status', { projectId: id, checkpoints: false });
-      if (latest.current === id) setStatus(next);
+      if (latest.current === id) setPolled({ projectId: id, status: next });
       return next;
     } catch {
       // A missed poll is retried by the next one; the editor keeps its last known state.
@@ -30,7 +31,6 @@ export function useAssistantSession(projectId: string | null): {
     }
   }, []);
   useEffect(() => {
-    setStatus(null);
     if (projectId === null) return;
     void refresh();
     const timer = setInterval(() => {
@@ -38,7 +38,7 @@ export function useAssistantSession(projectId: string | null): {
     }, POLL_MS);
     return () => clearInterval(timer);
   }, [projectId, refresh]);
-  return { status, refresh };
+  return { status: polled?.projectId === projectId ? polled.status : null, refresh };
 }
 
 export interface FollowOptions {
@@ -48,7 +48,16 @@ export interface FollowOptions {
   /** True when the editor holds no unsaved change or gesture, so a newer saved project may replace it. */
   idle: () => boolean;
   load: (projectId: string) => Promise<ProjectDocument>;
-  adopt: (document: ProjectDocument) => void;
+  /** Replaces the editor's document; frame is where the latest adopted edit shows, or null. */
+  adopt: (document: ProjectDocument, frame: number | null) => void;
+}
+
+/** The frame of the latest edit between two saved revisions that changed one, or null. */
+export function latestEditedFrame(session: Session | null, from: number | null, to: number): number | null {
+  const edits = session?.edits.filter(
+    (edit) => edit.frame !== null && edit.revision <= to && (from === null || edit.revision > from),
+  );
+  return edits?.at(-1)?.frame ?? null;
 }
 
 /**
@@ -58,9 +67,15 @@ export interface FollowOptions {
 export function useFollowAssistant({ projectId, revision, idle, load, adopt }: FollowOptions) {
   const { status, refresh } = useAssistantSession(projectId);
   const seen = useRef(new Set<string>());
+  // The session the project already had when the editor opened it, which the editor did not follow.
+  const before = useRef<{ projectId: string; startedAt: string | null } | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const session = status?.session ?? null;
-  if (session?.active) seen.current.add(session.startedAt);
+  if (status && projectId !== null && before.current?.projectId !== projectId)
+    before.current = { projectId, startedAt: session?.active ? null : (session?.startedAt ?? null) };
+  // A session that started and ended between two polls is followed too.
+  if (session && (session.active || session.startedAt !== before.current?.startedAt))
+    seen.current.add(session.startedAt);
   const followed = session !== null && seen.current.has(session.startedAt);
   const target = status?.revision ?? null;
   useEffect(() => {
@@ -68,14 +83,16 @@ export function useFollowAssistant({ projectId, revision, idle, load, adopt }: F
     let cancelled = false;
     void load(projectId)
       .then((document) => {
-        if (!cancelled && document.revision !== revision() && idle()) adopt(document);
+        const from = revision();
+        if (!cancelled && document.revision !== from && idle())
+          adopt(document, latestEditedFrame(session, from, document.revision));
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
     // Each poll rechecks, so a revision skipped during a gesture is adopted once the editor is idle.
-  }, [projectId, status, target, followed, revision, idle, load, adopt]);
+  }, [projectId, status, session, target, followed, revision, idle, load, adopt]);
   return {
     session,
     following: session?.active === true,
@@ -131,6 +148,7 @@ export function AssistantEndedBanner({
   restoreReason,
   onRestore,
   onOpenCopy,
+  onSeek,
   onDismiss,
 }: Readonly<{
   session: Session;
@@ -139,6 +157,7 @@ export function AssistantEndedBanner({
   restoreReason: string | null;
   onRestore: () => void;
   onOpenCopy: () => void;
+  onSeek: (frame: number) => void;
   onDismiss: () => void;
 }>) {
   const unavailable = busy || restoreReason !== null;
@@ -153,9 +172,18 @@ export function AssistantEndedBanner({
           <details className="assistant-edits">
             <summary>Edit log</summary>
             <ol>
-              {session.edits.map((edit) => (
-                <li key={edit.revision}>
-                  {new Date(edit.at).toLocaleTimeString()} · {edit.summary}
+              {session.edits.map(({ revision, at, summary, frame }) => (
+                <li key={revision}>
+                  {new Date(at).toLocaleTimeString()} · {summary}
+                  {frame !== null && (
+                    <button
+                      className="text-button"
+                      aria-label={`Go to the edit at ${formatTimecode(frame)}`}
+                      onClick={() => onSeek(frame)}
+                    >
+                      {formatTimecode(frame)}
+                    </button>
+                  )}
                 </li>
               ))}
             </ol>

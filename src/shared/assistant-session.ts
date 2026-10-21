@@ -33,6 +33,10 @@ export const sessionEditSchema = z
     at: z.string(),
     commands: z.number().int().positive(),
     summary: described(z.string(), 'The command types of the batch, in order.'),
+    frame: described(
+      frameSchema.nullable().default(null),
+      'Earliest project frame the batch changed, where the editor shows it; null when none in particular.',
+    ),
   })
   .strict();
 

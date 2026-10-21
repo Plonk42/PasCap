@@ -889,10 +889,14 @@ export function App() {
   );
   /** A newer saved revision replaces the editor's document without becoming an Undo step or a save. */
   const adoptSaved = useCallback(
-    (loaded: ProjectDocument) => {
+    (loaded: ProjectDocument, editedAt: number | null = null) => {
       autosave.current?.dispose();
       autosave.current = null;
       history.current = new EditHistory(loaded);
+      const duration = calculateLayout(loaded).duration;
+      // The preview follows the assistant's latest edit, unless the user is playing.
+      if (editedAt !== null && duration > 0 && !engine.current?.diagnostics().playing)
+        requestedFrame.current = Math.min(editedAt, duration - 1);
       publish(loaded, true);
       autosave.current = new Autosave(loaded, api.save, setSaveState);
       setSaveState({ state: 'saved', message: 'Saved on this device', revision: loaded.revision, recovery: null });
@@ -2028,6 +2032,7 @@ export function App() {
             }
             onRestore={() => restoreBeforeSession(assistant.ended!.checkpointId)}
             onOpenCopy={() => openBeforeSession(assistant.ended!.checkpointId)}
+            onSeek={seek}
             onDismiss={assistant.dismiss}
           />
         )}

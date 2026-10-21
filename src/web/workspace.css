@@ -813,6 +813,12 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.assistant-edits .text-button {
+  margin-left: 8px;
+  padding: 0 4px;
+  font-size: 12px;
+}
+
 .danger-button {
   min-height: 32px;
   padding: 6px 12px;

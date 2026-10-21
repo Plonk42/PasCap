@@ -1,6 +1,7 @@
 import { ZodError } from 'zod';
 import { sessionViolation } from '../../shared/assistant-session.js';
 import { applyCommand, type EditCommand } from '../../shared/commands.js';
+import { editedFrame } from '../../shared/edited-frame.js';
 import type { ProjectDocument } from '../../shared/model.js';
 import type { edit } from '../../shared/operations/edit.js';
 import { durationOf } from '../../shared/operations/timecode.js';
@@ -48,6 +49,7 @@ export const runEdit: OperationRunner<typeof edit> = async (context, { projectId
       projectId,
       saved.revision,
       commands.map((command) => command.type),
+      editedFrame(current, saved),
     );
   return { revision: saved.revision, duration: durationOf(calculateLayout(saved).duration) };
 };

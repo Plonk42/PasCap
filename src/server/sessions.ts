@@ -170,12 +170,12 @@ export class AssistantSessions {
     });
   }
 
-  recordEdit(projectId: string, revision: number, types: readonly string[]): Promise<void> {
+  recordEdit(projectId: string, revision: number, types: readonly string[], frame: number | null): Promise<void> {
     return this.#writer.run(async () => {
       const session = await this.#current(projectId);
       if (session?.endedAt !== null) return;
       const at = this.now();
-      const edit = { revision, at, commands: types.length, summary: types.join(', ') };
+      const edit = { revision, at, commands: types.length, summary: types.join(', '), frame };
       await this.write({ ...session, lastActivityAt: at, edits: [...session.edits, edit].slice(-MAX_SESSION_EDITS) });
     });
   }
