@@ -8,6 +8,7 @@ import { createClip, createLayer, createProject, projectSchema, type ProjectDocu
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { editLayerPoint, expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
+import { singleClipLane } from '../music-lanes.js';
 
 let memory: MemoryProjects;
 let assets: MediaAsset[];
@@ -69,7 +70,7 @@ test.beforeEach(async ({ page, request }) => {
   document.clips = [createClip('one', assets[0]!.id, 0, 120)];
   expect(music.metadata.frameCount).toBeGreaterThanOrEqual(120);
   document.music = [
-    {
+    singleClipLane({
       id: 'value-music',
       mediaId: music.id,
       sourceIn: 0,
@@ -80,7 +81,7 @@ test.beforeEach(async ({ page, request }) => {
       fadeIn: 0,
       fadeOut: 0,
       loop: false,
-    },
+    }),
   ];
   memory = await memoryProjects(page, document);
   await expandedInspectorPreferences(page);
@@ -285,7 +286,7 @@ const constantEdit: ValueEdit = (_document, rate) => ({
 });
 const gainEdit: ValueEdit = (document, gainDb) => ({
   type: 'music',
-  music: document.music.map((track) => (track.id === 'value-music' ? { ...track, gainDb } : track)),
+  music: document.music.map((track) => (track.id === 'value-music-track' ? { ...track, gainDb } : track)),
 });
 
 test('row Colour captures its base and keeps precise release-only edits identical across clip selection', async ({

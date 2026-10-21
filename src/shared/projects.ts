@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { applyCommand } from './commands.js';
 import { frameSchema, idSchema, projectSchema, type ProjectDocument } from './model.js';
+import { musicClips, removeMusicClips } from './music-lanes.js';
 
 export const projectSummarySchema = z
   .object({
@@ -22,7 +23,7 @@ export function projectVideoIds(project: ProjectDocument): Set<string> {
 }
 
 export function projectAudioIds(project: ProjectDocument): Set<string> {
-  return new Set([...project.media.audioIds, ...project.music.map((track) => track.mediaId)]);
+  return new Set([...project.media.audioIds, ...musicClips(project.music).map((clip) => clip.mediaId)]);
 }
 
 export interface MediaRemoval {
@@ -34,7 +35,7 @@ export interface MediaRemoval {
 export function mediaRemovalUsage(project: ProjectDocument, removal: MediaRemoval): { clips: number; music: number } {
   return {
     clips: project.clips.filter((clip) => removal.videoIds.includes(clip.mediaId)).length,
-    music: project.music.filter((track) => removal.audioIds.includes(track.mediaId)).length,
+    music: musicClips(project.music).filter((clip) => removal.audioIds.includes(clip.mediaId)).length,
   };
 }
 
@@ -53,11 +54,17 @@ export function removeProjectMedia(project: ProjectDocument, removal: MediaRemov
   let next = project;
   for (const clip of project.clips.filter((item) => removal.videoIds.includes(item.mediaId)))
     next = applyCommand(next, { type: 'delete', clipId: clip.id });
-  if (project.music.some((track) => removal.audioIds.includes(track.mediaId)))
+  if (musicClips(project.music).some((clip) => removal.audioIds.includes(clip.mediaId))) {
+    const removed = new Set(
+      musicClips(next.music)
+        .filter((clip) => removal.audioIds.includes(clip.mediaId))
+        .map((clip) => clip.id),
+    );
     next = applyCommand(next, {
       type: 'music',
-      music: next.music.filter((track) => !removal.audioIds.includes(track.mediaId)),
+      music: next.music.flatMap((lane) => removeMusicClips(lane, removed) ?? []),
     });
+  }
   return projectSchema.parse({
     ...next,
     media: {

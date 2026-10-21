@@ -20,6 +20,7 @@ import {
   sharedPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
+import { singleClipLane } from '../music-lanes.js';
 
 let assets: MediaAsset[];
 let audio: AudioAsset[];
@@ -367,7 +368,7 @@ for (const { width, height } of [
     const document = await current(page);
     document.media.audioIds = [music.id];
     document.music = [
-      {
+      singleClipLane({
         id: 'ux-music',
         mediaId: music.id,
         sourceIn: 0,
@@ -378,7 +379,7 @@ for (const { width, height } of [
         fadeIn: 0,
         fadeOut: 0,
         loop: true,
-      },
+      }),
     ];
     await page.evaluate((next) => window.pascapLab!.setDocument(next), document);
     await page.setViewportSize({ width, height });

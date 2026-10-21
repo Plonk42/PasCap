@@ -31,6 +31,7 @@ import {
   type ProjectDocument,
   type VideoLayer,
 } from '../shared/model.js';
+import { musicClips } from '../shared/music-lanes.js';
 import {
   projectAudioIds,
   projectVideoIds,
@@ -76,7 +77,8 @@ import { previewCommands, registerLivePreview } from './live-preview.js';
 import { MediaLibrary, type ReviewTarget } from './MediaLibrary.js';
 import { nextLayerName } from './move-to-track.js';
 import type { ImportActions, ImportKind, ImportResult, RelinkTarget } from './ImportDialog.js';
-import { MusicControls } from './MusicControls.js';
+import { MusicControls, type MusicBoundaryRequest } from './MusicControls.js';
+import { nextMusicSelection } from './music-ui.js';
 import { Popover } from './Popover.js';
 import { readPreference, writePreference } from './preferences.js';
 import { PreviewPanel } from './PreviewPanel.js';
@@ -270,6 +272,7 @@ export function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const clipGroup = useClipGroup();
   const [selectedMusicId, setSelectedMusicId] = useState<string | null>(null);
+  const [musicBoundary, setMusicBoundary] = useState<MusicBoundaryRequest | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState(EMPTY_PROJECT.layers[0]!.id);
   const [keyframeInspection, setKeyframeInspection] = useState<KeyframeInspection | null>(null);
   const [sourceInspectionEpoch, setSourceInspectionEpoch] = useState(0);
@@ -366,7 +369,8 @@ export function App() {
     [select, clipGroup.set, clipGroup.latest],
   );
   const selectMusic = useCallback((id: string): void => {
-    if (drafting.current || !current.current?.music.some((track) => track.id === id)) return;
+    if (drafting.current || !current.current || !musicClips(current.current.music).some((clip) => clip.id === id))
+      return;
     musicSelection.current = id;
     setSelectedMusicId(id);
     setInspectorMode('audio');
@@ -398,7 +402,7 @@ export function App() {
   const validate = useCallback((document: ProjectDocument): void => {
     projectSchema.parse(document);
     validateSourceRanges(document, new Map(latestAssets.current.map((asset) => [asset.id, asset.metadata.frameCount])));
-    for (const music of document.music) {
+    for (const music of musicClips(document.music)) {
       const asset = latestAudio.current.find((item) => item.id === music.mediaId);
       if (!asset || music.sourceOut > asset.metadata.frameCount)
         throw new Error('Music range exceeds the registered original.');
@@ -414,12 +418,7 @@ export function App() {
       }
       current.current = next;
       setProject(next);
-      const addedMusic = next.music.find((track) => !previous?.music.some((item) => item.id === track.id));
-      const nextMusicId =
-        addedMusic?.id ??
-        next.music.find((track) => track.id === musicSelection.current)?.id ??
-        next.music[0]?.id ??
-        null;
+      const nextMusicId = nextMusicSelection(previous, next, musicSelection.current);
       if (musicSelection.current !== nextMusicId) {
         musicSelection.current = nextMusicId;
         setSelectedMusicId(nextMusicId);
@@ -824,8 +823,9 @@ export function App() {
       selection.current = null;
       setSelectedId(null);
       clipGroup.set([]);
-      musicSelection.current = loaded.music[0]?.id ?? null;
+      musicSelection.current = loaded.music[0]?.clips[0]?.id ?? null;
       setSelectedMusicId(musicSelection.current);
+      setMusicBoundary(null);
       selectedLayer.current = loaded.layers[0]!.id;
       setSelectedLayerId(selectedLayer.current);
       let choices: MediaSelections = {};
@@ -1702,6 +1702,7 @@ export function App() {
         busy={musicBusy}
         drafting={musicDrafting}
         selectedMusicId={selectedMusicId}
+        boundary={musicBoundary}
         onSelectMusic={selectMusic}
         onImport={importMusicFiles}
         onEdit={edit}
@@ -1714,6 +1715,7 @@ export function App() {
       musicBusy,
       musicDrafting,
       selectedMusicId,
+      musicBoundary,
       selectMusic,
       importMusicFiles,
       edit,
@@ -2192,6 +2194,10 @@ export function App() {
             onSelectLayer={selectLayer}
             selectedMusicId={selectedMusicId}
             onSelectMusic={selectMusic}
+            onMusicBoundary={(leftId) => {
+              selectMusic(leftId);
+              setMusicBoundary((previous) => ({ leftId, serial: (previous?.serial ?? 0) + 1 }));
+            }}
             selectedBoundaryId={boundaryId}
             frame={diagnostics?.frame ?? 0}
             onSelect={select}

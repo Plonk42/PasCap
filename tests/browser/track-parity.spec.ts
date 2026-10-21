@@ -23,6 +23,7 @@ import {
   sharedPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
+import { singleClipLane } from '../music-lanes.js';
 
 const PROJECT_ID = 'track-parity-memory';
 let assets: MediaAsset[];
@@ -239,7 +240,7 @@ for (const row of [0, 1]) {
     }
     document.media.audioIds = [music.id];
     document.music = [
-      {
+      singleClipLane({
         id: 'parity-music',
         mediaId: music.id,
         sourceIn: 0,
@@ -250,7 +251,7 @@ for (const row of [0, 1]) {
         fadeIn: 4,
         fadeOut: 5,
         loop: true,
-      },
+      }),
     ];
     await fixture(page, document);
     const before = await current(page);

@@ -41,7 +41,7 @@ supported schema are upgraded on load; projects and receipt snapshots older than
 oldest supported schema are rejected and preserved, without defaults or automatic deletion;
 proxy/current PCM formats remain unchanged; the registries are version 2 (full-content
 checksums). Projects require a 0–8
-identified music track array (`[]` without music); version-1 export receipts
+music track array of clips joined by transitions (`[]` without music); version-1 export receipts
 require strict current-schema snapshots and captured audio-source/instance-plan arrays.
 Music can extend duration to maximum video/music OUT: closing video fades finish
 at clip OUT, then black while music continues/fades at its own end. One mixed

@@ -224,7 +224,7 @@ Audio processes **one original at a time** into selected s16 PCM and serially
 pairwise-sums with a **Float64 stereo accumulator**. At most **two intermediate
 audio inputs**, **one native audio child per pass** and **three audio scratch files**
 (selected PCM + old/new accumulators) coexist, deleting consumed inputs before the
-next music track. Apply per-track gain/fades, sum without normalisation or
+next music clip. Apply each clip's track gain and fades, sum without normalisation or
 intermediate clipping, then hard-clamp once before final AAC. There is no ducking,
 effect or video audio. These audio allocations are additional to the unchanged
 video bounds above and remain duration-dependent on disk.

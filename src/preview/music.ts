@@ -1,4 +1,4 @@
-import { musicTracksSchema, type MusicTrack } from '../shared/model.js';
+import { musicSourcesSchema, type MusicTrack } from '../shared/model.js';
 import {
   MUSIC_BYTES_PER_SAMPLE,
   MUSIC_CHANNELS,
@@ -118,7 +118,7 @@ export class MusicPlayback {
     this.#tracks = [];
     this.#lastErrorFrames = 0;
     const generation = this.#generation;
-    const snapshot = musicTracksSchema.parse(tracks);
+    const snapshot = musicSourcesSchema.parse(tracks);
     const configured: MusicSource[] = [];
     const deadline = AbortSignal.any([signal, AbortSignal.timeout(10_000)]);
     await forEachSerial(snapshot, async (track) => {

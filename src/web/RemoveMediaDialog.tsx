@@ -5,7 +5,7 @@ function count(value: number, singular: string, plural: string): string {
   return `${value} ${value === 1 ? singular : plural}`;
 }
 
-/** Confirms removing recordings that still have timeline excerpts or music tracks. */
+/** Confirms removing recordings that still have timeline clips or music clips. */
 export function RemoveMediaDialog({
   names,
   clips,
@@ -25,7 +25,7 @@ export function RemoveMediaDialog({
   const subject = names.length === 1 ? names[0]! : count(names.length, 'recording', 'recordings');
   const usage = [
     clips > 0 && count(clips, 'timeline clip', 'timeline clips'),
-    music > 0 && count(music, 'music track', 'music tracks'),
+    music > 0 && count(music, 'music clip', 'music clips'),
   ]
     .filter(Boolean)
     .join(' and ');

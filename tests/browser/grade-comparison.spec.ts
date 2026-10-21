@@ -8,6 +8,7 @@ import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { installMusicEvidence, observeMusicPlayback, observeRealtimeHeadroom } from './music-evidence.js';
+import { singleClipLane } from '../music-lanes.js';
 
 interface PixelSummary {
   checksum: number;
@@ -258,7 +259,7 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
       },
     ];
     playback.music = [
-      {
+      singleClipLane({
         id: 'comparison-music-track',
         mediaId: song!.id,
         sourceIn: 0,
@@ -269,7 +270,7 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
         fadeIn: 0,
         fadeOut: 0,
         loop: true,
-      },
+      }),
     ];
     projectSchema.parse(playback);
 

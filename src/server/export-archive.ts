@@ -3,7 +3,8 @@ import path from 'node:path';
 import { z } from 'zod';
 import { audioAssetSchema } from '../shared/audio.js';
 import { defaultExportName, exportOutputNameSchema, exportProfileSchema, planExportMusic } from '../shared/export.js';
-import { idSchema, MAX_MUSIC_TRACKS, projectSchema } from '../shared/model.js';
+import { idSchema, MAX_MUSIC_CLIPS, MAX_MUSIC_TRACKS, projectSchema } from '../shared/model.js';
+import { musicTracks } from '../shared/music-lanes.js';
 import { upgradeProject } from '../shared/project-migrations.js';
 import { forEachSerial } from '../shared/serial.js';
 import { calculateLayout } from '../shared/timeline.js';
@@ -41,9 +42,9 @@ const receiptSchema = z
     profile: exportProfileSchema,
     // Receipts written before output names existed have none; they keep the default label.
     outputName: exportOutputNameSchema.optional(),
-    musicSources: z.array(audioAssetSchema.omit({ content: true })).max(MAX_MUSIC_TRACKS),
+    musicSources: z.array(audioAssetSchema.omit({ content: true })).max(MAX_MUSIC_TRACKS * MAX_MUSIC_CLIPS),
     settings: z.looseObject({
-      audio: z.array(exportMusicPlanSchema).max(MAX_MUSIC_TRACKS),
+      audio: z.array(exportMusicPlanSchema).max(MAX_MUSIC_TRACKS * MAX_MUSIC_CLIPS),
     }),
     verification: z.looseObject({
       fullDecode: z.literal(true),
@@ -52,8 +53,10 @@ const receiptSchema = z
     }),
   })
   .superRefine((receipt, context) => {
+    // One plan per playable source: a clip with its music track's gain and its own fades.
+    const tracks = musicTracks(receipt.snapshot.music);
     const sourceIds = new Set(receipt.musicSources.map((source) => source.id));
-    const referencedIds = new Set(receipt.snapshot.music.map((music) => music.mediaId));
+    const referencedIds = new Set(tracks.map((music) => music.mediaId));
     if (
       sourceIds.size !== receipt.musicSources.length ||
       sourceIds.size !== referencedIds.size ||
@@ -66,7 +69,7 @@ const receiptSchema = z
       });
 
     const plans = new Map(receipt.settings.audio.map((plan) => [plan.id, plan]));
-    if (plans.size !== receipt.settings.audio.length || plans.size !== receipt.snapshot.music.length)
+    if (plans.size !== receipt.settings.audio.length || plans.size !== tracks.length)
       context.addIssue({
         code: 'custom',
         path: ['settings', 'audio'],
@@ -86,7 +89,7 @@ const receiptSchema = z
       });
       return;
     }
-    for (const music of receipt.snapshot.music) {
+    for (const music of tracks) {
       const expected = planExportMusic(music, duration);
       const plan = plans.get(music.id);
       if (!plan || Object.entries(expected).some(([key, value]) => plan[key as keyof typeof plan] !== value))

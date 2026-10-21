@@ -262,10 +262,13 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   it. Toggle **Add default keyframe** in the Colour keyframe line; amber filled marker.
   Transform keyframes carry the same `reset` flag (own toggle in the Transform line). See
   [layers/keyframes](../docs/LAYERS_AND_KEYFRAMES.md).
-- Music is a required 0–8 array of independently identified instances, never null
-  or singular. Duration is the maximum of all video and music OUTs. After the last
+- Music is a required 0–8 array of independently identified music tracks, never null
+  or singular. #203: like a video track, each owns gain, opening/closing fades, Ripple and
+  1–8 clips joined by Cut / Crossfade (two linear fades over the overlap) / Fade through
+  silence; export and preview flatten clips with `musicTracks()` into one source each.
+  Duration is the maximum of all video and music OUTs. After the last
   active video, preview/export is opaque black while music continues to its own OUT;
-  video fades remain inside their clips. Mix serially after per-instance gain/fades
+  video fades remain inside their clips. Mix serially after per-clip gain/fades
   and clamp once after the complete sum, with one bounded queue/output clock.
 - Heavy native work stays serial with bounded children/buffers, exact frame counts
   and source identity guards.

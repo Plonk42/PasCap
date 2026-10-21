@@ -22,6 +22,7 @@ import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
+import { singleClipLane } from '../music-lanes.js';
 
 vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
@@ -137,34 +138,33 @@ describe('duration-dependent planning allowance, not a codec guarantee', () => {
   });
   it('budgets bounded selected PCM and floating accumulators regardless of looping', () => {
     const document = documentWithClips();
-    document.music = [
-      {
-        id: 'music-instance',
-        mediaId: 'music',
-        sourceIn: 6,
-        sourceOut: 12,
-        start: 0,
-        duration: 30,
-        gainDb: 0,
-        fadeIn: 0,
-        fadeOut: 0,
-        loop: true,
-      },
-    ];
+    const track = {
+      id: 'music-instance',
+      mediaId: 'music',
+      sourceIn: 6,
+      sourceOut: 12,
+      start: 0,
+      duration: 30,
+      gainDb: 0,
+      fadeIn: 0,
+      fadeOut: 0,
+      loop: true,
+    };
+    document.music = [singleClipLane(track)];
     const videoSamples = Math.round((30 * 48000 * 1001) / 30000);
     expect(estimateExportSpace(document, 'draft720').audioBytes).toBe((19219 - 9610) * 4 + videoSamples * 16 * 2);
     document.music.push(
-      ...Array.from({ length: 7 }, (_, index) => ({
-        ...document.music[0]!,
-        id: `instance-${index}`,
-        sourceIn: 0,
-        sourceOut: 18,
-      })),
+      ...Array.from({ length: 7 }, (_, index) =>
+        singleClipLane({ ...track, id: `instance-${index}`, sourceIn: 0, sourceOut: 18 }),
+      ),
     );
     expect(estimateExportSpace(document, 'draft720').audioBytes).toBe(
       Math.round((18 * 48000 * 1001) / 30000) * 4 + videoSamples * 16 * 2,
     );
-    document.music = document.music.map((track) => ({ ...track, start: 40 }));
+    document.music = document.music.map((lane) => ({
+      ...lane,
+      clips: lane.clips.map((clip) => ({ ...clip, start: 40 })),
+    }));
     const extended = estimateExportSpace(document, 'draft720');
     expect(extended.audioBytes).toBe(
       Math.round((18 * 48000 * 1001) / 30000) * 4 + Math.round((70 * 48000 * 1001) / 30000) * 16 * 2,
@@ -187,7 +187,7 @@ describe('duration-dependent planning allowance, not a codec guarantee', () => {
     expect(Number.isFinite(long.totalBytes)).toBe(true);
     expect(long.totalBytes).toBeGreaterThan(short.totalBytes * 1_000_000);
     document.music = [
-      {
+      singleClipLane({
         id: 'maximum-tail',
         mediaId: 'music',
         sourceIn: 0,
@@ -198,11 +198,11 @@ describe('duration-dependent planning allowance, not a codec guarantee', () => {
         fadeIn: 0,
         fadeOut: 0,
         loop: false,
-      },
+      }),
     ];
     document.clips[0]!.sourceOut = 30;
     expect(Number.isFinite(estimateExportSpace(document, 'final4k').totalBytes)).toBe(true);
-    document.music[0]!.start++;
+    document.music[0]!.clips[0]!.start++;
     expect(() => estimateExportSpace(document, 'draft720')).toThrow('integer project-frame range');
   });
   it.each([

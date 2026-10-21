@@ -6,6 +6,7 @@ import { createClip, createLayer, createProject, type ProjectDocument } from '..
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { memoryProjects } from './memory-projects.js';
 import { installMusicEvidence, observeRealtimeHeadroom } from './music-evidence.js';
+import { singleClipLane } from '../music-lanes.js';
 
 interface StallEvidence {
   longestTask: number;
@@ -143,7 +144,7 @@ function buildProject(
     document = applyCommand(document, {
       type: 'music',
       music: [
-        {
+        singleClipLane({
           id: 'multi-clip-music',
           mediaId: music.id,
           sourceIn: 0,
@@ -154,7 +155,7 @@ function buildProject(
           fadeIn: 0,
           fadeOut: 0,
           loop: false,
-        },
+        }),
       ],
     });
   }

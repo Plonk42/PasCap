@@ -571,10 +571,11 @@ next clips. Each decoder holds at most six decoded frames. Source review adds on
 decoder while visible. No decoder or texture is allocated per stored clip. See
 [WebCodecs preview decoding](design/WEBCODECS_PREVIEW.md#requirements-and-resources).
 
-Up to **eight identified music tracks** share one AudioContext/AudioWorklet and
-one output timestamp clock with the unchanged one-project-frame A/V bound.
-Sources are read/accumulated serially into a single mixed stream: per-track
-gain/fades, linear sum, **one final [−1, 1] clamp**. No normalisation, ducking,
+Up to **eight identified music tracks** of up to eight clips each share one
+AudioContext/AudioWorklet and one output timestamp clock with the unchanged
+one-project-frame A/V bound. Every clip is a source, read/accumulated serially into a
+single mixed stream: its track's gain, its own fades (track fades at the ends, transition
+fades between clips), linear sum, **one final [−1, 1] clamp**. No normalisation, ducking,
 effects or source-video audio. The aggregate queue remains **four × 128 KiB stereo
 Float32 blocks (512 KiB)**, with shared bounded **64 KiB range/short-selection
 scratch**, one **128 KiB conversion workspace** and one **128 KiB mixed-output
@@ -682,9 +683,10 @@ channels are not accepted. `VideoLayer.opacity` is the required sole stored trac
 value, a number in 0–1; 1 is a new-track initial value, not a missing-field default.
 Keyframes require exactly the fifteen nullable fields listed above, including `opacity`, `temperature`, `tint`, `vibrance`, `whites`, `blacks`, `hdr` and `localContrast`.
 The required `music` array contains 0–8 independent music tracks with unique required
-IDs and complete source IN/OUT/start/duration/gain/fades/loop fields; `[]` without
+track and clip IDs: each has gain, Ripple, opening/closing fades, 1–8 clips with complete
+source IN/OUT/start/duration/loop fields and one transition per adjacent pair; `[]` without
 music, never a null/singular value or default. Version-1 export receipts require
-a strict current-schema snapshot plus captured audio-source/instance-plan arrays.
+a strict current-schema snapshot plus captured audio-source/per-clip plan arrays.
 Project documents saved with an older supported schema are upgraded on load; documents and
 export receipt snapshots older than the oldest supported schema remain unchanged and rejected;
 there are no compatibility fallback/default fields or automatic deletion

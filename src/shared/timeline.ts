@@ -2,6 +2,7 @@ import { NEUTRAL_COLOUR, type ColourSettings } from './colour.js';
 import { colourAt, opacityAt } from './composition.js';
 import { NEUTRAL_DETAIL, type DetailSettings } from './detail.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from './model.js';
+import { musicClips, validateMusicLane } from './music-lanes.js';
 import { evaluateSpatial, type SpatialPose } from './spatial.js';
 import { compileRetiming, type Retiming } from './speed.js';
 
@@ -194,12 +195,13 @@ function placeLayer(
 /** Single authoritative layout and incompatible-region validation, shared by preview/export. */
 export function calculateLayout(project: ProjectDocument): TimelineLayout {
   validateTopology(project);
+  for (const [index, lane] of project.music.entries()) validateMusicLane(lane, index);
   const tracks = project.layers.map((layer) => placeLayer(project, layer));
   const clips = tracks.flatMap((track) => track.clips);
   const duration = Math.max(
     0,
     ...clips.map((clip) => clip.end),
-    ...project.music.map((track) => track.start + track.duration),
+    ...musicClips(project.music).map((clip) => clip.start + clip.duration),
   );
   if (!Number.isSafeInteger(duration) || duration > 2_147_483_647)
     throw new Error('Project duration exceeds the supported integer project-frame range.');

@@ -32,6 +32,7 @@ import {
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { installVideoFrameGate } from './video-frame-gate.js';
+import { singleClipLane } from '../music-lanes.js';
 
 const PROJECT_ID = 'browser-rush-editing';
 let assets: MediaAsset[];
@@ -782,7 +783,7 @@ test('I/O middle removal is transient then one edit, preserving absolute fifteen
     start: 230,
   });
   document.music = [
-    {
+    singleClipLane({
       id: 'rush-music',
       mediaId: music.id,
       sourceIn: 10,
@@ -793,7 +794,7 @@ test('I/O middle removal is transient then one edit, preserving absolute fifteen
       fadeIn: 5,
       fadeOut: 10,
       loop: true,
-    },
+    }),
   ];
   document.media.audioIds = [music.id];
   await fixture(page, document);
@@ -2380,7 +2381,7 @@ test('removing a music recording removes its tracks after confirmation and keeps
   const music = await fixtureMusic(request);
   const document = sequence();
   document.music = [
-    {
+    singleClipLane({
       id: 'bin-music',
       mediaId: music.id,
       sourceIn: 0,
@@ -2391,16 +2392,16 @@ test('removing a music recording removes its tracks after confirmation and keeps
       fadeIn: 0,
       fadeOut: 0,
       loop: false,
-    },
+    }),
   ];
   document.media.audioIds = [music.id];
   await fixture(page, document);
   const before = await current(page);
   const row = page.locator(`[data-music-media-id="${music.id}"]`);
-  await expect(row).toContainText('1 music track');
+  await expect(row).toContainText('1 music clip');
   await row.getByRole('button', { name: `Remove ${music.name} from project`, exact: true }).click();
   const dialog = page.getByRole('dialog', { name: `Remove ${music.name} from this project?`, exact: true });
-  await expect(dialog).toContainText('1 music track using it will be removed too.');
+  await expect(dialog).toContainText('1 music clip using it will be removed too.');
   await dialog.getByRole('button', { name: 'Remove from project', exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await expect(row).toHaveCount(0);

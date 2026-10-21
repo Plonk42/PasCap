@@ -7,6 +7,7 @@ import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
+import { singleClipLane } from '../music-lanes.js';
 
 let memory: MemoryProjects;
 let unexpected: string[];
@@ -81,7 +82,7 @@ test.beforeEach(async ({ page, request }) => {
   if (!track) throw new Error('Help checks require the dedicated prepared synthetic audio fixture.');
   document.media.audioIds = [track.id];
   document.music = [
-    {
+    singleClipLane({
       id: 'help-music',
       mediaId: track.id,
       sourceIn: 0,
@@ -92,7 +93,7 @@ test.beforeEach(async ({ page, request }) => {
       fadeIn: 0,
       fadeOut: 0,
       loop: true,
-    },
+    }),
   ];
   memory = await memoryProjects(page, document);
   await expandedInspectorPreferences(page);
@@ -451,7 +452,7 @@ const HELP_CONTEXTS = [
     text: 'Fades and dissolves need the two clips to touch',
   },
   { label: 'Fade timing', tab: 'Sequence', text: '0 disables a fade.' },
-  { label: 'Audio timing', tab: 'Audio', text: 'Both fades must fit within Duration.' },
+  { label: 'Audio timing', tab: 'Audio', text: 'Fade in and out apply at the start and end of the music track.' },
 ] as const;
 
 const INSPECTOR_HELP_HEADINGS = [
@@ -610,7 +611,7 @@ test('numeric fields retain their descriptions even while the linked help popove
   await inspectorTab(page, 'Audio');
   await page.getByText('Placement & fades', { exact: true }).click();
   await expect(page.getByRole('spinbutton', { name: 'Music duration', exact: true })).toHaveAccessibleDescription(
-    /Both fades must fit within Duration/,
+    /Fade in and out apply at the start and end of the music track/,
   );
   expect(memory.saves).toBe(0);
 });

@@ -1,7 +1,7 @@
 # Desktop workspace and recovery
 
 The workspace uses **the strict current schema with complete required video track colour and Transform, clip-only speed and reverse, uniform video tracks, required per-track
-Ripple/transitions/fades, 0–8 independently identified music tracks, project-specific
+Ripple/transitions/fades, 0–8 independently identified music tracks of clips joined by transitions, project-specific
 video/music bins and draggable shared project-time track keyframes**, with per-setting channel navigation. Layout preferences,
 stored-keyframe inspection and recovery feedback remain editor-only. Source protection,
 coverage-preserving black fades, grouped dissolves and native video budgets are
@@ -65,8 +65,9 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
   track-owned Opacity control and, at its end, the whole-keyframe list (enabled-setting chips
   and Animation help), **HSL ranges**, **Colour curves**, **Transform** (ending with its own
   keyframe list), Transitions and Fades;
-  Audio owns selected-track music controls (**Music track / Recording / Add music
-  track / Delete selected music track**).
+  Audio owns selected-track music controls (**Music track / Add music track / Delete
+  selected music track**, then the track's gain, Ripple and fades and its **Clip**,
+  **Recording** and **Transitions**).
   Empty-track selection retains Track context and dormant fades. The chosen tab is
   a browser-local preference that survives reloads.
 - Bottom: frame-scaled multi-track timeline, playhead timecode, highlighted active
@@ -684,30 +685,36 @@ existing entry, its music tracks and cache, use **Relink** instead.
 ### Independent music tracks
 
 **Audio → Music → Music track** selects one of up to eight identified music tracks,
-with its trash **Delete selected music track** beside it. **Recording** changes
-the selected music track's ready source. **Add music track** is the only creation
-path: it lists ready music files and creates an independent music track, including
-reuse of the same original; dragging a ready file from Media → Music onto the
-music lane does the same at the drop frame.
+with its trash **Delete selected music track** (the track and its clips) beside it.
+**Add music track** lists ready music files and creates an independent music track
+holding one clip, including reuse of the same original. Like a video track, a music track
+has its own **Gain dB**, **Ripple** and fade in/out, and holds up to eight clips: **Clip**
+selects one, **+ Clip** (**Add music clip**) appends a clip of a ready file after the last
+one, **Delete selected music clip** removes the selected one (a track keeps at least one)
+and **Recording** changes the selected clip's ready source. Dragging a ready file from
+Media → Music onto a music track adds a clip there at the drop frame; onto the empty music
+area it starts a track. Between clips, **Transitions** choose **Cut**, **Crossfade** or
+**Fade through silence** (or with a **Pause**) with its duration; each boundary's button on the timeline opens it.
 Import merely adds bin membership/preparation and never implicitly places music.
 Selection is editor-only: no seek requirement, history entry or save. Editing,
-changing Recording or removal leaves the other music tracks, video tracks, track keyframes and
-bin membership untouched; Undo restores a removed music track, not deleted media.
+changing Recording or removal leaves the other clips, music tracks, video tracks, track
+keyframes and bin membership untouched; Undo restores a removed clip or track, not deleted
+media.
 
-Each music track has its own source IN/OUT, start/duration, gain, fades and selected-range
-loop. Mounted controls retain independent drafts across tab/section hiding and
-track selection; a former music track's draft cannot apply to a new selection.
+Each clip has its own source IN/OUT, start/duration and selected-range loop; its track has
+gain, Ripple and fades. Mounted controls retain independent drafts across tab/section
+hiding and track or clip selection; a former selection's draft cannot apply to a new one.
 Numeric Enter/blur and completed placement/trim/gain gestures commit once, with
 one Undo step. Invalid edits remain editable/reject atomically, never clamp,
-shorten another music track, merge or save a pointer draft. Escape, cancellation,
+shorten another clip or transition, merge or save a pointer draft. Escape, cancellation,
 unexpected capture loss or window blur restores a gesture's starting state.
 
-Project duration is **max(all retimed video OUTs, every music start + duration)**,
+Project duration is **max(all retimed video OUTs, every music clip start + duration)**,
 including hidden video placements. Music can extend it. A video track's closing fade
 ends at its own last clip OUT; afterwards absent active video is opaque black,
 never a frozen last image, while music continues and fades at its own OUT.
 Music-only preview is naturally black; export still requires a retained video clip.
-All music contributions sum after their per-track gain/fades and hard-clamp
+All music contributions sum after their per-clip gain/fades and hard-clamp
 to [−1, 1] once after all sources. No normalisation, ducking, effects or video audio.
 See [MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md) for strict fields, bounds and pending acceptance.
 
@@ -740,10 +747,11 @@ and static HSL/curves; missing fields and clip colour/correction are invalid.
 Every clip requires constant or 1–256-keyframe custom-curve speed and a boolean `reverse`; every video track
 requires complete Transform base/per-setting project-frame keyframes with easing and
 `reset`; saved `clip.spatial` or missing track Transform is invalid, not default-filled.
-The required `music` array holds 0–8 music tracks with unique required `id` values and
-complete per-track source/timing/gain/fades/loop fields; `[]` means no music,
+The required `music` array holds 0–8 music tracks with unique required track and clip IDs,
+each with gain, Ripple, fades, 1–8 clips (source/timing/loop) and one transition per
+adjacent pair; `[]` means no music,
 never null, a singular object or a missing-field default. Receipts require
-`musicSources` captured unique-original and `settings.audio` instance-plan arrays,
+`musicSources` captured unique-original and `settings.audio` per-clip plan arrays,
 both `[]` without music. Invalid arrays and older snapshots are rejected explicitly;
 their receipts and successful MP4s remain untouched.
 Both `media` arrays are required, unique and limited to 10,000 IDs each; missing

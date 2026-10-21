@@ -8,6 +8,7 @@ import { exportRequestSchema } from '../shared/export.js';
 import { MAX_FOOTAGE_FILES } from '../shared/footage.js';
 import type { SourceFingerprint } from '../shared/media.js';
 import { frameSchema, idSchema, projectSchema, type ProjectDocument } from '../shared/model.js';
+import { musicClips } from '../shared/music-lanes.js';
 import { validateSourceRanges } from '../shared/source-range.js';
 import { AudioLibrary } from './audio.js';
 import { BrowsePreviews } from './browse-previews.js';
@@ -146,7 +147,7 @@ async function assertProjectSources(
       throw new ServiceError(`Clip ${clip.id} exceeds its registered source frames.`, 422);
     sources.set(`video:${asset.id}`, asset);
   }
-  for (const track of document.music) {
+  for (const track of musicClips(document.music)) {
     const asset = audio.get(track.mediaId);
     if (track.sourceOut > asset.metadata.frameCount)
       throw new ServiceError('Music exceeds its registered source frames.', 422);
