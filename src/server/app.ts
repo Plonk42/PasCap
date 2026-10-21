@@ -22,6 +22,7 @@ import { assertProjectSources } from './project-sources.js';
 import { submitFolderRelink } from './relink.js';
 import { MediaLibrary, MediaQueueError } from './library.js';
 import { MCP_PATH, mcpToken, registerMcp } from './mcp.js';
+import { AssistantSessions } from './sessions.js';
 import { startReference } from './reference.js';
 import { StillRenderer } from './stills.js';
 import { ensurePrivateDirectory, ProjectStore } from './storage.js';
@@ -139,6 +140,7 @@ export async function createApp(config = createConfig()) {
   const archiveWarnings = await restoreExports(config, jobs);
   const operationContext = {
     projects,
+    sessions: new AssistantSessions(config.dataDir, config.assistantSessions, projects),
     library,
     audio,
     stills: new StillRenderer(config, library, jobs),

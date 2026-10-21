@@ -18,6 +18,14 @@ export interface ServiceConfig {
   allowedHosts: Set<string>;
   /** Largest pictures the assistant operations render. */
   assistantImages: AssistantImageBudget;
+  assistantSessions: AssistantSessionLimits;
+}
+
+export interface AssistantSessionLimits {
+  /** A session ends after this long without assistant activity. */
+  leaseMs: number;
+  /** Checkpoints kept per project, oldest removed first. */
+  checkpoints: number;
 }
 
 export interface AssistantImageBudget {
@@ -102,6 +110,10 @@ export function createConfig(overrides: Partial<ServiceConfig> = {}): ServiceCon
     allowedOrigins: new Set(origins),
     allowedHosts: new Set(origins.map((origin) => new URL(origin).host)),
     assistantImages: assistantImageBudget(),
+    assistantSessions: {
+      leaseMs: integerSetting('PASCAP_ASSISTANT_LEASE_MINUTES', 10, 1, 240) * 60_000,
+      checkpoints: integerSetting('PASCAP_ASSISTANT_CHECKPOINTS', 5, 1, 50),
+    },
     ...overrides,
     mediaRoots,
   };
