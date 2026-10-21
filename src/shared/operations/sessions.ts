@@ -42,11 +42,15 @@ export const sessionStart = defineOperation({
 export const sessionStatus = defineOperation({
   name: 'session_status',
   description:
-    "Read the project's latest assistant session (null if none): whether it is active, its brief, its edit log and the notes it ended with, the project's saved revision and its checkpoints, newest first.",
+    "Read the project's latest assistant session (null if none): whether it is active, its brief, its edit log and the notes it ended with, the project's saved revision and its checkpoints, newest first. Pictures returned during the session count against the pictures one conversation may hold; in a new conversation continuing an active session, pass newConversation true.",
   input: z
     .object({
       projectId,
       checkpoints: described(z.boolean().default(true), 'False leaves out the checkpoint list.'),
+      newConversation: described(
+        z.boolean().default(false),
+        "True when this conversation does not hold the session's earlier pictures: their count starts again.",
+      ),
     })
     .strict(),
   output: z

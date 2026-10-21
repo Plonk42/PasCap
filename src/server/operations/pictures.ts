@@ -8,6 +8,7 @@ import { calculateLayout, sampleTimeline } from '../../shared/timeline.js';
 import { formatTimecode, framesToSeconds, PROJECT_FPS } from '../../shared/timing.js';
 import { ServiceError } from '../errors.js';
 import { assertSourceRanges } from '../project-sources.js';
+import type { JpegImage } from '../stills.js';
 import type { OperationRunner, ServiceContext } from './context.js';
 import { allowedMovementFor } from './describe-recording.js';
 import { applyBatch } from './edit.js';
@@ -32,6 +33,17 @@ function withinBudget(count: number, limit: number, what: string): void {
   if (count > limit) throw new ServiceError(`The service's image budget allows ${limit} ${what}; ask for fewer.`, 422);
 }
 
+/** Renders one picture within the active session's picture budget. */
+export async function sessionPicture(
+  { sessions, images }: ServiceContext,
+  projectId: string,
+  render: () => Promise<JpegImage>,
+): Promise<{ image: JpegImage; picturesLeft: number | null }> {
+  await sessions.assertPictures(projectId, 1, images.sessionPictures);
+  const image = await render();
+  return { image, picturesLeft: await sessions.countPictures(projectId, 1, images.sessionPictures) };
+}
+
 function legend(document: Parameters<typeof sampleTimeline>[0], frames: readonly number[]) {
   const layout = calculateLayout(document);
   const order = new Map(document.layers.map((layer, index) => [layer.id, index]));
@@ -53,7 +65,7 @@ export const runStill: OperationRunner<typeof still> = async (context, { project
   const { saved, document } = await renderedProject(context, projectId, commands);
   return {
     revision: saved.revision,
-    image: await stills.still(document, frame, size, crop ?? null),
+    ...(await sessionPicture(context, projectId, () => stills.still(document, frame, size, crop ?? null))),
     legend: legend(document, [frame]),
   };
 };
@@ -66,18 +78,20 @@ export const runTimelineSheet: OperationRunner<typeof timelineSheet> = async (
   const { saved, document } = await renderedProject(context, projectId, commands);
   return {
     revision: saved.revision,
-    image: await context.stills.timelineSheet(document, frames, context.images),
+    ...(await sessionPicture(context, projectId, () => context.stills.timelineSheet(document, frames, context.images))),
     legend: legend(document, frames),
   };
 };
 
 export const runRecordingSheet: OperationRunner<typeof recordingSheet> = async (
-  { stills, images },
-  { mediaId, frames },
+  context,
+  { projectId, mediaId, frames },
 ) => {
-  withinBudget(frames.length, images.sheetCells, 'frames per sheet');
+  withinBudget(frames.length, context.images.sheetCells, 'frames per sheet');
+  if (!projectVideoIds(await context.projects.load(projectId)).has(mediaId))
+    throw new ServiceError(`The project has no video recording ${mediaId}; read describe_project.`, 404);
   return {
-    image: await stills.recordingSheet(mediaId, frames, images),
+    ...(await sessionPicture(context, projectId, () => context.stills.recordingSheet(mediaId, frames, context.images))),
     legend: frames.map((frame, cell) => ({ cell, frame, timecode: formatTimecode(frame) })),
   };
 };
@@ -139,5 +153,10 @@ export const runCompareRecordings: OperationRunner<typeof compareRecordings> = a
     });
   });
   const cells = candidates.flatMap(({ mediaId, frames }) => frames.map((frame) => ({ mediaId, frame })));
-  return { image: await stills.sourceSheet(cells, perCandidate > 1 ? perCandidate : null, images), candidates };
+  return {
+    ...(await sessionPicture(context, input.projectId, () =>
+      stills.sourceSheet(cells, perCandidate > 1 ? perCandidate : null, images),
+    )),
+    candidates,
+  };
 };

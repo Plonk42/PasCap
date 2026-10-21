@@ -33,8 +33,9 @@ export const runSessionStart: OperationRunner<typeof sessionStart> = async (
 
 export const runSessionStatus: OperationRunner<typeof sessionStatus> = async (
   { sessions, projects },
-  { projectId, checkpoints },
+  { projectId, checkpoints, newConversation },
 ) => {
+  if (newConversation) await sessions.resetPictures(projectId);
   const session = await sessions.current(projectId);
   return {
     session: session && view(sessions, session),
