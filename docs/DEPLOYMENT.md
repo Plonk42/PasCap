@@ -191,7 +191,10 @@ or expose the unauthenticated service to the LAN/Internet. Keep exact trusted
 `allowedHosts` / `allowedOrigins`, cross-site rejection and the existing client
 header requirement; do not replace them with `*`. If the published host port differs
 from the internal port, the eventual configuration must explicitly allow the exact
-loopback browser Host/Origin rather than weakening those guards.
+loopback browser Host/Origin rather than weakening those guards. The MCP endpoint
+(`/mcp`) keeps the same Host/Origin checks and replaces the client header with the
+bearer token in `<data directory>/mcp-token`; keep that file private with the rest of
+the data directory.
 
 ## Shutdown, native processing and toolchain
 
