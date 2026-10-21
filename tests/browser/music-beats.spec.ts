@@ -9,7 +9,7 @@ import {
   type MusicTrack,
   type ProjectDocument,
 } from '../../src/shared/model.js';
-import { musicBeatFrames, type MusicAnalysis } from '../../src/shared/music-analysis.js';
+import { MUSIC_ANALYSIS_VERSION, musicBeatFrames, type MusicAnalysis } from '../../src/shared/music-analysis.js';
 import { MUSIC_SAMPLES_PER_FRAME } from '../../src/shared/music-format.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { singleClipLane } from '../music-lanes.js';
@@ -44,7 +44,7 @@ const TRACK: MusicTrack = {
 
 function synthetic(): MusicAnalysis {
   return {
-    version: 1,
+    version: MUSIC_ANALYSIS_VERSION,
     source: { content: 'a'.repeat(64), bytes: 4, mtimeMs: 0 },
     sampleRate: 48_000,
     hop: 480,

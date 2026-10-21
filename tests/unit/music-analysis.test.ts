@@ -138,6 +138,79 @@ describe('music analysis · synthetic signals', () => {
     expect(Math.abs(curve.at(-1)!.bpm / 130 - 1)).toBeLessThanOrEqual(0.02);
   });
 
+  it('keeps the song tempo through a soft passage instead of following an arpeggio', () => {
+    const truth = beatTimes(128, 0.3, 45);
+    const soft = (time: number): boolean => time >= 12 && time < 30;
+    // A soft passage whose quiet beat sits under a slightly louder arpeggio, 8% faster.
+    const arpeggio = beatTimes(60 / 0.432, 12.1, 30).map((time) => ({ time, gain: 0.12 }));
+    const hits = [...truth.map((time) => ({ time, gain: soft(time) ? 0.1 : 0.5 })), ...arpeggio];
+    const result = analyse(render(45, hits, () => 0.02));
+    const inside = (samples: number[]): number[] => samples.filter((sample) => soft(sample / RATE));
+    expect(
+      fMeasure(
+        inside(beatSamples(result)),
+        truth.filter((time) => soft(time)),
+      ),
+    ).toBeGreaterThanOrEqual(0.9);
+    expect(Math.abs(result.tempo!.bpm / 128 - 1)).toBeLessThanOrEqual(0.01);
+  });
+
+  it('finds downbeats at chord changes when the kick is stronger on the third beat', () => {
+    const bpm = 110;
+    const truth = beatTimes(bpm, 0.4, 40);
+    const chords = [
+      [261.6, 329.6, 392],
+      [196, 246.9, 293.7],
+      [220, 261.6, 329.6],
+      [174.6, 220, 261.6],
+    ];
+    // Bars start on the second beat; the kick sounds on beats one and three, harder on three.
+    const signal = render(
+      40,
+      truth.map((time, index) => ({ time, gain: index % 4 === 3 ? 0.5 : 0.4, low: index % 2 === 1 })),
+    );
+    // Chords change on every fourth beat from the second one.
+    const bar = (4 * 60) / bpm;
+    const first = truth[1]!;
+    for (let index = 0; index < signal.length; index++) {
+      const time = index / RATE;
+      const chord = chords[((Math.floor((time - first) / bar) % 4) + 4) % 4]!;
+      for (const hz of chord) signal[index] = signal[index]! + 0.05 * Math.sin(2 * Math.PI * hz * time);
+    }
+    const result = analyse(signal);
+    expect(result.meter?.beatsPerBar).toBe(4);
+    expect(
+      fMeasure(
+        downbeatSamples(result),
+        truth.filter((_, index) => index % 4 === 1),
+      ),
+    ).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it('follows the bar through an extra half bar', () => {
+    // Eight bars of four, one bar of two, eight bars of four: the kick marks every bar start.
+    const times = beatTimes(120, 0.25, 40).slice(0, 66);
+    const starts = new Set([
+      ...Array.from({ length: 8 }, (_, bar) => 4 * bar),
+      32,
+      ...Array.from({ length: 8 }, (_, bar) => 34 + 4 * bar),
+    ]);
+    const hits = times.map((time, index) => ({ time, gain: starts.has(index) ? 0.8 : 0.4, low: starts.has(index) }));
+    const result = analyse(render(34, hits, () => 0.02));
+    expect(
+      fMeasure(
+        downbeatSamples(result),
+        times.filter((_, index) => starts.has(index)),
+      ),
+    ).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it('reports no tempo for hits without a steady pulse', () => {
+    const random = noise(5);
+    const hits = Array.from({ length: 60 }, () => ({ time: 15 * (random() + 1), gain: 0.3 + 0.2 * random() }));
+    expect(analyse(render(30, hits, () => 0.02))).toMatchObject({ tempo: null, meter: null, beats: [] });
+  });
+
   it.each([
     { beatsPerBar: 4, bpm: 120 },
     { beatsPerBar: 3, bpm: 96 },
@@ -166,6 +239,8 @@ describe('music analysis · synthetic signals', () => {
     const [, middle] = result.sections;
     expect(Math.abs(middle!.fromSample - 20 * RATE)).toBeLessThanOrEqual(RATE);
     expect(Math.abs(middle!.toSample - 40 * RATE)).toBeLessThanOrEqual(RATE);
+    // Boundaries sit on downbeats, so a cut there lands on the bar.
+    expect(downbeatSamples(result)).toEqual(expect.arrayContaining([middle!.fromSample, middle!.toSample]));
     expect(result.sections[0]!.fromSample).toBe(0);
     expect(result.sections.at(-1)!.toSample).toBe(result.samples);
     expect(middle!.loudnessDb).toBeGreaterThan(result.sections[0]!.loudnessDb + 10);

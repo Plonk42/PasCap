@@ -24,20 +24,41 @@ export const MUSIC_ANALYSIS = {
   prior: { bpm: 120, octaves: 1.5 },
   /** The fastest periodicity scoring at least this share of the best is the tempo. */
   fastestShare: 0.85,
-  /** Local tempo: 8 s windows every 2 s, staying within this many octaves of the global tempo. */
-  tempoWindow: { frames: 800, step: 200, octaves: 0.25 },
+  /**
+   * Local tempo: 8 s windows every 2 s. A window takes its own tempo, within this many octaves of the
+   * global one, only where the global tempo scores below `change` of its own peak (a tempo change).
+   */
+  tempoWindow: { frames: 800, step: 200, octaves: 0.25, change: 0.5 },
   tightness: 100,
   /** Fewer tracked beats than this are isolated hits, not a tempo. */
   minimumBeats: 4,
+  /** Below this tempo confidence the pulse is too ambiguous to tap along to: no tempo or beats. */
+  minimumConfidence: 0.3,
+  /** Below this pulse clarity the onsets barely repeat at the beat (scattered hits): no tempo or beats. */
+  minimumClarity: 0.25,
   /** Beats snap to the strongest onset within ±20 ms. */
   refineFrames: 2,
   /** Leading and trailing beats weaker than this share of the beats' RMS are dropped. */
   trimShare: 0.5,
+  downbeat: {
+    /** Beat salience: standard scores of the kick bands and the chord change (onsets mark every beat alike). */
+    weights: { onset: 0, low: 1, harmony: 1 },
+    /** Chords are compared over this many beats on either side. */
+    harmonyBeats: 4,
+    /** Restarting the bar costs this much salience. */
+    jump: 8,
+    /** Three beats per bar must score this much better than four. */
+    threeOverFour: 1.2,
+    /** Downbeats this many standard deviations above the other beats make the meter certain. */
+    sureContrast: 1.5,
+  },
   accentFrames: 15,
   accentPercentile: 0.9,
   /** Section boundaries: novelty over ±8 s, sections at least 8 s long. */
   sectionBlocks: 8,
   sectionNovelty: 0.25,
+  /** Section boundaries move to the nearest downbeat within this many seconds. */
+  sectionSnapSeconds: 2,
   /** Loudness change across a section, in dB, that makes it a build or a release. */
   sectionSlopeDb: 6,
 } as const;
@@ -152,6 +173,8 @@ export interface MusicFeatures {
   flux: Float32Array;
   /** Mean log level of the kick bands per frame. */
   low: Float32Array;
+  /** Pitch-class magnitudes, twelve per frame. */
+  chroma: Float32Array;
   /** Per second: mean log level of every band, then the share of each pitch class. */
   blocks: Float32Array[];
   /** dBFS per 100 ms. */
@@ -176,6 +199,8 @@ export class MusicFeatureExtractor {
   readonly #previous = new Float64Array(BANDS);
   readonly #flux: number[] = [];
   readonly #low: number[] = [];
+  readonly #chroma: number[] = [];
+  readonly #frameChroma = new Float64Array(CHROMA);
   readonly #blocks: Float32Array[] = [];
   readonly #blockLevels = new Float64Array(BANDS);
   readonly #blockChroma = new Float64Array(CHROMA);
@@ -212,6 +237,7 @@ export class MusicFeatureExtractor {
       samples: this.#received,
       flux: Float32Array.from(this.#flux),
       low: Float32Array.from(this.#low),
+      chroma: Float32Array.from(this.#chroma),
       blocks: this.#blocks,
       loudness: this.#loudness,
     };
@@ -255,10 +281,15 @@ export class MusicFeatureExtractor {
       this.#blockLevels[band] = this.#blockLevels[band]! + level;
     }
     for (const band of this.#kick) low += this.#level[band]!;
+    this.#frameChroma.fill(0);
     for (let bin = 0; bin <= HALF; bin++) {
       const pitch = this.#pitch[bin]!;
       if (pitch >= 0)
-        this.#blockChroma[pitch] = this.#blockChroma[pitch]! + Math.hypot(this.#re[bin]!, this.#im[bin]!) * this.#scale;
+        this.#frameChroma[pitch] = this.#frameChroma[pitch]! + Math.hypot(this.#re[bin]!, this.#im[bin]!) * this.#scale;
+    }
+    for (let pitch = 0; pitch < CHROMA; pitch++) {
+      this.#blockChroma[pitch] = this.#blockChroma[pitch]! + this.#frameChroma[pitch]!;
+      this.#chroma.push(this.#frameChroma[pitch]!);
     }
     this.#flux.push(flux);
     this.#low.push(this.#kick.length ? low / this.#kick.length : 0);
@@ -326,25 +357,53 @@ function chooseLag(correlation: Float64Array, weight: (lag: number) => number): 
 
 interface Periods {
   confidence: number;
+  /** Autocorrelation at the beat period over the envelope's energy: how much of the onsets repeat at the beat. */
+  clarity: number;
   /** Beat period in frames at every frame. */
   frames: Float32Array;
   windows: { from: number; to: number }[];
 }
 
-function beatPeriods(envelope: Float32Array): Periods | null {
-  const n = envelope.length;
+function tempoWindows(n: number): { from: number; to: number }[] {
   const { frames: size, step } = MUSIC_ANALYSIS.tempoWindow;
+  if (n <= size) return [{ from: 0, to: n }];
   const windows: { from: number; to: number }[] = [];
-  if (n <= size) windows.push({ from: 0, to: n });
-  else {
-    for (let from = 0; from + size <= n; from += step) windows.push({ from, to: from + size });
-    if (windows.at(-1)!.to < n) windows.push({ from: n - size, to: n });
+  for (let from = 0; from + size <= n; from += step) windows.push({ from, to: from + size });
+  if (windows.at(-1)!.to < n) windows.push({ from: n - size, to: n });
+  return windows;
+}
+
+function meanSquare(envelope: Float32Array, from: number, to: number): number {
+  let sum = 0;
+  for (let index = from; index < to; index++) sum += envelope[index]! ** 2;
+  return sum / (to - from);
+}
+
+/** The window periods at every frame, interpolated between window centres. */
+function framePeriods(n: number, windows: { from: number; to: number }[], periods: number[]): Float32Array {
+  const centres = windows.map((window) => (window.from + window.to) / 2);
+  const frames = new Float32Array(n);
+  let window = 0;
+  for (let index = 0; index < n; index++) {
+    while (window + 1 < centres.length && centres[window + 1]! <= index) window++;
+    if (index <= centres[0]! || window + 1 >= centres.length) frames[index] = periods[window]!;
+    else {
+      const progress = (index - centres[window]!) / (centres[window + 1]! - centres[window]!);
+      frames[index] = periods[window]! + progress * (periods[window + 1]! - periods[window]!);
+    }
   }
+  return frames;
+}
+
+function beatPeriods(envelope: Float32Array): Periods | null {
+  const windows = tempoWindows(envelope.length);
   const global = new Float64Array(LAG_MAX + 2);
+  let energy = 0;
   const local = windows.map((window) => {
     const correlation = new Float64Array(LAG_MAX + 2);
     autocorrelate(envelope, window.from, window.to, correlation);
     for (let lag = 0; lag < correlation.length; lag++) global[lag] = global[lag]! + correlation[lag]!;
+    energy += meanSquare(envelope, window.from, window.to);
     return correlation;
   });
   const { bpm, octaves: width } = MUSIC_ANALYSIS.prior;
@@ -355,27 +414,22 @@ function beatPeriods(envelope: Float32Array): Periods | null {
   );
   const peak = global[Math.round(lag)]!;
   const confidence = Math.max(0, Math.min(1, 1 - values[values.length >> 1]! / peak));
+  const clarity = energy > 0 ? Math.max(0, Math.min(1, peak / energy)) : 0;
   const spread = MUSIC_ANALYSIS.tempoWindow.octaves;
-  const lags = local.map(
-    (correlation) =>
-      chooseLag(correlation, (candidate) => Math.exp(-0.5 * (octaves(candidate / lag) / spread) ** 2)) ?? lag,
-  );
+  const atLag = (correlation: Float64Array, candidate: number): number =>
+    Math.max(correlation[Math.floor(candidate)]!, correlation[Math.ceil(candidate)]!);
+  const lags = local.map((correlation) => {
+    const own = chooseLag(correlation, (candidate) => Math.exp(-0.5 * (octaves(candidate / lag) / spread) ** 2));
+    // A window keeps the global tempo unless it clearly lacks it: weak passages follow noise otherwise.
+    if (own === null || atLag(correlation, lag) >= MUSIC_ANALYSIS.tempoWindow.change * atLag(correlation, own))
+      return lag;
+    return own;
+  });
   const smoothed = lags.map((_, index) => {
     const around = lags.slice(Math.max(0, index - 1), index + 2).sort((a, b) => a - b);
     return around[around.length >> 1]!;
   });
-  const centres = windows.map((window) => (window.from + window.to) / 2);
-  const frames = new Float32Array(n);
-  let window = 0;
-  for (let index = 0; index < n; index++) {
-    while (window + 1 < centres.length && centres[window + 1]! <= index) window++;
-    if (index <= centres[0]! || window + 1 >= centres.length) frames[index] = smoothed[window]!;
-    else {
-      const progress = (index - centres[window]!) / (centres[window + 1]! - centres[window]!);
-      frames[index] = smoothed[window]! + progress * (smoothed[window + 1]! - smoothed[window]!);
-    }
-  }
-  return { confidence, frames, windows };
+  return { confidence, clarity, frames: framePeriods(envelope.length, windows, smoothed), windows };
 }
 
 /** Dynamic-programming beat tracking (Ellis 2007) at the local period. */
@@ -469,32 +523,92 @@ function tempoCurve(beats: TrackedBeat[], windows: Periods['windows']): { fromSa
   return curve;
 }
 
+/** Each value in units of the values' standard deviation from their mean. */
+function standardScores(values: number[]): number[] {
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const deviation = Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length);
+  return values.map((value) => (deviation > 1e-9 ? (value - mean) / deviation : 0));
+}
+
+/** How much the chords change at each beat: chroma over the beats before it against those after it. */
+function harmonicChange(beats: TrackedBeat[], chroma: Float32Array): number[] {
+  const frames = chroma.length / CHROMA;
+  const reach = MUSIC_ANALYSIS.downbeat.harmonyBeats;
+  const profile = (from: number, to: number): Float64Array => {
+    const sum = new Float64Array(CHROMA);
+    for (let frame = Math.max(0, from); frame < Math.min(frames, to); frame++)
+      for (let pitch = 0; pitch < CHROMA; pitch++) sum[pitch] = sum[pitch]! + chroma[frame * CHROMA + pitch]!;
+    const length = Math.hypot(...sum);
+    return length > 0 ? sum.map((value) => value / length) : sum;
+  };
+  return beats.map((beat, index) => {
+    const before = beats[Math.max(0, index - reach)]!.frame;
+    const after = beats[Math.min(beats.length - 1, index + reach)]!.frame;
+    if (before === beat.frame || after === beat.frame) return 0;
+    return 1 - dot(profile(before, beat.frame), profile(beat.frame, after));
+  });
+}
+
+/**
+ * Bar positions by dynamic programming over the beats: each beat advances the bar by one, or the
+ * bar restarts anywhere at a cost, so a dropped or added beat does not shift every later downbeat.
+ */
+function barPositions(salience: number[], beatsPerBar: number): { downbeats: boolean[]; score: number } {
+  const jump = MUSIC_ANALYSIS.downbeat.jump;
+  const emit = (value: number, position: number): number => (position === 0 ? value : -value / (beatsPerBar - 1));
+  let scores = Array.from({ length: beatsPerBar }, (_, position) => emit(salience[0]!, position));
+  const back: Int8Array[] = [];
+  for (let index = 1; index < salience.length; index++) {
+    const best = scores.indexOf(Math.max(...scores));
+    const from = new Int8Array(beatsPerBar);
+    scores = scores.map((_, position) => {
+      const previous = (position + beatsPerBar - 1) % beatsPerBar;
+      const restart = scores[best]! - jump > scores[previous]!;
+      from[position] = restart ? best : previous;
+      return (restart ? scores[best]! - jump : scores[previous]!) + emit(salience[index]!, position);
+    });
+    back.push(from);
+  }
+  let position = scores.indexOf(Math.max(...scores));
+  const score = scores[position]!;
+  const downbeats = new Array<boolean>(salience.length).fill(false);
+  for (let index = salience.length - 1; index >= 0; index--) {
+    downbeats[index] = position === 0;
+    if (index > 0) position = back[index - 1]![position]!;
+  }
+  return { downbeats, score };
+}
+
 function downbeats(
   beats: TrackedBeat[],
-  low: Float32Array,
-): { meter: MusicMeasurement['meter']; phase: number; beatsPerBar: number } {
-  const meanOnset = beats.reduce((sum, beat) => sum + beat.onset, 0) / beats.length || 1;
-  const meanLow = beats.reduce((sum, beat) => sum + low[beat.frame]!, 0) / beats.length || 1;
-  const values = beats.map((beat) => beat.onset / meanOnset + low[beat.frame]! / meanLow);
+  features: MusicFeatures,
+): { meter: MusicMeasurement['meter']; downbeats: boolean[] } {
+  const { onset, low, harmony } = MUSIC_ANALYSIS.downbeat.weights;
+  const parts = [
+    standardScores(beats.map((beat) => beat.onset)),
+    standardScores(beats.map((beat) => features.low[beat.frame]!)),
+    standardScores(harmonicChange(beats, features.chroma)),
+  ];
+  const salience = beats.map(
+    (_, index) => onset * parts[0]![index]! + low * parts[1]![index]! + harmony * parts[2]![index]!,
+  );
   const candidates = ([4, 3] as const).flatMap((beatsPerBar) => {
     if (beats.length < 2 * beatsPerBar) return [];
-    const phases = Array.from({ length: beatsPerBar }, (_, phase) => {
-      const own = values.filter((_, index) => index % beatsPerBar === phase);
-      return own.reduce((sum, value) => sum + value, 0) / own.length;
-    });
-    const phase = phases.indexOf(Math.max(...phases));
-    const others = phases.filter((_, index) => index !== phase);
-    const overall = phases.reduce((sum, value) => sum + value, 0) / beatsPerBar;
-    const contrast = (phases[phase]! - others.reduce((sum, value) => sum + value, 0) / others.length) / overall;
-    return [{ beatsPerBar, phase, contrast }];
+    const { downbeats: marked, score } = barPositions(salience, beatsPerBar);
+    // Effect size: downbeats' mean salience against the other beats', in standard deviations.
+    const on = salience.filter((_, index) => marked[index]);
+    const off = salience.filter((_, index) => !marked[index]);
+    const mean = (values: number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
+    const spread = Math.sqrt(mean(salience.map((value) => value ** 2)) - mean(salience) ** 2) || 1;
+    return [{ beatsPerBar, marked, score, contrast: on.length && off.length ? (mean(on) - mean(off)) / spread : 0 }];
   });
-  if (!candidates.length) return { meter: null, phase: 0, beatsPerBar: 0 };
+  if (!candidates.length) return { meter: null, downbeats: beats.map(() => false) };
   const [four, three] = candidates;
-  const chosen = three && three.contrast > 1.2 * four!.contrast ? three : four!;
+  const chosen = three && three.score > MUSIC_ANALYSIS.downbeat.threeOverFour * four!.score ? three : four!;
+  const confidence = Math.max(0, Math.min(1, chosen.contrast / MUSIC_ANALYSIS.downbeat.sureContrast));
   return {
-    meter: { beatsPerBar: chosen.beatsPerBar, confidence: Math.max(0, Math.min(1, chosen.contrast)) },
-    phase: chosen.phase,
-    beatsPerBar: chosen.beatsPerBar,
+    meter: { beatsPerBar: chosen.beatsPerBar, confidence },
+    downbeats: chosen.marked,
   };
 }
 
@@ -600,9 +714,25 @@ function sectionBoundaries(blocks: Float32Array[]): number[] {
   return chosen.sort((a, b) => a - b);
 }
 
-function sections(features: MusicFeatures): MusicMeasurement['sections'] {
+function sections(features: MusicFeatures, anchors: number[]): MusicMeasurement['sections'] {
   if (features.samples === 0) return [];
-  const edges = [0, ...sectionBoundaries(features.blocks).map((block) => block * MUSIC_SAMPLE_RATE), features.samples];
+  const reach = MUSIC_ANALYSIS.sectionSnapSeconds * MUSIC_SAMPLE_RATE;
+  // A boundary moves to the nearest downbeat within reach, so a cut there lands on the bar.
+  const snapped = sectionBoundaries(features.blocks).map((block) => {
+    const sample = block * MUSIC_SAMPLE_RATE;
+    let nearest: number | null = null;
+    for (const anchor of anchors)
+      if (
+        Math.abs(anchor - sample) <= reach &&
+        (nearest === null || Math.abs(anchor - sample) < Math.abs(nearest - sample))
+      )
+        nearest = anchor;
+    return nearest ?? sample;
+  });
+  const inside = snapped.filter(
+    (sample, index) => sample > 0 && sample < features.samples && sample > (snapped[index - 1] ?? 0),
+  );
+  const edges = [0, ...inside, features.samples];
   const parts = edges.slice(1).map((toSample, index) => {
     const fromSample = edges[index]!;
     const values = features.loudness.slice(
@@ -638,21 +768,30 @@ export function analyseFeatures(features: MusicFeatures): MusicMeasurement {
     samples: features.samples,
     accents: envelope ? accents(envelope, features.samples) : [],
     loudness: features.loudness.map((value) => Math.round(value * 10) / 10),
-    sections: sections(features),
   } as const;
   const periods = envelope && beatPeriods(envelope);
   const tracked =
     envelope && periods ? placeBeats(envelope, trackBeats(envelope, periods.frames), features.samples) : [];
-  // A few isolated hits are not a beat.
-  if (!envelope || !periods || tracked.length < MUSIC_ANALYSIS.minimumBeats)
-    return { ...base, tempo: null, meter: null, beats: [] };
+  // A few isolated hits, or a pulse too weak to tap along to, are not a beat.
+  if (
+    !envelope ||
+    !periods ||
+    tracked.length < MUSIC_ANALYSIS.minimumBeats ||
+    periods.confidence < MUSIC_ANALYSIS.minimumConfidence ||
+    periods.clarity < MUSIC_ANALYSIS.minimumClarity
+  )
+    return { ...base, sections: sections(features, []), tempo: null, meter: null, beats: [] };
   const top = percentile(envelope, 0.999) || 1;
-  const bar = downbeats(tracked, features.low);
+  const bar = downbeats(tracked, features);
   const intervals = tracked.slice(1).map((beat, index) => beat.sample - tracked[index]!.sample);
   const bpm = (60 * MUSIC_SAMPLE_RATE) / median(intervals);
   const curve = tempoCurve(tracked, periods.windows);
   return {
     ...base,
+    sections: sections(
+      features,
+      tracked.flatMap((beat, index) => (bar.downbeats[index] ? [beat.sample] : [])),
+    ),
     tempo: {
       bpm: Math.round(bpm * 100) / 100,
       confidence: Math.round(periods.confidence * 100) / 100,
@@ -665,7 +804,7 @@ export function analyseFeatures(features: MusicFeatures): MusicMeasurement {
     beats: tracked.map((beat, index) => ({
       sample: beat.sample,
       strength: Math.round(Math.min(1, beat.onset / top) * 1000) / 1000,
-      downbeat: bar.beatsPerBar > 0 && index % bar.beatsPerBar === bar.phase,
+      downbeat: bar.downbeats[index]!,
     })),
   };
 }
