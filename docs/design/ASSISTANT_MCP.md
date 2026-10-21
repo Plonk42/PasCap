@@ -54,8 +54,13 @@ The plan builds on current code; these are the pieces it reuses or must change.
 ## Decisions to confirm
 
 Confirmed by the owner on 2026-10-21: the operation registry, existing REST routes migrating
-when touched or on demand, VS Code as the first MCP client, and music analysis shipping
-first (done). The other rows are still proposals.
+when touched or on demand, VS Code as the first MCP client, music analysis shipping first
+(done), the MCP endpoint inside the service, the same project with a lease and checkpoints
+(checkpoints serve the user on large projects too), an image budget set in the service
+configuration with conservative defaults, and no brief permissions: security is not a
+concern for now and the assistant must be able to achieve any operation, so the operations
+this plan excluded (import, preparation, export, deletion) may become operations too. The
+work iterates on the `mcp` branch until the owner merges it.
 
 | Question                           | Proposal                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -124,10 +129,9 @@ document, export receipts or compatibility rules.
 
 The **brief** is what the user tells the assistant in the Hand off dialog: chosen music
 track or music recording, target length (`follow music` | seconds), style notes (free
-text, ≤ 2,000 characters), allowed camera movement (the Source preview tolerance, 0.5–6),
-whether speed changes, several tracks and picture-in-picture are allowed, and the maximum
-number of clips. It is exposed to the LLM as a resource and never interpreted by the
-service.
+text, ≤ 2,000 characters), allowed camera movement (the Source preview tolerance, 0.5–6)
+and the maximum number of clips. It carries no permissions: the assistant may use every
+operation. It is exposed to the LLM as a resource and never interpreted by the service.
 
 ### Music analysis cache
 
@@ -581,10 +585,11 @@ endpoint, token and loopback), [EDITOR_CONTROLS](EDITOR_CONTROLS.md) (new contro
 
 ## Open questions for the owner
 
-1. Same project with a lease and checkpoint (proposed) or always a copy?
+1. Same project with a lease and checkpoint (proposed) or always a copy? **Answered: same
+   project with a lease and checkpoints, which the user can use on large projects too.**
 2. Should the assistant be allowed to create tracks, use Transform overlays and speed
    changes by default, or only when the brief allows (proposed: brief flags, all off
-   except several tracks)?
+   except several tracks)? **Answered: no permissions; it may use every operation.**
 3. Which LLM client first (VS Code, Claude Code, Codex, Claude Desktop through
    `mcp-remote`)? The dialog's configuration snippet targets the first one.
    **Answered: VS Code.**
@@ -593,6 +598,7 @@ endpoint, token and loopback), [EDITOR_CONTROLS](EDITOR_CONTROLS.md) (new contro
 5. Should `Beats → bookmarks` and beat ticks ship before anything assistant-related
    (proposed: yes, Phase 1 is user-facing on its own)? **Answered: yes; shipped.**
 6. Image budget: default 640 × 360 and 12-cell sheets, or smaller to save tokens?
+   **Answered: service configuration, conservative defaults.**
 7. Should the editor's existing REST routes migrate to operations when touched (proposed),
    or stay as they are indefinitely? **Answered: when touched, or on demand.**
 
