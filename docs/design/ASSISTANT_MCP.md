@@ -279,6 +279,41 @@ Read; for editor and assistant. Map where a video recording is usable and how it
 | `allowedMovement` | number  | How much the movement may change in a steady range (0.5–6, lower is steadier), as in Source preview; defaults to the session brief's, else 2. |
 | `sheet`           | boolean | False leaves out the contact sheet.                                                                                                           |
 
+#### `music_analysis`
+
+Read; for editor and assistant. Read the tempo, meter, beats, downbeats, accents (strong hits worth cutting on) and sections (quiet, build, peak, release) of the project's music clips, at project frames: where each plays on the timeline, repeated across loops. Use a frame window for long music. A clip whose music is not analysed yet says so; ask the user to analyse it in Audio → Music.
+
+| Input         | Type    | Description                                                                                |
+| ------------- | ------- | ------------------------------------------------------------------------------------------ |
+| `projectId`   | string  | ID of the saved project.                                                                   |
+| `musicClipId` | string  | ID of one music clip, from describe_project; every music clip of the project when omitted. |
+| `fromFrame`   | integer | First project frame of the window.                                                         |
+| `toFrame`     | integer | Project frame after the window (exclusive).                                                |
+
+#### `check_alignment`
+
+Read; for editor and assistant. Measure how the cut follows the music: for every boundary of every video track (or one), the frame the viewer perceives as the change (the cut, the middle of a dissolve, the middle of a black pause), its nearest beat and downbeat and the signed offsets in frames, and a summary. Within one frame of a beat counts as on the beat.
+
+| Input         | Type   | Description                                                                                |
+| ------------- | ------ | ------------------------------------------------------------------------------------------ |
+| `projectId`   | string | ID of the saved project.                                                                   |
+| `layerId`     | string | One video track only.                                                                      |
+| `musicClipId` | string | ID of one music clip, from describe_project; every music clip of the project when omitted. |
+
+#### `snap_cuts_to_beats`
+
+Write; for editor and assistant. Move the boundaries of one Ripple video track onto the music: left to right, shorten each boundary's left clip so the change lands on the nearest beat (or downbeat) at or before it, keeping each clip at least minimumSeconds long and leaving transitions as they are; later clips follow. Clips only get shorter, so they stay inside the kept ranges. Returns the proposed trim commands and each boundary before and after; with apply, saves them as one edit (needs the session and expectedRevision). Do the arithmetic with this rather than by hand.
+
+| Input              | Type                 | Description                                                                                |
+| ------------------ | -------------------- | ------------------------------------------------------------------------------------------ |
+| `projectId`        | string               | ID of the saved project.                                                                   |
+| `layerId`          | string               | ID of a video track with Ripple on.                                                        |
+| `prefer`           | "beat" or "downbeat" | Snap to every beat or to downbeats only.                                                   |
+| `minimumSeconds`   | number               | Shortest a clip may become; a boundary that would need a shorter clip stays where it is.   |
+| `musicClipId`      | string               | ID of one music clip, from describe_project; every music clip of the project when omitted. |
+| `apply`            | boolean              | True saves the trims as one edit; false only proposes them.                                |
+| `expectedRevision` | integer              | Revision you last read, from describe_project; required with apply.                        |
+
 #### `session_start`
 
 Write; for editor and assistant. Take the project's write lease for an assistant session, after checkpointing it, so the editor follows your edits read-only until the user takes over or you call session_end. Required before edit, checkpoint_restore or any write. Pass the user's brief from the conversation. Refused while another session is active or when the revision is stale. The session lasts until the user takes over or you call session_end, unless the service ends idle sessions (expiresAt).
@@ -442,25 +477,25 @@ The `commands` of `edit`; their fields are described in the JSON Schema of the t
 The first operations. Session and editor-only ones are listed because they share the
 registry; the assistant never sees them.
 
-| Operation            | Audience  | Purpose                                                                                                                                                                                                                    | Bounds                                                                                 |
-| -------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `session_start`      | editor    | Start an assistant session: checkpoint, brief, lease token; refuses when a session is active or the revision is stale (the editor flushes autosave first)                                                                  | One session per project                                                                |
-| `session_status`     | both      | State, brief, edit log, notes (editor banner and LLM resource)                                                                                                                                                             |                                                                                        |
-| `session_end`        | both      | Take over (editor) or finish with notes (assistant); the notes appear in the editor's hand-off dialog                                                                                                                      |                                                                                        |
-| `checkpoint`         | both      | Named checkpoint of the current document; `checkpoint_restore` (editor only) replaces the document in one revision after checkpointing the current state                                                                   | Last 5 per project                                                                     |
-| `edit`               | both      | Apply a batch of commands atomically; with a session it also enforces selects and bin membership; returns the new revision and a one-line summary, or the first failing command's message                                  | ≤ 64 commands                                                                          |
-| `preview_edits`      | assistant | Dry run of a batch against the saved revision: resulting timeline summary and errors, no save                                                                                                                              |                                                                                        |
-| `describe_project`   | both      | Compact timeline: tracks, clips with timecodes, transitions, music, bookmarks, selects, alignment summary; `detail: summary \| full`                                                                                       |                                                                                        |
-| `describe_track`     | both      | One video track's complete appearance (Colour with HSL and curves, Opacity, Transform, keyframes), its keyed settings and the values that apply at requested frames ([#252](https://github.com/Plonk42/PasCap/issues/252)) | ≤ 32 frames                                                                            |
-| `describe_recording` | both      | Shot descriptors (below) inside the selects, flight data, damage, `allowedMovement`, a sheet of each steady range's middle frame ([#239](https://github.com/Plonk42/PasCap/issues/239))                                    | Computed on request, no cache                                                          |
-| `still`              | both      | One composed project frame from the proxies (`frame`, `width`, `crop?`, `commands?` for a candidate), JPEG ([#238](https://github.com/Plonk42/PasCap/issues/238))                                                          | Serial, two waiting; refused (409) while an export or reference job runs; image budget |
-| `timeline_sheet`     | both      | Contact sheet of project frames (`frames[]`, `commands?`), JPEG plus legend                                                                                                                                                | Same as still                                                                          |
-| `recording_sheet`    | both      | Contact sheet of a recording's proxy frames (`mediaId`, `frames[]`), ungraded, JPEG plus legend                                                                                                                            | Same as still                                                                          |
-| `estimate`           | both      | `{ clipId or mediaId + range, kind: auto-adjust \| white-balance \| detail }`: decodes ≤ 16 proxy frames at ≤ 320 × 180 and runs the shared estimators or the detail heuristics                                            | Serial with stills                                                                     |
-| `music_analyse`      | editor    | Queue the music analysis job; `music_analysis` (both) returns `{ analysis, job }`, with beats/accents in a window as samples, source frames and project frames                                                             | Background job kind                                                                    |
-| `check_alignment`    | both      | Boundary-to-beat report (below)                                                                                                                                                                                            | Pure, bounded by clip/beat counts                                                      |
-| `snap_cuts_to_beats` | both      | `layerId`, `prefer: beat \| downbeat`, `minimumSeconds`, `apply`: the alignment helper, a proposal or one `edit` batch                                                                                                     |                                                                                        |
-| `beats_to_bookmarks` | both      | Add a music track's beats or downbeats as bookmarks in one revision; the editor's **Beats → bookmarks** uses it too                                                                                                        | ≤ 1,000 bookmarks                                                                      |
+| Operation            | Audience  | Purpose                                                                                                                                                                                                                                | Bounds                                                                                 |
+| -------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `session_start`      | editor    | Start an assistant session: checkpoint, brief, lease token; refuses when a session is active or the revision is stale (the editor flushes autosave first)                                                                              | One session per project                                                                |
+| `session_status`     | both      | State, brief, edit log, notes (editor banner and LLM resource)                                                                                                                                                                         |                                                                                        |
+| `session_end`        | both      | Take over (editor) or finish with notes (assistant); the notes appear in the editor's hand-off dialog                                                                                                                                  |                                                                                        |
+| `checkpoint`         | both      | Named checkpoint of the current document; `checkpoint_restore` (editor only) replaces the document in one revision after checkpointing the current state                                                                               | Last 5 per project                                                                     |
+| `edit`               | both      | Apply a batch of commands atomically; with a session it also enforces selects and bin membership; returns the new revision and a one-line summary, or the first failing command's message                                              | ≤ 64 commands                                                                          |
+| `preview_edits`      | assistant | Dry run of a batch against the saved revision: resulting timeline summary and errors, no save                                                                                                                                          |                                                                                        |
+| `describe_project`   | both      | Compact timeline: tracks, clips with timecodes, transitions, music, bookmarks, selects, alignment summary; `detail: summary \| full`                                                                                                   |                                                                                        |
+| `describe_track`     | both      | One video track's complete appearance (Colour with HSL and curves, Opacity, Transform, keyframes), its keyed settings and the values that apply at requested frames ([#252](https://github.com/Plonk42/PasCap/issues/252))             | ≤ 32 frames                                                                            |
+| `describe_recording` | both      | Shot descriptors (below) inside the selects, flight data, damage, `allowedMovement`, a sheet of each steady range's middle frame ([#239](https://github.com/Plonk42/PasCap/issues/239))                                                | Computed on request, no cache                                                          |
+| `still`              | both      | One composed project frame from the proxies (`frame`, `width`, `crop?`, `commands?` for a candidate), JPEG ([#238](https://github.com/Plonk42/PasCap/issues/238))                                                                      | Serial, two waiting; refused (409) while an export or reference job runs; image budget |
+| `timeline_sheet`     | both      | Contact sheet of project frames (`frames[]`, `commands?`), JPEG plus legend                                                                                                                                                            | Same as still                                                                          |
+| `recording_sheet`    | both      | Contact sheet of a recording's proxy frames (`mediaId`, `frames[]`), ungraded, JPEG plus legend                                                                                                                                        | Same as still                                                                          |
+| `estimate`           | both      | `{ clipId or mediaId + range, kind: auto-adjust \| white-balance \| detail }`: decodes ≤ 16 proxy frames at ≤ 320 × 180 and runs the shared estimators or the detail heuristics                                                        | Serial with stills                                                                     |
+| `music_analyse`      | editor    | Not an operation: the editor queues the job (**Analyse music**) and the Hand off dialog's readiness list queues it; `music_analysis` (both) returns tempo, meter, beats, accents and sections at project frames, in an optional window | Background job kind                                                                    |
+| `check_alignment`    | both      | Boundary-to-beat report (below)                                                                                                                                                                                                        | Pure, bounded by clip/beat counts                                                      |
+| `snap_cuts_to_beats` | both      | `layerId`, `prefer: beat \| downbeat`, `minimumSeconds`, `apply`: the alignment helper, a proposal or one `edit` batch                                                                                                                 |                                                                                        |
+| `beats_to_bookmarks` | both      | Not an operation: the assistant adds `bookmark-add` commands for the frames `music_analysis` lists; the editor keeps **Beats → bookmarks**                                                                                             | ≤ 1,000 bookmarks                                                                      |
 
 There are deliberately no `add_clip`/`set_transition`-style wrappers: those are `edit`
 commands, already described in `editCommandSchema`, and a wrapper would be a second place
@@ -556,8 +591,12 @@ flights.
 
 Implemented ahead of the registry (owner, 2026-10-20): the job and cache are served by
 `GET`/`POST /api/audio/<id>/analysis`, described in
-[speed and audio](../SPEED_AND_AUDIO.md#music-analysis); `music_analyse` and
-`music_analysis` will wrap them once the registry exists. The design as proposed:
+[speed and audio](../SPEED_AND_AUDIO.md#music-analysis). The assistant reads it through
+`music_analysis` ([#241](https://github.com/Plonk42/PasCap/issues/241)): for each music clip of
+the project, tempo, meter, beats with downbeats and strength, accents and sections mapped to
+project frames through the clip's placement, source range and loops (`musicBeatFrames`,
+`musicSampleFrames`, `musicSampleRanges` in [beat alignment](../../src/shared/beat-alignment.ts)),
+in an optional frame window, at most 2,000 beats per clip. The design as proposed:
 
 Runs in a worker thread (as `motion-pool` does), streaming the PCM cache in 1 MiB blocks,
 mono downmix in float; no new dependency (a small radix-2 FFT in TypeScript).
@@ -595,17 +634,27 @@ beats; the action reports when it would exceed the limit and offers downbeats on
 
 ### Alignment helpers
 
-- `check_alignment`: for every boundary of every video track, the moment the viewer perceives
-  (cut frame; middle of a dissolve; middle of a black pause), the nearest beat and
-  downbeat with signed offsets in frames, and a summary (share of boundaries within one
-  frame of a beat). Also the first and last video frame against the music's first/last
-  beat and sections.
-- `snap_cuts_to_beats`: on one Ripple track, shorten clips' OUT (or IN) inside their
-  selects so each boundary lands on the nearest beat or downbeat at or before its current
-  position, keeping each clip at least `minimumSeconds` long and honouring existing
-  dissolve overlaps; returns the resulting `trim` commands as a proposal (`apply: false`)
-  or applies them as one batch. Deterministic arithmetic the LLM should not do by hand.
-- `beats_to_bookmarks`: the editor action above, for the LLM.
+Implemented on the `mcp` branch ([#241](https://github.com/Plonk42/PasCap/issues/241),
+[beat alignment](../../src/shared/beat-alignment.ts)); beats are those of every analysed music
+clip on the timeline (or one), merged by frame.
+
+- `check_alignment`: for every boundary of every video track (or one), the moment the viewer
+  perceives (the cut; the middle of a dissolve's overlap; the middle of a black pause's slot;
+  a fade through black's boundary), the nearest beat and downbeat with signed offsets in
+  frames (positive: the change comes after the beat), and a summary: boundaries within one
+  frame of a beat or downbeat and the mean absolute offset.
+- `snap_cuts_to_beats`: on one Ripple track, left to right, shortens each boundary's left
+  clip (its OUT as displayed, so source IN for a reversed clip, through the editor's **Trim
+  end**) so the perceived moment lands on the nearest beat or downbeat at or before it,
+  keeping each clip at least `minimumSeconds` long; transitions keep their durations and
+  later clips follow. Clips only shrink, so they stay inside their kept ranges. A boundary
+  whose trim would break the minimum or a transition stays put with the reason. Returns the
+  `trim` commands and each boundary before and after as a proposal, or with `apply` and
+  `expectedRevision` saves them as one `edit` (the session rules apply). With slow motion a
+  boundary can land a frame from the beat; `after` says where.
+- No `beats_to_bookmarks` operation: bookmarks are `bookmark-add` commands at the frames
+  `music_analysis` lists. Not done: the first/last video frame against the music's first and
+  last beat, and lengthening clips.
 
 ## MCP server
 

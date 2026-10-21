@@ -5,6 +5,7 @@ import { describeTrack } from './describe-track.js';
 import { edit } from './edit.js';
 import { handOffReadiness } from './hand-off.js';
 import { listProjects } from './list-projects.js';
+import { checkAlignment, musicAnalysis, snapCutsToBeats } from './music.js';
 import { recordingSheet, still, timelineSheet } from './pictures.js';
 import {
   checkpoint,
@@ -22,6 +23,9 @@ export const operations = [
   describeProject,
   describeTrack,
   describeRecording,
+  musicAnalysis,
+  checkAlignment,
+  snapCutsToBeats,
   sessionStart,
   sessionStatus,
   sessionEnd,
