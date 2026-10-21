@@ -6,6 +6,7 @@ import { runDescribeProject } from './describe-project.js';
 import { runDescribeRecording } from './describe-recording.js';
 import { runDescribeTrack } from './describe-track.js';
 import { runEdit } from './edit.js';
+import { runEstimate } from './estimate.js';
 import { runHandOffReadiness } from './hand-off.js';
 import { runListProjects } from './list-projects.js';
 import { runCheckAlignment, runMusicAnalysis, runSnapCutsToBeats } from './music.js';
@@ -40,6 +41,7 @@ export const runners: OperationRunners = {
   still: runStill,
   timeline_sheet: runTimelineSheet,
   recording_sheet: runRecordingSheet,
+  estimate: runEstimate,
 };
 
 export async function runOperation(operation: Operation, context: ServiceContext, input: unknown): Promise<unknown> {

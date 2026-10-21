@@ -1,14 +1,6 @@
 import { forEachSerial } from '../shared/serial.js';
-import type { AnalysisFrame } from '../shared/white-balance.js';
+import { analysisSize, type AnalysisFrame } from '../shared/white-balance.js';
 import { VideoStreams } from './video-streams.js';
-
-/** Pixels read per analysed frame: a 720p proxy is read at 320 × 180. */
-export const ANALYSIS_PIXELS = 320 * 180;
-
-export function analysisSize(width: number, height: number): { width: number; height: number } {
-  const scale = Math.min(1, Math.sqrt(ANALYSIS_PIXELS / (width * height)));
-  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
-}
 
 /** The decoded frame as the compositor uploads it, downscaled, in encoded RGBA bytes. */
 function readPixels(frame: VideoFrame): AnalysisFrame {

@@ -17,9 +17,8 @@ import {
   type ProjectDocument,
 } from '../../src/shared/model.js';
 import { calculateLayout, type PlacedClip } from '../../src/shared/timeline.js';
+import { animatedSettings, autoAdjustCommand, trackSamples } from '../../src/shared/auto-colour.js';
 import {
-  animatedSettings,
-  autoAdjustCommand,
   autoAdjustCommands,
   autoAdjustTarget,
   cachedAnalysis,
@@ -27,7 +26,6 @@ import {
   keyframeReason,
   rememberAnalysis,
   settingLabel,
-  trackSamples,
 } from '../../src/web/auto-adjust.js';
 import { analysisAsset as asset } from './analysis-asset.js';
 

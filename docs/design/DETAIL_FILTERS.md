@@ -320,6 +320,34 @@ precision, applies on Enter/blur and restores on Escape; out-of-range drafts sta
 editable with an inline error and never clamp. Double-clicking a setting's name resets
 only that setting; **Reset detail** restores all three in one Undo step.
 
+## Detail estimate
+
+The assistant's `estimate` operation with `kind: detail`
+([assistant design](ASSISTANT_MCP.md#server-side-auto-adjust-white-balance-and-detail-measurement))
+measures a clip's proxy and suggests Denoise and Sharpen; the editor has no such action. Every
+constant is in `DETAIL_ESTIMATE` ([detail estimate](../../src/shared/detail-estimate.ts)),
+starting values set on synthetic noise and blur, to tune on real flights.
+
+- **Frames**: up to 8 at the centres of equal slices of the range (or the 1 s window), read
+  as full-range luma at the proxy's size, the 720-line scale of the filters' units.
+- **Noise**: Immerkær's estimate $\sigma = \sqrt{\pi/2}\,\overline{|I * M|}/6$ with the
+  Laplacian difference $M = [1,-2,1;-2,4,-2;1,-2,1]$, per 16 × 16 block, then the 10th
+  percentile over blocks whose mean is within 0.02–0.98 (clipped areas and letterbox show no
+  noise), so texture does not count; the median over frames. It reads within 10 % of the
+  added noise on synthetic patches.
+- **Blur**: Crété-Roffet's no-reference measure, the share of neighbour differences a 9-tap
+  box blur keeps, horizontally and vertically, the larger; only differences above
+  $\max(4/255,\ 4\sqrt2\,\sigma)$ count, so noise does not pass for detail. A crisp edge reads
+  about 0.11; Gaussian blur of 1, 2 and 4 pixels about 0.41, 0.68 and 0.87.
+- **Suggestions**: Denoise $= \min(0.5,\ 25\,\max(0, \sigma - 0.003))$, Sharpen
+  $= \min(0.6,\ 2\,\max(0, b - 0.3))$, rounded to hundredths; Clarity is never suggested.
+
+Limits: heavy noise hides the gentle slopes of heavily blurred edges, so the blur then reads
+too low and Sharpen is under-suggested (safely: sharpening noise would show it). Smooth content
+such as a sky gradient counts as soft only where its slope exceeds 4 codes per pixel. The proxy
+is a downscaled H.264 encode, cleaner than the original: real drone proxies measure almost no
+noise, so Denoise is rarely suggested even when the 4K original shows grain.
+
 ## Validation and parity gates
 
 - Unit: strict schema, neutral bypass, an independent transcription of the kernel

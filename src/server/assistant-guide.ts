@@ -46,7 +46,12 @@ what the footage shows from its pictures.
 - describe_track before changing appearance: settings interact (Contrast with Shadows,
   Highlights, Whites and Blacks shape one tone curve). Prefer static grades; animate only when
   the brief asks or the light changes within a shot.
+- Start from estimate: auto-adjust on a representative clip (or the whole track) gives the
+  editor's Auto correction and the edit applying it; white-balance only Temperature and Tint;
+  detail suggests a clip's Denoise and Sharpen. Clips needing different grades go on their own
+  track, since Colour belongs to the track.
 - Compare with still or timeline_sheet: both accept commands to preview a change without saving.
+  Judge Detail on a 1:1 crop: no halos, no waxy smoothing.
 
 ## 7. Finish
 - Verify with a timeline_sheet across the cut, check_alignment and the duration against the

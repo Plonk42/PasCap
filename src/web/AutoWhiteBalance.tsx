@@ -1,10 +1,11 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
+import { whiteBalanceCommands } from '../shared/auto-colour.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { VideoLayer } from '../shared/model.js';
 import type { TimelineLayout } from '../shared/timeline.js';
 import { frameIlluminant, poolWhiteBalance } from '../shared/white-balance.js';
-import { proxyUrl, whiteBalanceCommands, whiteBalanceTarget } from './auto-white-balance.js';
+import { proxyUrl, whiteBalanceTarget } from './auto-white-balance.js';
 import { Icon } from './icons.js';
 import { useDelayedFlag } from './use-delayed-flag.js';
 import './auto-white-balance.css';
