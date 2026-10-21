@@ -798,6 +798,16 @@ See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) and
 The [multiple-music contract](design/MULTIPLE_MUSIC.md) specifies schema, mixing,
 resources and pending acceptance; this guide does not claim those tests passed.
 
+## Edit with an assistant (experimental)
+
+An AI assistant in an MCP client such as VS Code can read a project, look at it through
+stills and contact sheets, and edit it with the same commands as the editor. Connect the
+client to `http://127.0.0.1:4318/mcp` with the token in `.pascap/mcp-token`
+([setup](DEVELOPMENT.md#mcp-endpoint)). It never imports, prepares, exports or deletes
+anything. Hand-off is not built yet: close the project in the editor, or give the assistant
+a copy, while it edits; reopen the project afterwards to see its work. An editor that keeps
+the project open reports its next save as stale instead of overwriting the assistant's edits.
+
 ## Workspace and keyboard
 
 Use **Clip** for the selected clip's **Speed**, **Detail**, **Range** and **Placement**;

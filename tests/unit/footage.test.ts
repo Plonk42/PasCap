@@ -576,7 +576,7 @@ describe('metadata-only approved-root audio browsing and explicit registration',
     expect(library.list()).toEqual([]);
     expect(audio.list()).toEqual([]);
     expect(jobs.list()).toEqual([]);
-    expect(await fs.readdir(config.dataDir)).toEqual(['music.json']);
+    expect((await fs.readdir(config.dataDir)).sort()).toEqual(['mcp-token', 'music.json']);
     expect(await fs.readFile(path.join(config.dataDir, 'music.json'))).toEqual(savedRegistry);
   });
 
@@ -1229,7 +1229,7 @@ describe('batch path prevalidation and serial no-copy registration', () => {
     expect((await fs.stat(filename)).mode & 0o777).toBe(0o444);
     expect((await fs.stat(sources)).mode & 0o777).toBe(0o555);
     expect(await fs.readdir(sources)).toEqual(['Clip 1.mp4']);
-    expect((await fs.readdir(config.dataDir)).sort()).toEqual(['assets', 'music.json', 'videos.json']);
+    expect((await fs.readdir(config.dataDir)).sort()).toEqual(['assets', 'mcp-token', 'music.json', 'videos.json']);
     expect(library.get(result.assets[0]!.id).status).toBe('ready');
   });
 
@@ -1380,7 +1380,7 @@ describe('trusted JSON-only HTTP boundary and retained native registry entries',
     expect(multipart.statusCode).toBe(415);
     expect(library.list()).toEqual([]);
     expect(jobs.list()).toEqual([]);
-    expect(await fs.readdir(config.dataDir)).toEqual(['music.json']);
+    expect((await fs.readdir(config.dataDir)).sort()).toEqual(['mcp-token', 'music.json']);
   });
 
   it('removes the upload route entirely and never creates copy scratch for rejected requests', async () => {
@@ -1396,7 +1396,7 @@ describe('trusted JSON-only HTTP boundary and retained native registry entries',
     expect([404, 415]).toContain(multipart.statusCode);
     expect(library.list()).toEqual([]);
     expect(jobs.list()).toEqual([]);
-    expect(await fs.readdir(config.dataDir)).toEqual(['music.json']);
+    expect((await fs.readdir(config.dataDir)).sort()).toEqual(['mcp-token', 'music.json']);
   });
 
   it('preserves an already registered extensionless copied source, verified proxy and exact bytes across restart', async () => {

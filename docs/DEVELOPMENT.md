@@ -421,7 +421,7 @@ total-process memory; reports expose private paths/snapshots, so review before s
 ### Service operations
 
 New service capabilities are **operations**, defined once and served as `POST /api/ops/<name>`
-behind the usual loopback and client guards; the future MCP endpoint will expose the same
+behind the usual loopback and client guards; the [MCP endpoint](#mcp-endpoint) exposes the same
 definitions ([operation registry](design/ASSISTANT_MCP.md#the-operation-registry)). To add one:
 
 1. Define it in `src/shared/operations/<name>.ts` with `defineOperation`: snake_case name,
@@ -439,6 +439,36 @@ definitions ([operation registry](design/ASSISTANT_MCP.md#the-operation-registry
 Existing REST routes move to operations when touched or when an operation needs them. A new
 edit command belongs in [`editCommandSchema`](../src/shared/command-schema.ts), with
 descriptions; the `edit` operation then accepts it.
+
+### MCP endpoint
+
+The service answers MCP clients at `http://127.0.0.1:4318/mcp` ([MCP server](design/ASSISTANT_MCP.md#mcp-server)):
+every operation whose audience includes `assistant` is a tool, with its description and input
+JSON Schema; stills and sheets come back as image content. Requests need the bearer token the
+service writes at startup to `<data directory>/mcp-token` (owner-only), and keep the loopback
+Host and Origin checks. In VS Code, add to `.vscode/mcp.json` (or the user `mcp.json`):
+
+```json
+{
+  "inputs": [
+    { "id": "pascap-token", "type": "promptString", "description": "Contents of .pascap/mcp-token", "password": true }
+  ],
+  "servers": {
+    "pascap": {
+      "type": "http",
+      "url": "http://127.0.0.1:4318/mcp",
+      "headers": { "Authorization": "Bearer ${input:pascap-token}" }
+    }
+  }
+}
+```
+
+The endpoint is stateless (JSON responses, no session or event stream) and implemented in
+[mcp.ts](../src/server/mcp.ts); the official `@modelcontextprotocol/sdk` client is a
+development dependency that tests it. Assistant sessions do not exist yet: while the editor
+has the same project open, an assistant edit makes the editor's next save stale (it is
+rejected, never overwritten), so try the assistant on a copy. `tsx watch` restarts on source
+edits and drops in-flight tool calls, as it ends exports.
 
 Preview decodes editing proxies with WebCodecs in a worker, using **two decoders and
 textures per track, up to 16 for eight**, plus one source-review decoder, not one per

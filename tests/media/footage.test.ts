@@ -227,7 +227,7 @@ describe.skipIf(!enabled)('approved-root no-copy import · disposable native pro
     expect((await stat(filename)).mode & 0o777).toBe(0o444);
     expect((await stat(sources)).mode & 0o777).toBe(0o555);
     expect(await readdir(sources)).toEqual(['Camera 2.MP4']);
-    expect((await readdir(config.dataDir)).sort()).toEqual(['assets', 'music.json', 'videos.json']);
+    expect((await readdir(config.dataDir)).sort()).toEqual(['assets', 'mcp-token', 'music.json', 'videos.json']);
     expect(
       registrySchema.parse(JSON.parse(await readFile(path.join(config.dataDir, 'videos.json'), 'utf8'))).assets,
     ).toEqual([ready]);
@@ -286,7 +286,7 @@ describe.skipIf(!enabled)('approved-root no-copy import · disposable native pro
     expect(await readFile(filename)).toEqual(bytes);
     expect(await fingerprintFile(filename)).toEqual(identity);
     expect(await readdir(sources)).toEqual(['Not actually video.mov']);
-    expect(await readdir(config.dataDir)).toEqual(['music.json']);
+    expect((await readdir(config.dataDir)).sort()).toEqual(['mcp-token', 'music.json']);
   });
 
   it('previews browsed recordings with real FFmpeg, read-only, without registering, preparing or writing next to them', async () => {
@@ -335,6 +335,6 @@ describe.skipIf(!enabled)('approved-root no-copy import · disposable native pro
     expect((await readdir(sources)).sort()).toEqual(['DJI_0468.MP4', 'DJI_0999.MP4']);
     expect(library.list()).toEqual([]);
     expect(jobs.list()).toEqual([]);
-    expect((await readdir(config.dataDir)).sort()).toEqual(['browse-previews', 'music.json']);
+    expect((await readdir(config.dataDir)).sort()).toEqual(['browse-previews', 'mcp-token', 'music.json']);
   });
 });
