@@ -8,7 +8,7 @@ import { createApp } from '../../src/server/app.js';
 import { createConfig } from '../../src/server/config.js';
 import { runners } from '../../src/server/operations/index.js';
 import { createColourSettings } from '../../src/shared/colour.js';
-import { createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import type { TrackDescription } from '../../src/shared/operations/describe-track.js';
 import { operations } from '../../src/shared/operations/index.js';
 import { durationOf } from '../../src/shared/operations/timecode.js';
@@ -98,7 +98,7 @@ describe('operation routes', () => {
       commands: [
         { type: 'bookmark-add', frame: 90 },
         { type: 'bookmark-add', frame: 30 },
-        { type: 'layer-add', layer: createLayer('video-2', 'Overlay') },
+        { type: 'layer-create', layerId: 'video-2', name: 'Overlay' },
         { type: 'opacity', layerId: 'video-2', opacity: 0.5 },
       ],
     });

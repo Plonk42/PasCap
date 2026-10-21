@@ -14,6 +14,7 @@ import {
 } from './keyframes.js';
 import {
   clipSchema,
+  createLayer,
   frameSchema,
   idSchema,
   layerSchema,
@@ -320,7 +321,10 @@ function editLayerKey(next: ProjectDocument, command: LayerKeyCommand): void {
   }
 }
 
-type LayerCommand = Extract<EditCommand, { type: 'layer-add' | 'layer-update' | 'layer-remove' | 'layer-order' }>;
+type LayerCommand = Extract<
+  EditCommand,
+  { type: 'layer-add' | 'layer-create' | 'layer-update' | 'layer-options' | 'layer-remove' | 'layer-order' }
+>;
 function updateLayer(next: ProjectDocument, updated: VideoLayer, before: TimelineLayout): void {
   const position = next.layers.findIndex((layer) => layer.id === updated.id);
   if (position < 0) throw new Error('Track no longer exists.');
@@ -344,9 +348,19 @@ function editLayer(next: ProjectDocument, command: LayerCommand, before: Timelin
     case 'layer-add':
       next.layers.push(layerSchema.parse(command.layer));
       break;
+    case 'layer-create':
+      next.layers.push(createLayer(command.layerId, command.name));
+      break;
     case 'layer-update':
       updateLayer(next, command.layer, before);
       break;
+    case 'layer-options': {
+      const layer = next.layers.find((item) => item.id === command.layerId);
+      if (!layer) throw new Error('Track no longer exists.');
+      const { name = layer.name, enabled = layer.enabled, ripple = layer.ripple } = command;
+      updateLayer(next, { ...layer, name, enabled, ripple }, before);
+      break;
+    }
     case 'layer-remove':
       if (!next.layers.some((layer) => layer.id === command.layerId)) throw new Error('Track no longer exists.');
       if (next.layers.length === 1) throw new Error('The last video track cannot be removed.');
@@ -567,7 +581,9 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
       editLayerKey(next, command);
       break;
     case 'layer-add':
+    case 'layer-create':
     case 'layer-update':
+    case 'layer-options':
     case 'layer-remove':
     case 'layer-order':
       editLayer(next, command, before);

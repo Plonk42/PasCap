@@ -245,11 +245,18 @@ scalar Colour settings), `hsl-band` (one HSL range), `colour-curve` (one curve) 
 setting its base is rejected with the keyframe count; the assistant changes the keyframes with
 `layer-key-value` instead. The editor keeps sending whole `colour` and `transform` commands.
 
-Only `edit` publishes the whole command schema (about 99 KB of JSON Schema). `preview_edits`,
+The editor's `layer-add` and `layer-update` carry a complete track (every Colour and Transform
+setting and keyframe): half of the command schema. `edit` offers the assistant
+`assistantEditCommandSchema`, every command except those two, with `layer-create` (a neutral track
+with an ID and a name) and `layer-options` (name, visibility or Ripple; turning Ripple on packs the
+clips like the editor's toggle) in their place; the assistant then sets the track's appearance
+setting by setting.
+
+Only `edit` publishes the command schema (about 50 KB of JSON Schema). `preview_edits`,
 `still` and `timeline_sheet` take the same commands but publish them as `referencedEditCommandSchema`:
 a command `type` plus its fields, validated exactly like `edit`'s. Each embedded the whole schema
 before, so the tool list a client loads for every conversation was 413 KB; it is now about
-113 KB ([#243](https://github.com/Plonk42/PasCap/issues/243)).
+74 KB ([#243](https://github.com/Plonk42/PasCap/issues/243)).
 
 ### Operation catalogue
 
@@ -491,8 +498,8 @@ The `commands` of `edit`; their fields are described in the JSON Schema of the t
 | `layer-key-remove`    | `layerId`, `frame`                             | Remove a whole track keyframe.                                                                                                                                                                                                                                                                            |
 | `layer-key-default`   | `layerId`, `frame`                             | Add a default keyframe, which returns every Colour setting and Opacity to neutral from its frame on, or remove the default keyframe already there. Rejected where an ordinary keyframe exists.                                                                                                            |
 | `layer-key-easing`    | `layerId`, `frame`, `setting`, `interpolation` | Set the Easing of a track keyframe's settings toward their next keyframes.                                                                                                                                                                                                                                |
-| `layer-add`           | `layer`                                        | Add a video track on top of the others; a project has at most 8.                                                                                                                                                                                                                                          |
-| `layer-update`        | `layer`                                        | Replace a video track's settings. Turning Ripple on packs its clips from the first one's start; turning it off keeps their current starts.                                                                                                                                                                |
+| `layer-create`        | `layerId`, `name`                              | Add a video track on top of the others, with neutral Colour and Transform, Opacity 1, Ripple on and no clips; a project has at most 8.                                                                                                                                                                    |
+| `layer-options`       | `layerId`, `name`, `enabled`, `ripple`         | Rename a video track, show or hide it, or turn its Ripple on or off; omitted fields keep their value. Turning Ripple on packs its clips from the first one's start; turning it off keeps their current starts.                                                                                            |
 | `layer-remove`        | `layerId`                                      | Delete a video track and its clips; the last track cannot be deleted.                                                                                                                                                                                                                                     |
 | `layer-order`         | `layerIds`                                     | Set the composition order of the video tracks, bottom first.                                                                                                                                                                                                                                              |
 | `place`               | `clipId`, `layerId`, `start`, `index`          | Move a clip to a track and position. On a Ripple track the array position decides its place in the sequence and start must equal the resulting start, unless it is the first clip.                                                                                                                        |
