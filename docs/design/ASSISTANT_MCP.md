@@ -237,6 +237,14 @@ hand-written union, and `applyCommand` is unchanged. The `edit` operation's inpu
 `{ projectId, expectedRevision, commands: editCommandSchema.array().max(64) }`. Any command
 added later for the editor is exposed to the assistant the moment it is in the union.
 
+Four commands change one appearance setting of a track and keep every other saved value, so the
+assistant never resends a whole Colour or Transform
+([#252](https://github.com/Plonk42/PasCap/issues/252)): `colour-setting` (one of the fourteen
+scalar Colour settings), `hsl-band` (one HSL range), `colour-curve` (one curve) and
+`transform-setting` (one Transform base setting). A setting with keyframes follows them, so
+setting its base is rejected with the keyframe count; the assistant changes the keyframes with
+`layer-key-value` instead. The editor keeps sending whole `colour` and `transform` commands.
+
 ### Operation catalogue
 
 <!-- operation-catalogue:start -->
@@ -461,6 +469,10 @@ The `commands` of `edit`; their fields are described in the JSON Schema of the t
 | `remove-source-range` | `clipId`, `sourceIn`, `sourceOut`, `newClipId` | Cut source frames [sourceIn, sourceOut) out of a clip. Removing the middle leaves two clips; removing an end trims the clip; removing everything deletes it. A Ripple track closes the gap; otherwise the remaining pieces keep their timeline positions. The range must lie within the clip's own range. |
 | `duplicate`           | `clipId`, `newClipId`                          | Copy a clip (range, speed, direction and detail) right after it. A Ripple track inserts the copy into its sequence; otherwise it starts at the original's end and must not overlap another clip.                                                                                                          |
 | `colour`              | `layerId`, `colour`                            | Replace a video track's complete Colour; it applies to every clip on the track. Settings with track keyframes follow their keyframes instead of these base values.                                                                                                                                        |
+| `colour-setting`      | `layerId`, `setting`, `value`                  | Set one scalar Colour setting of a video track, keeping every other one. Rejected while the setting has track keyframes, which it then follows: change those with layer-key-value.                                                                                                                        |
+| `hsl-band`            | `layerId`, `band`, `values`                    | Set one HSL range of a video track's Colour, keeping the other ranges and settings.                                                                                                                                                                                                                       |
+| `colour-curve`        | `layerId`, `channel`, `points`                 | Replace one curve of a video track's Colour, keeping the other curves and settings.                                                                                                                                                                                                                       |
+| `transform-setting`   | `layerId`, `setting`, `value`                  | Set one Transform base setting of a video track, keeping the others. Rejected while the setting has Transform keyframes, which it then follows.                                                                                                                                                           |
 | `speed`               | `clipId`, `speed`                              | Set a clip's speed. Its duration changes with it: a Ripple track re-sequences the clips after it, and overlaps or transitions that no longer fit reject the edit.                                                                                                                                         |
 | `reverse`             | `clipId`, `reverse`                            | Play a clip backwards or forwards; its duration and placement do not change.                                                                                                                                                                                                                              |
 | `transform`           | `layerId`, `transform`                         | Replace a video track's Transform; it applies to every clip on the track at project time.                                                                                                                                                                                                                 |
@@ -808,7 +820,10 @@ Follow mode, Take over, restore and the Hand off dialog are implemented on the `
   endpoint, the token file and a VS Code `mcp.json` entry that prompts for the token, with
   **Copy configuration**; the token itself never reaches the editor.
 
-Still planned: placing a music recording from the dialog.
+The dialog places no music (owner, 2026-10-21): placing is an edit, not part of a brief. The
+**Music track** field names a placed track; with none placed, the assistant finds the project's
+music recordings in `describe_project` and places one with the `music` command, or the user
+places it on the timeline first.
 
 ## Assistant playbook (the `pascap://guide` resource)
 

@@ -7,14 +7,14 @@ export const HSL_CENTRES = [0, 30, 60, 120, 180, 240, 270, 300] as const;
 export const CURVE_CHANNELS = ['master', 'red', 'green', 'blue'] as const;
 export type HslBand = (typeof HSL_BANDS)[number];
 export type CurveChannel = (typeof CURVE_CHANNELS)[number];
-const bandSchema = z
+export const hslBandSchema = z
   .object({
     hue: described(z.number().min(-30).max(30), 'Hue shift of the range in degrees, neutral 0.'),
     saturation: described(z.number().min(-1).max(1), 'Saturation change of the range, neutral 0; −1 removes it.'),
     lightness: described(z.number().min(-0.5).max(0.5), 'Lightness change of the range, neutral 0.'),
   })
   .strict();
-const band = (name: HslBand, centre: number) => described(bandSchema, `The ${name} range, centred on ${centre}°.`);
+const band = (name: HslBand, centre: number) => described(hslBandSchema, `The ${name} range, centred on ${centre}°.`);
 export const hslSchema = z
   .object({
     red: band('red', 0),
