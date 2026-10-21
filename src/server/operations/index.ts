@@ -10,7 +10,7 @@ import { runEstimate } from './estimate.js';
 import { runHandOffReadiness } from './hand-off.js';
 import { runListProjects } from './list-projects.js';
 import { runCheckAlignment, runMusicAnalysis, runSnapCutsToBeats } from './music.js';
-import { runRecordingSheet, runStill, runTimelineSheet } from './pictures.js';
+import { runCompareRecordings, runRecordingSheet, runStill, runTimelineSheet } from './pictures.js';
 import {
   runCheckpoint,
   runCheckpointCopy,
@@ -41,6 +41,7 @@ export const runners: OperationRunners = {
   still: runStill,
   timeline_sheet: runTimelineSheet,
   recording_sheet: runRecordingSheet,
+  compare_recordings: runCompareRecordings,
   estimate: runEstimate,
 };
 

@@ -236,6 +236,34 @@ describe.skipIf(!enabled)('project stills · disposable native fixture', () => {
     expect(recordingSheet.statusCode, recordingSheet.body).toBe(200);
     expect(recordingSheet.json<Picture>().image.width).toBe(2 * 240 + 4);
 
+    const compared = await app.inject({
+      method: 'POST',
+      url: '/api/ops/compare_recordings',
+      headers,
+      payload: {
+        projectId: project.id,
+        candidates: [
+          { mediaId: asset.id, sourceIn: 0, sourceOut: 30 },
+          { mediaId: asset.id, sourceIn: 30, sourceOut: 60 },
+        ],
+        frames: 3,
+      },
+    });
+    expect(compared.statusCode, compared.body).toBe(200);
+    const rows = compared.json<{ image: Picture['image']; candidates: { cells: number[]; frames: number[] }[] }>();
+    // One row of three cells per candidate.
+    expect([rows.image.width, rows.image.height]).toEqual([3 * 240 + 2 * 4, 2 * 136 + 4]);
+    expect(rows.candidates.map((candidate) => [candidate.cells, candidate.frames])).toEqual([
+      [
+        [0, 1, 2],
+        [5, 15, 25],
+      ],
+      [
+        [3, 4, 5],
+        [35, 45, 55],
+      ],
+    ]);
+
     const tooWide = await app.inject({
       method: 'POST',
       url: '/api/ops/still',
