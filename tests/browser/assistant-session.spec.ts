@@ -69,6 +69,7 @@ function session(edits: number): MemorySession {
         at: '2026-10-21T10:01:00.000Z',
         commands: 1,
         summary: 'bookmark-add',
+        frame: 30,
       })),
       endedAt: null,
       endedBy: null,
@@ -103,10 +104,12 @@ test('follows an assistant session read-only, then takes over and restores the p
   );
   expect(await bookmarks(page)).toEqual([]);
 
-  // The assistant saves a revision: the editor adopts it without an Undo step or a save.
+  // The assistant saves a revision: the editor adopts it without an Undo step or a save, and the preview
+  // moves to the frame it changed.
   memory.seed(project([30], 2));
   memory.session = session(1);
   await expect.poll(() => bookmarks(page), { timeout: 10_000 }).toEqual([30]);
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(30);
   await expect(banner).toContainText('1 edit · last: bookmark-add');
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   expect(memory.saves).toBe(0);
@@ -127,6 +130,31 @@ test('follows an assistant session read-only, then takes over and restores the p
   await expect.poll(() => bookmarks(page)).toEqual([]);
   expect(memory.snapshot().revision).toBe(4);
   await expect(ended).toHaveCount(0);
+});
+
+test('follows a session that started and ended between two polls, but not one from before the editor opened', async ({
+  page,
+}) => {
+  const ended = (startedAt: string): MemorySession => {
+    const done = session(1);
+    return {
+      ...done,
+      view: { ...done.view!, startedAt, active: false, endedAt: startedAt, endedBy: 'assistant', expiresAt: null },
+    };
+  };
+  memory.session = ended('2026-10-21T09:00:00.000Z');
+  await page.goto(`/?project=${PROJECT_ID}`);
+  await ready(page);
+  await page.waitForResponse((response) => response.url().endsWith('/api/ops/session_status'));
+  await expect(page.locator('.assistant-banner')).toHaveCount(0);
+
+  memory.seed(project([30], 2));
+  memory.session = ended('2026-10-21T10:00:00.000Z');
+  await expect(page.getByRole('region', { name: 'Assistant session summary' })).toContainText(
+    'The assistant finished · 1 edit',
+  );
+  await expect.poll(() => bookmarks(page)).toEqual([30]);
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(30);
 });
 
 test('keeps unsaved editor changes when a session starts, for the user to download or discard', async ({ page }) => {
@@ -233,7 +261,7 @@ test('hands off with a brief after showing what the assistant can use, then open
     ...memory.session!,
     view: {
       ...memory.session!.view!,
-      edits: [{ revision: 2, at: '2026-10-21T10:02:00.000Z', commands: 1, summary: 'bookmark-add' }],
+      edits: [{ revision: 2, at: '2026-10-21T10:02:00.000Z', commands: 1, summary: 'bookmark-add', frame: 30 }],
       active: false,
       endedAt: '2026-10-21T10:03:00.000Z',
       endedBy: 'assistant',
@@ -247,6 +275,9 @@ test('hands off with a brief after showing what the assistant can use, then open
   await expect.poll(() => bookmarks(page)).toEqual([30]);
   await ended.getByText('Edit log').click();
   await expect(ended.getByRole('listitem')).toContainText(['bookmark-add']);
+  await page.evaluate(() => window.pascapLab!.engine.seek(0));
+  await ended.getByRole('button', { name: 'Go to the edit at 00:01:00' }).click();
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(30);
 
   await ended.getByRole('button', { name: 'Open as new project' }).click();
   await expect(page).toHaveURL(/project=browser-project-1/);

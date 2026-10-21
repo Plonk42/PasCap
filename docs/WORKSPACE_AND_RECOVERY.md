@@ -736,12 +736,14 @@ While a session is active (started here or by the assistant itself), a banner **
 is editing this project** shows the edit count and the last command with **Take over**, and
 the editor follows the saved project read-only: edits and Undo/Redo are refused with the
 reason; each newer saved revision replaces the document and its history whenever no draft,
-gesture or save is pending. A draft from before the session stays, its saves refused, for
+gesture or save is pending, and the preview moves to the earliest frame the assistant's latest
+edit changed (a clip, transition, fade, keyframe, bookmark or music clip; not while playing,
+and not for a whole-track grade). A draft from before the session stays, its saves refused, for
 the user to download or discard. **Take over** ends the session at once.
 
 When a session the editor followed ends (Take over, the assistant finishing, or the lease
 expiring), a summary shows who ended it, the edit count, the assistant's notes and an **Edit
-log** disclosure, with **Open as new project** (the checkpoint taken at the start, saved as
+log** disclosure (each edit with a timecode button that seeks to the frame it changed), with **Open as new project** (the checkpoint taken at the start, saved as
 "… (before assistant)" and opened; the assistant's version stays) and **Restore project
 before session** (replaces the project in one revision after checkpointing it), both
 unavailable with the reason while changes are unsaved, and × to dismiss. See
