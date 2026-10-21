@@ -248,6 +248,37 @@ Write; for editor and assistant. Apply up to 64 edit commands to a saved project
 | `expectedRevision` | integer         | Revision the commands were written against, from describe_project.   |
 | `commands`         | array of object | Commands applied in order; each sees the result of the previous one. |
 
+#### `still`
+
+Read; for editor and assistant. Render one project frame as the export composes it (every enabled track with its Colour, Detail, Transform, Opacity and transitions), from the 720p editing proxies, as a JPEG. Use crop for a 1:1 detail of the 1280 × 720 composition, for example to judge Sharpen or Denoise. Width and crop size are limited by the service's image budget.
+
+| Input       | Type            | Description                                                                                                             |
+| ----------- | --------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `projectId` | string          | ID of the saved project.                                                                                                |
+| `frame`     | integer         | Project frame to render.                                                                                                |
+| `width`     | integer         | Picture width in pixels; defaults to, and may not exceed, the service's still width.                                    |
+| `crop`      | object          | Render this region at 1:1 instead of the scaled whole frame.                                                            |
+| `commands`  | array of object | Edit commands applied in memory to the saved project before rendering, to compare a candidate change without saving it. |
+
+#### `timeline_sheet`
+
+Read; for editor and assistant. Render several project frames as one contact sheet, row by row, with a legend naming each cell's frame, timecode and clips. Cheaper than several stills for checking pacing, shot order or a grade across the cut. The number of frames and the cell width are limited by the service's image budget.
+
+| Input       | Type             | Description                                                                                                             |
+| ----------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `projectId` | string           | ID of the saved project.                                                                                                |
+| `frames`    | array of integer | Project frames in the order to show them.                                                                               |
+| `commands`  | array of object  | Edit commands applied in memory to the saved project before rendering, to compare a candidate change without saving it. |
+
+#### `recording_sheet`
+
+Read; for editor and assistant. Render source frames of one video recording's editing proxy as a contact sheet, without any track Colour or Transform, to choose footage before placing it. A single frame renders at the still width.
+
+| Input     | Type             | Description                                               |
+| --------- | ---------------- | --------------------------------------------------------- |
+| `mediaId` | string           | ID of a prepared video recording.                         |
+| `frames`  | array of integer | Source frames of the recording in the order to show them. |
+
 #### Edit commands
 
 The `commands` of `edit`; their fields are described in the JSON Schema of the tool.
@@ -296,56 +327,67 @@ The `commands` of `edit`; their fields are described in the JSON Schema of the t
 The first operations. Session and editor-only ones are listed because they share the
 registry; the assistant never sees them.
 
-| Operation            | Audience  | Purpose                                                                                                                                                                                                                    | Bounds                                                                                               |
-| -------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `session_start`      | editor    | Start an assistant session: checkpoint, brief, lease token; refuses when a session is active, recordings in the bin are not ready, or autosave is dirty (the editor flushes first)                                         | One session per project                                                                              |
-| `session_status`     | both      | State, brief, edit log, notes (editor banner and LLM resource)                                                                                                                                                             |                                                                                                      |
-| `session_end`        | both      | Take over (editor) or finish with notes (assistant); the notes appear in the editor's hand-off dialog                                                                                                                      |                                                                                                      |
-| `checkpoint`         | both      | Named checkpoint of the current document; `checkpoint_restore` (editor only) replaces the document in one revision after checkpointing the current state                                                                   | Last 5 per project                                                                                   |
-| `edit`               | both      | Apply a batch of commands atomically; with a session it also enforces selects and bin membership; returns the new revision and a one-line summary, or the first failing command's message                                  | ≤ 64 commands                                                                                        |
-| `preview_edits`      | assistant | Dry run of a batch against the saved revision: resulting timeline summary and errors, no save                                                                                                                              |                                                                                                      |
-| `describe_project`   | both      | Compact timeline: tracks, clips with timecodes, transitions, music, bookmarks, selects, alignment summary; `detail: summary \| full`                                                                                       |                                                                                                      |
-| `describe_track`     | both      | One video track's complete appearance (Colour with HSL and curves, Opacity, Transform, keyframes), its keyed settings and the values that apply at requested frames ([#252](https://github.com/Plonk42/PasCap/issues/252)) | ≤ 32 frames                                                                                          |
-| `describe_recording` | both      | Shot descriptors (below) inside the selects, telemetry, damage; `tolerance`                                                                                                                                                | Computed on request, no cache                                                                        |
-| `still`              | both      | One composed project frame from the proxies (`frame`, `width ≤ 1280`, `crop?`, `commands?` for a candidate), JPEG                                                                                                          | Serial, one FFmpeg child at a time, two waiting; refused (409) while an export or reference job runs |
-| `timeline_sheet`     | both      | Contact sheet of ≤ 12 project frames (`frames[]` or `from/to/count`), JPEG plus legend                                                                                                                                     | Same as still                                                                                        |
-| `source_frame`       | both      | One proxy source frame (`mediaId`, `frame`, `width`, `crop?`), JPEG; `recording_sheet` for a source range                                                                                                                  | Same as still                                                                                        |
-| `estimate`           | both      | `{ clipId or mediaId + range, kind: auto-adjust \| white-balance \| detail }`: decodes ≤ 16 proxy frames at ≤ 320 × 180 and runs the shared estimators or the detail heuristics                                            | Serial with stills                                                                                   |
-| `music_analyse`      | editor    | Queue the music analysis job; `music_analysis` (both) returns `{ analysis, job }`, with beats/accents in a window as samples, source frames and project frames                                                             | Background job kind                                                                                  |
-| `check_alignment`    | both      | Boundary-to-beat report (below)                                                                                                                                                                                            | Pure, bounded by clip/beat counts                                                                    |
-| `snap_cuts_to_beats` | both      | `layerId`, `prefer: beat \| downbeat`, `minimumSeconds`, `apply`: the alignment helper, a proposal or one `edit` batch                                                                                                     |                                                                                                      |
-| `beats_to_bookmarks` | both      | Add a music track's beats or downbeats as bookmarks in one revision; the editor's **Beats → bookmarks** uses it too                                                                                                        | ≤ 1,000 bookmarks                                                                                    |
+| Operation            | Audience  | Purpose                                                                                                                                                                                                                    | Bounds                                                                                 |
+| -------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `session_start`      | editor    | Start an assistant session: checkpoint, brief, lease token; refuses when a session is active, recordings in the bin are not ready, or autosave is dirty (the editor flushes first)                                         | One session per project                                                                |
+| `session_status`     | both      | State, brief, edit log, notes (editor banner and LLM resource)                                                                                                                                                             |                                                                                        |
+| `session_end`        | both      | Take over (editor) or finish with notes (assistant); the notes appear in the editor's hand-off dialog                                                                                                                      |                                                                                        |
+| `checkpoint`         | both      | Named checkpoint of the current document; `checkpoint_restore` (editor only) replaces the document in one revision after checkpointing the current state                                                                   | Last 5 per project                                                                     |
+| `edit`               | both      | Apply a batch of commands atomically; with a session it also enforces selects and bin membership; returns the new revision and a one-line summary, or the first failing command's message                                  | ≤ 64 commands                                                                          |
+| `preview_edits`      | assistant | Dry run of a batch against the saved revision: resulting timeline summary and errors, no save                                                                                                                              |                                                                                        |
+| `describe_project`   | both      | Compact timeline: tracks, clips with timecodes, transitions, music, bookmarks, selects, alignment summary; `detail: summary \| full`                                                                                       |                                                                                        |
+| `describe_track`     | both      | One video track's complete appearance (Colour with HSL and curves, Opacity, Transform, keyframes), its keyed settings and the values that apply at requested frames ([#252](https://github.com/Plonk42/PasCap/issues/252)) | ≤ 32 frames                                                                            |
+| `describe_recording` | both      | Shot descriptors (below) inside the selects, telemetry, damage; `tolerance`                                                                                                                                                | Computed on request, no cache                                                          |
+| `still`              | both      | One composed project frame from the proxies (`frame`, `width`, `crop?`, `commands?` for a candidate), JPEG ([#238](https://github.com/Plonk42/PasCap/issues/238))                                                          | Serial, two waiting; refused (409) while an export or reference job runs; image budget |
+| `timeline_sheet`     | both      | Contact sheet of project frames (`frames[]`, `commands?`), JPEG plus legend                                                                                                                                                | Same as still                                                                          |
+| `recording_sheet`    | both      | Contact sheet of a recording's proxy frames (`mediaId`, `frames[]`), ungraded, JPEG plus legend                                                                                                                            | Same as still                                                                          |
+| `estimate`           | both      | `{ clipId or mediaId + range, kind: auto-adjust \| white-balance \| detail }`: decodes ≤ 16 proxy frames at ≤ 320 × 180 and runs the shared estimators or the detail heuristics                                            | Serial with stills                                                                     |
+| `music_analyse`      | editor    | Queue the music analysis job; `music_analysis` (both) returns `{ analysis, job }`, with beats/accents in a window as samples, source frames and project frames                                                             | Background job kind                                                                    |
+| `check_alignment`    | both      | Boundary-to-beat report (below)                                                                                                                                                                                            | Pure, bounded by clip/beat counts                                                      |
+| `snap_cuts_to_beats` | both      | `layerId`, `prefer: beat \| downbeat`, `minimumSeconds`, `apply`: the alignment helper, a proposal or one `edit` batch                                                                                                     |                                                                                        |
+| `beats_to_bookmarks` | both      | Add a music track's beats or downbeats as bookmarks in one revision; the editor's **Beats → bookmarks** uses it too                                                                                                        | ≤ 1,000 bookmarks                                                                      |
 
 There are deliberately no `add_clip`/`set_transition`-style wrappers: those are `edit`
 commands, already described in `editCommandSchema`, and a wrapper would be a second place
-to maintain. Brief permissions (speed, several tracks, picture-in-picture) are enforced in
-`edit` by command type during a session.
+to maintain. The brief carries no permissions: every command is available.
 
 ### Stills and contact sheets
 
-Pipeline for project frame $f$:
+Implemented on the `mcp` branch ([stills](../../src/server/stills.ts)). Pipeline for project
+frame $f$, at the 1280 × 720 draft size:
 
-1. `sampleTimeline(document, f)` (and `sampleSlots` for transition timeslots) gives the
-   active sources with evaluated Colour, Transform, Detail, weights and Opacity.
-2. For each source, decode proxy frame `sourceFrame` with FFmpeg: `-ss` to the keyframe at
-   or before it (closed GOP 15, uniform 1001/30000 durations), `select` the exact frame,
-   output `rgb24`, verify exactly one frame. Damaged ranges follow the proxy, which is
-   already black there.
-3. `composeLayerFrame` composes the group(s) at proxy size into the RGBA16 accumulator
-   (bottom-to-top source-over as export does, see
-   [group composition](../LAYERS_AND_KEYFRAMES.md#group-composition)).
-4. Flatten over opaque black, scale to the requested width, encode JPEG (quality 80) with
-   FFmpeg from raw input; sheets copy each still into a grid before one encode and return a
-   legend `{ cell, frame, timecode, clipIds }` instead of burnt-in text (no libfreetype
-   dependency).
+1. `sampleTimeline(document, f)` and `sampleSlots` give the active sources with evaluated
+   Colour, Transform, Detail, weights and Opacity.
+2. Each source decodes proxy frame `sourceFrame` with FFmpeg: input `-ss` a quarter frame
+   before it, so accurate seeking returns exactly that frame (a native test compares it with
+   a full decode across GOP boundaries), fitted and padded like the export's decode, as
+   `rgb24`. Damaged ranges follow the proxy, which is already black there.
+3. Each enabled track is composed as one group with `composeLayerFrame` on the CPU
+   compositor pool, then source-over the tracks below with the export's `sourceOverGroup`
+   ([group composition](../LAYERS_AND_KEYFRAMES.md#group-composition)); timeslots draw
+   geometry without decoding.
+4. Over opaque black, the RGB is rounded to 8 bits; FFmpeg scales it (area) and encodes
+   one JPEG. Sheets tile the frames row by row with a 4-pixel black gap and return a legend
+   `{ cell, frame, timecode, clipIds }` instead of burnt-in text.
 
-Optional `commands` apply to the saved revision in memory before composing, so the LLM can
-compare a grade or a transition without a revision; the draft is validated exactly like a
-save and never written.
-Default size 640 × 360 (about 50 KB); a `crop` at 1:1 proxy pixels serves judging Sharpen
-and Denoise. Stills show the 720p proxy composition: the export at 4K differs in
-resolution only, as the preview does today ([detail filters](DETAIL_FILTERS.md#kernel)).
-A 720p frame composes in well under a second on the CPU pool; the GPU worker is not used.
+Operations return the JPEG base64-encoded in JSON with its size; the MCP endpoint will turn
+it into image content. Optional `commands` apply to the saved revision in memory before
+composing, so the LLM can compare a grade or a transition without a revision; they are
+validated like an `edit` and against the recordings' frames, and never written. A `crop`
+renders a region of the 1280 × 720 composition at 1:1, to judge Sharpen and Denoise. Stills
+show the 720p proxy composition: the export at 4K differs in resolution only, as the preview
+does ([detail filters](DETAIL_FILTERS.md#kernel)).
+
+The image budget is service configuration with conservative defaults:
+`PASCAP_ASSISTANT_STILL_WIDTH` (480; still width and largest crop side, 160–1280),
+`PASCAP_ASSISTANT_SHEET_CELL_WIDTH` (240, 96–640) and `PASCAP_ASSISTANT_SHEET_CELLS` (9,
+1–24). A request may ask for less, never more; a single-frame sheet renders at the still
+width. At the defaults a still is about 35 KB and a 3 × 3 sheet 728 × 416, about 80 KB.
+
+Measured read-only on the owner's flight (one track, Shadows keyed; 16-thread host): a still
+takes 0.6–0.8 s and a 9-frame sheet 6 s. Shadows, Highlights, HDR, Local contrast and Detail
+use the neighbourhood kernel, about 3 s per 720p frame in process and 1 s on the pool;
+the GPU worker is not used.
 
 ### Shot descriptors
 

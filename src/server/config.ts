@@ -16,6 +16,34 @@ export interface ServiceConfig {
   hardwareDecode: boolean;
   allowedOrigins: Set<string>;
   allowedHosts: Set<string>;
+  /** Largest pictures the assistant operations render. */
+  assistantImages: AssistantImageBudget;
+}
+
+export interface AssistantImageBudget {
+  /** Width of a single still or crop, in pixels. */
+  stillWidth: number;
+  /** Width of each cell of a contact sheet. */
+  sheetCellWidth: number;
+  /** Frames per contact sheet. */
+  sheetCells: number;
+}
+
+function integerSetting(name: string, fallback: number, min: number, max: number): number {
+  const setting = process.env[name];
+  const value = setting === undefined ? fallback : Number(setting);
+  if (!Number.isInteger(value) || value < min || value > max)
+    throw new Error(`${name} must be an integer from ${min} to ${max}.`);
+  return value;
+}
+
+/** Conservative defaults keep each picture cheap for a model; raise them in the environment. */
+function assistantImageBudget(): AssistantImageBudget {
+  return {
+    stillWidth: integerSetting('PASCAP_ASSISTANT_STILL_WIDTH', 480, 160, 1280),
+    sheetCellWidth: integerSetting('PASCAP_ASSISTANT_SHEET_CELL_WIDTH', 240, 96, 640),
+    sheetCells: integerSetting('PASCAP_ASSISTANT_SHEET_CELLS', 9, 1, 24),
+  };
 }
 
 function validateMediaRoots(value: unknown): string[] {
@@ -73,6 +101,7 @@ export function createConfig(overrides: Partial<ServiceConfig> = {}): ServiceCon
     hardwareDecode: decode === 'auto',
     allowedOrigins: new Set(origins),
     allowedHosts: new Set(origins.map((origin) => new URL(origin).host)),
+    assistantImages: assistantImageBudget(),
     ...overrides,
     mediaRoots,
   };

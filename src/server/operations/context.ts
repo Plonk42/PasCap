@@ -1,7 +1,9 @@
 import type { z } from 'zod';
 import type { Operation, OperationName, OperationNamed } from '../../shared/operations/index.js';
 import type { AudioLibrary } from '../audio.js';
+import type { AssistantImageBudget } from '../config.js';
 import type { MediaLibrary } from '../library.js';
+import type { StillRenderer } from '../stills.js';
 import type { ProjectStore } from '../storage.js';
 
 /** What operations may use of the service. */
@@ -9,6 +11,8 @@ export interface ServiceContext {
   projects: Pick<ProjectStore, 'load' | 'save'>;
   library: Pick<MediaLibrary, 'get'>;
   audio: Pick<AudioLibrary, 'get'>;
+  stills: Pick<StillRenderer, 'still' | 'timelineSheet' | 'recordingSheet'>;
+  images: AssistantImageBudget;
 }
 
 export type OperationRunner<S extends Operation> = (

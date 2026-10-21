@@ -206,7 +206,7 @@ function sharedFrame(bytes: number): Buffer {
 }
 
 /** Already graded/premultiplied RGBA16 groups: apply coverage once, never a second LUT. */
-async function sourceOverGroup(lower: Buffer, group: Buffer, signal: AbortSignal): Promise<void> {
+export async function sourceOverGroup(lower: Buffer, group: Buffer, signal: AbortSignal): Promise<void> {
   checkLayeredCancellation(signal);
   if (
     lower.length !== group.length ||
