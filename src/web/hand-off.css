@@ -96,3 +96,46 @@
   gap: 8px;
   align-items: center;
 }
+
+.hand-off-readiness li.idle > svg {
+  color: var(--muted);
+}
+
+.hand-off-connection details {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.hand-off-connection summary {
+  width: fit-content;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.hand-off-connection p {
+  margin: 8px 0;
+  color: var(--muted);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.hand-off-connection pre {
+  max-height: 180px;
+  margin: 0;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: 12px;
+  user-select: all;
+}
+
+.hand-off-copy {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}

@@ -45,7 +45,12 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
   let saves = 0;
   let serial = 0;
   let session: MemorySession | null = null;
-  let readiness: OperationOutput<'hand_off_readiness'> = { recordings: [], music: [], exportRunning: false };
+  let readiness: OperationOutput<'hand_off_readiness'> = {
+    recordings: [],
+    music: [],
+    exportRunning: false,
+    connection: { url: 'http://127.0.0.1:4318/mcp', tokenFile: '/data/mcp-token', lastCall: null, client: null },
+  };
   await page.route(
     /\/api\/ops\/(session_status|session_start|session_end|checkpoint_restore|checkpoint_copy|hand_off_readiness)$/,
     async (route) => {

@@ -305,6 +305,11 @@ describe('operation routes', () => {
         },
       },
       jobs: { list: () => [{ kind: 'export', state: 'running' }] },
+      assistant: {
+        url: 'http://127.0.0.1:4318/mcp',
+        tokenFile: '/data/mcp-token',
+        lastClient: () => ({ at: '2026-10-21T10:00:00.000Z', name: 'Visual Studio Code' }),
+      },
     } as unknown as Parameters<typeof runners.hand_off_readiness>[0];
     expect(await runners.hand_off_readiness(context, { projectId: project.id })).toEqual({
       recordings: [
@@ -314,6 +319,12 @@ describe('operation routes', () => {
       ],
       music: [{ id: 'song-1', name: 'song.wav', preparation: 'ready', beats: 'missing' }],
       exportRunning: true,
+      connection: {
+        url: 'http://127.0.0.1:4318/mcp',
+        tokenFile: '/data/mcp-token',
+        lastCall: '2026-10-21T10:00:00.000Z',
+        client: 'Visual Studio Code',
+      },
     });
   });
 

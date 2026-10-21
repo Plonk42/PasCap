@@ -7,6 +7,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z, ZodError, type ZodType } from 'zod';
 import { operations } from '../shared/operations/index.js';
 import { ASSISTANT_GUIDE } from './assistant-guide.js';
+import { clientName } from './assistant-connection.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { assertNoSymlinks } from './files.js';
 import type { ServiceContext, ServiceResources } from './operations/context.js';
@@ -147,6 +148,7 @@ export function registerMcp(app: FastifyInstance, resources: ServiceResources, t
     handler: async (request, reply) => {
       if (!authorized(request, token))
         return reply.code(401).send({ error: 'Send the PasCap MCP token as Authorization: Bearer <token>.' });
+      resources.assistant.seen(clientName(request.body));
       reply.hijack();
       // Fastify's raw request always has a method and URL; Node types them optional.
       await serve(request.raw as NodeIncomingMessageLike, reply.raw, request.body);

@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type { Operation, OperationName, OperationNamed } from '../../shared/operations/index.js';
+import type { AssistantConnection } from '../assistant-connection.js';
 import type { AudioLibrary } from '../audio.js';
 import type { AssistantImageBudget } from '../config.js';
 import type { JobQueue } from '../jobs.js';
@@ -32,6 +33,7 @@ export interface ServiceContext {
   audio: Pick<AudioLibrary, 'get' | 'analysis' | 'analysisJob'>;
   jobs: Pick<JobQueue, 'list'>;
   stills: Pick<StillRenderer, 'still' | 'timelineSheet' | 'recordingSheet' | 'analysisFrames' | 'lumaFrames'>;
+  assistant: Pick<AssistantConnection, 'url' | 'tokenFile' | 'lastClient' | 'seen'>;
   images: AssistantImageBudget;
 }
 
