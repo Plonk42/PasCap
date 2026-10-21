@@ -6,13 +6,15 @@ export type MusicTransitionType = MusicTransition['type'];
 export function musicTransitionFade(transition: MusicTransition | undefined, side: 'in' | 'out'): number {
   if (!transition || transition.type === 'cut') return 0;
   if (transition.type === 'crossfade') return transition.duration;
+  if (transition.type === 'fade-silence-pause') return transition.fade;
   // Like a video fade through black: the left clip takes the larger half.
   return side === 'out' ? Math.ceil(transition.duration / 2) : Math.floor(transition.duration / 2);
 }
 
-/** Signed frames from the left clip's OUT to the right clip's start: a crossfade overlaps the two clips. */
+/** Signed frames from the left clip's OUT to the right clip's start: a crossfade overlaps the two clips, a pause leaves its own slot. */
 export function musicTransitionOffset(transition: MusicTransition | undefined): number {
-  return transition?.type === 'crossfade' ? -transition.duration : 0;
+  if (transition?.type === 'crossfade') return -transition.duration;
+  return transition?.type === 'fade-silence-pause' ? transition.pause : 0;
 }
 
 export function musicClipEnd(clip: Pick<MusicClip, 'start' | 'duration'>): number {
@@ -52,6 +54,8 @@ export function laneOfClip(lanes: readonly MusicLane[], clipId: string): MusicLa
 function placementError(lane: MusicLane, incoming: MusicTransition): string {
   if (incoming.type === 'crossfade') return 'A music crossfade must overlap its two clips by exactly its duration.';
   if (incoming.type === 'fade-through-silence') return 'A fade through silence requires touching music clips.';
+  if (incoming.type === 'fade-silence-pause')
+    return 'A music pause must leave exactly its length between its two clips.';
   return lane.ripple
     ? 'A Ripple music track plays its clips one after another without gaps.'
     : 'Music clips on one track cannot overlap except in a crossfade.';
@@ -169,24 +173,27 @@ export function moveMusicClip(lane: MusicLane, clipId: string, start: number): M
   return arrangeMusicLane(lane, clips);
 }
 
-/** Sets the transition between clip `index` and the next; without Ripple only the right clip moves. */
+/**
+ * Sets the transition between clip `index` and the next; without Ripple only the right clip moves.
+ * `duration` is the fade of a pause transition, whose silent slot is `pause`.
+ */
 export function setMusicTransition(
   lane: MusicLane,
   index: number,
   type: MusicTransitionType,
   duration: number,
+  pause = 0,
 ): MusicLane {
   const left = lane.clips[index];
   const right = lane.clips[index + 1];
   if (!left || !right) throw new Error('This music clip has no following clip to join.');
   if (type === 'crossfade' && duration > Math.min(left.duration, right.duration))
     throw new Error('A music crossfade cannot be longer than either clip it joins.');
-  const transition = {
-    leftId: left.id,
-    rightId: right.id,
-    type,
-    duration: type === 'cut' ? 0 : duration,
-  } as MusicTransition;
+  const ids = { leftId: left.id, rightId: right.id };
+  let transition: MusicTransition;
+  if (type === 'fade-silence-pause') transition = { ...ids, type, fade: duration, pause };
+  else if (type === 'cut') transition = { ...ids, type, duration: 0 };
+  else transition = { ...ids, type, duration };
   const transitions = lane.transitions.map((item, position) => (position === index ? transition : item));
   const previous = lane.transitions[index]!;
   if (lane.ripple || (type === 'cut' && previous.type === 'cut')) return sequenceMusicLane({ ...lane, transitions });

@@ -694,7 +694,7 @@ one, **Delete selected music clip** removes the selected one (a track keeps at l
 and **Recording** changes the selected clip's ready source. Dragging a ready file from
 Media → Music onto a music track adds a clip there at the drop frame; onto the empty music
 area it starts a track. Between clips, **Transitions** choose **Cut**, **Crossfade** or
-**Fade through silence** with its duration; each boundary's button on the timeline opens it.
+**Fade through silence** (or with a **Pause**) with its duration; each boundary's button on the timeline opens it.
 Import merely adds bin membership/preparation and never implicitly places music.
 Selection is editor-only: no seek requirement, history entry or save. Editing,
 changing Recording or removal leaves the other clips, music tracks, video tracks, track

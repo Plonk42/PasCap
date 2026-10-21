@@ -132,7 +132,7 @@ export const musicClipSchema = z
   .refine((clip) => clip.start + clip.duration <= 2_147_483_647, {
     message: 'Music timeline OUT exceeds the supported integer project-frame range.',
   });
-/** Joins two consecutive clips of a music track: a cut, an overlapping crossfade or a fade through silence. */
+/** Joins two consecutive clips of a music track: a cut, an overlapping crossfade, a fade through silence or one with a pause. */
 export const musicTransitionSchema = z.discriminatedUnion('type', [
   z.object({ leftId: idSchema, rightId: idSchema, type: z.literal('cut'), duration: z.literal(0) }).strict(),
   z
@@ -144,6 +144,16 @@ export const musicTransitionSchema = z.discriminatedUnion('type', [
       rightId: idSchema,
       type: z.literal('fade-through-silence'),
       duration: frameSchema.min(2),
+    })
+    .strict(),
+  // Fade out over `fade` frames, stay silent for its own `pause` timeslot between the clips, fade in.
+  z
+    .object({
+      leftId: idSchema,
+      rightId: idSchema,
+      type: z.literal('fade-silence-pause'),
+      fade: frameSchema.min(1),
+      pause: frameSchema.min(1),
     })
     .strict(),
 ]);

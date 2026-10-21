@@ -167,6 +167,71 @@ describe('music track clips and transitions', () => {
   });
 });
 
+describe('music pause transition', () => {
+  const pause = (fade: number, gap: number, ...changes: Parameters<typeof lane>[1][]) =>
+    setMusicTransition(
+      lane([clip('a', 0), clip('b', 100), clip('c', 200)], ...changes),
+      0,
+      'fade-silence-pause',
+      fade,
+      gap,
+    );
+
+  it('leaves its own silent slot: each clip fades over the whole fade and the right clip starts after the pause', () => {
+    const joined = setMusicRipple(pause(20, 15), true);
+    expect(joined.transitions[0]).toEqual({
+      leftId: 'a',
+      rightId: 'b',
+      type: 'fade-silence-pause',
+      fade: 20,
+      pause: 15,
+    });
+    expect(starts(joined)).toEqual([0, 115, 215]);
+    expect(() => validateMusicLane(joined)).not.toThrow();
+    const sources = musicTracks([joined]);
+    expect(sources.map((source) => [source.fadeIn, source.fadeOut])).toEqual([
+      [0, 20],
+      [20, 0],
+      [0, 0],
+    ]);
+  });
+
+  it('moves only the right clip without Ripple and back again when the pause goes', () => {
+    const spaced = lane([clip('a', 0), clip('b', 200), clip('c', 400)]);
+    const paused = setMusicTransition(spaced, 0, 'fade-silence-pause', 10, 25);
+    expect(starts(paused)).toEqual([0, 125, 400]);
+    expect(starts(setMusicTransition(paused, 0, 'fade-silence-pause', 10, 40))).toEqual([0, 140, 400]);
+    expect(starts(setMusicTransition(paused, 0, 'cut', 0))).toEqual([0, 100, 400]);
+  });
+
+  it('re-sequences the suffix on a Ripple track', () => {
+    const ripple = setMusicRipple(lane([clip('a', 0), clip('b', 100), clip('c', 200)]), true);
+    expect(starts(setMusicTransition(ripple, 0, 'fade-silence-pause', 10, 25))).toEqual([0, 125, 225]);
+  });
+
+  it('rejects a misplaced slot and fades that do not fit', () => {
+    const joined = pause(20, 15);
+    const misplaced = {
+      ...joined,
+      clips: joined.clips.map((item) => (item.id === 'b' ? { ...item, start: 100 } : item)),
+    };
+    expect(() => validateMusicLane(misplaced)).toThrow('must leave exactly its length');
+    expect(() => validateMusicLane(setMusicRipple(pause(120, 15), true))).toThrow('Fades and transitions overlap');
+    expect(musicTracksSchema.safeParse([setMusicRipple(joined, true)]).success).toBe(true);
+    const invalid = { ...joined.transitions[0]!, pause: 0 };
+    expect(musicTracksSchema.safeParse([{ ...joined, transitions: [invalid, joined.transitions[1]!] }]).success).toBe(
+      false,
+    );
+  });
+
+  it('plays a trimmed clip next to the slot without moving other clips', () => {
+    const joined = setMusicRipple(pause(10, 20), true);
+    const shorter = planMusicGesture(project(joined), 'a', 'out', -30);
+    expect(shorter.error).toBe('');
+    expect(starts(shorter.document.music[0]!)).toEqual([0, 90, 190]);
+  });
+});
+
 describe('music editing helpers', () => {
   const asset = { id: 'song', metadata: { frameCount: 300 } } as AudioAsset;
 

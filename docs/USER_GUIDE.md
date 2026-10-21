@@ -744,8 +744,7 @@ and out at its start and end, and **Ripple**, which plays its clips one after an
 like a video track. Each clip has its own waveform placement/edge trims, source IN/OUT,
 start/duration and **Loop selected source range**. Without looping, duration must fit its
 source range; looping repeats only it. Between clips, **Transitions** choose a **Cut**, a
-**Crossfade** (the clips overlap, one fading out while the other fades in) or a **Fade
-through silence**, with its length; the boundary button on the timeline opens it.
+**Crossfade** (the clips overlap, one fading out while the other fades in), a **Fade through silence** or a **Fade through silence with pause** (a **Fade** length, then a silent **Pause** before the next clip starts), with its length; the boundary button on the timeline opens it.
 Independent drafts never apply to another clip or track.
 Each accepted edit or completed gesture is one Undo step; invalid/cancelled edits
 are atomic and never silently clamp timing, save a draft or change other tracks.

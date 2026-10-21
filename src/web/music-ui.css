@@ -311,3 +311,18 @@ button.music-beat-bookmarks[aria-disabled='true'] {
   vertical-align: top;
   font-size: 11px;
 }
+
+/* A pause's silent slot between two clips, like video's dark Pause block. */
+.music-instance-lane .music-transition-slot {
+  position: absolute;
+  top: 3px;
+  height: 42px;
+  border: 1px dashed #5d6894;
+  border-radius: 4px;
+  background: #0d1018;
+  pointer-events: none;
+}
+
+.music-controls .music-transition .range-fields + .range-fields {
+  margin-top: 6px;
+}

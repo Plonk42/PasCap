@@ -358,6 +358,33 @@ test('a music track holds clips joined by Cut, Crossfade or Fade through silence
   await type.selectOption('fade-through-silence');
   expect((await current(page)).music[0]!.transitions[0]).toMatchObject({ type: 'fade-through-silence', duration: 20 });
   expect(await starts()).toEqual([0, 60]);
+  await type.selectOption('fade-silence-pause');
+  expect((await current(page)).music[0]!.transitions[0]).toEqual({
+    leftId: first.id,
+    rightId: second.id,
+    type: 'fade-silence-pause',
+    fade: 10,
+    pause: 15,
+  });
+  expect(await starts()).toEqual([0, 75]);
+  await expect(boundary).toHaveText('Pause');
+  await expect(timeline.locator('.music-transition-slot')).toHaveCount(1);
+  await number(controls, 'Music transition pause after clip 1', '40');
+  expect(await starts()).toEqual([0, 100]);
+  const fade = controls.getByRole('spinbutton', { name: 'Music transition fade after clip 1', exact: true });
+  const paused = (await current(page)).music;
+  await fade.fill('61');
+  await fade.press('Enter');
+  await expect(fade).toHaveAttribute('aria-invalid', 'true');
+  await expect(fade.locator('..').getByRole('alert')).toContainText('Fades and transitions overlap');
+  expect((await current(page)).music).toEqual(paused);
+  await fade.press('Escape');
+  await number(controls, 'Music transition fade after clip 1', '20');
+  expect((await current(page)).music[0]!.transitions[0]).toMatchObject({
+    type: 'fade-silence-pause',
+    fade: 20,
+    pause: 40,
+  });
   await type.selectOption('cut');
   expect(await starts()).toEqual([0, 60]);
 
@@ -379,7 +406,7 @@ test('a music track holds clips joined by Cut, Crossfade or Fade through silence
   await expect(remove).toBeDisabled();
   await expect(remove).toHaveAccessibleDescription(/delete the music track instead/);
   await flush(page);
-  for (let step = 0; step < 8; step++) await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  for (let step = 0; step < 11; step++) await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect((await current(page)).music).toEqual(document.music);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });

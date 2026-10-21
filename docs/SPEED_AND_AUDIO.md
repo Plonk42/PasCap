@@ -299,7 +299,7 @@ frame for main capture.
 
 Projects require `music`, an array of **0–8 independent music tracks**; `[]` means no
 music. Like a video track, a music track owns its gain, Ripple, opening/closing fades and
-**1–8 clips** joined by transitions (Cut, Crossfade or Fade through silence). Each clip
+**1–8 clips** joined by transitions (Cut, Crossfade, Fade through silence or Fade through silence with pause). Each clip
 requires `mediaId`, `sourceIn`, `sourceOut`, `start`, `duration` and `loop`; track and clip
 IDs are unique together. Several clips can use the same registered recording without
 sharing edits. A missing array/ID, null/singular music, unknown fields or duplicate IDs
@@ -363,10 +363,9 @@ A track's **Transitions** list one boundary per pair of adjacent clips, also rea
 from the boundary button on the timeline: **Cut** (the next clip starts at or after the
 previous OUT; a gap is allowed without Ripple), **Crossfade** (the clips overlap by its
 duration, one fading out while the other fades in, both linearly) or **Fade through
-silence** (the clips touch; the first fades out, then the second fades in). With
+silence** (the clips touch; the first fades out, then the second fades in) or **Fade through silence with pause** (a **Fade** length for each clip with a silent **Pause** between them: the second clip starts that many frames after the first one's OUT). With
 **Ripple** on, clips play one after another from the first clip's start and later clips'
-starts are not editable; with it off each clip keeps its start, and choosing or
-lengthening a crossfade or fade through silence moves only the clip after it. A
+starts are not editable; with it off each clip keeps its start, and choosing or lengthening a crossfade or pause moves only the clip after it. A
 transition that does not fit is refused, never shortened.
 
 Project duration is **max(all retimed video clip OUTs, every music clip start + duration)**,

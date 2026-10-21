@@ -29,9 +29,15 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
     those same frames, two linear fades, not an equal-power curve.
   - **Fade through silence** (`fade-through-silence`, duration ≥ 2): the clips touch; the
     left clip fades out over the larger half and the right one fades in over the other.
+  - **Fade through silence with pause** (`fade-silence-pause`, `{ fade ≥ 1, pause ≥ 1 }` instead of
+    `duration`, like video's `fade-black-pause`): the left clip fades out over its last `fade`
+    frames, the pause is the transition's own timeslot of silence (it needs no audio source), and
+    the right clip, which starts `pause` frames after the previous OUT, fades in over its first
+    `fade` frames. Each clip keeps its own fades, so the mix, receipt format and PCM cache are
+    unchanged. A new one has a fade of half the previous length and a 15-frame pause.
 - With **Ripple** on, clips play one after another from the first clip's start; with it
   off, each clip keeps its own start, except that a crossfade or fade through silence
-  places its right clip as above. No three clips overlap.
+  places its right clip as above (a pause shifts it by its length). No three clips overlap.
 - Source IN/OUT, placement, fades and transitions are integer frames; OUT is exclusive.
   IN/start/fades are nonnegative; OUT/duration are positive. Frames and timeline
   OUT fit **0–2,147,483,647**. Reject overflow; never shorten or clamp a clip.
@@ -103,7 +109,7 @@ clip) and **+ Clip** (**Add music clip**), which appends a clip of a ready recor
 the last one, up to eight. The selected clip's **Recording**, beats, length and **Loop**
 follow, then **Placement & fades**: the clip's source IN/OUT, timeline start and duration,
 and the track's fade in and out. A track with several clips ends with its
-**Transitions**: one Cut / Crossfade / Fade through silence selector per boundary, with
+**Transitions**: one Cut / Crossfade / Fade through silence / Fade through silence with pause selector per boundary, with
 its duration. The timeline draws each boundary as a button that selects the clip before
 it and focuses that transition. Dragging a ready file from Media → Music onto a music
 track adds a clip at the drop frame (a Ripple track takes it at the nearest place in its

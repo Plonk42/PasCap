@@ -61,12 +61,14 @@ interface Props {
 type LaneUpdate = (lane: MusicLane) => MusicLane;
 
 const MAX_FRAME = 2_147_483_647;
-/** A new crossfade or fade through silence lasts one second. */
+/** A new crossfade or fade through silence lasts one second; a new pause is half a second. */
 const DEFAULT_TRANSITION_FRAMES = 30;
+const DEFAULT_PAUSE_FRAMES = 15;
 const TRANSITION_NAMES: Record<MusicTransitionType, string> = {
   cut: 'Cut',
   crossfade: 'Crossfade',
   'fade-through-silence': 'Fade through silence',
+  'fade-silence-pause': 'Fade through silence with pause',
 };
 
 /** Why an edit cannot apply, or null: invalid drafts stay editable, never clamped. */
@@ -768,13 +770,19 @@ function MusicTransitionRow({
 }>) {
   const errorId = useId();
   const [error, setError] = useState('');
-  const edit = (type: MusicTransitionType, duration: number): MusicEdit =>
-    musicLaneEdit(project, lane.id, (current) => setMusicTransition(current, position, type, duration));
+  const edit = (type: MusicTransitionType, duration: number, pause = 0): MusicEdit =>
+    musicLaneEdit(project, lane.id, (current) => setMusicTransition(current, position, type, duration, pause));
+  const resetKey = `${project.id}:${transition.leftId}:${transition.rightId}:${transition.type}`;
   const choose = (type: MusicTransitionType): void => {
-    const duration = transition.type === 'cut' ? DEFAULT_TRANSITION_FRAMES : transition.duration;
-    const message = editError(project, () => edit(type, duration));
+    // Switching type keeps the visible fade length where both types have one.
+    let span = DEFAULT_TRANSITION_FRAMES;
+    if (transition.type === 'fade-silence-pause') span = 2 * transition.fade;
+    else if (transition.type !== 'cut') span = transition.duration;
+    const duration = type === 'fade-silence-pause' ? Math.ceil(span / 2) : span;
+    const pause = type === 'fade-silence-pause' ? DEFAULT_PAUSE_FRAMES : 0;
+    const message = editError(project, () => edit(type, duration, pause));
     setError(message ?? '');
-    if (!message && active && !drafting) onEdit(edit(type, duration));
+    if (!message && active && !drafting) onEdit(edit(type, duration, pause));
   };
   const name = `after clip ${position + 1}`;
   return (
@@ -797,7 +805,7 @@ function MusicTransitionRow({
             ))}
           </select>
         </label>
-        {transition.type !== 'cut' && (
+        {(transition.type === 'crossfade' || transition.type === 'fade-through-silence') && (
           <label>
             Duration · frames
             <NumberField
@@ -808,7 +816,7 @@ function MusicTransitionRow({
               step={1}
               value={transition.duration}
               disabled={drafting}
-              resetKey={`${project.id}:${transition.leftId}:${transition.rightId}:${transition.type}`}
+              resetKey={resetKey}
               validate={(duration) => editError(project, () => edit(transition.type, duration))}
               onCommit={(duration) => {
                 if (active && !drafting) onEdit(edit(transition.type, duration));
@@ -817,6 +825,44 @@ function MusicTransitionRow({
           </label>
         )}
       </div>
+      {transition.type === 'fade-silence-pause' && (
+        <div className="range-fields">
+          <label>
+            Fade · frames
+            <NumberField
+              aria-label={`Music transition fade ${name}`}
+              min={1}
+              max={MAX_FRAME}
+              integer
+              step={1}
+              value={transition.fade}
+              disabled={drafting}
+              resetKey={resetKey}
+              validate={(fade) => editError(project, () => edit(transition.type, fade, transition.pause))}
+              onCommit={(fade) => {
+                if (active && !drafting) onEdit(edit(transition.type, fade, transition.pause));
+              }}
+            />
+          </label>
+          <label>
+            Pause · frames
+            <NumberField
+              aria-label={`Music transition pause ${name}`}
+              min={1}
+              max={MAX_FRAME}
+              integer
+              step={1}
+              value={transition.pause}
+              disabled={drafting}
+              resetKey={resetKey}
+              validate={(pause) => editError(project, () => edit(transition.type, transition.fade, pause))}
+              onCommit={(pause) => {
+                if (active && !drafting) onEdit(edit(transition.type, transition.fade, pause));
+              }}
+            />
+          </label>
+        </div>
+      )}
       {error && (
         <span className="number-field-error" id={errorId} role="alert">
           {error}

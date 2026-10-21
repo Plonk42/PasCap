@@ -704,8 +704,7 @@ rejected while the receipt and finished output remain preserved. Current PCM for
 
 Each music track has its own timeline lane holding its clips, each with its
 backend-prepared waveform: a clip shows the recording name (and **loop**), kept at the
-left edge while the clip starts off-screen, and a boundary button (**Cut**, **Crossfade**
-or **Fade**) sits between adjacent clips. Clicking a clip, or Enter on it, selects it and
+left edge while the clip starts off-screen, and a boundary button (**Cut**, **Crossfade**, **Fade** or **Pause**) sits between adjacent clips. Clicking a clip, or Enter on it, selects it and
 its track, as does **Audio → Music → Music track** (then **Clip**); a boundary button
 selects the clip before it and focuses that transition in Audio. **Add music track**
 lists ready music files and creates a track with one clip; **+ Clip** adds a clip after
@@ -724,7 +723,7 @@ per clip. A music track's **Ripple** plays its clips one after another from the 
 one's start, re-sequencing later clips after a move, trim, removal or transition change;
 without it each clip keeps its start. Music is never retimed or rippled with video tracks.
 A Crossfade overlaps two clips by its duration with two linear fades; a Fade through
-silence fades the first clip out, then the second in. Transitions or fades that do not
+silence fades the first clip out, then the second in; a Pause leaves a dark dashed slot of silence between them, which the right clip starts after. Transitions or fades that do not
 fit are refused, never shortened. All music clips sum linearly after their
 gain/fades and clamp once after the complete mix; one AudioContext/worklet/output
 clock drives synchronisation, never per-track clocks or queues.

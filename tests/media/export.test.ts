@@ -1317,6 +1317,75 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     expect(result.receipt.snapshot.music).toEqual([lane]);
   }, 120_000);
 
+  it("leaves the slot of a music pause silent between each clip's own fades", async () => {
+    const project = document(24);
+    const tone = mixSources[1]!;
+    const empty = {
+      id: 'paused',
+      gainDb: 0,
+      ripple: true,
+      openingFade: 0,
+      closingFade: 0,
+      clips: [],
+      transitions: [],
+    };
+    const lane = setMusicTransition(
+      arrangeMusicLane(empty, [
+        { id: 'first', mediaId: tone.id, sourceIn: 0, sourceOut: 12, start: 0, duration: 8, loop: false },
+        { id: 'second', mediaId: audio.id, sourceIn: 6, sourceOut: 18, start: 8, duration: 12, loop: false },
+      ]),
+      0,
+      'fade-silence-pause',
+      3,
+      4,
+    );
+    project.music = [lane];
+    expect(lane.clips.map((clip) => clip.start)).toEqual([0, 12]);
+    const plans = musicTracks(project.music).map((track) => planExportMusic(track, 24));
+    const expected = expectedMusicPCM(plans, sourcePCM);
+    const pause = expected.subarray(exportAudioSample(8) * 2, exportAudioSample(12) * 2);
+    expect(pause).toHaveLength((exportAudioSample(12) - exportAudioSample(8)) * 2);
+    expect(pause.every((value) => value === 0)).toBe(true);
+    expect(expected.subarray(0, exportAudioSample(8) * 2).some((value) => value !== 0)).toBe(true);
+    const originalRun = nativeProcesses.runProcess;
+    const accumulators: number[] = [];
+    const processSpy = vi
+      .spyOn(nativeProcesses, 'runProcess')
+      .mockImplementation(async (binary, args, options = {}) => {
+        const result = await originalRun(binary, args, options);
+        const match = /^music-accumulator-(\d+)\.wav$/.exec(args.at(-1)!);
+        if (binary === config.ffmpeg && match) {
+          const index = Number(match[1]);
+          const mixed = await stereoPCM(config, path.join(options.cwd!, args.at(-1)!));
+          assertPCM(mixed, expectedMusicPCM(plans.slice(0, index + 1), sourcePCM), `pause accumulator ${index}`);
+          expect(
+            mixed.subarray(exportAudioSample(8) * 2, exportAudioSample(12) * 2).every((value) => value === 0),
+          ).toBe(true);
+          accumulators.push(index);
+        }
+        return result;
+      });
+    let result: Awaited<ReturnType<typeof completed>>;
+    try {
+      result = await completed(project);
+    } finally {
+      processSpy.mockRestore();
+    }
+    expect(accumulators).toEqual([0, 1]);
+    expect(
+      result.receipt.settings.audio.map((plan) => [
+        plan.id,
+        plan.startSamples,
+        plan.fadeInSamples,
+        plan.fadeOutSamples,
+      ]),
+    ).toEqual([
+      ['first', 0, 0, exportAudioSample(3)],
+      ['second', exportAudioSample(12), exportAudioSample(3), 0],
+    ]);
+    expect(result.receipt.snapshot.music).toEqual([lane]);
+  }, 120_000);
+
   it('fails a missing second original and cancels its active decode without changing originals, saved edits or successful outputs', async () => {
     const positive = mixSources[1]!;
     const negative = mixSources[2]!;

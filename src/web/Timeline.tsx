@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -22,7 +23,7 @@ import {
   type ProjectDocument,
   type VideoClip,
 } from '../shared/model.js';
-import { insertMusicClip, musicClips, musicTracks } from '../shared/music-lanes.js';
+import { insertMusicClip, musicClips, musicTracks, musicTransitionOffset } from '../shared/music-lanes.js';
 import type { TimelineRange } from '../shared/rush-editing.js';
 import { snapFrame, snapPoints } from '../shared/snap.js';
 import { trimOnTimeline, type TrimEdge } from '../shared/source-range.js';
@@ -390,6 +391,7 @@ const MUSIC_TRANSITION_LABELS: Record<MusicTransition['type'], string> = {
   cut: 'Cut',
   crossfade: 'Crossfade',
   'fade-through-silence': 'Fade',
+  'fade-silence-pause': 'Pause',
 };
 
 function TimelineMusicLanes(
@@ -464,23 +466,32 @@ function TimelineMusicLanes(
         {lane.transitions.map((transition, position) => {
           const left = lane.clips[position]!;
           const end = left.start + left.duration;
-          // A crossfade's button sits in the middle of its overlap, the others on the boundary.
-          const at = transition.type === 'crossfade' ? end - transition.duration / 2 : end;
+          // A crossfade's button sits in the middle of its overlap, a pause's in its slot, the others on the boundary.
+          const offset = musicTransitionOffset(transition);
+          const at = offset === 0 ? end : end + offset / 2;
           const label = MUSIC_TRANSITION_LABELS[transition.type];
           return (
-            <button
-              key={`${transition.leftId}-${transition.rightId}`}
-              type="button"
-              className="boundary-button music-boundary"
-              data-music-transition={transition.leftId}
-              disabled={props.disabled}
-              style={{ left: props.leading + at * props.scale }}
-              aria-label={`Transition after clip ${position + 1} on music track ${index + 1}`}
-              title={`${label} on music track ${index + 1} · edit this boundary in Audio`}
-              onClick={() => props.onMusicBoundary(transition.leftId)}
-            >
-              {label}
-            </button>
+            <Fragment key={`${transition.leftId}-${transition.rightId}`}>
+              {transition.type === 'fade-silence-pause' && (
+                <div
+                  className="music-transition-slot"
+                  aria-hidden="true"
+                  style={{ left: props.leading + end * props.scale, width: transition.pause * props.scale }}
+                />
+              )}
+              <button
+                type="button"
+                className="boundary-button music-boundary"
+                data-music-transition={transition.leftId}
+                disabled={props.disabled}
+                style={{ left: props.leading + at * props.scale }}
+                aria-label={`Transition after clip ${position + 1} on music track ${index + 1}`}
+                title={`${label} on music track ${index + 1} · edit this boundary in Audio`}
+                onClick={() => props.onMusicBoundary(transition.leftId)}
+              >
+                {label}
+              </button>
+            </Fragment>
           );
         })}
       </div>
