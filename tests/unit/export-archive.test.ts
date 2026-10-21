@@ -10,11 +10,20 @@ import { JobQueue } from '../../src/server/jobs.js';
 import { audioAssetSchema } from '../../src/shared/audio.js';
 import { planExportMusic } from '../../src/shared/export.js';
 import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
-import { createClip, createProject, PROJECT_SCHEMA_VERSION, type ProjectDocument } from '../../src/shared/model.js';
+import {
+  createClip,
+  createProject,
+  MAX_MUSIC_CLIPS,
+  MAX_MUSIC_TRACKS,
+  PROJECT_SCHEMA_VERSION,
+  type ProjectDocument,
+} from '../../src/shared/model.js';
+import { musicTracks } from '../../src/shared/music-lanes.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { framesToSeconds } from '../../src/shared/timing.js';
-import { EARLIER_SCHEMA_VERSIONS, unsupportedProject } from './project-fixtures.js';
+import { singleClipLane } from '../music-lanes.js';
+import { EARLIER_SCHEMA_VERSIONS, SUPPORTED_VERSIONS, unsupportedProject } from './project-fixtures.js';
 
 function audioAsset(id: string) {
   return audioAssetSchema.omit({ content: true }).parse({
@@ -44,6 +53,7 @@ function audioAsset(id: string) {
 
 function receiptFixture(snapshot: ProjectDocument, jobId: string) {
   const duration = calculateLayout(snapshot).duration;
+  const tracks = musicTracks(snapshot.music);
   return {
     kind: 'export',
     schemaVersion: 1,
@@ -51,8 +61,8 @@ function receiptFixture(snapshot: ProjectDocument, jobId: string) {
     createdAt: new Date().toISOString(),
     snapshot,
     profile: 'draft720',
-    musicSources: [...new Set(snapshot.music.map((music) => music.mediaId))].map(audioAsset),
-    settings: { audio: snapshot.music.map((music) => planExportMusic(music, duration)) },
+    musicSources: [...new Set(tracks.map((music) => music.mediaId))].map(audioAsset),
+    settings: { audio: tracks.map((music) => planExportMusic(music, duration)) },
     verification: { frameCount: duration, fullDecode: true, faststart: true },
   };
 }
@@ -61,7 +71,7 @@ function musicProject() {
   const snapshot = createProject('music-flight', 'Music flight');
   snapshot.clips.push(createClip('one', 'source', 0, 10));
   snapshot.music = [
-    {
+    singleClipLane({
       id: 'music-0',
       mediaId: 'song',
       sourceIn: 2,
@@ -72,7 +82,7 @@ function musicProject() {
       fadeIn: 3,
       fadeOut: 4,
       loop: true,
-    },
+    }),
   ];
   return snapshot;
 }
@@ -146,18 +156,20 @@ describe('durable export receipts', () => {
       ],
     };
     snapshot.layers[0]!.keyframes = [layerKeyframe(5, { ...EMPTY_KEY_VALUES, opacity: 0.5, exposure: 0.7 }, 'smooth')];
-    snapshot.music = Array.from({ length: 8 }, (_, index) => ({
-      id: `music-${index}`,
-      mediaId: index % 2 ? 'one-source' : 'other-source',
-      sourceIn: index,
-      sourceOut: 20 + index,
-      start: index * 10,
-      duration: 20,
-      gainDb: -index,
-      fadeIn: index,
-      fadeOut: index,
-      loop: false,
-    }));
+    snapshot.music = Array.from({ length: 8 }, (_, index) =>
+      singleClipLane({
+        id: `music-${index}`,
+        mediaId: index % 2 ? 'one-source' : 'other-source',
+        sourceIn: index,
+        sourceOut: 20 + index,
+        start: index * 10,
+        duration: 20,
+        gainDb: -index,
+        fadeIn: index,
+        fadeOut: index,
+        loop: false,
+      }),
+    );
     expect(snapshot.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     const receipt = receiptFixture(snapshot, id);
     expect(receipt.musicSources).toHaveLength(2);
@@ -199,6 +211,37 @@ describe('durable export receipts', () => {
     try {
       expect(await restoreExports(createConfig({ dataDir: root }), jobs)).toEqual([]);
       expect(jobs.get(id)?.state).toBe('completed');
+    } finally {
+      await jobs.close();
+    }
+  });
+
+  it('restores a receipt whose schema-23 snapshot has one music track per placement, unchanged', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-archive-'));
+    temporary.push(root);
+    const id = randomUUID();
+    const folder = path.join(root, 'renders', id);
+    await mkdir(folder, { recursive: true });
+    const current = receiptFixture(musicProject(), id);
+    // Schema 23 stored each music placement as a track with its own gain and fades; its plans match them.
+    const [lane] = current.snapshot.music;
+    const { clips: _clips, ripple: _ripple, transitions: _transitions, ...rest } = lane!;
+    const saved = {
+      ...current,
+      snapshot: {
+        ...current.snapshot,
+        schemaVersion: 23,
+        music: [{ ...lane!.clips[0]!, gainDb: rest.gainDb, fadeIn: rest.openingFade, fadeOut: rest.closingFade }],
+      },
+    };
+    const text = JSON.stringify(saved);
+    await writeFile(path.join(folder, 'receipt.json'), text);
+    await writeFile(path.join(folder, 'export.mp4'), 'verified output fixture');
+    const jobs = new JobQueue();
+    try {
+      expect(await restoreExports(createConfig({ dataDir: root }), jobs)).toEqual([]);
+      expect(jobs.get(id)?.state).toBe('completed');
+      expect(await readFile(path.join(folder, 'receipt.json'), 'utf8')).toBe(text);
     } finally {
       await jobs.close();
     }
@@ -394,20 +437,22 @@ describe('durable export receipts', () => {
     {
       name: 'too many captured sources',
       change: (receipt) => {
-        receipt.musicSources = Array.from({ length: 9 }, (_, index) => audioAsset(`source-${index}`));
+        receipt.musicSources = Array.from({ length: MAX_MUSIC_TRACKS * MAX_MUSIC_CLIPS + 1 }, (_, index) =>
+          audioAsset(`source-${index}`),
+        );
       },
     },
     {
       name: 'too many plans',
       change: (receipt) => {
-        receipt.settings.audio = Array.from({ length: 9 }, (_, index) => ({
+        receipt.settings.audio = Array.from({ length: MAX_MUSIC_TRACKS * MAX_MUSIC_CLIPS + 1 }, (_, index) => ({
           ...receipt.settings.audio[0]!,
           id: `plan-${index}`,
         }));
       },
     },
   ];
-  for (const field of Object.keys(planExportMusic(musicProject().music[0]!, 45)))
+  for (const field of Object.keys(planExportMusic(musicTracks(musicProject().music)[0]!, 45)))
     invalidReceipts.push({
       name: `missing plan ${field}`,
       change: (receipt) => {
@@ -489,7 +534,7 @@ describe('durable export receipts', () => {
         const warnings = await restoreExports(createConfig({ dataDir: root }), jobs);
         expect(warnings).toHaveLength(1);
         expect(warnings[0]).toContain(
-          `Unsupported export snapshot schema version ${version}; this build requires version ${PROJECT_SCHEMA_VERSION}`,
+          `Unsupported export snapshot schema version ${version}; this build requires ${SUPPORTED_VERSIONS}`,
         );
         expect(jobs.list()).toEqual([]);
         expect(await readFile(path.join(folder, 'receipt.json'), 'utf8')).toBe(text);

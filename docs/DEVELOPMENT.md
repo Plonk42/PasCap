@@ -477,8 +477,9 @@ stored-keyframe navigation and live-preview sliders. See
 [the Transform contract](design/SPATIAL_TRANSFORMS.md), not historical benchmark
 reports, for current geometry/schema/UI facts.
 
-Up to eight independently identified music tracks share one bounded mixed queue,
-AudioContext/worklet and output clock. Apply each source's gain/fades, sum linearly,
+Up to eight independently identified music tracks, each holding up to eight clips joined by
+transitions, share one bounded mixed queue, AudioContext/worklet and output clock. Apply
+each clip's track gain and fades, sum linearly,
 then clamp once after the full mix. Native audio stays serial: one original decoder,
 at most two intermediate inputs and three scratch files (selected PCM plus old/new
 Float64 accumulators). Audio storage planning is maximum selected PCM plus two full

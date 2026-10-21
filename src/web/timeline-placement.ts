@@ -1,5 +1,6 @@
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { ProjectDocument, VideoClip } from '../shared/model.js';
+import { musicClips } from '../shared/music-lanes.js';
 import { clipDuration } from '../shared/speed.js';
 import { calculateLayout, layerClips, transitionOffset, type PlacedClip } from '../shared/timeline.js';
 
@@ -73,7 +74,12 @@ function snapPointsWithout(project: ProjectDocument, excluded: ReadonlySet<strin
     ...clips.flatMap((placed) => [placed.start, placed.end]),
     ...transitions.flatMap((region) => [region.start, region.boundary, region.end]),
   ];
-  points.push(...project.music.flatMap((track) => [track.start, track.start + track.duration]), ...project.bookmarks);
+  points.push(
+    ...musicClips(project.music)
+      .filter((clip) => !excluded.has(clip.id))
+      .flatMap((clip) => [clip.start, clip.start + clip.duration]),
+    ...project.bookmarks,
+  );
   return [...new Set(points)].filter((point) => point >= 0).sort((left, right) => left - right);
 }
 

@@ -3,7 +3,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ProjectStore } from '../../src/server/storage.js';
-import { PROJECT_SCHEMA_VERSION } from '../../src/shared/model.js';
+import {
+  musicTracksSchema,
+  PROJECT_SCHEMA_VERSION,
+  projectSchema,
+  type MusicLane,
+  type MusicTrack,
+} from '../../src/shared/model.js';
+import { musicTracks } from '../../src/shared/music-lanes.js';
 import {
   missingMigrations,
   OLDEST_PROJECT_SCHEMA_VERSION,
@@ -49,6 +56,52 @@ describe('project compatibility', () => {
       expect(await readFile(filename, 'utf8')).toBe(bytes);
       await rm(filename);
     }
+  });
+
+  it('upgrades each schema-23 music track to a track holding one clip that plays exactly the same', async () => {
+    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-23.json'), 'utf8')) as {
+      music: MusicTrack[];
+    };
+    const before = structuredClone(saved);
+    const upgraded = projectSchema.parse(upgradeProject(saved));
+    expect(saved).toEqual(before);
+    expect(saved.music.length).toBeGreaterThan(0);
+    expect(musicTracks(upgraded.music)).toEqual(saved.music);
+    expect(upgraded.music.map((lane) => lane.id)).toEqual(saved.music.map((_, index) => `music-track-${index + 1}`));
+    for (const lane of upgraded.music) expect(lane).toMatchObject({ ripple: false, transitions: [] });
+  });
+
+  it('keeps every saved music value through the upgrade, so invalid data is still rejected', () => {
+    const track = {
+      id: 'music-track-1',
+      mediaId: 'song',
+      sourceIn: 0,
+      sourceOut: 30,
+      start: 0,
+      duration: 30,
+      gainDb: 0,
+      fadeIn: 0,
+      fadeOut: 0,
+      loop: false,
+    };
+    const upgrade = (music: unknown) => upgradeProject({ schemaVersion: 23, music }) as { music: unknown };
+    const [lane] = upgrade([track]).music as MusicLane[];
+    const { gainDb, fadeIn, fadeOut, ...clip } = track;
+    // A lane ID never collides with a saved ID, which the clip keeps.
+    expect(lane).toEqual({
+      id: 'music-track-1-x',
+      gainDb,
+      ripple: false,
+      openingFade: fadeIn,
+      closingFade: fadeOut,
+      clips: [clip],
+      transitions: [],
+    });
+    expect(musicTracksSchema.safeParse(upgrade([{ ...track, extra: true }]).music).success).toBe(false);
+    const { gainDb: _gain, ...missing } = track;
+    expect(musicTracksSchema.safeParse(upgrade([missing]).music).success).toBe(false);
+    expect(upgrade(null).music).toBeNull();
+    expect(upgrade([null]).music).toEqual([null]);
   });
 
   it('rejects versions outside the supported range with the reason', () => {

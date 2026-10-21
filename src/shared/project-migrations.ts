@@ -1,13 +1,46 @@
 import { PROJECT_SCHEMA_VERSION } from './model.js';
 
 /** Oldest saved project schema this build still opens: the first one used for real editing. */
-export const OLDEST_PROJECT_SCHEMA_VERSION = 23;
+export const OLDEST_PROJECT_SCHEMA_VERSION: number = 23;
 
 type SavedProject = Record<string, unknown>;
 type Migration = (document: SavedProject) => SavedProject;
 
+/**
+ * Schema 24: a music track holds clips joined by transitions and owns gain and fades. Each saved music
+ * track becomes a track with that one clip, which keeps the old ID so saved export plans still match;
+ * its fades become the track's opening/closing fades, so it sounds exactly the same.
+ */
+function musicTracksWithClips(document: SavedProject): SavedProject {
+  const music = document['music'];
+  if (!Array.isArray(music)) return document;
+  const used = new Set(music.map((track: unknown) => (track as { id?: unknown } | null)?.id));
+  const laneId = (index: number): string => {
+    let candidate = `music-track-${index + 1}`;
+    while (used.has(candidate)) candidate = `${candidate}-x`;
+    used.add(candidate);
+    return candidate;
+  };
+  return {
+    ...document,
+    music: music.map((track: unknown, index) => {
+      if (typeof track !== 'object' || track === null || Array.isArray(track)) return track;
+      const { gainDb, fadeIn, fadeOut, ...clip } = track as SavedProject;
+      return {
+        id: laneId(index),
+        gainDb,
+        ripple: false,
+        openingFade: fadeIn,
+        closingFade: fadeOut,
+        clips: [clip],
+        transitions: [],
+      };
+    }),
+  };
+}
+
 /** `MIGRATIONS[v]` upgrades a document saved with schema `v` to schema `v + 1`; it never mutates its input. */
-const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = {};
+const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = { 23: musicTracksWithClips };
 
 export function supportedProjectVersions(): string {
   return OLDEST_PROJECT_SCHEMA_VERSION === PROJECT_SCHEMA_VERSION

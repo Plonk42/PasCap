@@ -217,6 +217,60 @@ button.music-beat-bookmarks[aria-disabled='true'] {
   display: none;
 }
 
+.music-controls [data-music-clip-id][hidden],
+.music-controls [data-music-clip-timing-id][hidden] {
+  display: none;
+}
+
+/* The selected clip's settings follow the track's, below a hairline. */
+.music-controls .music-clip-picker {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.music-controls .music-transitions {
+  min-width: 0;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.music-controls .music-transitions > legend {
+  margin-bottom: 6px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.music-controls .music-transitions > ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.music-controls .music-transition select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.music-controls .music-transition > .number-field-error {
+  display: block;
+  margin-top: 4px;
+}
+
+/* A music transition's button sits on its lane, centred in the 48 px row. */
+.music-instance-lane .boundary-button.music-boundary {
+  top: 12px;
+  color: #ccd4f2;
+  background: #2a3150;
+  border-color: #5d6894;
+}
+
 .music-lane-wrapper.music-instance-lane {
   height: 48px;
   border-bottom: 1px solid #414963;
@@ -256,4 +310,19 @@ button.music-beat-bookmarks[aria-disabled='true'] {
   white-space: nowrap;
   vertical-align: top;
   font-size: 11px;
+}
+
+/* A pause's silent slot between two clips, like video's dark Pause block. */
+.music-instance-lane .music-transition-slot {
+  position: absolute;
+  top: 3px;
+  height: 42px;
+  border: 1px dashed #5d6894;
+  border-radius: 4px;
+  background: #0d1018;
+  pointer-events: none;
+}
+
+.music-controls .music-transition .range-fields + .range-fields {
+  margin-top: 6px;
 }

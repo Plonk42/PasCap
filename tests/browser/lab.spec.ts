@@ -4,8 +4,10 @@ import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { planExportMusic } from '../../src/shared/export.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
+import { musicTracks } from '../../src/shared/music-lanes.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { parseTimecode } from '../../src/web/TimecodeField.js';
+import { singleClipLane } from '../music-lanes.js';
 import {
   addMusicTrack,
   clipAction,
@@ -534,16 +536,16 @@ test('music drag placement is one undoable edit and Escape discards its draft', 
   await page.mouse.down();
   await page.mouse.move(box.x + 25 + 20 * scale, box.y + 25, { steps: 6 });
   await page.mouse.up();
-  expect(await page.evaluate(() => window.pascapLab!.project()!.music[0]!.start)).toBe(20);
+  expect(await page.evaluate(() => window.pascapLab!.project()!.music[0]!.clips[0]!.start)).toBe(20);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect(await page.evaluate(() => window.pascapLab!.project()!.music[0]!.start)).toBe(0);
+  expect(await page.evaluate(() => window.pascapLab!.project()!.music[0]!.clips[0]!.start)).toBe(0);
   const restored = (await body.boundingBox())!;
   await page.mouse.move(restored.x + 25, restored.y + 25);
   await page.mouse.down();
   await page.mouse.move(restored.x + 25 + 10 * scale, restored.y + 25, { steps: 3 });
   await page.keyboard.press('Escape');
   await page.mouse.up();
-  expect(await page.evaluate(() => window.pascapLab!.project()!.music[0]!.start)).toBe(0);
+  expect(await page.evaluate(() => window.pascapLab!.project()!.music[0]!.clips[0]!.start)).toBe(0);
 });
 
 test('plays both ramp directions across dissolves and music source wraps on repeated playback', async ({
@@ -581,7 +583,7 @@ test('plays both ramp directions across dissolves and music source wraps on repe
   project = applyCommand(project, {
     type: 'music',
     music: [
-      {
+      singleClipLane({
         id: 'ramp-music',
         mediaId: audio.assets[0]!.id,
         sourceIn: 30,
@@ -592,7 +594,7 @@ test('plays both ramp directions across dissolves and music source wraps on repe
         fadeIn: 6,
         fadeOut: 12,
         loop: true,
-      },
+      }),
     ],
   });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
@@ -655,7 +657,7 @@ test('exports a multi-clip retimed/graded music edit and serves verified snapsho
   project = applyCommand(project, {
     type: 'music',
     music: [
-      {
+      singleClipLane({
         id: 'export-music',
         mediaId: audio.assets[0]!.id,
         sourceIn: 0,
@@ -666,7 +668,7 @@ test('exports a multi-clip retimed/graded music edit and serves verified snapsho
         fadeIn: 5,
         fadeOut: 10,
         loop: true,
-      },
+      }),
     ],
   });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
@@ -679,7 +681,7 @@ test('exports a multi-clip retimed/graded music edit and serves verified snapsho
   expect(receipt.verification.audio).toMatchObject({ codec: 'aac', sampleRate: 48_000, channels: 2 });
   expect(receipt.musicSources.map((source) => source.id)).toEqual([audio.assets[0]!.id]);
   expect(receipt.settings.audio).toEqual(
-    project.music.map((track) => planExportMusic(track, calculateLayout(project).duration)),
+    musicTracks(project.music).map((track) => planExportMusic(track, calculateLayout(project).duration)),
   );
   expect(receipt).not.toHaveProperty('musicSource');
   expect(projectSchema.parse(receipt.snapshot).clips[0]?.speed).toEqual({ mode: 'constant', rate: 0.5 });

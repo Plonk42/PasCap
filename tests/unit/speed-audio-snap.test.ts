@@ -6,6 +6,7 @@ import { snapFrame, snapPoints } from '../../src/shared/snap.js';
 import { trimByOutputFrames } from '../../src/shared/source-range.js';
 import { clipDuration, compileRetiming, sourceFrameAt } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
+import { singleClipLane } from '../music-lanes.js';
 import { EARLIER_SCHEMA_VERSIONS, unsupportedProject } from './project-fixtures.js';
 
 describe('shared retiming and recoverable speed edits', () => {
@@ -120,7 +121,9 @@ describe('music and snapping', () => {
     expect(musicGainAt(music, 130)).toBe(0);
   });
   it('rejects music without explicit loop when the track exceeds the selected source', () => {
-    expect(() => projectSchema.parse({ ...createProject('p', 'P'), music: [{ ...music, loop: false }] })).toThrow();
+    expect(() =>
+      projectSchema.parse({ ...createProject('p', 'P'), music: [singleClipLane({ ...music, loop: false })] }),
+    ).toThrow();
   });
   it('snaps to the closest clip or music boundary only within tolerance', () => {
     const project = applyCommand(createProject('p', 'P'), {
@@ -128,7 +131,10 @@ describe('music and snapping', () => {
       clip: createClip('a', 'source', 0, 100),
       index: 0,
     });
-    const points = snapPoints({ ...project, music: [music, { ...music, id: 'second', start: 40 }] });
+    const points = snapPoints({
+      ...project,
+      music: [singleClipLane(music), singleClipLane({ ...music, id: 'second', start: 40 })],
+    });
     expect(points).toContain(10);
     expect(points).toContain(130);
     expect(points).toContain(40);

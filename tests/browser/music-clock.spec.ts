@@ -4,6 +4,7 @@ import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject } from '../../src/shared/model.js';
 import { memoryProjects } from './memory-projects.js';
 import { installMusicEvidence, observeMusicPlayback, observeRealtimeHeadroom } from './music-evidence.js';
+import { singleClipLane } from '../music-lanes.js';
 
 for (const startFrame of [0, 40])
   test(`streaming music clock at frame ${startFrame} completes without repeated audio restarts`, async ({
@@ -21,7 +22,7 @@ for (const startFrame of [0, 40])
     project.clips = [createClip('clock-clip', video.id, 0, 90)];
     project.media = { videoIds: [video.id], audioIds: [song.id] };
     project.music = [
-      {
+      singleClipLane({
         id: 'clock-music',
         mediaId: song.id,
         sourceIn: 0,
@@ -32,7 +33,7 @@ for (const startFrame of [0, 40])
         fadeIn: 0,
         fadeOut: 0,
         loop: false,
-      },
+      }),
     ];
     const memory = await memoryProjects(page, project);
     await installMusicEvidence(page);
@@ -89,7 +90,7 @@ test('streamed PCM reaches the output with placement silence, real gain, selecte
   project.clips = [createClip('signal-clip', video.id, 0, 90)];
   project.media = { videoIds: [video.id], audioIds: [song.id] };
   project.music = [
-    {
+    singleClipLane({
       id: 'signal-music',
       mediaId: song.id,
       sourceIn: 10,
@@ -100,7 +101,7 @@ test('streamed PCM reaches the output with placement silence, real gain, selecte
       fadeIn: 6,
       fadeOut: 6,
       loop: true,
-    },
+    }),
   ];
   const memory = await memoryProjects(page, project);
   await installMusicEvidence(page, true);

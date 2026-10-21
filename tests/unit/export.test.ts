@@ -28,6 +28,8 @@ import {
 import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
+import { musicTracks } from '../../src/shared/music-lanes.js';
+import { singleClipLane } from '../music-lanes.js';
 import { unsupportedProject } from './project-fixtures.js';
 
 const temporary: string[] = [];
@@ -200,26 +202,25 @@ describe('strict production export request and immutable validation', () => {
   });
   it('parses and deeply freezes an independent snapshot instead of retaining the editor document', () => {
     const document = documentWithClips();
-    document.music = [
-      {
-        id: 'captured',
-        mediaId: 'music',
-        sourceIn: 6,
-        sourceOut: 18,
-        start: 3,
-        duration: 24,
-        gainDb: -6,
-        fadeIn: 6,
-        fadeOut: 6,
-        loop: true,
-      },
-    ];
-    document.music.push({ ...document.music[0]!, id: 'second', start: 50 });
+    const captured = {
+      id: 'captured',
+      mediaId: 'music',
+      sourceIn: 6,
+      sourceOut: 18,
+      start: 3,
+      duration: 24,
+      gainDb: -6,
+      fadeIn: 6,
+      fadeOut: 6,
+      loop: true,
+    };
+    document.music = [singleClipLane(captured), singleClipLane({ ...captured, id: 'second', start: 50 })];
     const snapshot = validateExport(document, fakeLibrary());
     document.title = 'Later edit';
     document.clips[0]!.sourceIn = 10;
     document.layers[0]!.colour.brightness = 0.2;
     document.music[0]!.gainDb = 12;
+    document.music[0]!.clips[0]!.start = 9;
     document.music.splice(1, 1);
     expect(snapshot.title).toBe('Export unit');
     expect(snapshot.clips[0]!.sourceIn).toBe(7);
@@ -229,8 +230,10 @@ describe('strict production export request and immutable validation', () => {
     expect(Object.isFrozen(snapshot.layers[0]!.colour)).toBe(true);
     expect(snapshot.music).toHaveLength(2);
     expect(snapshot.music[0]!.gainDb).toBe(-6);
+    expect(snapshot.music[0]!.clips[0]!.start).toBe(3);
     expect(Object.isFrozen(snapshot.music)).toBe(true);
     expect(Object.isFrozen(snapshot.music[1])).toBe(true);
+    expect(Object.isFrozen(snapshot.music[1]!.clips[0])).toBe(true);
   });
   it('requires a resolver only for music and validates its identity and exact selected source bounds', () => {
     const document = documentWithClips();
@@ -246,7 +249,7 @@ describe('strict production export request and immutable validation', () => {
       fadeOut: 6,
       loop: true,
     };
-    document.music = [music];
+    document.music = [singleClipLane(music)];
     expect(() => startExport(document, 'draft720', fakeLibrary())).toThrow('resolver');
     expect(validateExportAudio(music, audioAsset()).metadata.sampleRate).toBe(48000);
     expect(() => validateExportAudio({ ...music, sourceOut: 61 }, audioAsset())).toThrow('source bounds');
@@ -300,13 +303,10 @@ describe('sequential output-frame chunk planning', () => {
       fadeOut: 6,
       loop: true,
     };
-    document.music = [music];
+    document.music = [singleClipLane(music)];
     expect(needsLayeredExport(document)).toBe(false);
     expect(planExport(document).duration).toBe(30);
-    document.music = [
-      { ...music, start: 60 },
-      { ...music, id: 'shorter', start: 20 },
-    ];
+    document.music = [singleClipLane({ ...music, start: 60 }), singleClipLane({ ...music, id: 'shorter', start: 20 })];
     const captured = structuredClone(document);
     const layout = calculateLayout(document);
     expect(layout.duration).toBe(84);
@@ -322,8 +322,9 @@ describe('sequential output-frame chunk planning', () => {
     expect(sampleTimeline(document, 29, layout)[0]!.brightness).toBe(0);
     expect(sampleTimeline(document, 30, layout)).toEqual([]);
     expect(sampleTimeline(document, 83, layout)).toEqual([]);
-    const audio = document.music.map((track) => planExportMusic(track, plan.duration));
-    for (const [index, track] of document.music.entries()) {
+    const tracks = musicTracks(document.music);
+    const audio = tracks.map((track) => planExportMusic(track, plan.duration));
+    for (const [index, track] of tracks.entries()) {
       expect(audio[index]!.activeSamples).toBe(exportAudioSample(track.duration));
       expect(audio[index]!.videoSamples).toBe(exportAudioSample(84));
       expect(audio[index]!.sourceInSamples).toBe(exportAudioSample(6));

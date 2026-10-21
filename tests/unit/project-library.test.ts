@@ -8,7 +8,9 @@ import {
   type ProjectDocument,
 } from '../../src/shared/model.js';
 import { mediaRemovalUsage, projectAudioIds, projectVideoIds, removeProjectMedia } from '../../src/shared/projects.js';
+import { arrangeMusicLane, setMusicRipple } from '../../src/shared/music-lanes.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
+import { singleClipLane } from '../music-lanes.js';
 
 describe('project media membership', () => {
   it('starts empty without inheriting another project bin', () => {
@@ -24,24 +26,23 @@ describe('project media membership', () => {
     const project = createProject('first', 'First');
     project.media = { videoIds: ['unused', 'shared'], audioIds: ['unused-audio', 'music'] };
     project.clips = [createClip('one', 'shared', 0, 10), createClip('two', 'timeline', 0, 10)];
+    const placement = {
+      id: 'music-instance',
+      mediaId: 'music',
+      sourceIn: 0,
+      sourceOut: 10,
+      start: 0,
+      duration: 10,
+      gainDb: 0,
+      fadeIn: 0,
+      fadeOut: 0,
+      loop: false,
+    };
     project.music = [
-      {
-        id: 'music-instance',
-        mediaId: 'music',
-        sourceIn: 0,
-        sourceOut: 10,
-        start: 0,
-        duration: 10,
-        gainDb: 0,
-        fadeIn: 0,
-        fadeOut: 0,
-        loop: false,
-      },
+      singleClipLane(placement),
+      singleClipLane({ ...placement, id: 'reused-instance', start: 20 }),
+      singleClipLane({ ...placement, id: 'other-instance', mediaId: 'timeline-audio', start: 40 }),
     ];
-    project.music.push(
-      { ...project.music[0]!, id: 'reused-instance', start: 20 },
-      { ...project.music[0]!, id: 'other-instance', mediaId: 'timeline-audio', start: 40 },
-    );
     const before = JSON.stringify(project);
     expect([...projectVideoIds(project)]).toEqual(['unused', 'shared', 'timeline']);
     expect([...projectAudioIds(project)]).toEqual(['unused-audio', 'music', 'timeline-audio']);
@@ -79,7 +80,9 @@ describe('removing recordings from the project bin', () => {
       });
     return projectSchema.parse({
       ...project,
-      music: [music('m1', 'song', 0), music('m2', 'other-song', 10), music('m3', 'song', 40)],
+      music: [music('m1', 'song', 0), music('m2', 'other-song', 10), music('m3', 'song', 40)].map((track) =>
+        singleClipLane(track),
+      ),
     });
   }
 
@@ -104,7 +107,7 @@ describe('removing recordings from the project bin', () => {
     // Ripple closes the removed excerpts' gap exactly like deleting them one by one.
     expect(calculateLayout(next).clips[0]!.start).toBe(0);
     expect(next.layers[0]!.transitions).toEqual([]);
-    expect(next.music.map((track) => track.id)).toEqual(['m2']);
+    expect(next.music.map((track) => track.id)).toEqual(['m2-track']);
     expect([...projectVideoIds(next)]).toEqual(['b', 'unused']);
     expect([...projectAudioIds(next)]).toEqual(['other-song', 'quiet']);
   });
@@ -114,6 +117,26 @@ describe('removing recordings from the project bin', () => {
     const next = removeProjectMedia(project, { videoIds: ['a'], audioIds: [] });
     expect(next.clips.map((clip) => [clip.id, clip.start])).toEqual([['b1', 40]]);
     expect(next.music).toEqual(project.music);
+  });
+
+  it('removes only the clips of a removed recording from a music track, keeping its other clips', () => {
+    const project = binProject();
+    const clip = (id: string, mediaId: string, start: number) => singleClipLane(music(id, mediaId, start)).clips[0]!;
+    const mixed = setMusicRipple(
+      arrangeMusicLane({ ...singleClipLane(music('mix', 'song', 0)), clips: [], transitions: [] }, [
+        clip('mix-a', 'song', 0),
+        clip('mix-b', 'other-song', 30),
+        clip('mix-c', 'song', 60),
+      ]),
+      true,
+    );
+    const withMix = projectSchema.parse({ ...project, music: [...project.music, mixed] });
+    expect(mediaRemovalUsage(withMix, { videoIds: [], audioIds: ['song'] })).toEqual({ clips: 0, music: 4 });
+    const next = removeProjectMedia(withMix, { videoIds: [], audioIds: ['song'] });
+    expect(next.music.map((track) => track.id)).toEqual(['m2-track', 'mix-track']);
+    // A Ripple music track closes the gap from its first start, like a video track.
+    expect(next.music[1]!.clips.map((clip) => [clip.id, clip.start])).toEqual([['mix-b', 0]]);
+    expect(next.music[1]!.transitions).toEqual([]);
   });
 
   it('rejects recordings outside the bin and empty removals without partial changes', () => {

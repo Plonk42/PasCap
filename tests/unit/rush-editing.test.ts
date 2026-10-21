@@ -27,13 +27,14 @@ import {
 import { trimOnTimeline, validateSourceRanges } from '../../src/shared/source-range.js';
 import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
 import { calculateLayout, layerClips, sampleTimeline } from '../../src/shared/timeline.js';
+import { singleClipLane } from '../music-lanes.js';
 
 // Complete durations of these in-memory recordings, independent of any excerpt.
 const SOURCE_COUNTS = new Map([
   ['recording', 600],
   ['other', 180],
 ]);
-const MUSIC = {
+const MUSIC = singleClipLane({
   id: 'music-instance',
   mediaId: 'music',
   sourceIn: 10,
@@ -44,7 +45,7 @@ const MUSIC = {
   fadeIn: 5,
   fadeOut: 10,
   loop: false,
-};
+});
 const SPEEDS: { name: string; speed: SpeedSettings }[] = [
   { name: 'constant slow', speed: { mode: 'constant', rate: 0.5 } },
   { name: 'constant fast', speed: { mode: 'constant', rate: 2 } },

@@ -11,6 +11,8 @@ import { PROJECT_FPS } from './timing.js';
 export const BASE_LAYER_ID = 'video-1';
 export const MAX_VIDEO_LAYERS = 8;
 export const MAX_MUSIC_TRACKS = 8;
+/** Clips per music track; with crossfades at most two sound at once on a track. */
+export const MAX_MUSIC_CLIPS = 8;
 export const MAX_BOOKMARKS = 1_000;
 export const MAX_TRACK_KEYFRAMES = 256;
 
@@ -80,6 +82,7 @@ export const layerSchema = z
     closingFade: frameSchema,
   })
   .strict();
+/** A playable music source: one clip of a music track with that track's gain and the clip's own fades. */
 export const musicSchema = z
   .object({
     id: idSchema,
@@ -104,12 +107,78 @@ export const musicSchema = z
   .refine((music) => music.start + music.duration <= 2_147_483_647, {
     message: 'Music timeline OUT exceeds the supported integer project-frame range.',
   });
-export const musicTracksSchema = z
+/** The playable sources of every music track's clips, as the preview mixes them. */
+export const musicSourcesSchema = z
   .array(musicSchema)
-  .max(MAX_MUSIC_TRACKS)
-  .refine((tracks) => new Set(tracks.map((track) => track.id)).size === tracks.length, {
-    message: 'Music instance IDs must be unique.',
+  .max(MAX_MUSIC_TRACKS * MAX_MUSIC_CLIPS)
+  .refine((sources) => new Set(sources.map((source) => source.id)).size === sources.length, {
+    message: 'Music source IDs must be unique.',
   });
+/** One placement of a music recording on a music track: its source range, timeline placement and loop. */
+export const musicClipSchema = z
+  .object({
+    id: idSchema,
+    mediaId: idSchema,
+    sourceIn: frameSchema,
+    sourceOut: frameSchema.positive(),
+    start: frameSchema,
+    duration: frameSchema.positive(),
+    loop: z.boolean(),
+  })
+  .strict()
+  .refine((clip) => clip.sourceOut > clip.sourceIn && (clip.loop || clip.duration <= clip.sourceOut - clip.sourceIn), {
+    message: 'Music source range or non-looping duration is invalid.',
+  })
+  .refine((clip) => clip.start + clip.duration <= 2_147_483_647, {
+    message: 'Music timeline OUT exceeds the supported integer project-frame range.',
+  });
+/** Joins two consecutive clips of a music track: a cut, an overlapping crossfade, a fade through silence or one with a pause. */
+export const musicTransitionSchema = z.discriminatedUnion('type', [
+  z.object({ leftId: idSchema, rightId: idSchema, type: z.literal('cut'), duration: z.literal(0) }).strict(),
+  z
+    .object({ leftId: idSchema, rightId: idSchema, type: z.literal('crossfade'), duration: frameSchema.min(1) })
+    .strict(),
+  z
+    .object({
+      leftId: idSchema,
+      rightId: idSchema,
+      type: z.literal('fade-through-silence'),
+      duration: frameSchema.min(2),
+    })
+    .strict(),
+  // Fade out over `fade` frames, stay silent for its own `pause` timeslot between the clips, fade in.
+  z
+    .object({
+      leftId: idSchema,
+      rightId: idSchema,
+      type: z.literal('fade-silence-pause'),
+      fade: frameSchema.min(1),
+      pause: frameSchema.min(1),
+    })
+    .strict(),
+]);
+/** A music track: like a video track, it owns gain, opening/closing fades, Ripple and its clips' transitions. */
+export const musicLaneSchema = z
+  .object({
+    id: idSchema,
+    gainDb: z.number().min(-60).max(12),
+    ripple: z.boolean(),
+    openingFade: frameSchema,
+    closingFade: frameSchema,
+    clips: z.array(musicClipSchema).min(1).max(MAX_MUSIC_CLIPS),
+    transitions: z.array(musicTransitionSchema).max(MAX_MUSIC_CLIPS - 1),
+  })
+  .strict();
+export const musicTracksSchema = z
+  .array(musicLaneSchema)
+  .max(MAX_MUSIC_TRACKS)
+  .refine(
+    (lanes) => {
+      const ids = lanes.flatMap((lane) => [lane.id, ...lane.clips.map((clip) => clip.id)]);
+      return new Set(ids).size === ids.length;
+    },
+    { message: 'Music track and music clip IDs must be unique.' },
+  );
 /** Project-time snap points; editing aids only, never rendered or exported. */
 export const bookmarksSchema = z
   .array(frameSchema)
@@ -119,7 +188,7 @@ export const bookmarksSchema = z
   });
 
 /** The only accepted project schema; bump it for every incompatible change. */
-export const PROJECT_SCHEMA_VERSION = 23;
+export const PROJECT_SCHEMA_VERSION = 24;
 
 const baseProjectSchema = z
   .object({
@@ -152,6 +221,9 @@ export type ProjectDocument = z.infer<typeof baseProjectSchema>;
 export type VideoClip = z.infer<typeof clipSchema>;
 export type Transition = z.infer<typeof transitionSchema>;
 export type MusicTrack = z.infer<typeof musicSchema>;
+export type MusicLane = z.infer<typeof musicLaneSchema>;
+export type MusicClip = z.infer<typeof musicClipSchema>;
+export type MusicTransition = z.infer<typeof musicTransitionSchema>;
 export type VideoLayer = ProjectDocument['layers'][number];
 
 export const projectSchema = baseProjectSchema.superRefine((project, context) => {

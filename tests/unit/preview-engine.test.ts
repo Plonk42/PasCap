@@ -17,12 +17,15 @@ import {
   createLayer,
   createProject,
   projectSchema,
+  type MusicLane,
   type MusicTrack,
   type ProjectDocument,
 } from '../../src/shared/model.js';
+import { musicTracks } from '../../src/shared/music-lanes.js';
 import { evaluateSpatial } from '../../src/shared/spatial.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { framesToSeconds } from '../../src/shared/timing.js';
+import { singleClipLane } from '../music-lanes.js';
 
 // Browser boundaries are doubles: WebCodecs decoding (frames delivered when a
 // test decides), WebGL textures/draws and the music clock. The timeline itself
@@ -429,7 +432,7 @@ function expectSurface(engine: PreviewEngine, project: ProjectDocument, frame: n
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
   return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
-function musicTrack(duration = 600): MusicTrack {
+function musicSource(duration = 600): MusicTrack {
   return {
     id: 'song-instance',
     mediaId: 'song',
@@ -442,6 +445,9 @@ function musicTrack(duration = 600): MusicTrack {
     fadeOut: 0,
     loop: false,
   };
+}
+function musicTrack(duration = 600): MusicLane {
+  return singleClipLane(musicSource(duration));
 }
 function singleProject(withMusic = false): ProjectDocument {
   const project = createProject('single', 'Single clip');
@@ -1324,17 +1330,19 @@ describe('editor-only ungraded comparison', () => {
 describe('lifecycle', () => {
   it('configures every music instance and previews a music-only project as black', async () => {
     const project = layeredProject();
-    project.music = Array.from({ length: 8 }, (_value, index) => ({
-      ...musicTrack(600),
-      id: `music-${index}`,
-      mediaId: `source-${index}`,
-      sourceOut: 60,
-      start: index * 20,
-      loop: true,
-    }));
+    project.music = Array.from({ length: 8 }, (_value, index) =>
+      singleClipLane({
+        ...musicSource(600),
+        id: `music-${index}`,
+        mediaId: `source-${index}`,
+        sourceOut: 60,
+        start: index * 20,
+        loop: true,
+      }),
+    );
     const engine = makeEngine();
     await engine.loadProject(project, proxyUrl, originalDimensions, 15);
-    expect(music().configure).toHaveBeenCalledWith(project.music, expect.any(AbortSignal));
+    expect(music().configure).toHaveBeenCalledWith(musicTracks(project.music), expect.any(AbortSignal));
     expect(engine.diagnostics()).toMatchObject({ duration: 740, frame: 15 });
     await engine.loadProject({ ...project, clips: [] }, proxyUrl, originalDimensions);
     expect(engine.diagnostics()).toMatchObject({ duration: 740, frame: 0, status: 'paused', decoderCount: 0 });

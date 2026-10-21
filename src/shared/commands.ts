@@ -22,7 +22,7 @@ import {
   MAX_BOOKMARKS,
   projectSchema,
   transitionSchema,
-  type MusicTrack,
+  type MusicLane,
   type ProjectDocument,
   type Transition,
   type VideoClip,
@@ -47,7 +47,7 @@ export type EditCommand =
   | { type: 'reverse'; clipId: string; reverse: boolean }
   | { type: 'transform'; layerId: string; transform: SpatialSettings }
   | { type: 'detail'; clipId: string; detail: DetailSettings }
-  | { type: 'music'; music: MusicTrack[] }
+  | { type: 'music'; music: MusicLane[] }
   | { type: 'opacity'; layerId: string; opacity: number }
   | { type: 'layer-key-toggle'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
   | { type: 'layer-key-value'; layerId: string; frame: number; setting: KeyframeSetting; value: number }

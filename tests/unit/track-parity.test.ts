@@ -23,6 +23,7 @@ import {
 } from '../../src/shared/model.js';
 import { trimOnTimeline } from '../../src/shared/source-range.js';
 import { calculateLayout, layerClips, sampleTimeline } from '../../src/shared/timeline.js';
+import { singleClipLane } from '../music-lanes.js';
 import { clipStartRestriction, layerActionRestrictions } from '../../src/web/layer-actions.js';
 import { planTimelineDrop } from '../../src/web/timeline-placement.js';
 import { timelineRows } from '../../src/web/timeline-rows.js';
@@ -47,7 +48,7 @@ function fixture(selectedId = 'middle', ripple = false): ProjectDocument {
   for (const layer of document.layers)
     layer.transitions = [cut(`${layer.id}-a`, `${layer.id}-b`), cut(`${layer.id}-b`, `${layer.id}-c`)];
   document.music = [
-    {
+    singleClipLane({
       id: 'song-instance',
       mediaId: 'song',
       sourceIn: 7,
@@ -58,7 +59,7 @@ function fixture(selectedId = 'middle', ripple = false): ProjectDocument {
       fadeIn: 3,
       fadeOut: 5,
       loop: false,
-    },
+    }),
   ];
   return projectSchema.parse(document);
 }
