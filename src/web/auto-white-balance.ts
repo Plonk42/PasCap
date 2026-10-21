@@ -1,9 +1,8 @@
-import type { EditCommand } from '../shared/commands.js';
-import { activeLayerSetting, type KeyframeSetting } from '../shared/keyframes.js';
+import { keyframeLimitReason } from '../shared/auto-colour.js';
 import type { MediaAsset } from '../shared/media.js';
-import { MAX_TRACK_KEYFRAMES, type VideoLayer } from '../shared/model.js';
+import type { VideoLayer } from '../shared/model.js';
 import type { PlacedClip, TimelineLayout } from '../shared/timeline.js';
-import { whiteBalanceWindow, type WhiteBalance } from '../shared/white-balance.js';
+import { whiteBalanceWindow } from '../shared/white-balance.js';
 import { mediaReady } from './display.js';
 
 /**
@@ -83,32 +82,6 @@ export function whiteBalanceTarget(
   const projectFrames = whiteBalanceWindow(clip, frame);
   const sourceFrames = projectFrames.map((projectFrame) => clip.retiming.sourceAt(projectFrame - clip.start));
   return { target: { clip, asset, projectFrames, sourceFrames }, reason: null };
-}
-
-/** Why no keyframe can be captured at `frame`: the track is full and none is there to join. */
-export function keyframeLimitReason(layer: VideoLayer, frame: number): string | null {
-  return layer.keyframes.length >= MAX_TRACK_KEYFRAMES && !layer.keyframes.some((key) => key.frame === frame)
-    ? `This track already has ${MAX_TRACK_KEYFRAMES} keyframes. Move the playhead to one of them, or remove one.`
-    : null;
-}
-
-/** Captures each value at `frame` exactly like its diamond (joining or overwriting), in one transaction. */
-export function captureCommands(
-  layer: VideoLayer,
-  frame: number,
-  values: Readonly<Partial<Record<KeyframeSetting, number>>>,
-): EditCommand[] {
-  return (Object.entries(values) as [KeyframeSetting, number][]).map(([setting, value]): EditCommand => {
-    const capture = { layerId: layer.id, frame, setting, value };
-    return activeLayerSetting(layer, setting, frame)
-      ? { type: 'layer-key-value', ...capture }
-      : { type: 'layer-key-toggle', ...capture };
-  });
-}
-
-/** Captures both settings at the playhead exactly like their diamonds, in one transaction. */
-export function whiteBalanceCommands(layer: VideoLayer, frame: number, balance: WhiteBalance): EditCommand[] {
-  return captureCommands(layer, frame, { temperature: balance.temperature, tint: balance.tint });
 }
 
 export function proxyUrl(mediaId: string): string {

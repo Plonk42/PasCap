@@ -1,12 +1,12 @@
 import { useEffect, useId, useState, type KeyboardEvent } from 'react';
 import { AUTO_ADJUST, type AutoCorrection } from '../shared/auto-adjust.js';
+import { animatedSettings } from '../shared/auto-colour.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { VideoLayer } from '../shared/model.js';
 import type { TimelineLayout } from '../shared/timeline.js';
 import {
   analyseTarget,
-  animatedSettings,
   autoAdjustCommands,
   autoAdjustTarget,
   cachedAnalysis,

@@ -117,6 +117,11 @@ dropped as in white balance; in the statistics below, pixels are weighted toward
 centre with $\omega=0.5+0.5\,e^{-r^2/(2\cdot0.35^2)}$ ($r=1$ at the corners), and pixels
 whose linear luma is below 0.002 are left out as noise.
 
+The assistant's `estimate` operation runs this estimator on the same frames, decoded by the
+service with FFmpeg's exact BT.709 conversion instead of the browser's canvas readback; its
+settings agree with the editor's within 0.07
+([server-side estimates](ASSISTANT_MCP.md#server-side-auto-adjust-white-balance-and-detail-measurement)).
+
 **White balance.** Temperature and Tint are exactly what
 [Auto white balance](TEMPERATURE_AND_TINT.md#automatic-white-balance) estimates from these
 frames: Shades of Grey and Grey-Edge per frame, median pooling, confidence and damping

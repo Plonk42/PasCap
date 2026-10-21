@@ -3,6 +3,7 @@ import { describeProject } from './describe-project.js';
 import { describeRecording } from './describe-recording.js';
 import { describeTrack } from './describe-track.js';
 import { edit } from './edit.js';
+import { estimate } from './estimate.js';
 import { handOffReadiness } from './hand-off.js';
 import { listProjects } from './list-projects.js';
 import { checkAlignment, musicAnalysis, snapCutsToBeats } from './music.js';
@@ -38,6 +39,7 @@ export const operations = [
   still,
   timelineSheet,
   recordingSheet,
+  estimate,
 ] as const;
 
 export type Operation = (typeof operations)[number];

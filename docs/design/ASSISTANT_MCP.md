@@ -429,6 +429,23 @@ Read; for editor and assistant. Render source frames of one video recording's ed
 | `mediaId` | string           | ID of a prepared video recording.                         |
 | `frames`  | array of integer | Source frames of the recording in the order to show them. |
 
+#### `estimate`
+
+Read; for editor and assistant. Measure footage the way the editor's automatic tools do, from proxy frames, and return the values with the edit commands that apply them (pass them to edit; nothing changes until then). kind auto-adjust is Track → Colour → Auto: eleven Colour settings balancing exposure, contrast, white balance and colour. white-balance is Auto white balance: Temperature and Tint. detail measures noise and softness and suggests the clip's Denoise and Sharpen (never Clarity, a look). Analyse a clip (clipId: the whole clip, or with frame the second around that project frame, as at the playhead), a whole track (layerId: all its clips by duration; not for detail) or a recording range (mediaId, sourceIn, sourceOut: values only, no commands). Judge the result with a still.
+
+| Input       | Type                                         | Description                                                                                                                                                |
+| ----------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId` | string                                       | ID of the saved project.                                                                                                                                   |
+| `kind`      | "auto-adjust" or "white-balance" or "detail" | What to estimate.                                                                                                                                          |
+| `clipId`    | string                                       | Analyse this clip.                                                                                                                                         |
+| `frame`     | integer                                      | With clipId: analyse the project frames within 1 s of this one, inside the clip, instead of the whole clip.                                                |
+| `layerId`   | string                                       | Analyse every clip of this video track instead.                                                                                                            |
+| `mediaId`   | string                                       | Analyse a range of this video recording instead, with sourceIn and sourceOut.                                                                              |
+| `sourceIn`  | integer                                      | First source frame of the recording range.                                                                                                                 |
+| `sourceOut` | integer                                      | Source frame after the recording range (exclusive).                                                                                                        |
+| `applyAs`   | "values" or "keyframe"                       | Colour kinds: values replaces the track's values (leaving animated settings unchanged); keyframe keys the settings at frame, which needs clipId and frame. |
+| `intensity` | number                                       | auto-adjust: strength of the correction in %; 80 is the correction as fitted, 100 exaggerates it by a quarter.                                             |
+
 #### Edit commands
 
 The `commands` of `edit`; their fields are described in the JSON Schema of the tool.
@@ -491,7 +508,7 @@ registry; the assistant never sees them.
 | `still`              | both      | One composed project frame from the proxies (`frame`, `width`, `crop?`, `commands?` for a candidate), JPEG ([#238](https://github.com/Plonk42/PasCap/issues/238))                                                                      | Serial, two waiting; refused (409) while an export or reference job runs; image budget |
 | `timeline_sheet`     | both      | Contact sheet of project frames (`frames[]`, `commands?`), JPEG plus legend                                                                                                                                                            | Same as still                                                                          |
 | `recording_sheet`    | both      | Contact sheet of a recording's proxy frames (`mediaId`, `frames[]`), ungraded, JPEG plus legend                                                                                                                                        | Same as still                                                                          |
-| `estimate`           | both      | `{ clipId or mediaId + range, kind: auto-adjust \| white-balance \| detail }`: decodes ≤ 16 proxy frames at ≤ 320 × 180 and runs the shared estimators or the detail heuristics                                                        | Serial with stills                                                                     |
+| `estimate`           | both      | Auto adjust, Auto white balance or detail measurement of a clip (whole, or 1 s around a frame), a track or a recording range, with the edit commands applying it (below, [#240](https://github.com/Plonk42/PasCap/issues/240))         | Serial with stills; ≤ 16 proxy frames                                                  |
 | `music_analyse`      | editor    | Not an operation: the editor queues the job (**Analyse music**) and the Hand off dialog's readiness list queues it; `music_analysis` (both) returns tempo, meter, beats, accents and sections at project frames, in an optional window | Background job kind                                                                    |
 | `check_alignment`    | both      | Boundary-to-beat report (below)                                                                                                                                                                                                        | Pure, bounded by clip/beat counts                                                      |
 | `snap_cuts_to_beats` | both      | `layerId`, `prefer: beat \| downbeat`, `minimumSeconds`, `apply`: the alignment helper, a proposal or one `edit` batch                                                                                                                 |                                                                                        |
@@ -570,22 +587,38 @@ model sees the pictures. A recording without motion analysis returns no ranges a
 
 ### Server-side Auto adjust, white balance and detail measurement
 
-The `estimate` operation decodes the frames `autoAdjustFrames(sourceIn, sourceOut)`
-(or the white-balance window) from the proxy, scaled to at most 320 × 180 with a bilinear
-scaler, to RGBA and runs the unchanged estimators. The browser samples through a canvas, so pixels differ
-slightly from FFmpeg's scaler: the results agree within tolerance but are not bit-identical
-with **Auto** in the editor; the unit test fixes that tolerance. The LLM applies the
-result through the existing `colour` command, scaled by the same `scaleCorrection` and
-intensity rule ([Auto adjust](AUTO_ADJUST.md)); animated settings are reported and left
-alone, like the popover does.
+Implemented on the `mcp` branch ([#240](https://github.com/Plonk42/PasCap/issues/240),
+[estimate](../../src/server/operations/estimate.ts)). `estimate` analyses one target and returns
+values plus the `edit` commands that apply them; it edits nothing itself:
 
-Detail has no estimator today. The `detail` kind returns measurements, not settings: noise
-level (median absolute high-pass residual in flat 8 × 8 blocks, in 8-bit codes), sharpness
-(gradient energy at the proxy scale) and compression blockiness, each with a suggested
-starting value (Denoise from noise above about 1.5 codes; Sharpen 0.2–0.5 by sharpness;
-Clarity 0–0.2). They are heuristics the LLM confirms on 1:1 crops; they are kept in one
-module with their constants, like `AUTO_ADJUST`, so the owner can tune them on real
-flights.
+- **clipId**: the whole clip, the frames **Auto**'s Clip source reads (`autoAdjustFrames`);
+  with `frame`, the project frames within 1 s of it in the clip, mapped through retiming, as the
+  Playhead source and **Auto white balance** read them (white balance weighs each project frame,
+  Auto adjust each source frame once, as in the editor);
+- **layerId**: every clip of the track by duration (`trackSamples`), as the Track source;
+- **mediaId** with `sourceIn`/`sourceOut`: a recording range, values only.
+
+`kind: auto-adjust` runs `analyseAutoAdjust` and scales the correction by `intensity` (80 %
+is the fitted correction); `white-balance` runs `frameIlluminant` and `poolWhiteBalance`. Their
+commands are the editor's: track values as one `colour` edit leaving animated settings unchanged
+(listed in `unchanged`), or with `applyAs: keyframe` the settings captured at `frame` like their
+diamonds ([shared helpers](../../src/shared/auto-colour.ts)). The frames are decoded on the
+still renderer's serial queue from the proxy with FFmpeg, at the editor's analysis size
+(`analysisSize`, 320 × 180 for a 720p proxy) in RGBA, area-scaled with full chroma
+interpolation. That is the exact BT.709 conversion (checked at patch centres within one code);
+the browser's canvas readback is not bit-identical: Chrome's unscaled path (libyuv) uses 2.0
+for BT.709's blue coefficient 2.112. On a synthetic flat proxy the fitted settings agree with
+the page's within 0.07 (Whites and Temperature differ most; most within 0.02), checked by a
+browser test at 320 × 180 and 1280 × 720. A request takes about 2 s for 16 frames of a
+720p proxy.
+
+`kind: detail` measures proxy luma at the proxy's own size, the 720-line scale whose units the
+detail filters use ([detail estimate](DETAIL_FILTERS.md#detail-estimate)), on up to 8 frames,
+and suggests Denoise and Sharpen with a `detail` command for a clip. The proxy is a clean
+H.264 encode downscaled from the original, so it shows little of the original's noise: on the
+owner's DJI recordings it measures almost none. The suggestions are starting values to judge on
+a 1:1 `still` crop; Clarity is a look and is never suggested. Compression blockiness, first
+proposed, is not measured: the proxy's blocks are its own encode's, not the original's.
 
 ## Music analysis
 
@@ -804,8 +837,8 @@ The LLM is told what good looks like and what PasCap can do; the tools do the ar
 
 The served text ([assistant-guide.ts](../../src/server/assistant-guide.ts)) follows these
 steps with the tools that exist: footage from `describe_recording` and `recording_sheet`, the
-music from `music_analysis`, `preview_edits` before a batch, and grading from `describe_track`
-with candidate `still`s, since `estimate` (#240) is not built yet.
+music from `music_analysis`, `preview_edits` before a batch, and grading from `estimate` and
+`describe_track` with candidate `still`s.
 
 ## Delivery plan
 

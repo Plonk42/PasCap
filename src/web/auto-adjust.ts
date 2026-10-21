@@ -1,28 +1,26 @@
 import {
   analyseAutoAdjust,
-  AUTO_ADJUST,
-  AUTO_ADJUST_SETTINGS,
   autoAdjustFrames,
-  autoAdjustWindow,
   scaleCorrection,
   type AutoAdjustSetting,
   type AutoCorrection,
 } from '../shared/auto-adjust.js';
+import {
+  animatedSettings,
+  autoAdjustCommand,
+  captureCommands,
+  keyframeLimitReason,
+  trackSamples,
+  windowSourceFrames,
+} from '../shared/auto-colour.js';
 import { COLOUR_CONTROLS } from '../shared/colour.js';
 import type { EditCommand } from '../shared/commands.js';
-import { hasLayerKeys } from '../shared/keyframes.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { VideoLayer } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
-import type { PlacedClip, TimelineLayout } from '../shared/timeline.js';
+import type { TimelineLayout } from '../shared/timeline.js';
 import { frameIlluminant, type AnalysisFrame, type IlluminantEstimate } from '../shared/white-balance.js';
-import {
-  captureCommands,
-  keyframeLimitReason,
-  proxyUrl,
-  readyAsset,
-  readyClipAtPlayhead,
-} from './auto-white-balance.js';
+import { proxyUrl, readyAsset, readyClipAtPlayhead } from './auto-white-balance.js';
 
 /** What Auto analyses: 1 s around the playhead, the whole clip at the playhead, or every clip of the track. */
 export type AutoAdjustSource = 'playhead' | 'clip' | 'track';
@@ -69,33 +67,8 @@ export function autoAdjustTarget(
     reason: null,
   });
   if (source === 'clip') return target(['clip', ...prefix], autoAdjustFrames(sourceIn, sourceOut));
-  const sourceFrames = [
-    ...new Set(autoAdjustWindow(clip, frame).map((projectFrame) => clip.retiming.sourceAt(projectFrame - clip.start))),
-  ];
+  const sourceFrames = windowSourceFrames(clip, frame);
   return target(['playhead', ...prefix, frame, sourceFrames.join(',')], sourceFrames);
-}
-
-/**
- * Every clip of the track laid end to end in timeline order, with up to AUTO_ADJUST.frames output frames at the
- * centres of equal slices: each clip is analysed in proportion to its duration on screen.
- */
-export function trackSamples(clips: readonly PlacedClip[]): { clip: PlacedClip; sourceFrame: number }[] {
-  const ordered = [...clips].sort((left, right) => left.start - right.start);
-  const total = ordered.reduce((sum, clip) => sum + clip.end - clip.start, 0);
-  const count = Math.min(AUTO_ADJUST.frames, total);
-  const samples: { clip: PlacedClip; sourceFrame: number }[] = [];
-  let index = 0;
-  let before = 0;
-  for (let sample = 0; sample < count; sample++) {
-    const position = Math.floor(((sample + 0.5) * total) / count);
-    while (position >= before + ordered[index]!.end - ordered[index]!.start) {
-      before += ordered[index]!.end - ordered[index]!.start;
-      index++;
-    }
-    const clip = ordered[index]!;
-    samples.push({ clip, sourceFrame: clip.retiming.sourceAt(position - before) });
-  }
-  return samples;
 }
 
 function trackTarget(
@@ -136,31 +109,8 @@ export function initialChoice(layer: VideoLayer): { source: AutoAdjustSource; ap
     : { source: 'clip', apply: 'values' };
 }
 
-/** The settings Auto sets that this track animates: Auto leaves them unchanged. */
-export function animatedSettings(layer: VideoLayer): AutoAdjustSetting[] {
-  return AUTO_ADJUST_SETTINGS.filter((setting) => hasLayerKeys(layer, setting));
-}
-
 export function settingLabel(setting: AutoAdjustSetting): string {
   return COLOUR_CONTROLS.find((control) => control.key === setting)!.label;
-}
-
-/**
- * The one Colour edit Auto applies: the correction at `intensity` (0–1) replaces the track's values of the eleven
- * settings, except animated ones. Null when every one of them is animated.
- */
-export function autoAdjustCommand(
-  layer: VideoLayer,
-  correction: Readonly<AutoCorrection>,
-  intensity: number,
-): EditCommand | null {
-  const animated = new Set(animatedSettings(layer));
-  const settings = AUTO_ADJUST_SETTINGS.filter((setting) => !animated.has(setting));
-  if (!settings.length) return null;
-  const scaled = scaleCorrection(correction, intensity);
-  const colour = { ...layer.colour };
-  for (const setting of settings) colour[setting] = scaled[setting];
-  return { type: 'colour', layerId: layer.id, colour };
 }
 
 /** The edit Auto applies: the track's values, or a keyframe of all eleven at the playhead `frame`. */
