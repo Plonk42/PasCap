@@ -4,6 +4,7 @@ import path from 'node:path';
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../src/server/app.js';
+import { ASSISTANT_GUIDE } from '../../src/server/assistant-guide.js';
 import { createConfig } from '../../src/server/config.js';
 import { toolResult } from '../../src/server/mcp.js';
 import { operations } from '../../src/shared/operations/index.js';
@@ -103,6 +104,14 @@ describe('MCP endpoint', () => {
       expect(edit.annotations).toEqual({ readOnlyHint: false, openWorldHint: false });
       expect(tools.find((tool) => tool.name === 'still')!.annotations?.readOnlyHint).toBe(true);
 
+      expect(client.getInstructions()).toContain('pascap://guide');
+      const { resources } = await client.listResources();
+      expect(resources.map((resource) => resource.uri)).toEqual(['pascap://guide']);
+      const guide = await client.readResource({ uri: 'pascap://guide' });
+      expect(guide.contents[0]).toMatchObject({ mimeType: 'text/markdown', text: ASSISTANT_GUIDE });
+      const prompt = await client.getPrompt({ name: 'rough_cut', arguments: { request: 'A calm cut of the lake' } });
+      expect(JSON.stringify(prompt.messages)).toContain('The request: A calm cut of the lake');
+
       const created = await app.inject({
         method: 'POST',
         url: '/api/projects',
@@ -192,7 +201,7 @@ describe('MCP endpoint', () => {
     expect((await post({ ...bearer, 'mcp-protocol-version': '2025-06-18' })).statusCode).toBe(200);
     expect((await post({ ...bearer, 'mcp-protocol-version': '2099-01-01' })).statusCode).toBe(400);
     expect((await post(bearer, { jsonrpc: '2.0', method: 'notifications/initialized' })).statusCode).toBe(202);
-    expect(message(await post(bearer, { jsonrpc: '2.0', id: 2, method: 'resources/list' }))).toMatchObject({
+    expect(message(await post(bearer, { jsonrpc: '2.0', id: 2, method: 'pascap/unknown' }))).toMatchObject({
       error: { code: -32601 },
     });
     const stream = await app.inject({ method: 'GET', url: '/mcp', headers: { host, ...bearer } });

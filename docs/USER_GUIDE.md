@@ -803,7 +803,9 @@ resources and pending acceptance; this guide does not claim those tests passed.
 An AI assistant in an MCP client such as VS Code can read a project, look at it through
 stills and contact sheets, and edit it with the same commands as the editor. Connect the
 client to `http://127.0.0.1:4318/mcp` with the token in `.pascap/mcp-token`
-([setup](DEVELOPMENT.md#mcp-endpoint)). It never imports, prepares, exports or deletes
+([setup](DEVELOPMENT.md#mcp-endpoint)). In VS Code chat, `/mcp.pascap.rough_cut` followed by
+what you want starts the assistant on PasCap's step-by-step guide to a first cut. It never
+imports, prepares, exports or deletes
 anything. Before editing, the assistant starts a session on the project: PasCap keeps a
 checkpoint of the project as it was, and only the assistant can save it until it finishes or
 you take the project back. You can also start it yourself with **Hand off** in the header:
