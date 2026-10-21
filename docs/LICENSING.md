@@ -21,40 +21,41 @@ from the obligations for **redistributing the native executables themselves**.
 
 ## npm source and built-application notices
 
-The six direct production dependencies are:
+The seven direct production dependencies are:
 
-| Package                   | Locked version | License |
-| ------------------------- | -------------- | ------- |
-| @fastify/static           | 10.1.5         | MIT     |
-| @modelcontextprotocol/sdk | 1.32.1         | MIT     |
-| fastify                   | 5.12.5         | MIT     |
-| react                     | 19.3.0         | MIT     |
-| react-dom                 | 19.3.0         | MIT     |
-| zod                       | 4.6.5          | MIT     |
+| Package                      | Locked version | License    |
+| ---------------------------- | -------------- | ---------- |
+| @fastify/static              | 10.1.5         | MIT        |
+| @modelcontextprotocol/node   | 2.1.1          | Apache-2.0 |
+| @modelcontextprotocol/server | 2.3.1          | Apache-2.0 |
+| fastify                      | 5.12.5         | MIT        |
+| react                        | 19.3.0         | MIT        |
+| react-dom                    | 19.3.0         | MIT        |
+| zod                          | 4.6.5          | MIT        |
 
-The locked production closure contains **155 installations**, including nested
+The locked production closure contains **79 installations**, including nested
 versions. React, React DOM, scheduler and Zod are embedded in browser chunks;
 server-only dependencies are still part of a complete built-application package.
 Use the actual graph, not only the direct-dependency list:
 
 | License family | Production installations | Required treatment                                                                                     |
 | -------------- | -----------------------: | ------------------------------------------------------------------------------------------------------ |
-| MIT            |                      134 | Retain each upstream copyright and permission/disclaimer text                                          |
-| ISC            |                       10 | Retain each upstream copyright and permission/disclaimer text                                          |
-| BSD-2-Clause   |                        1 | Retain copyright, conditions and disclaimer in source and binary documentation                         |
-| BSD-3-Clause   |                        5 | Preserve copyright, conditions/disclaimer in source and binary documentation; do not imply endorsement |
+| MIT            |                       62 | Retain each upstream copyright and permission/disclaimer text                                          |
+| ISC            |                        5 | Retain each upstream copyright and permission/disclaimer text                                          |
+| Apache-2.0     |                        3 | Retain the license text and any NOTICE file; mark modified files                                       |
+| BSD-3-Clause   |                        4 | Preserve copyright, conditions/disclaimer in source and binary documentation; do not imply endorsement |
 | BlueOak-1.0.0  |                        5 | Supply the license text or its permitted license link                                                  |
 
-Non-MIT entries are fastq 1.20.3, inherits 2.0.4, isexe 2.0.0, once 1.4.0,
-semver 7.8.5, setprototypeof 1.2.0, split2 4.2.0, which 2.0.2, wrappy 1.0.2 and
-zod-to-json-schema 3.25.2 (ISC); json-schema-typed 8.0.2 (BSD-2-Clause); fast-uri
-3.1.8 and 4.2.1, light-my-request 6.6.0, qs 6.16.1 and secure-json-parse 4.1.0
-(BSD-3-Clause); glob 13.0.6, lru-cache 11.5.3, minimatch 10.2.6, minipass 7.1.3 and
-path-scurry 2.0.2 (BlueOak-1.0.0). The MCP SDK brings 81 of these installations,
-including Express and Hono, which its HTTP transport loads.
+Non-MIT entries are fastq 1.20.3, inherits 2.0.4, semver 7.8.5,
+setprototypeof 1.2.0 and split2 4.2.0 (ISC); @modelcontextprotocol/core 2.3.1,
+@modelcontextprotocol/node 2.1.1 and @modelcontextprotocol/server 2.3.1 (Apache-2.0,
+without NOTICE files); fast-uri 3.1.8 and 4.2.1, light-my-request 6.6.0 and
+secure-json-parse 4.1.0 (BSD-3-Clause); glob 13.0.6, lru-cache 11.5.3, minimatch
+10.2.6, minipass 7.1.3 and path-scurry 2.0.2 (BlueOak-1.0.0). The MCP SDK brings five
+of these installations: its three packages, hono and @hono/node-server (MIT).
 
 The browser also receives generated preload/module-interop helpers from **Vite
-8.3.2** and **Rolldown 1.2.12**. These two build packages are not in the 155-entry
+8.3.2** and **Rolldown 1.2.12**. These two build packages are not in the 79-entry
 production closure, but their runtime code is emitted. Their MIT licenses and
 full bundled third-party notices are therefore included explicitly, including
 Rolldown's separate Rollup/esbuild attribution. This narrow supplement does not

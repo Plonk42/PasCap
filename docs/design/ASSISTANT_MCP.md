@@ -482,24 +482,25 @@ beats; the action reports when it would exceed the limit and offers downbeats on
 ## MCP server
 
 Implemented on the `mcp` branch ([#242](https://github.com/Plonk42/PasCap/issues/242),
-[mcp.ts](../../src/server/mcp.ts)) with the official `@modelcontextprotocol/sdk`: `/mcp` on
-the service's loopback port runs its `McpServer` over its Streamable HTTP transport in
-**stateless** mode, a new server and transport per `POST`, answered with JSON. The Fastify
-route checks the token, then hands the raw request and its parsed body to the transport
-(`reply.hijack()`); the SDK handles initialization and protocol versions, `ping`,
-`tools/list` and `tools/call`, notifications and JSON-RPC errors. `GET` and `DELETE` answer
-405, since there is no session or server-initiated stream. The tools are registered in a loop
-from the operations whose `audience` includes `assistant`: name, description, the zod input
-schema (the SDK publishes it as JSON Schema, nested descriptions included, and validates
-calls against it) and a read-only hint from `access`. A call runs the same `runOperation` as
-the HTTP route; pictures become image content beside a JSON text legend, other outputs JSON
-text, and a rejected call is a tool error carrying the service's reason, so the model can
-correct it.
+[mcp.ts](../../src/server/mcp.ts)) with the official MCP TypeScript SDK v2
+(`@modelcontextprotocol/server` and `@modelcontextprotocol/node`): `/mcp` on the service's
+loopback port is its `createMcpHandler`, mounted on Fastify with `toNodeHandler` after the
+token check (`reply.hijack()`). It serves the 2026-07-28 protocol revision and, for
+2025-era clients, stateless Streamable HTTP; each request gets a fresh `McpServer` from one
+factory, so both eras offer the same tools. The SDK handles negotiation, `tools/list`,
+`tools/call`, notifications, JSON-RPC errors and the 405 for session `GET`/`DELETE`. The
+tools are registered in a loop from the operations whose `audience` includes `assistant`:
+name, description, the zod input schema (published as JSON Schema with its nested
+descriptions, and validated on every call) and a read-only hint from `access`. A call runs
+the same `runOperation` as the HTTP route; pictures become image content beside a JSON text
+legend, other outputs JSON text, and a rejected call is a tool error carrying the service's
+reason, so the model can correct it. An unknown tool is a protocol error.
 
 The owner preferred the standard SDK to a hand-written endpoint (2026-10-21): it follows the
-protocol as it evolves, and resources, prompts, progress or sessions come with it. It adds
-81 production installations (Express and Hono among them, loaded but never listening) and
-one new reviewed licence family, BSD-2-Clause ([licensing](../LICENSING.md)).
+protocol as it evolves, and resources, prompts, progress or subscriptions come with it. v2 is
+the SDK's stable line (v1, `@modelcontextprotocol/sdk`, only receives fixes); its server needs
+zod 4, which PasCap already uses, and adds five production installations (the SDK's three
+Apache-2.0 packages, Hono and its Node adapter) ([licensing](../LICENSING.md)).
 
 Authentication is a bearer token generated at the first startup and kept in
 `<dataDir>/mcp-token` (owner-only, like the rest of the data directory); `/mcp` is exempt
