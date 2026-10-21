@@ -284,6 +284,15 @@ clip edges; **Alt** bypasses. Each add, move or delete is one Undo step. Bookmar
 are saved with the project but never rendered or exported. Details:
 [bookmarks](TIMELINE_EDITING.md#bookmarks).
 
+To cut on the music, turn on **Snap to beats** (metronome icon beside **Snap**): every
+snapping gesture then also lands on the analysed beats of the music clips, wherever they
+are placed, and the ruler shows those beats as ticks. Its arrow chooses **Beats** or
+**Downbeats only**. Analysed music clips also show their sections (quiet, build, peak,
+release), swells, silences and a low/mid/high tone strip; hover one for a readout, or open
+**Audio → Music structure** for a list with the key. Details:
+[snap to beats](TIMELINE_EDITING.md#snap-to-beats) and
+[music analysis](SPEED_AND_AUDIO.md#music-analysis).
+
 Boundary **Cut / Fade / Pause / Dissolve** and **Fades** belong to the selected
 track in **Track**; clicking a boundary button opens that tab and scrolls to the
 boundary, expanded.

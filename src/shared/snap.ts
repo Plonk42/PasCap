@@ -1,8 +1,29 @@
 import type { ProjectDocument } from './model.js';
-import { musicClips } from './music-lanes.js';
+import { musicBeatFrames, type MusicAnalysis } from './music-analysis.js';
+import { musicClips, musicTracks } from './music-lanes.js';
 import { calculateLayout } from './timeline.js';
 
-export function snapPoints(project: ProjectDocument): number[] {
+/**
+ * The beats a project's music clips snap to, at project frames, leaving out those of the
+ * excluded clips (the ones being moved); none while beat snapping is off.
+ */
+export type BeatSnap = (project: ProjectDocument, excludedMusicIds?: ReadonlySet<string>) => readonly number[];
+export const NO_BEATS: BeatSnap = () => [];
+
+/** Snaps to the analysed beats (or downbeats only) of every music clip, where they play now. */
+export function musicBeatSnap(
+  beatsOf: (mediaId: string) => MusicAnalysis['beats'] | null,
+  downbeatsOnly: boolean,
+): BeatSnap {
+  return (project, excluded) =>
+    musicTracks(project.music).flatMap((music) => {
+      const beats = excluded?.has(music.id) ? null : beatsOf(music.mediaId);
+      if (!beats) return [];
+      return musicBeatFrames(music, beats).flatMap((beat) => (downbeatsOnly && !beat.downbeat ? [] : [beat.frame]));
+    });
+}
+
+export function snapPoints(project: ProjectDocument, beats: BeatSnap = NO_BEATS): number[] {
   const layout = calculateLayout(project);
   const points = layout.clips.flatMap((clip) => [clip.start, clip.end]);
   for (const clip of musicClips(project.music)) points.push(clip.start, clip.start + clip.duration);
@@ -12,6 +33,7 @@ export function snapPoints(project: ProjectDocument): number[] {
       ...points,
       ...layout.transitions.flatMap((region) => [region.start, region.boundary, region.end]),
       ...project.bookmarks,
+      ...beats(project),
     ]),
   ].sort((a, b) => a - b);
 }

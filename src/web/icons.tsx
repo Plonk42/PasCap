@@ -40,6 +40,7 @@ export type IconName =
   | 'curve'
   | 'tone-curve'
   | 'magnet'
+  | 'metronome'
   | 'cut'
   | 'warning'
   | 'disk'
@@ -99,6 +100,7 @@ const paths: Record<IconName, string> = {
   curve: 'M3 18c8 0 10-12 18-12M3 15v6m18-18v6',
   'tone-curve': 'M3 3h18v18H3V3Zm3 15c6 0 5-12 12-12',
   magnet: 'M5 3v9a7 7 0 0 0 14 0V3h-5v9a2 2 0 0 1-4 0V3H5Zm0 5h5m4 0h5',
+  metronome: 'M6 21h12L14.5 3h-5L6 21Zm6-4 6-10M8 15h8',
   cut: 'm7 7 10 10M7 17 17 7M6 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 12a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm11-8 4-4m-4 14 4 4',
   warning: 'm12 3 10 18H2L12 3Zm0 6v5m0 3h.1',
   disk: 'M4 4h14l3 3v14H3V4h1Zm3 0v7h10V4M7 21v-7h10v7M14 7h.1',

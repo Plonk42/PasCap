@@ -544,9 +544,33 @@ relative major (C major for A minor). On those songs the swells follow the loudn
 99 s crescendo of 25 dB, a sudden 20 dB cut-off before the end. Instruments, voice and
 lyrics are not analysed ([#257](https://github.com/Plonk42/PasCap/issues/257)).
 
-Each analysed music clip shows its beats as ticks, and **Beats → bookmarks** under the
-analysis line adds the selected music clip's beats or downbeats as project bookmarks in one Undo step
-([bookmarks](TIMELINE_EDITING.md#bookmarks)).
+Each analysed music clip shows its beats as ticks, and **Snap to beats** in the timeline
+toolbar snaps every snapping gesture to them ([snap to beats](TIMELINE_EDITING.md#snap-to-beats)).
+
+The editor also shows the rest of the analysis, display only (nothing is saved). Music
+lanes are 64 pixels tall. On each analysed music clip, at the positions they play after
+its placement, source range and loops:
+
+- **Sections** tint the clip behind its waveform, with a coloured top edge: **quiet**
+  blue-grey, **build** amber, **peak** pink, **release** teal, labelled at their top
+  right when at least 40 pixels wide;
+- **Swells** are hairpins along the top: a crescendo opens to the right, a decrescendo
+  closes; a sudden one is a filled wedge, drawn at least 6 pixels wide, while gradual
+  ones narrower than 6 pixels are left out;
+- **Silences** are hatched dark;
+- **Tone** is a strip along the bottom, three rows: low (below 250 Hz, orange), mid
+  (green) and high (from 4 kHz, blue), each brighter where that band is louder, over the
+  40 dB below its loudest second, in six steps, sampled every 3 pixels (at most 600
+  columns per clip).
+
+Hovering a music clip shows a readout at the pointer: the timecode, section, loudness
+(or silence), any swell and the three tone levels there. Under **Recording**, the analysis
+line adds the key (**128 BPM · 4/4 · C minor · 290 beats**, or **No steady beat found ·
+C minor**), and a **Music structure** disclosure lists the selected clip's sections (with
+their loudness and average tone), swells (with their change in dB) and silences, each with
+its timeline position as a button that moves the playhead there: the keyboard and
+screen-reader route to the same information. Unanalysed music shows only the analysis
+line.
 
 ## Versioning
 

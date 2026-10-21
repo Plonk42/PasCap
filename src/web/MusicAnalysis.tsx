@@ -1,12 +1,11 @@
-import { useCallback, useEffect, useId, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
-import type { EditCommand } from '../shared/commands.js';
 import type { MediaJob } from '../shared/media.js';
 import type { MusicTrack } from '../shared/model.js';
-import { beatBookmarks, type BeatChoice, type MusicAnalysis } from '../shared/music-analysis.js';
+import { keyName, type MusicAnalysis } from '../shared/music-analysis.js';
 import { api } from './api.js';
 import { Icon } from './icons.js';
-import { Popover } from './Popover.js';
+import { MusicStructureList } from './music-structure.js';
 
 const POLL_MS = 1000;
 
@@ -27,6 +26,11 @@ interface Entry {
 /** One entry per prepared music recording, shared by its lanes and the Audio tab: one read, one poll. */
 const entries = new Map<string, Entry>();
 const IDLE: MusicAnalysisPhase = { kind: 'idle' };
+/** Every change to any entry, for views that read several recordings at once. */
+const anyListeners = new Set<() => void>();
+let revision = 0;
+
+const entryKey = (asset: AudioAsset): string => `${asset.id}/${asset.content?.digest ?? ''}`;
 
 function entryFor(key: string): Entry {
   let entry = entries.get(key);
@@ -41,6 +45,8 @@ function publish(key: string, phase: MusicAnalysisPhase): void {
   const entry = entryFor(key);
   entry.phase = phase;
   for (const listener of entry.listeners) listener();
+  revision++;
+  for (const listener of anyListeners) listener();
 }
 
 function failed(key: string, cause: unknown): void {
@@ -88,7 +94,7 @@ export function useMusicAnalysis(asset: AudioAsset | undefined): {
 } {
   const ready = asset?.status === 'ready';
   const id = asset?.id ?? '';
-  const key = `${id}/${asset?.content?.digest ?? ''}`;
+  const key = asset ? entryKey(asset) : '/';
   const subscribe = useCallback(
     (listener: () => void) => {
       const entry = entryFor(key);
@@ -115,10 +121,30 @@ export function useMusicAnalysis(asset: AudioAsset | undefined): {
   return { phase, analyse };
 }
 
+function subscribeAny(listener: () => void): () => void {
+  anyListeners.add(listener);
+  return () => anyListeners.delete(listener);
+}
+
+/** The analysed beats of these recordings once read; the music lanes load their analyses. */
+export function useAnalysedBeats(assets: readonly AudioAsset[]): (mediaId: string) => MusicAnalysis['beats'] | null {
+  const current = useSyncExternalStore(subscribeAny, () => revision);
+  return useMemo(() => {
+    const beats = new Map<string, MusicAnalysis['beats']>();
+    for (const asset of assets) {
+      const phase = asset.status === 'ready' ? entries.get(entryKey(asset))?.phase : undefined;
+      if (phase?.kind === 'ready') beats.set(asset.id, phase.analysis.beats);
+    }
+    return (mediaId: string) => beats.get(mediaId) ?? null;
+    // `current` changes whenever an analysis is read.
+  }, [assets, current]);
+}
+
 function summary(analysis: MusicAnalysis): string {
-  if (!analysis.tempo) return 'No steady beat found';
+  const key = analysis.key ? ` · ${keyName(analysis.key)}` : '';
+  if (!analysis.tempo) return `No steady beat found${key}`;
   const meter = analysis.meter ? ` · ${analysis.meter.beatsPerBar}/4` : '';
-  return `${Math.round(analysis.tempo.bpm)} BPM${meter} · ${analysis.beats.length} beats`;
+  return `${Math.round(analysis.tempo.bpm)} BPM${meter}${key} · ${analysis.beats.length} beats`;
 }
 
 function statusText(phase: MusicAnalysisPhase): string {
@@ -130,35 +156,17 @@ function statusText(phase: MusicAnalysisPhase): string {
   return 'Tempo and beats not analysed';
 }
 
-/** Why Beats → bookmarks cannot open, or '' when it can. */
-function unavailableReason(phase: MusicAnalysisPhase, disabled: boolean): string {
-  if (phase.kind === 'checking' || phase.kind === 'running') return 'Wait for the music analysis to finish.';
-  if (phase.kind !== 'ready') return 'Analyse the music first to find its beats.';
-  if (!phase.analysis.tempo) return 'No steady beat was found in this music.';
-  return disabled ? 'Finish the current edit first.' : '';
-}
-
 interface StatusProps {
   asset: AudioAsset | undefined;
   music: MusicTrack;
-  bookmarks: readonly number[];
-  disabled: boolean;
-  onEdit: (commands: readonly EditCommand[]) => void;
+  onSeek: (frame: number) => void;
 }
 
-/** Under Recording: the analysis summary, its progress or Analyse music, then Beats → bookmarks. */
-export function MusicAnalysisStatus({ asset, music, bookmarks, disabled, onEdit }: Readonly<StatusProps>) {
-  const id = useId();
+/** Under Recording: the analysis summary, its progress or Analyse music, then the music's structure. */
+export function MusicAnalysisStatus({ asset, music, onSeek }: Readonly<StatusProps>) {
   const { phase, analyse } = useMusicAnalysis(asset);
   if (asset?.status !== 'ready') return null;
   const text = statusText(phase);
-  const reason = unavailableReason(phase, disabled);
-  const trigger = (
-    <>
-      <Icon name="bookmark" size={14} />
-      Beats → bookmarks
-    </>
-  );
   return (
     <div className="music-analysis">
       <div className={`music-analysis-status ${phase.kind}`} role="status" aria-live="polite">
@@ -175,52 +183,7 @@ export function MusicAnalysisStatus({ asset, music, bookmarks, disabled, onEdit 
           </button>
         )}
       </div>
-      {reason || phase.kind !== 'ready' ? (
-        <>
-          <button
-            type="button"
-            className="secondary-button small music-beat-bookmarks"
-            aria-disabled="true"
-            aria-describedby={`${id}-reason`}
-            title={reason}
-          >
-            {trigger}
-          </button>
-          <span className="sr-only" id={`${id}-reason`}>
-            {reason}
-          </span>
-        </>
-      ) : (
-        <Popover label="Beats → bookmarks" className="music-beat-bookmarks" trigger={trigger}>
-          {(close) => (
-            <div className="music-beat-choices">
-              <p>Bookmark this music clip&apos;s beats, so every snapping gesture lands on the beat.</p>
-              {(['beats', 'downbeats'] as const satisfies readonly BeatChoice[]).map((choice) => {
-                const plan = beatBookmarks(bookmarks, music, phase.analysis.beats, choice);
-                const label = choice === 'beats' ? 'All beats' : 'Downbeats only';
-                return (
-                  <div key={choice} className="music-beat-choice">
-                    <button
-                      type="button"
-                      className="text-button"
-                      aria-disabled={plan.reason ? 'true' : undefined}
-                      aria-describedby={plan.reason ? `${id}-${choice}` : undefined}
-                      onClick={() => {
-                        if (plan.reason) return;
-                        close();
-                        onEdit(plan.frames.map((frame) => ({ type: 'bookmark-add', frame })));
-                      }}
-                    >
-                      {label} · {plan.frames.length}
-                    </button>
-                    {plan.reason && <small id={`${id}-${choice}`}>{plan.reason}</small>}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Popover>
-      )}
+      {phase.kind === 'ready' && <MusicStructureList music={music} analysis={phase.analysis} onSeek={onSeek} />}
     </div>
   );
 }

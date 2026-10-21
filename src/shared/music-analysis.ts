@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAX_BOOKMARKS, type MusicTrack } from './model.js';
+import type { MusicTrack } from './model.js';
 import { MUSIC_SAMPLE_RATE, MUSIC_SAMPLES_PER_FRAME } from './music-format.js';
 
 /** Version 3 (#257) adds tone, key, silences and swells; earlier caches are ignored, never deleted. */
@@ -104,28 +104,34 @@ export function musicBeatFrames(music: MusicTrack, beats: MusicAnalysis['beats']
   return placed;
 }
 
-export type BeatChoice = 'beats' | 'downbeats';
+/** A stretch of a music clip at project frames, OUT exclusive. */
+export interface PlacedSpan {
+  start: number;
+  end: number;
+}
 
 /**
- * The bookmarks Beats → bookmarks would add for a music clip: its beats (or downbeats) at
- * project frames that are not bookmarks yet, or why none can be added. Never a partial add.
+ * Where a stretch of the recording `[fromSample, toSample)` plays in a music clip, at project
+ * frames: clipped to the clip's source range and placement, once per loop.
  */
-export function beatBookmarks(
-  bookmarks: readonly number[],
-  music: MusicTrack,
-  beats: MusicAnalysis['beats'],
-  choice: BeatChoice,
-): { frames: number[]; reason: string } {
-  const existing = new Set(bookmarks);
-  const placed = musicBeatFrames(music, beats).filter((beat) => choice === 'beats' || beat.downbeat);
-  const frames = placed.map((beat) => beat.frame).filter((frame) => !existing.has(frame));
-  const noun = choice === 'beats' ? 'beat' : 'downbeat';
-  if (!placed.length) return { frames, reason: `No ${noun}s fall within this music clip's placement.` };
-  if (!frames.length) return { frames, reason: `Every ${noun} of this music clip is already a bookmark.` };
-  if (bookmarks.length + frames.length > MAX_BOOKMARKS)
-    return {
-      frames,
-      reason: `${frames.length.toLocaleString('en')} ${noun}s would exceed ${MAX_BOOKMARKS.toLocaleString('en')} bookmarks (${bookmarks.length.toLocaleString('en')} already set).${choice === 'beats' ? ' Add downbeats only instead.' : ''}`,
-    };
-  return { frames, reason: '' };
+export function musicSpans(music: MusicTrack, fromSample: number, toSample: number): PlacedSpan[] {
+  const length = music.sourceOut - music.sourceIn;
+  const end = music.start + music.duration;
+  const from = Math.max(fromSample / MUSIC_SAMPLES_PER_FRAME, music.sourceIn) - music.sourceIn;
+  const to = Math.min(toSample / MUSIC_SAMPLES_PER_FRAME, music.sourceOut) - music.sourceIn;
+  if (to <= from) return [];
+  const repeats = music.loop ? Math.ceil(music.duration / length) : 1;
+  const spans: PlacedSpan[] = [];
+  for (let repeat = 0; repeat < repeats; repeat++) {
+    const start = music.start + repeat * length + Math.round(from);
+    const stop = Math.min(end, music.start + repeat * length + Math.round(to));
+    if (start >= end) break;
+    if (stop > start) spans.push({ start, end: stop });
+  }
+  return spans;
+}
+
+/** "C♯ minor". */
+export function keyName(key: NonNullable<MusicAnalysis['key']>): string {
+  return `${key.tonic.replace('#', '♯')} ${key.mode}`;
 }

@@ -56,6 +56,7 @@ interface Props {
   onSelectMusic: (id: string) => void;
   onImport: () => void;
   onEdit: (command: EditCommand | readonly EditCommand[]) => void;
+  onSeek: (frame: number) => void;
 }
 
 type LaneUpdate = (lane: MusicLane) => MusicLane;
@@ -190,6 +191,7 @@ export function MusicControls({
   onSelectMusic,
   onImport,
   onEdit,
+  onSeek,
 }: Readonly<Props>) {
   const blocked = busy || drafting;
   const lane = project.music.find((item) => item.clips.some((clip) => clip.id === selectedMusicId)) ?? project.music[0];
@@ -277,6 +279,7 @@ export function MusicControls({
           drafting={drafting}
           onSelectMusic={onSelectMusic}
           onEdit={onEdit}
+          onSeek={onSeek}
         />
       ))}
     </section>
@@ -297,6 +300,7 @@ interface LaneProps {
   drafting: boolean;
   onSelectMusic: (id: string) => void;
   onEdit: Props['onEdit'];
+  onSeek: Props['onSeek'];
 }
 
 /** One music track's settings, kept mounted so selecting another track cannot borrow or discard its drafts. */
@@ -376,6 +380,7 @@ function MusicLaneControls(props: Readonly<LaneProps>) {
           busy={props.busy}
           drafting={drafting}
           onEdit={onEdit}
+          onSeek={props.onSeek}
         />
       ))}
       <MusicTiming helpId={helpId}>
@@ -538,6 +543,7 @@ function MusicClipSettings({
   busy,
   drafting,
   onEdit,
+  onSeek,
 }: Readonly<{
   project: ProjectDocument;
   lane: MusicLane;
@@ -548,6 +554,7 @@ function MusicClipSettings({
   busy: boolean;
   drafting: boolean;
   onEdit: Props['onEdit'];
+  onSeek: Props['onSeek'];
 }>) {
   const asset = assets.find((item) => item.id === clip.mediaId);
   const source = musicTracks([lane]).find((item) => item.id === clip.id)!;
@@ -585,13 +592,7 @@ function MusicClipSettings({
           ))}
         </select>
       </label>
-      <MusicAnalysisStatus
-        asset={asset}
-        music={source}
-        bookmarks={project.bookmarks}
-        disabled={busy || drafting}
-        onEdit={onEdit}
-      />
+      <MusicAnalysisStatus asset={asset} music={source} onSeek={onSeek} />
       <div className="music-track-overview">
         <span>{sourceSeconds(clip.duration)} on timeline</span>
         {lane.clips.length === 1 && (

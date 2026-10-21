@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent, type RefObject } from 'react';
 import type { ProjectDocument } from '../shared/model.js';
 import type { TimelineRange } from '../shared/rush-editing.js';
-import { snapFrame, snapPoints } from '../shared/snap.js';
+import { snapFrame, snapPoints, type BeatSnap } from '../shared/snap.js';
 
 const DRAG_THRESHOLD = 3;
 const EDGE = 28;
@@ -32,6 +32,7 @@ interface Options {
   leading: number;
   scale: number;
   snapping: boolean;
+  beats: BeatSnap;
   disabled: boolean;
   surface: RefObject<HTMLDivElement | null>;
   viewport: RefObject<HTMLDivElement | null>;
@@ -57,7 +58,8 @@ export function useRulerRange(options: Options) {
   ): { frame: number; guide: number | null } => {
     const left = latest.current.surface.current?.getBoundingClientRect().left ?? 0;
     const raw = Math.round((clientX - left - active.leading) / active.scale);
-    const targets = playhead ? [...snapPoints(active.base), active.playhead] : snapPoints(active.base);
+    const points = snapPoints(active.base, latest.current.beats);
+    const targets = playhead ? [...points, active.playhead] : points;
     const snapped = latest.current.snapping && !alt ? snapFrame(raw, targets, 8 / active.scale) : raw;
     const frame = Math.max(0, Math.min(active.duration, snapped));
     return { frame, guide: snapped === raw ? null : frame };
