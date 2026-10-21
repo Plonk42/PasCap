@@ -316,4 +316,70 @@ describe('operation routes', () => {
       exportRunning: true,
     });
   });
+
+  it("describes a recording's steady ranges inside its kept ranges with a sheet of their middle frames", async () => {
+    const pan = Array.from({ length: 600 }, (_, frame) => (frame === 0 ? null : frame < 300 ? 3 : -3));
+    const zero = pan.map((value) => (value === null ? null : 0));
+    const project: ProjectDocument = projectSchema.parse({
+      ...createProject('shots', 'Shots'),
+      media: { videoIds: ['rec-1'], audioIds: [] },
+      selects: { 'rec-1': [{ sourceIn: 30, sourceOut: 570 }] },
+    });
+    const sheets: number[][] = [];
+    const context = {
+      projects: { load: async () => project },
+      library: {
+        get: () => ({
+          id: 'rec-1',
+          name: 'DJI_0001.MP4',
+          status: 'ready',
+          damage: [{ start: 100, end: 130 }],
+          metadata: { frameCount: 600 },
+        }),
+        motion: async () => ({
+          version: 3,
+          verifiedAt: 'now',
+          frameCount: 600,
+          tx: pan,
+          ty: zero,
+          zoom: zero,
+          rotation: zero,
+          telemetry: [],
+        }),
+      },
+      sessions: {
+        current: async () => ({ endedAt: null, brief: { allowedMovement: 3 } }),
+      },
+      stills: {
+        recordingSheet: async (_: string, frames: number[]) => {
+          sheets.push(frames);
+          return { mimeType: 'image/jpeg', data: 'jpeg', width: 240, height: 135 };
+        },
+      },
+      images: { stillWidth: 480, sheetCellWidth: 240, sheetCells: 2 },
+    } as unknown as Parameters<typeof runners.describe_recording>[0];
+    const described = await runners.describe_recording(context, { projectId: 'shots', mediaId: 'rec-1', sheet: true });
+    expect(described.allowedMovement).toBe(3);
+    expect(described.recording).toMatchObject({ damaged: [{ sourceIn: 100, sourceOut: 130 }], flightData: false });
+    expect(described.keptRanges).toEqual([{ sourceIn: 30, sourceOut: 570 }]);
+    const ranges = described.steadyRanges;
+    expect(ranges.map((range) => range.motion)).toEqual(['pan left', 'pan left', 'pan right']);
+    expect(ranges[0]!.sourceIn).toBe(30);
+    expect(ranges.at(-1)!.sourceOut).toBe(570);
+    // Two cells: the two longest ranges, in source order.
+    expect(ranges.map((range) => range.cell)).toEqual([null, 0, 1]);
+    expect(sheets).toEqual([ranges.slice(1).map((range) => Math.floor((range.sourceIn + range.sourceOut) / 2))]);
+    expect(described.image).toMatchObject({ mimeType: 'image/jpeg' });
+    const bare = await runners.describe_recording(context, {
+      projectId: 'shots',
+      mediaId: 'rec-1',
+      allowedMovement: 1,
+      sheet: false,
+    });
+    expect(bare.image).toBeUndefined();
+    expect(bare.allowedMovement).toBe(1);
+    await expect(
+      runners.describe_recording(context, { projectId: 'shots', mediaId: 'rec-9', sheet: false }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
 });
