@@ -54,6 +54,10 @@ function synthetic(): MusicAnalysis {
     beats: BEATS,
     accents: [],
     loudness: [],
+    tone: [],
+    key: null,
+    silences: [],
+    swells: [],
     sections: [],
   };
 }

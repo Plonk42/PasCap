@@ -465,8 +465,8 @@ cancellation cleans only owned scratch/partials and preserves completed outputs.
 ### Music analysis
 
 Once music is ready, a **Music analysis** background job (after every other queued job,
-like camera motion analysis) finds its tempo, beats, downbeats, accents, loudness and
-sections. It runs on one worker thread, streaming the PCM cache in 1 MiB blocks as a
+like camera motion analysis) finds its tempo, beats, downbeats, accents, loudness, tone,
+key, swells, silences and sections. It runs on one worker thread, streaming the PCM cache in 1 MiB blocks as a
 mono float mix (never the whole file): 2,048-sample Hann windows every 480 samples
 (10 ms), 40 mel bands from 30 Hz to 16 kHz, a spectral-flux onset envelope, tempo from
 its autocorrelation (50–220 BPM; the fastest strong periodicity, with a mild prior around
@@ -493,14 +493,26 @@ loudness and its change), and accents (onset peaks above the 90th percentile, at
   beats', in standard deviations, divided by 1.5.
 - **Sections.** Each boundary moves to the nearest downbeat within 2 s, so a cut there
   lands on the bar.
+- **Tone.** Per second, the level in dBFS below 250 Hz (bass, kick), from 250 Hz to 4 kHz
+  (most instruments and voice) and above 4 kHz (cymbals, air), from the FFT power.
+- **Key.** The song's pitch-class power from 250 Hz to 2 kHz (finer bins than a semitone),
+  per bin of each class, correlated with the Krumhansl–Kessler major and minor profiles;
+  none below a correlation of 0.5, the confidence being the margin over the next key
+  divided by 0.15. A relative major and minor (C major, A minor) can be confused.
+- **Silences.** At least 0.3 s below −50 dBFS and 35 dB under the song's 95th
+  percentile of loudness.
+- **Swells.** Loudness averaged over 3 s that rises or falls by at least 6 dB between
+  turning points is a crescendo or decrescendo, timed from 10% to 90% of its change on
+  loudness averaged over 0.5 s; under 1 s it is sudden. A step of at least 9 dB between
+  the 2 s before and after a moment, inside a longer swell, is a sudden swell of its own.
 
 Every constant is in `MUSIC_ANALYSIS` ([analysis](../src/server/music-analysis.ts)); a
 10-minute song takes about 5 s and under 10 MB.
 
-The result is cached as `music-v2.json` beside `playback.pcm`, positions in PCM samples,
+The result is cached as `music-v3.json` beside `playback.pcm`, positions in PCM samples,
 tied to the original's content checksum and the cache file's size and modification time:
-re-preparing the cache makes it stale (ignored, never rewritten silently). Results of the
-earlier analysis (`music-v1.json`) are ignored, never deleted. Music analysed before this
+re-preparing the cache makes it stale (ignored, never rewritten silently). Results of
+earlier analyses (`music-v1.json`, `music-v2.json`) are ignored, never deleted. Music analysed before this
 version, or whose analysis is stale, failed or was cancelled, shows
 **Tempo and beats not analysed** with **Analyse music** under **Recording** in
 **Audio → Music**; otherwise that line shows the tempo, meter and beat count, or the job's
@@ -525,6 +537,12 @@ Limits: the downbeat cues are weak on real songs (meter confidence about 0.15–
 they agree), so downbeats can still land on the third beat; the tempo confidence and
 clarity thresholds are set from these three songs; sections remain coarse where the timbre
 barely changes. Beats sit about 9 ms after madmom's, below what is audible.
+
+The key agrees with librosa's constant-Q chroma and the same profiles (an independent
+reference) on two of the three songs (C minor, G♯ major); on the third it reports the
+relative major (C major for A minor). On those songs the swells follow the loudness: a
+99 s crescendo of 25 dB, a sudden 20 dB cut-off before the end. Instruments, voice and
+lyrics are not analysed ([#257](https://github.com/Plonk42/PasCap/issues/257)).
 
 Each analysed music clip shows its beats as ticks, and **Beats → bookmarks** under the
 analysis line adds the selected music clip's beats or downbeats as project bookmarks in one Undo step

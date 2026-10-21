@@ -1,7 +1,13 @@
 import { constants } from 'node:fs';
 import { open } from 'node:fs/promises';
 import { Worker } from 'node:worker_threads';
-import { MUSIC_ANALYSIS_HOP, sectionKinds, type MusicMeasurement } from '../shared/music-analysis.js';
+import {
+  MUSIC_ANALYSIS_HOP,
+  pitchNames,
+  sectionKinds,
+  swellKinds,
+  type MusicMeasurement,
+} from '../shared/music-analysis.js';
 import { MUSIC_BYTES_PER_SAMPLE, MUSIC_SAMPLE_RATE } from '../shared/music-format.js';
 import { whileSerial } from '../shared/serial.js';
 import { ServiceError } from './errors.js';
@@ -61,6 +67,18 @@ export const MUSIC_ANALYSIS = {
   sectionSnapSeconds: 2,
   /** Loudness change across a section, in dB, that makes it a build or a release. */
   sectionSlopeDb: 6,
+  /** Tone: low below the first frequency, high from the second. */
+  toneHz: [250, 4_000] as const,
+  /** Key: Krumhansl–Kessler profiles; none below this correlation, certain at this margin over the next key. */
+  key: { hz: [250, 2_000] as const, minimumCorrelation: 0.5, sureMargin: 0.15 },
+  /** Silence: at least this long, below `maximumDb` and `belowLoudDb` under the song's 95th percentile. */
+  silence: { maximumDb: -50, belowLoudDb: 35, minimumSeconds: 0.3 },
+  /**
+   * Swells: loudness averaged over `phraseSeconds` that rises or falls by at least `changeDb`, timed
+   * on loudness averaged over `timingSeconds` from 10% to 90% of the change; sudden under `suddenSeconds`.
+   * A step of `stepDb` between the `stepSeconds` before and after a moment is a sudden swell too.
+   */
+  swell: { changeDb: 6, phraseSeconds: 3, timingSeconds: 0.5, span: 0.1, suddenSeconds: 1, stepSeconds: 2, stepDb: 9 },
 } as const;
 
 const HOP = MUSIC_ANALYSIS_HOP;
@@ -72,6 +90,7 @@ const BLOCK_FRAMES = FRAME_RATE;
 const LOUDNESS_SAMPLES = MUSIC_SAMPLE_RATE / 10;
 const RING = 4096;
 const CHROMA = 12;
+const TONE_BANDS = 3;
 const LAG_MIN = Math.floor((FRAME_RATE * 60) / MUSIC_ANALYSIS.bpm[1]);
 const LAG_MAX = Math.ceil((FRAME_RATE * 60) / MUSIC_ANALYSIS.bpm[0]);
 const SILENT_DB = -120;
@@ -175,6 +194,10 @@ export interface MusicFeatures {
   low: Float32Array;
   /** Pitch-class magnitudes, twelve per frame. */
   chroma: Float32Array;
+  /** Per second: dBFS of the low, mid and high frequencies (three per second). */
+  tone: Float32Array;
+  /** The song's pitch-class power from bins fine enough to separate semitones, per bin of each class (index 0 is A). */
+  keyChroma: Float64Array;
   /** Per second: mean log level of every band, then the share of each pitch class. */
   blocks: Float32Array[];
   /** dBFS per 100 ms. */
@@ -188,6 +211,13 @@ export class MusicFeatureExtractor {
     (_, index) => 0.5 - 0.5 * Math.cos((2 * Math.PI * index) / WINDOW),
   );
   readonly #scale = 2 / this.#hann.reduce((sum, value) => sum + value, 0);
+  /** Squared bin magnitudes to mean square of the signal (Parseval, one-sided). */
+  readonly #powerScale = 2 / (WINDOW * this.#hann.reduce((sum, value) => sum + value * value, 0));
+  readonly #toneBand: Int8Array;
+  readonly #keyPitch: Int8Array;
+  readonly #keyChroma = new Float64Array(CHROMA);
+  readonly #blockTone = new Float64Array(TONE_BANDS);
+  readonly #tone: number[] = [];
   readonly #weights: BandWeight[];
   readonly #kick: number[];
   readonly #pitch: Int8Array;
@@ -219,6 +249,15 @@ export class MusicFeatureExtractor {
       if (hz < MUSIC_ANALYSIS.chromaHz[0] || hz > MUSIC_ANALYSIS.chromaHz[1]) return -1;
       return ((Math.round(12 * Math.log2(hz / 440)) % CHROMA) + CHROMA) % CHROMA;
     });
+    const [lowTo, midTo] = MUSIC_ANALYSIS.toneHz;
+    const [keyFrom, keyTo] = MUSIC_ANALYSIS.key.hz;
+    this.#keyPitch = this.#pitch.map((pitch, bin) => (binHz(bin) >= keyFrom && binHz(bin) <= keyTo ? pitch : -1));
+    this.#toneBand = Int8Array.from({ length: HALF + 1 }, (_, bin) => {
+      const hz = binHz(bin);
+      if (bin === 0) return -1;
+      if (hz < lowTo) return 0;
+      return hz < midTo ? 1 : 2;
+    });
   }
   push(mono: Float32Array): void {
     for (const value of mono) {
@@ -238,6 +277,11 @@ export class MusicFeatureExtractor {
       flux: Float32Array.from(this.#flux),
       low: Float32Array.from(this.#low),
       chroma: Float32Array.from(this.#chroma),
+      tone: Float32Array.from(this.#tone),
+      keyChroma: this.#keyChroma.map((power, pitch) => {
+        const bins = this.#keyPitch.reduce((count, other) => count + (other === pitch ? 1 : 0), 0);
+        return bins > 0 ? power / bins : 0;
+      }),
       blocks: this.#blocks,
       loudness: this.#loudness,
     };
@@ -255,6 +299,9 @@ export class MusicFeatureExtractor {
     if (chroma > 0)
       for (let pitch = 0; pitch < CHROMA; pitch++) block[BANDS + pitch] = this.#blockChroma[pitch]! / chroma;
     this.#blocks.push(block);
+    for (const power of this.#blockTone)
+      this.#tone.push(power > 0 ? Math.max(SILENT_DB, 10 * Math.log10(power / this.#blockFrames)) : SILENT_DB);
+    this.#blockTone.fill(0);
     this.#blockLevels.fill(0);
     this.#blockChroma.fill(0);
     this.#blockFrames = 0;
@@ -281,20 +328,27 @@ export class MusicFeatureExtractor {
       this.#blockLevels[band] = this.#blockLevels[band]! + level;
     }
     for (const band of this.#kick) low += this.#level[band]!;
+    this.#accumulateToneAndChroma();
+    this.#flux.push(flux);
+    this.#low.push(this.#kick.length ? low / this.#kick.length : 0);
+    this.#frame++;
+    if (++this.#blockFrames === BLOCK_FRAMES) this.#flushBlock();
+  }
+  #accumulateToneAndChroma(): void {
     this.#frameChroma.fill(0);
-    for (let bin = 0; bin <= HALF; bin++) {
+    for (let bin = 1; bin <= HALF; bin++) {
+      const power = this.#re[bin]! ** 2 + this.#im[bin]! ** 2;
+      const band = this.#toneBand[bin]!;
+      this.#blockTone[band] = this.#blockTone[band]! + power * this.#powerScale;
       const pitch = this.#pitch[bin]!;
-      if (pitch >= 0)
-        this.#frameChroma[pitch] = this.#frameChroma[pitch]! + Math.hypot(this.#re[bin]!, this.#im[bin]!) * this.#scale;
+      if (pitch >= 0) this.#frameChroma[pitch] = this.#frameChroma[pitch]! + Math.sqrt(power) * this.#scale;
+      const keyPitch = this.#keyPitch[bin]!;
+      if (keyPitch >= 0) this.#keyChroma[keyPitch] = this.#keyChroma[keyPitch]! + power * this.#powerScale;
     }
     for (let pitch = 0; pitch < CHROMA; pitch++) {
       this.#blockChroma[pitch] = this.#blockChroma[pitch]! + this.#frameChroma[pitch]!;
       this.#chroma.push(this.#frameChroma[pitch]!);
     }
-    this.#flux.push(flux);
-    this.#low.push(this.#kick.length ? low / this.#kick.length : 0);
-    this.#frame++;
-    if (++this.#blockFrames === BLOCK_FRAMES) this.#flushBlock();
   }
 }
 
@@ -759,6 +813,149 @@ function sections(features: MusicFeatures, anchors: number[]): MusicMeasurement[
   });
 }
 
+const MAJOR_PROFILE = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+const MINOR_PROFILE = [6.33, 2.68, 3.52, 5.38, 2.6, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+
+function correlation(a: readonly number[], b: readonly number[]): number {
+  const mean = (values: readonly number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
+  const [ma, mb] = [mean(a), mean(b)];
+  let product = 0;
+  let squaresA = 0;
+  let squaresB = 0;
+  for (let index = 0; index < a.length; index++) {
+    product += (a[index]! - ma) * (b[index]! - mb);
+    squaresA += (a[index]! - ma) ** 2;
+    squaresB += (b[index]! - mb) ** 2;
+  }
+  return squaresA > 0 && squaresB > 0 ? product / Math.sqrt(squaresA * squaresB) : 0;
+}
+
+/** Key and mode from the song's pitch-class profile (Krumhansl–Kessler). */
+function musicKey(chroma: Float64Array): MusicMeasurement['key'] {
+  // Chroma index 0 is A; profiles start at their tonic.
+  const totals = new Array<number>(CHROMA).fill(0);
+  for (let index = 0; index < CHROMA; index++) totals[(index + 9) % CHROMA] = chroma[index]!;
+  const candidates = pitchNames.flatMap((tonic, root) =>
+    (['major', 'minor'] as const).map((mode) => {
+      const profile = mode === 'major' ? MAJOR_PROFILE : MINOR_PROFILE;
+      const rotated = totals.map((_, pitch) => profile[(pitch - root + CHROMA) % CHROMA]!);
+      return { tonic, mode, score: correlation(totals, rotated) };
+    }),
+  );
+  candidates.sort((a, b) => b.score - a.score);
+  const [best, next] = candidates;
+  if (!best || best.score < MUSIC_ANALYSIS.key.minimumCorrelation) return null;
+  const confidence = Math.min(1, (best.score - next!.score) / MUSIC_ANALYSIS.key.sureMargin);
+  return { tonic: best.tonic, mode: best.mode, confidence: Math.round(confidence * 100) / 100 };
+}
+
+/** Below this level, 100 ms of loudness is silence: quiet in absolute terms and against the song's loud parts. */
+function silenceThreshold(loudness: number[]): number {
+  const { maximumDb, belowLoudDb } = MUSIC_ANALYSIS.silence;
+  return Math.min(maximumDb, Math.max(SILENT_DB + 1, percentile(loudness, 0.95) - belowLoudDb));
+}
+
+/** Near-silent stretches. */
+function silences(loudness: number[]): MusicMeasurement['silences'] {
+  const { minimumSeconds } = MUSIC_ANALYSIS.silence;
+  const threshold = silenceThreshold(loudness);
+  const shortest = Math.round(minimumSeconds * 10);
+  const found: MusicMeasurement['silences'] = [];
+  let from = -1;
+  for (let index = 0; index <= loudness.length; index++) {
+    const quiet = index < loudness.length && loudness[index]! < threshold;
+    if (quiet && from < 0) from = index;
+    else if (!quiet && from >= 0) {
+      if (index - from >= shortest)
+        found.push({ fromSample: from * LOUDNESS_SAMPLES, toSample: index * LOUDNESS_SAMPLES });
+      from = -1;
+    }
+  }
+  return found;
+}
+
+/** Turning points of a curve that moves by at least `change` between them. */
+function turningPoints(values: number[], change: number): number[] {
+  const turns: number[] = [];
+  let low = 0;
+  let high = 0;
+  let direction = 0;
+  for (let index = 1; index < values.length; index++) {
+    const value = values[index]!;
+    if (direction <= 0 && value < values[low]!) low = index;
+    if (direction >= 0 && value > values[high]!) high = index;
+    if (direction <= 0 && value - values[low]! >= change) {
+      turns.push(low);
+      direction = 1;
+      high = index;
+    } else if (direction >= 0 && values[high]! - value >= change) {
+      turns.push(high);
+      direction = -1;
+      low = index;
+    }
+  }
+  if (direction !== 0) turns.push(direction > 0 ? high : low);
+  return turns;
+}
+
+/** Crescendos and decrescendos: phrase-scale loudness rising or falling by several dB. */
+function swells(loudness: number[]): MusicMeasurement['swells'] {
+  const { changeDb, phraseSeconds, timingSeconds, span, suddenSeconds, stepSeconds, stepDb } = MUSIC_ANALYSIS.swell;
+  const floor = silenceThreshold(loudness);
+  const smoothed = (seconds: number): number[] => {
+    const half = Math.floor((seconds * 10) / 2);
+    return loudness.map((_, index) =>
+      Math.max(floor, meanDb(loudness.slice(Math.max(0, index - half), index + half + 1))),
+    );
+  };
+  const phrase = smoothed(phraseSeconds);
+  const fine = smoothed(timingSeconds);
+  const turns = turningPoints(phrase, changeDb);
+  const gradual = turns.slice(1).map((end, index) => {
+    const start = turns[index]!;
+    const total = phrase[end]! - phrase[start]!;
+    // The swell itself: from 10% to 90% of the change, not the plateaus around it.
+    const crossed = (share: number): number => {
+      for (let position = start; position <= end; position++)
+        if ((fine[position]! - phrase[start]!) / total >= share) return position;
+      return end;
+    };
+    const from = crossed(span);
+    const to = Math.max(from + 1, crossed(1 - span));
+    return {
+      fromSample: from * LOUDNESS_SAMPLES,
+      toSample: to * LOUDNESS_SAMPLES,
+      kind: total > 0 ? swellKinds[0] : swellKinds[1],
+      changeDb: Math.round(total * 10) / 10,
+      sudden: (to - from) / 10 < suddenSeconds,
+    };
+  });
+  // A step inside a longer swell (a build ending in a drop) is a sudden swell of its own.
+  const reach = Math.round(stepSeconds * 10);
+  const steps: MusicMeasurement['swells'] = [];
+  const level = (from: number, to: number): number => Math.max(floor, meanDb(loudness.slice(from, to)));
+  const change = loudness.map((_, index) =>
+    index < reach || index + reach > loudness.length ? 0 : level(index, index + reach) - level(index - reach, index),
+  );
+  const order = change.map((_, index) => index).sort((a, b) => Math.abs(change[b]!) - Math.abs(change[a]!) || a - b);
+  for (const index of order) {
+    const value = change[index]!;
+    if (Math.abs(value) < stepDb) break;
+    const sample = index * LOUDNESS_SAMPLES;
+    const near = (swell: { fromSample: number; toSample: number }): boolean =>
+      swell.fromSample - reach * LOUDNESS_SAMPLES <= sample && sample <= swell.toSample + reach * LOUDNESS_SAMPLES;
+    if (steps.some(near) || gradual.some((swell) => swell.sudden && near(swell))) continue;
+    steps.push({
+      fromSample: (index - 1) * LOUDNESS_SAMPLES,
+      toSample: (index + 1) * LOUDNESS_SAMPLES,
+      kind: value > 0 ? swellKinds[0] : swellKinds[1],
+      changeDb: Math.round(value * 10) / 10,
+      sudden: true,
+    });
+  }
+  return [...gradual, ...steps].sort((a, b) => a.fromSample - b.fromSample || a.toSample - b.toSample);
+}
+
 /** Tempo, beats, downbeats, accents and sections from the features. Deterministic. */
 export function analyseFeatures(features: MusicFeatures): MusicMeasurement {
   const envelope = onsetEnvelope(features.flux);
@@ -768,6 +965,13 @@ export function analyseFeatures(features: MusicFeatures): MusicMeasurement {
     samples: features.samples,
     accents: envelope ? accents(envelope, features.samples) : [],
     loudness: features.loudness.map((value) => Math.round(value * 10) / 10),
+    tone: Array.from({ length: features.tone.length / TONE_BANDS }, (_, second) => {
+      const [low, mid, high] = features.tone.subarray(second * TONE_BANDS, (second + 1) * TONE_BANDS);
+      return [low!, mid!, high!].map((value) => Math.round(value * 10) / 10) as [number, number, number];
+    }),
+    key: musicKey(features.keyChroma),
+    silences: silences(features.loudness),
+    swells: swells(features.loudness),
   } as const;
   const periods = envelope && beatPeriods(envelope);
   const tracked =

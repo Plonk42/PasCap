@@ -71,7 +71,7 @@ permission). The work iterates on the `mcp` branch until the owner merges it.
 | How the assistant edits            | The `edit` operation `{ commands, expectedRevision }`: the service applies the batch atomically with `applyCommand`, validates like a save and writes one revision. Candidates (`preview_edits`, `still` of a draft) are also `commands` relative to a saved revision, never whole documents. The editor keeps its document saves.                                                                                                                                                                                       | One validation path and one revision per logical step (the assistant's "one Undo step"); rich command errors come back verbatim; commands stay small under the 1 MiB body limit where a large project document would not; the editor can adopt it later for bulk actions.                                                                                                                                                                                              |
 | Concurrency with the open editor   | A server-side **assistant session** (lease) per project: started from the editor's **Hand off** dialog after flushing autosave, with a **checkpoint** copy of the document. While it holds the lease, editor saves get 423 and the editor follows the document read-only (polling revision); `edit` requires the lease. The user can **Take over** at any time; the LLM can end the session with notes (`session_end`). By default the lease never expires (owner, 2026-10-21); a service setting can end idle sessions. | Same project, no silent divergence, nothing destructive: the checkpoint restores the pre-hand-off cut through **Open project file…** (new project) or a **Restore checkpoint** action. A `copy: true` option builds the cut in a new project instead, using the existing import path.                                                                                                                                                                                  |
 | How the LLM sees pictures          | **Native stills** from the proxies through `composeLayerFrame`, encoded to JPEG by FFmpeg, served by new routes; contact sheets tile several stills with a JSON legend. No browser screenshots.                                                                                                                                                                                                                                                                                                                          | The composed picture is what matters, it matches export, and it needs no GPU or Chrome. The editor UI is for the user.                                                                                                                                                                                                                                                                                                                                                 |
-| Music analysis                     | A new background job kind (`music-analysis`) on the existing PCM cache: onset envelope, tempo, beats, downbeats, loudness, sections and accents, cached as `music-v2.json`; pure TypeScript in a worker thread, no new dependency or decoder.                                                                                                                                                                                                                                                                            | The PCM is already exact 48 kHz stereo; a bounded single-thread analysis takes about a second per song. It also gives the editor beat ticks and **Beats → bookmarks** without the assistant.                                                                                                                                                                                                                                                                           |
+| Music analysis                     | A new background job kind (`music-analysis`) on the existing PCM cache: onset envelope, tempo, beats, downbeats, loudness, sections and accents, cached as `music-v3.json`; pure TypeScript in a worker thread, no new dependency or decoder.                                                                                                                                                                                                                                                                            | The PCM is already exact 48 kHz stereo; a bounded single-thread analysis takes about a second per song. It also gives the editor beat ticks and **Beats → bookmarks** without the assistant.                                                                                                                                                                                                                                                                           |
 | Export                             | Not exposed.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | The user reviews first; export remains a deliberate action with its own storage checks.                                                                                                                                                                                                                                                                                                                                                                                |
 
 ## Architecture
@@ -87,7 +87,7 @@ flowchart LR
     H --> K
     X --> K[op.run]
     K --> P[(projects/*.json\nrevision, checkpoints, session)]
-    K --> R[(registries, proxies,\nmotion-v3.json, PCM, music-v2.json)]
+    K --> R[(registries, proxies,\nmotion-v3.json, PCM, music-v3.json)]
     K --> C[Native compositor\ncomposeLayerFrame]
     K --> J[JobQueue\nmusic-analysis, motion]
     K --> F[FFmpeg\nproxy frame decode, JPEG]
@@ -158,18 +158,22 @@ service.
 
 ### Music analysis cache
 
-`audio-assets/<id>/pcm16-48k-stereo-mono-unity-v3/music-v2.json`, tied to the PCM cache
+`audio-assets/<id>/pcm16-48k-stereo-mono-unity-v3/music-v3.json`, tied to the PCM cache
 (stored alongside it; removed with it; ignored if the asset's `content` changed):
 
 ```ts
 {
-  version: 2,
+  version: 3,
   sampleRate: 48000, hop: 480,             // 10 ms feature rate
   tempo: { bpm, confidence },              // global; curve: [{ fromSample, bpm }]
   meter: { beatsPerBar: 3 | 4, confidence },
   beats: [{ sample, strength, downbeat }], // ascending samples
   accents: [{ sample, strength }],         // strong isolated onsets
   loudness: number[],                      // dBFS per 100 ms
+  tone: [low, mid, high][],                // dBFS per second: < 250 Hz, 250 Hz–4 kHz, > 4 kHz
+  key: { tonic, mode, confidence } | null, // 'C'…'B', 'major' | 'minor'
+  swells: [{ fromSample, toSample, kind: 'crescendo' | 'decrescendo', changeDb, sudden }],
+  silences: [{ fromSample, toSample }],
   sections: [{ fromSample, toSample, kind: 'quiet' | 'build' | 'peak' | 'release', loudnessDb }]
 }
 ```
@@ -302,7 +306,7 @@ Read; for editor and assistant. Map where a video recording is usable and how it
 
 #### `music_analysis`
 
-Read; for editor and assistant. Read the tempo, meter, beats, downbeats, accents (strong hits worth cutting on) and sections (quiet, build, peak, release) of the project's music clips, at project frames: where each plays on the timeline, repeated across loops. Use a frame window for long music. A clip whose music is not analysed yet says so; ask the user to analyse it in Audio → Music.
+Read; for editor and assistant. Read the music of the project's music clips at project frames (where each plays on the timeline, repeated across loops): tempo, meter, beats, downbeats, accents (strong hits worth cutting on), key and mode, sections (quiet, build, peak, release) with their loudness and tone (low, mid and high frequency levels), swells (crescendos and decrescendos, sudden or gradual) and silences. Use a frame window for long music. A clip whose music is not analysed yet says so; ask the user to analyse it in Audio → Music.
 
 | Input         | Type    | Description                                                                                |
 | ------------- | ------- | ------------------------------------------------------------------------------------------ |
