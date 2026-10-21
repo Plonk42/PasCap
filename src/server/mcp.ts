@@ -4,8 +4,9 @@ import path from 'node:path';
 import { toNodeHandler, type NodeIncomingMessageLike } from '@modelcontextprotocol/node';
 import { createMcpHandler, McpServer, type CallToolResult } from '@modelcontextprotocol/server';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { ZodError, type ZodType } from 'zod';
+import { z, ZodError, type ZodType } from 'zod';
 import { operations } from '../shared/operations/index.js';
+import { ASSISTANT_GUIDE } from './assistant-guide.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { assertNoSymlinks } from './files.js';
 import type { ServiceContext, ServiceResources } from './operations/context.js';
@@ -19,12 +20,15 @@ import { atomicWrite } from './storage.js';
  */
 export const MCP_PATH = '/mcp';
 
+export const GUIDE_URI = 'pascap://guide';
+
 const INSTRUCTIONS = [
   'PasCap edits drone-flight video projects. Frames are integers at 30000/1001 fps; outputs also give MM:SS:FF timecodes.',
-  'Start with list_projects and describe_project, and read a track with describe_track before grading it.',
+  `Before building or changing a cut, follow the playbook in the ${GUIDE_URI} resource (also the rough_cut prompt).`,
+  'Start with list_projects and describe_project; choose footage with describe_recording and recording_sheet, and follow the music with music_analysis, check_alignment and snap_cuts_to_beats. Read a track with describe_track before grading it.',
   "To change a project, first take it with session_start and the user's brief; the user then cannot save it until you call session_end with notes for them or the user takes it back.",
   'Change a project only with edit: its commands apply together against the expectedRevision you last read, or not at all, and a rejected command returns its reason. Clips you add must stay inside the ranges the user kept.',
-  'Look at the result with timeline_sheet or still, and choose footage with recording_sheet.',
+  'Look at the result with timeline_sheet or still.',
 ].join(' ');
 
 const assistantOperations = operations.filter((operation) => operation.audience.includes('assistant'));
@@ -93,6 +97,40 @@ export function mcpServer(resources: ServiceResources): McpServer {
       }
     });
   }
+  server.registerResource(
+    'guide',
+    GUIDE_URI,
+    {
+      title: 'Building a rough cut in PasCap',
+      description: 'The playbook: read, take the project, choose footage, structure, build, grade, finish.',
+      mimeType: 'text/markdown',
+    },
+    (uri) => ({ contents: [{ uri: uri.href, mimeType: 'text/markdown', text: ASSISTANT_GUIDE }] }),
+  );
+  server.registerPrompt(
+    'rough_cut',
+    {
+      title: 'Build a rough cut',
+      description: "Build a first cut of a PasCap project from the user's brief, following the playbook.",
+      argsSchema: z.object({
+        request: z.string().optional().describe("The project and what to make, in the user's words."),
+      }),
+    },
+    ({ request }) => {
+      const ask = request ? `The request: ${request}` : 'Ask which project and what to make if the request is unclear.';
+      return {
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `${ASSISTANT_GUIDE}\n---\n\nBuild a rough cut following this playbook. ${ask}`,
+            },
+          },
+        ],
+      };
+    },
+  );
   return server;
 }
 
