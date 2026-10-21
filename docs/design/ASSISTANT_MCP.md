@@ -122,16 +122,35 @@ selects: Record<mediaId, SelectRange[]>; // SelectRange = { sourceIn, sourceOut 
 
 ### Assistant session and checkpoint (service files, not schema)
 
-`projects/<id>.assistant.json`: `{ token, startedAt, lastActivityAt, brief, notes, edits }`
-written by the service; `projects/<id>.checkpoint-<iso>.json` holds the document as handed
-off (bounded to the last 5 checkpoints per project). Neither is part of the project
-document, export receipts or compatibility rules.
+Implemented on the `mcp` branch ([#235](https://github.com/Plonk42/PasCap/issues/235),
+[sessions](../../src/server/sessions.ts)). `<dataDir>/assistant/<id>/session.json` holds the
+project's latest session: `{ projectId, startedAt, startedBy, lastActivityAt, brief,
+checkpointId, edits, endedAt, endedBy, notes }`; `<dataDir>/assistant/<id>/checkpoints/` holds
+checkpoints `{ summary, document }`, the last `PASCAP_ASSISTANT_CHECKPOINTS` (5) per project,
+never removing the active session's own. Neither is part of the project document, export
+receipts or compatibility rules; a checkpoint is upgraded and validated like a project file
+when restored.
 
-The **brief** is what the user tells the assistant in the Hand off dialog: chosen music
-track or music recording, target length (`follow music` | seconds), style notes (free
-text, ≤ 2,000 characters), allowed camera movement (the Source preview tolerance, 0.5–6)
-and the maximum number of clips. It carries no permissions: the assistant may use every
-operation. It is exposed to the LLM as a resource and never interpreted by the service.
+`session_start` (the editor, or the assistant itself from what the user asked, decided on
+2026-10-21) checks the revision the starter read and that every bin recording is prepared,
+checkpoints the project and takes its write lease. While it is active every write of the user
+(editor saves, renames, deletes, imports into the bin, `edit` from the editor) is refused with
+423, and the assistant's writes are allowed; without an active session the assistant cannot
+write and is told why (none started, the user took the project back, or the lease expired).
+The lease ends after `PASCAP_ASSISTANT_LEASE_MINUTES` (10) without any assistant call naming
+the project. During a session `edit` and `preview_edits` also refuse, leaving the project
+unchanged, any batch that widens kept ranges or inserts or changes a clip outside its
+recording's kept ranges or bin; the user's own clips outside them may stay. `session_end` is
+Take over from the editor, or the assistant finishing with notes; `checkpoint_restore` replaces
+the project with a checkpoint in one revision after checkpointing its current state. The
+checks run inside the project store's write queue, so no save interleaves with a start or a
+restore.
+
+The **brief** is what the user tells the assistant, in the chat or later in the Hand off
+dialog: notes (≤ 2,000 characters), music track, target length in seconds, allowed camera
+movement (0.5–6) and the maximum number of clips, all optional. It carries no permissions:
+the assistant may use every operation. It is stored and returned, never interpreted by the
+service.
 
 ### Music analysis cache
 
@@ -245,6 +264,33 @@ Read; for editor and assistant. Read every appearance value of one video track: 
 | `layerId`   | string           | ID of the video track.                                                               |
 | `frames`    | array of integer | Up to 32 project frames at which to report the values that apply; none when omitted. |
 
+#### `session_start`
+
+Write; for editor and assistant. Take the project's write lease for an assistant session, after checkpointing it, so the editor follows your edits read-only until the user takes over or you call session_end. Required before edit, checkpoint_restore or any write. Pass the user's brief from the conversation. Refused while another session is active, when the revision is stale or while a recording of the project is not prepared. The lease ends after some minutes without any call on the project.
+
+| Input              | Type    | Description                                                      |
+| ------------------ | ------- | ---------------------------------------------------------------- |
+| `projectId`        | string  | ID of the saved project.                                         |
+| `expectedRevision` | integer | Revision you last read, from describe_project.                   |
+| `brief`            | object  | The user's brief, from what they asked; every field is optional. |
+
+#### `session_status`
+
+Read; for editor and assistant. Read the project's latest assistant session (null if none): whether it is active, its brief, its edit log and the notes it ended with, and the project's checkpoints, newest first.
+
+| Input       | Type   | Description              |
+| ----------- | ------ | ------------------------ |
+| `projectId` | string | ID of the saved project. |
+
+#### `session_end`
+
+Write; for editor and assistant. End the active assistant session and give the project back to the user, with notes: what you built, the choices you made and anything the user should look at. From the editor it is the Take over action.
+
+| Input       | Type           | Description              |
+| ----------- | -------------- | ------------------------ |
+| `projectId` | string         | ID of the saved project. |
+| `notes`     | string or null | Notes for the user.      |
+
 #### `edit`
 
 Write; for editor and assistant. Apply up to 64 edit commands to a saved project, in order, as one step: either every command applies and the project is saved once with the next revision, or nothing changes and the first rejected command's reason is returned. A stale expectedRevision is rejected; read the project again first.
@@ -254,6 +300,34 @@ Write; for editor and assistant. Apply up to 64 edit commands to a saved project
 | `projectId`        | string          | ID of the saved project.                                             |
 | `expectedRevision` | integer         | Revision the commands were written against, from describe_project.   |
 | `commands`         | array of object | Commands applied in order; each sees the result of the previous one. |
+
+#### `preview_edits`
+
+Read; for editor and assistant. Try up to 64 edit commands against the saved project without saving: the same checks as edit, including the session rules, and the resulting duration and clip count, or the first rejected command's reason.
+
+| Input       | Type            | Description                |
+| ----------- | --------------- | -------------------------- |
+| `projectId` | string          | ID of the saved project.   |
+| `commands`  | array of object | Commands applied in order. |
+
+#### `checkpoint`
+
+Write; for editor and assistant. Keep a copy of the project as it is saved now, to restore later with checkpoint_restore; only the most recent checkpoints of a project are kept.
+
+| Input       | Type           | Description              |
+| ----------- | -------------- | ------------------------ |
+| `projectId` | string         | ID of the saved project. |
+| `label`     | string or null | Short name for it.       |
+
+#### `checkpoint_restore`
+
+Write; for editor and assistant. Replace the project with one of its checkpoints, as one new revision; the current state is checkpointed first, so it can be restored in turn.
+
+| Input              | Type    | Description                                    |
+| ------------------ | ------- | ---------------------------------------------- |
+| `projectId`        | string  | ID of the saved project.                       |
+| `expectedRevision` | integer | Revision you last read, from describe_project. |
+| `checkpointId`     | string  | ID from session_status.                        |
 
 #### `still`
 

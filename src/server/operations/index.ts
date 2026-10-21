@@ -1,18 +1,32 @@
 import type { FastifyInstance } from 'fastify';
 import { operations, type Operation } from '../../shared/operations/index.js';
 import { ServiceError } from '../errors.js';
-import type { OperationRunner, OperationRunners, ServiceContext } from './context.js';
+import type { OperationRunner, OperationRunners, ServiceContext, ServiceResources } from './context.js';
 import { runDescribeProject } from './describe-project.js';
 import { runDescribeTrack } from './describe-track.js';
 import { runEdit } from './edit.js';
 import { runListProjects } from './list-projects.js';
 import { runRecordingSheet, runStill, runTimelineSheet } from './pictures.js';
+import {
+  runCheckpoint,
+  runCheckpointRestore,
+  runPreviewEdits,
+  runSessionEnd,
+  runSessionStart,
+  runSessionStatus,
+} from './sessions.js';
 
 export const runners: OperationRunners = {
   list_projects: runListProjects,
   describe_project: runDescribeProject,
   describe_track: runDescribeTrack,
+  session_start: runSessionStart,
+  session_status: runSessionStatus,
+  session_end: runSessionEnd,
   edit: runEdit,
+  preview_edits: runPreviewEdits,
+  checkpoint: runCheckpoint,
+  checkpoint_restore: runCheckpointRestore,
   still: runStill,
   timeline_sheet: runTimelineSheet,
   recording_sheet: runRecordingSheet,
@@ -27,7 +41,8 @@ export async function runOperation(operation: Operation, context: ServiceContext
 }
 
 /** `POST /api/ops/<name>` for every operation, behind the service's loopback and client guards. */
-export function registerOperations(app: FastifyInstance, context: ServiceContext): void {
+export function registerOperations(app: FastifyInstance, resources: ServiceResources): void {
+  const context: ServiceContext = { ...resources, caller: 'editor' };
   for (const operation of operations) {
     app.post(`/api/ops/${operation.name}`, async (request) => runOperation(operation, context, request.body));
   }

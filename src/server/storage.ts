@@ -94,9 +94,22 @@ export class SerialWriter {
   }
 }
 
+/** Who writes a project: the editor and its routes, or an assistant through its operations. */
+export type ProjectWriter = 'user' | 'assistant';
+export type ProjectWriteGuard = (projectId: string, writer: ProjectWriter) => Promise<void>;
+
 export class ProjectStore {
   readonly #writer = new SerialWriter();
+  #guard: ProjectWriteGuard = async () => {};
   constructor(private readonly dataDir: string) {}
+  /** Checked inside the write queue before every save, rename or delete of an existing project. */
+  guardWrites(guard: ProjectWriteGuard): void {
+    this.#guard = guard;
+  }
+  /** Runs work in the write queue, so no save interleaves with it. */
+  exclusive<T>(work: () => Promise<T>): Promise<T> {
+    return this.#writer.run(work);
+  }
   private filename(id: string): string {
     return path.join(this.dataDir, 'projects', `${idSchema.parse(id)}.json`);
   }
@@ -110,6 +123,14 @@ export class ProjectStore {
     const document = projectSchema.parse(upgradeProject(value));
     if (document.id !== id) throw new ServiceError('The project ID does not match its filename.', 422);
     return document;
+  }
+  /** A stored copy of a project (a checkpoint), upgraded and validated like the project file. */
+  revive(id: string, value: unknown): ProjectDocument {
+    try {
+      return this.decode(id, value);
+    } catch (error) {
+      throw this.incompatible(error);
+    }
   }
   private incompatible(error: unknown): ServiceError {
     return new ServiceError(
@@ -219,6 +240,7 @@ export class ProjectStore {
       try {
         const info = await assertNoSymlinks(filename);
         if (!info.isFile()) throw new ServiceError('Only regular project files can be deleted.', 422);
+        await this.#guard(id, 'user');
         if (expectedRevision === null) {
           // Unavailable files can be explicitly removed without interpreting or migrating them.
           // A now-compatible document still requires a revision, so a stale list cannot delete it.
@@ -252,24 +274,41 @@ export class ProjectStore {
     frameSchema.parse(expectedRevision);
     return this.#writer.run(async () => {
       const current = await this.load(id);
-      return this.write(projectSchema.parse({ ...current, title }), expectedRevision);
+      return this.write(projectSchema.parse({ ...current, title }), expectedRevision, 'user');
     });
   }
-  async save(document: ProjectDocument, expectedRevision: number): Promise<ProjectDocument> {
+  async save(
+    document: ProjectDocument,
+    expectedRevision: number,
+    writer: ProjectWriter = 'user',
+  ): Promise<ProjectDocument> {
     const snapshot = projectSchema.parse(document);
     this.filename(snapshot.id);
     frameSchema.parse(expectedRevision);
     if (snapshot.revision !== expectedRevision)
       throw new ServiceError('Document and expected revisions must agree.', 409);
-    return this.#writer.run(() => this.write(snapshot, expectedRevision));
+    return this.#writer.run(() => this.write(snapshot, expectedRevision, writer));
   }
-  private async write(snapshot: ProjectDocument, expectedRevision: number): Promise<ProjectDocument> {
+  /** Inside the write queue only: saves after the guard and revision checks. */
+  async writeExclusive(
+    snapshot: ProjectDocument,
+    expectedRevision: number,
+    writer: ProjectWriter,
+  ): Promise<ProjectDocument> {
+    return this.write(projectSchema.parse(snapshot), expectedRevision, writer);
+  }
+  private async write(
+    snapshot: ProjectDocument,
+    expectedRevision: number,
+    writer: ProjectWriter,
+  ): Promise<ProjectDocument> {
     let current: SavedProject | null = null;
     try {
       current = await this.loadSaved(snapshot.id);
     } catch (error) {
       if (!(error instanceof ServiceError && error.statusCode === 404)) throw error;
     }
+    if (current) await this.#guard(snapshot.id, writer);
     if ((current?.document.revision ?? 0) !== expectedRevision)
       throw new ServiceError('Stale save: this project was saved by another tab. Reload before editing.', 409);
     const saved = projectSchema.parse({ ...snapshot, revision: expectedRevision + 1 });
