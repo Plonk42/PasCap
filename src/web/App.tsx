@@ -11,6 +11,7 @@ import {
 import type { GpuComparison, GpuCompositionComparison } from '../preview/compositor.js';
 import type { PreviewDiagnostics, PreviewEngine } from '../preview/engine.js';
 import type { AudioAsset } from '../shared/audio.js';
+import type { Brief } from '../shared/assistant-session.js';
 import type { ColourSettings } from '../shared/colour.js';
 import { applyCommand, EditHistory, type EditCommand } from '../shared/commands.js';
 import type { ExportProfile } from '../shared/export.js';
@@ -123,6 +124,7 @@ const SaveRecovery = lazy(() => import('./SaveRecovery.js').then((module) => ({ 
 const ShortcutHelp = lazy(() => import('./ShortcutHelp.js').then((module) => ({ default: module.ShortcutHelp })));
 const SourceReview = lazy(() => import('./SourceReview.js').then((module) => ({ default: module.SourceReview })));
 const ImportDialog = lazy(() => import('./ImportDialog.js').then((module) => ({ default: module.ImportDialog })));
+const HandOffDialog = lazy(() => import('./HandOff.js').then((module) => ({ default: module.HandOffDialog })));
 const loadInspector = () => import('./Inspector.js').then((module) => ({ default: module.Inspector }));
 const loadDiagnostics = () => import('./Diagnostics.js').then((module) => ({ default: module.Diagnostics }));
 const EMPTY_PROJECT = createProject('preview-lab', 'Untitled');
@@ -242,6 +244,11 @@ function previewIsLoading(connection: ConnectionState, ready: boolean, error: st
   return connection.state === 'connecting' || (!ready && !error);
 }
 
+function handOffBlocked(save: SaveState, drafting: boolean): string | null {
+  if (save.state === 'error') return 'Resolve the save error first: the assistant edits the saved project.';
+  return drafting ? 'Finish the current gesture first.' : null;
+}
+
 export function App() {
   const workspace = useWorkspace();
   const latestWorkspace = useRef(workspace);
@@ -256,6 +263,7 @@ export function App() {
   const [projectList, setProjectList] = useState<ProjectSummary[]>([]);
   const [showProjects, setShowProjects] = useState(false);
   const [showExport, setShowExport] = useState(false);
+  const [showHandOff, setShowHandOff] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
@@ -346,6 +354,7 @@ export function App() {
   const timelineTab = useRef<HTMLButtonElement>(null);
   const projectsTrigger = useRef<HTMLButtonElement>(null);
   const exportTrigger = useRef<HTMLButtonElement>(null);
+  const handOffTrigger = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -1697,6 +1706,35 @@ export function App() {
       await assistant.refresh();
     });
   };
+  const handOff = async (brief: Brief): Promise<boolean> =>
+    (
+      await act(async () => {
+        if (!current.current) throw new Error('Open a project before handing it off.');
+        await autosave.current?.flush();
+        if (!autosave.current || autosave.current.dirty)
+          throw new Error('Current changes could not be saved. Resolve the save error before handing off.');
+        await callOperation('session_start', {
+          projectId: current.current.id,
+          expectedRevision: autosave.current.revision,
+          brief,
+        });
+        await assistant.refresh();
+      })
+    ).ok;
+  const openBeforeSession = (checkpointId: string): void => {
+    void act(async () => {
+      if (!current.current) throw new Error('No project is open.');
+      const { id, title } = current.current;
+      await flushBeforeSwitch();
+      const copy = await callOperation('checkpoint_copy', {
+        projectId: id,
+        checkpointId,
+        title: `${title} (before assistant)`.slice(0, 200),
+      });
+      installProject((await api.load(copy.projectId)).document);
+      refreshProjectList();
+    });
+  };
   const restoreBeforeSession = (checkpointId: string): void => {
     void act(async () => {
       if (!current.current || !autosave.current) throw new Error('No project is open.');
@@ -1885,6 +1923,20 @@ export function App() {
             </button>
           </Popover>
           <button
+            ref={handOffTrigger}
+            className="secondary-button small"
+            aria-label="Hand off to an assistant"
+            title="Let an assistant connected to PasCap edit this project while you watch"
+            disabled={!project || busy || draft !== null || connection.state !== 'ready' || assistant.following}
+            onClick={() => {
+              setActionError('');
+              setShowHandOff(true);
+            }}
+          >
+            <Icon name="assistant" size={15} />
+            Hand off
+          </button>
+          <button
             ref={exportTrigger}
             className="primary-button small"
             aria-label="Export video"
@@ -1975,6 +2027,7 @@ export function App() {
               saveState.state === 'saved' ? null : 'Save or discard the unsaved changes in this editor first.'
             }
             onRestore={() => restoreBeforeSession(assistant.ended!.checkpointId)}
+            onOpenCopy={() => openBeforeSession(assistant.ended!.checkpointId)}
             onDismiss={assistant.dismiss}
           />
         )}
@@ -2344,6 +2397,22 @@ export function App() {
             />
           )}
           {showHelp && <ShortcutHelp onClose={() => setShowHelp(false)} />}
+          {showHandOff && project && (
+            <HandOffDialog
+              project={project}
+              musicName={(id) => audioAssets.find((asset) => asset.id === id)?.name ?? id}
+              busy={busy}
+              error={actionError}
+              blocked={handOffBlocked(saveState, draft !== null)}
+              restoreFocusTo={handOffTrigger}
+              onJobs={(accepted) => {
+                accepted.forEach(receiveJob);
+                refreshAfterAcceptance();
+              }}
+              onHandOff={handOff}
+              onClose={() => setShowHandOff(false)}
+            />
+          )}
           {importKind !== null && project && (
             <ImportDialog
               initialKind={importKind}

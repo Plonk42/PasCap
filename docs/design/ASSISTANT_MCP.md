@@ -331,6 +331,24 @@ Write; for editor and assistant. Replace the project with one of its checkpoints
 | `expectedRevision` | integer | Revision you last read, from describe_project. |
 | `checkpointId`     | string  | ID from session_status.                        |
 
+#### `checkpoint_copy`
+
+Write; for editor. Save one of the project's checkpoints as a new project with its own ID, leaving the project unchanged; returns the new project.
+
+| Input          | Type   | Description               |
+| -------------- | ------ | ------------------------- |
+| `projectId`    | string | ID of the saved project.  |
+| `checkpointId` | string | ID from session_status.   |
+| `title`        | string | Title of the new project. |
+
+#### `hand_off_readiness`
+
+Read; for editor. What an assistant can use in a project: each video recording of its bin with its proxy and camera motion analysis, each music recording with its playback cache and tempo analysis, and whether an export is running (stills wait for it).
+
+| Input       | Type   | Description              |
+| ----------- | ------ | ------------------------ |
+| `projectId` | string | ID of the saved project. |
+
 #### `still`
 
 Read; for editor and assistant. Render one project frame as the export composes it (every enabled track with its Colour, Detail, Transform, Opacity and transitions), from the 720p editing proxies, as a JPEG. Use crop for a 1:1 detail of the 1280 × 720 composition, for example to judge Sharpen or Denoise. Width and crop size are limited by the service's image budget.
@@ -635,7 +653,7 @@ which command (for example static grades unless the brief wants animation).
 
 ## Hand-off in the editor
 
-Follow mode, Take over and restore are implemented on the `mcp` branch
+Follow mode, Take over, restore and the Hand off dialog are implemented on the `mcp` branch
 ([#236](https://github.com/Plonk42/PasCap/issues/236), [AssistantSession.tsx](../../src/web/AssistantSession.tsx)):
 
 - While the page is visible the editor polls `session_status` (without checkpoints) every
@@ -648,20 +666,22 @@ Follow mode, Take over and restore are implemented on the `mcp` branch
   assistant's `session_end` with notes, or expiry), the editor adopts the latest revision once
   and shows who ended it, the edit count and the notes, with **Restore project before
   session**: `checkpoint_restore` of the session's start checkpoint, after checkpointing the
-  current state, in one revision; the editor reloads it with a fresh history. The summary is
-  dismissed with ×.
+  current state, in one revision; the editor reloads it with a fresh history. **Open as new
+  project** (`checkpoint_copy`, editor only) saves that checkpoint as a new project titled
+  "… (before assistant)" and opens it, leaving the assistant's version as it is. An **Edit
+  log** disclosure lists the session's batches. The summary is dismissed with ×.
+- **Hand off** (header, beside Export; [HandOff.tsx](../../src/web/HandOff.tsx)) opens a
+  dialog with the brief's fields (notes, a placed music track or Any, target length, allowed
+  movement, most clips) and **What the assistant can use**, from `hand_off_readiness`
+  (editor only): bin recordings prepared, their camera motion analysed, music prepared and
+  analysed, a running export. Missing jobs are queued from the dialog (**Prepare N**,
+  **Analyse N**) and the list refreshes every 2 s while they run; none of it blocks the
+  hand-off (decided 2026-10-21: the assistant works with what is ready). Confirm flushes
+  autosave and calls `session_start` with the brief.
 
-Still planned:
-
-1. **Hand off** (header, beside Export) opens a dialog: music (a placed music track, or a
-   ready music recording to place at frame 0), target length, allowed camera movement,
-   notes, and a readiness list: every bin recording prepared and analysed, the music
-   prepared and analysed (queue the missing jobs from the dialog and wait), no running
-   export. Confirm flushes autosave and calls `session_start` with that brief.
-2. The dialog shows the client configuration with the token and whether an MCP session has
-   connected; the MCP client is started by the user outside PasCap (its own window).
-3. **Open checkpoint as new project** beside Restore, and the preview following the last
-   edited frame.
+Still planned: the dialog showing the client configuration and whether an MCP client has
+connected (the client is started outside PasCap), placing a music recording from the dialog,
+and the preview following the last edited frame.
 
 ## Assistant playbook (the `pascap://guide` resource)
 

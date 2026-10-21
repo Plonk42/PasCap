@@ -5,10 +5,12 @@ import type { OperationRunner, OperationRunners, ServiceContext, ServiceResource
 import { runDescribeProject } from './describe-project.js';
 import { runDescribeTrack } from './describe-track.js';
 import { runEdit } from './edit.js';
+import { runHandOffReadiness } from './hand-off.js';
 import { runListProjects } from './list-projects.js';
 import { runRecordingSheet, runStill, runTimelineSheet } from './pictures.js';
 import {
   runCheckpoint,
+  runCheckpointCopy,
   runCheckpointRestore,
   runPreviewEdits,
   runSessionEnd,
@@ -27,6 +29,8 @@ export const runners: OperationRunners = {
   preview_edits: runPreviewEdits,
   checkpoint: runCheckpoint,
   checkpoint_restore: runCheckpointRestore,
+  checkpoint_copy: runCheckpointCopy,
+  hand_off_readiness: runHandOffReadiness,
   still: runStill,
   timeline_sheet: runTimelineSheet,
   recording_sheet: runRecordingSheet,

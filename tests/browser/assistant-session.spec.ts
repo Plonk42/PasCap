@@ -156,3 +156,102 @@ test('keeps unsaved editor changes when a session starts, for the user to downlo
   expect(await bookmarks(page)).toEqual([45]);
   await expect(page.getByRole('button', { name: 'Download unsaved project' })).toBeVisible();
 });
+
+test('hands off with a brief after showing what the assistant can use, then opens the project before it as a copy', async ({
+  page,
+}) => {
+  memory.readiness = {
+    recordings: [
+      { id: assets[0]!.id, name: 'pattern-a.mp4', preparation: 'ready', cameraMotion: 'analysed' },
+      { id: assets[1]!.id, name: 'pattern-b.mp4', preparation: 'ready', cameraMotion: 'missing' },
+    ],
+    music: [],
+    exportRunning: true,
+  };
+  const analysed: string[] = [];
+  await page.route('**/api/media/*/motion', async (route) => {
+    const id = new URL(route.request().url()).pathname.split('/')[3]!;
+    analysed.push(id);
+    memory.readiness = {
+      ...memory.readiness,
+      recordings: memory.readiness.recordings.map((item) =>
+        item.id === id ? { ...item, cameraMotion: 'analysing' } : item,
+      ),
+    };
+    await route.fulfill({
+      json: {
+        job: {
+          id: 'motion-job',
+          kind: 'motion',
+          label: 'pattern-b.mp4',
+          state: 'queued',
+          progress: 0,
+          message: 'Queued',
+          createdAt: '2026-10-21T10:00:00.000Z',
+          finishedAt: null,
+          outputUrl: null,
+          receiptUrl: null,
+        },
+      },
+    });
+  });
+  await page.goto(`/?project=${PROJECT_ID}`);
+  await ready(page);
+  await page.getByRole('button', { name: 'Hand off to an assistant' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Hand off to an assistant' });
+  const readiness = dialog.getByRole('region', { name: 'What the assistant can use' });
+  await expect(readiness).toContainText('2 video recordings prepared');
+  await expect(readiness).toContainText('Camera motion not analysed for 1 recording');
+  await expect(readiness).toContainText('No music in this project');
+  await expect(readiness).toContainText('An export is running');
+  await readiness.getByRole('button', { name: 'Analyse 1' }).click();
+  await expect(readiness).toContainText('1 analysing');
+  expect(analysed).toEqual([assets[1]!.id]);
+
+  await dialog.getByLabel('What should it make?').fill('A calm cut of the lake');
+  await dialog.getByLabel('Target length (s)').fill('30');
+  await dialog.getByLabel('Allowed movement').fill('9');
+  await expect(dialog.getByText('Enter a number from 0.5 to 6.')).toBeVisible();
+  const confirm = dialog.getByRole('button', { name: 'Hand off', exact: true });
+  await expect(confirm).toBeDisabled();
+  await dialog.getByLabel('Allowed movement').fill('3');
+  await confirm.click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator('.assistant-banner.editing')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Hand off to an assistant' })).toBeDisabled();
+  expect(memory.session?.view?.brief).toEqual({
+    notes: 'A calm cut of the lake',
+    musicTrackId: null,
+    targetSeconds: 30,
+    allowedMovement: 3,
+    maxClips: null,
+  });
+
+  // The assistant edits, then finishes with notes.
+  memory.seed(project([30], 2));
+  memory.session = {
+    ...memory.session!,
+    view: {
+      ...memory.session!.view!,
+      edits: [{ revision: 2, at: '2026-10-21T10:02:00.000Z', commands: 1, summary: 'bookmark-add' }],
+      active: false,
+      endedAt: '2026-10-21T10:03:00.000Z',
+      endedBy: 'assistant',
+      notes: 'Marked the first cut.',
+      expiresAt: null,
+    },
+  };
+  const ended = page.getByRole('region', { name: 'Assistant session summary' });
+  await expect(ended).toContainText('The assistant finished · 1 edit');
+  await expect(ended).toContainText('Marked the first cut.');
+  await expect.poll(() => bookmarks(page)).toEqual([30]);
+  await ended.getByText('Edit log').click();
+  await expect(ended.getByRole('listitem')).toContainText(['bookmark-add']);
+
+  await ended.getByRole('button', { name: 'Open as new project' }).click();
+  await expect(page).toHaveURL(/project=browser-project-1/);
+  await expect(page.locator('.assistant-banner')).toHaveCount(0);
+  expect(await bookmarks(page)).toEqual([]);
+  expect(memory.snapshot('browser-project-1').title).toBe('Assistant · memory-only (before assistant)');
+  expect(memory.snapshot().bookmarks).toEqual([30]);
+});

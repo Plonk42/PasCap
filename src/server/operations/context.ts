@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import type { Operation, OperationName, OperationNamed } from '../../shared/operations/index.js';
 import type { AudioLibrary } from '../audio.js';
 import type { AssistantImageBudget } from '../config.js';
+import type { JobQueue } from '../jobs.js';
 import type { MediaLibrary } from '../library.js';
 import type { AssistantSessions } from '../sessions.js';
 import type { StillRenderer } from '../stills.js';
@@ -16,10 +17,20 @@ export interface ServiceContext {
   projects: Pick<ProjectStore, 'list' | 'load' | 'save'>;
   sessions: Pick<
     AssistantSessions,
-    'current' | 'expiresAt' | 'start' | 'end' | 'checkpoint' | 'checkpoints' | 'restore' | 'recordEdit' | 'touch'
+    | 'current'
+    | 'expiresAt'
+    | 'start'
+    | 'end'
+    | 'checkpoint'
+    | 'checkpoints'
+    | 'restore'
+    | 'copy'
+    | 'recordEdit'
+    | 'touch'
   >;
-  library: Pick<MediaLibrary, 'get'>;
-  audio: Pick<AudioLibrary, 'get'>;
+  library: Pick<MediaLibrary, 'get' | 'motion' | 'motionJob'>;
+  audio: Pick<AudioLibrary, 'get' | 'analysis' | 'analysisJob'>;
+  jobs: Pick<JobQueue, 'list'>;
   stills: Pick<StillRenderer, 'still' | 'timelineSheet' | 'recordingSheet'>;
   images: AssistantImageBudget;
 }
