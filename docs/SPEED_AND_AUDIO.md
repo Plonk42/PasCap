@@ -469,28 +469,62 @@ like camera motion analysis) finds its tempo, beats, downbeats, accents, loudnes
 sections. It runs on one worker thread, streaming the PCM cache in 1 MiB blocks as a
 mono float mix (never the whole file): 2,048-sample Hann windows every 480 samples
 (10 ms), 40 mel bands from 30 Hz to 16 kHz, a spectral-flux onset envelope, tempo from
-its autocorrelation over 8 s windows (50–220 BPM; the fastest strong periodicity, with a
-mild prior around 120 BPM), dynamic-programming beat tracking at the local tempo refined
-to the strongest onset within ±20 ms, downbeats from the bar phase (3 or 4 beats) with the
-strongest onsets and kick-band energy, loudness per 100 ms, sections at least 8 s long
-from the novelty of 1 s band-level and pitch-class averages (**quiet**, **build**,
-**peak**, **release** from their loudness and its change), and accents (onset peaks above
-the 90th percentile, at least 150 ms apart). Fewer than four tracked beats is no tempo.
-Every constant is in `MUSIC_ANALYSIS` ([analysis](../src/server/music-analysis.ts)); a
-10-minute song takes about 5 s and a few MB.
+its autocorrelation (50–220 BPM; the fastest strong periodicity, with a mild prior around
+120 BPM), dynamic-programming beat tracking refined to the strongest onset within ±20 ms,
+downbeats, loudness per 100 ms, sections at least 8 s long from the novelty of 1 s
+band-level and pitch-class averages (**quiet**, **build**, **peak**, **release** from their
+loudness and its change), and accents (onset peaks above the 90th percentile, at least
+150 ms apart).
 
-The result is cached as `music-v1.json` beside `playback.pcm`, positions in PCM samples,
+- **Tempo.** The song's tempo holds throughout. An 8 s window (every 2 s) takes its own
+  tempo only where the song's tempo scores below half its own strongest periodicity, a
+  real tempo change; otherwise soft passages followed their arpeggios or noise and the beats
+  drifted by up to half a beat.
+- **No steady beat.** Fewer than four tracked beats, a tempo confidence below 0.3 (the
+  autocorrelation peak barely above its median) or a pulse clarity below 0.25 (the
+  autocorrelation at the beat over the envelope's energy: scattered hits repeat little)
+  report no tempo, meter or beats.
+- **Downbeats.** Each beat's salience is the standard score of its kick-band level plus that
+  of its chord change (pitch-class profiles over the four beats before and after it).
+  Dynamic programming over the beats gives each a bar position: the bar advances by one
+  beat, or restarts anywhere at a cost of 8, so an added or missing beat or a short bar
+  does not shift every later downbeat. 3 beats per bar is chosen only when it scores 1.2
+  times better than 4. The meter confidence is the downbeats' mean salience above the other
+  beats', in standard deviations, divided by 1.5.
+- **Sections.** Each boundary moves to the nearest downbeat within 2 s, so a cut there
+  lands on the bar.
+
+Every constant is in `MUSIC_ANALYSIS` ([analysis](../src/server/music-analysis.ts)); a
+10-minute song takes about 5 s and under 10 MB.
+
+The result is cached as `music-v2.json` beside `playback.pcm`, positions in PCM samples,
 tied to the original's content checksum and the cache file's size and modification time:
-re-preparing the cache makes it stale (ignored, never rewritten silently). Music analysed
-before this job existed, or whose analysis is stale, failed or was cancelled, shows
+re-preparing the cache makes it stale (ignored, never rewritten silently). Results of the
+earlier analysis (`music-v1.json`) are ignored, never deleted. Music analysed before this
+version, or whose analysis is stale, failed or was cancelled, shows
 **Tempo and beats not analysed** with **Analyse music** under **Recording** in
 **Audio → Music**; otherwise that line shows the tempo, meter and beat count, or the job's
 progress. `GET /api/audio/<id>/analysis` returns `{ analysis, job }`;
 `POST /api/audio/<id>/analysis` queues the job. A cancelled or failed analysis leaves the
 PCM cache and playback untouched. Beats map to project frames through each music clip's
-placement, source range and loops (`musicBeatFrames`). Validation uses synthetic click
-tracks, modulated noise, swing, a tempo change and loudness steps only; real songs are
-evaluated by the owner.
+placement, source range and loops (`musicBeatFrames`). Unit tests use synthetic click
+tracks, modulated noise, swing, a tempo change, a soft passage under an arpeggio, chord
+changes, a short bar, scattered hits and loudness steps; no real song is in the repository.
+
+On three of the owner's songs, compared with madmom's RNN beat and downbeat trackers (an
+independent reference, used only for evaluation, at whichever level of the beat it chose
+in each 15 s):
+
+| Song           | Beats agreeing, before → now | Downbeats agreeing, before → now | Now                                          |
+| -------------- | ---------------------------- | -------------------------------- | -------------------------------------------- |
+| 148 s, 128 BPM | 82% → 95%                    | 59% → 95%                        | Sections: 3, boundaries on downbeats         |
+| 278 s, 142 BPM | 94% → 96%                    | 0% (half a bar off) → 86%        | One 155 s section the novelty does not split |
+| 218 s, no beat | 55% (madmom itself unsure)   | 17%                              | No steady beat: no tempo, beats or bookmarks |
+
+Limits: the downbeat cues are weak on real songs (meter confidence about 0.15–0.2 even when
+they agree), so downbeats can still land on the third beat; the tempo confidence and
+clarity thresholds are set from these three songs; sections remain coarse where the timbre
+barely changes. Beats sit about 9 ms after madmom's, below what is audible.
 
 Each analysed music clip shows its beats as ticks, and **Beats → bookmarks** under the
 analysis line adds the selected music clip's beats or downbeats as project bookmarks in one Undo step
