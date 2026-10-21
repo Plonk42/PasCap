@@ -1,11 +1,9 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { toNodeHandler, type NodeIncomingMessageLike } from '@modelcontextprotocol/node';
+import { createMcpHandler, McpServer, type CallToolResult } from '@modelcontextprotocol/server';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { ZodError, type ZodType } from 'zod';
 import { operations } from '../shared/operations/index.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
@@ -15,8 +13,8 @@ import { runOperation } from './operations/index.js';
 import { atomicWrite } from './storage.js';
 
 /**
- * The MCP SDK's server in stateless Streamable HTTP mode: each request gets its own server and
- * transport, answered with JSON. The tools are the operations whose audience includes the
+ * The MCP SDK's handler: the 2026-07-28 revision plus stateless serving of 2025-era clients, a
+ * fresh server per request. The tools are the operations whose audience includes the
  * assistant, so the registry stays the only place a capability is described.
  */
 export const MCP_PATH = '/mcp';
@@ -78,6 +76,7 @@ export function mcpServer(context: ServiceContext): McpServer {
   for (const operation of assistantOperations) {
     const config = {
       description: operation.description,
+      // One schema type for the loop; each tool still publishes and validates its own schema.
       inputSchema: operation.input as ZodType,
       annotations: { readOnlyHint: operation.access === 'read', openWorldHint: false },
     };
@@ -95,27 +94,20 @@ export function mcpServer(context: ServiceContext): McpServer {
 
 /** `/mcp` for MCP clients: loopback Host and Origin checks as every route, plus the bearer token. */
 export function registerMcp(app: FastifyInstance, context: ServiceContext, token: string): void {
-  app.post(MCP_PATH, async (request, reply) => {
-    if (!authorized(request, token))
-      return reply.code(401).send({ error: 'Send the PasCap MCP token as Authorization: Bearer <token>.' });
-    const server = mcpServer(context);
-    const transport = new StreamableHTTPServerTransport({ enableJsonResponse: true });
-    reply.hijack();
-    reply.raw.on('close', () => void server.close());
-    try {
-      // The SDK's own transport type does not satisfy its interface under exactOptionalPropertyTypes.
-      await server.connect(transport as unknown as Transport);
-      await transport.handleRequest(request.raw, reply.raw, request.body);
-    } catch (error) {
-      request.log.error(error);
-      if (!reply.raw.headersSent)
-        reply.raw
-          .writeHead(500, { 'content-type': 'application/json' })
-          .end(JSON.stringify({ jsonrpc: '2.0', id: null, error: { code: -32603, message: errorMessage(error) } }));
-    }
+  const handler = createMcpHandler(() => mcpServer(context), {
+    onerror: (error) => app.log.error(error),
   });
-  // No server-initiated stream and no session to end.
-  const unsupported = (_request: FastifyRequest, reply: FastifyReply) => reply.code(405).header('Allow', 'POST').send();
-  app.get(MCP_PATH, unsupported);
-  app.delete(MCP_PATH, unsupported);
+  const serve = toNodeHandler(handler, { onerror: (error) => app.log.error(error) });
+  app.addHook('onClose', () => handler.close());
+  app.route({
+    method: ['GET', 'POST', 'DELETE'],
+    url: MCP_PATH,
+    handler: async (request, reply) => {
+      if (!authorized(request, token))
+        return reply.code(401).send({ error: 'Send the PasCap MCP token as Authorization: Bearer <token>.' });
+      reply.hijack();
+      // Fastify's raw request always has a method and URL; Node types them optional.
+      await serve(request.raw as NodeIncomingMessageLike, reply.raw, request.body);
+    },
+  });
 }
