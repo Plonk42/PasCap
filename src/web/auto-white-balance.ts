@@ -83,7 +83,3 @@ export function whiteBalanceTarget(
   const sourceFrames = projectFrames.map((projectFrame) => clip.retiming.sourceAt(projectFrame - clip.start));
   return { target: { clip, asset, projectFrames, sourceFrames }, reason: null };
 }
-
-export function proxyUrl(mediaId: string): string {
-  return `/api/media/${encodeURIComponent(mediaId)}/proxy`;
-}

@@ -72,6 +72,11 @@ function responseFailure(status: number, ok: boolean): ApiError {
   );
 }
 
+/** The verified editing proxy of a video recording, read in byte ranges. */
+export function proxyUrl(mediaId: string): string {
+  return `/api/media/${encodeURIComponent(mediaId)}/proxy`;
+}
+
 /** One attempt only, including for writes. The deadline covers both fetch and response decoding. */
 export async function request<T>(
   url: string,
