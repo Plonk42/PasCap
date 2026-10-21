@@ -50,6 +50,9 @@ what the footage shows from its pictures.
   editor's Auto correction and the edit applying it; white-balance only Temperature and Tint;
   detail suggests a clip's Denoise and Sharpen. Clips needing different grades go on their own
   track, since Colour belongs to the track.
+- Change one setting with colour-setting, hsl-band, colour-curve or transform-setting, which
+  keep every other value; a keyed setting follows its keyframes, so change those instead
+  (layer-key-value). The colour and transform commands replace everything and suit a full grade.
 - Compare with still or timeline_sheet: both accept commands to preview a change without saving.
   Judge Detail on a 1:1 crop: no halos, no waxy smoothing.
 
