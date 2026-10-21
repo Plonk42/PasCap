@@ -290,11 +290,91 @@ describe('music analysis · synthetic signals', () => {
     expect(analyse(signal, 4_801)).toEqual(first);
   });
 
+  it('measures low, mid and high levels per second', () => {
+    // A 100 Hz sine, then a 1 kHz sine, then white noise, each 0.5 peak for 3 s.
+    const random = noise(3);
+    const signal = Float32Array.from({ length: 9 * RATE }, (_, index) => {
+      const time = index / RATE;
+      if (time < 3) return 0.5 * Math.sin(2 * Math.PI * 100 * time);
+      if (time < 6) return 0.5 * Math.sin(2 * Math.PI * 1_000 * time);
+      return 0.5 * random();
+    });
+    const { tone } = analyse(signal);
+    expect(tone).toHaveLength(9);
+    const sine = 20 * Math.log10(0.5 / Math.SQRT2);
+    expect(tone[1]![0]).toBeCloseTo(sine, 0);
+    expect(tone[1]![1]).toBeLessThan(sine - 30);
+    expect(tone[4]![1]).toBeCloseTo(sine, 0);
+    expect(tone[4]![0]).toBeLessThan(sine - 30);
+    // White noise spreads its power by bandwidth: most of it above 4 kHz.
+    const [low, mid, high] = tone[7]!;
+    expect(high).toBeGreaterThan(mid!);
+    expect(mid).toBeGreaterThan(low!);
+  });
+
+  it.each([
+    {
+      key: { tonic: 'C', mode: 'major' },
+      chords: [
+        [261.6, 329.6, 392],
+        [349.2, 440, 523.3],
+        [392, 493.9, 587.3],
+        [261.6, 329.6, 392],
+      ],
+    },
+    {
+      key: { tonic: 'A', mode: 'minor' },
+      chords: [
+        [440, 523.3, 659.3],
+        [587.3, 698.5, 880],
+        [659.3, 830.6, 987.8],
+        [440, 523.3, 659.3],
+      ],
+    },
+  ])('finds the key $key.tonic $key.mode from its chords', ({ key, chords }) => {
+    const signal = Float32Array.from({ length: 16 * RATE }, (_, index) => {
+      const time = index / RATE;
+      return chords[Math.floor(time / 2) % 4]!.reduce((sum, hz) => sum + 0.1 * Math.sin(2 * Math.PI * hz * time), 0);
+    });
+    expect(analyse(signal).key).toMatchObject(key);
+  });
+
+  it('finds silences of at least 0.3 s, not shorter gaps', () => {
+    const gap = (time: number): boolean => (time >= 4 && time < 5) || (time >= 7 && time < 7.15);
+    const random = noise(9);
+    const signal = Float32Array.from({ length: 10 * RATE }, (_, index) => (gap(index / RATE) ? 0 : 0.3 * random()));
+    expect(analyse(signal).silences).toEqual([{ fromSample: 4 * RATE, toSample: 5 * RATE }]);
+  });
+
+  it('finds a gradual crescendo and a sudden drop', () => {
+    // Noise rising from −40 to −10 dB over 4–14 s, holding, then cut to −40 dB at 20 s.
+    const random = noise(13);
+    const level = (time: number): number => {
+      if (time < 4 || time >= 20) return -40;
+      return time < 14 ? -40 + 3 * (time - 4) : -10;
+    };
+    const signal = Float32Array.from(
+      { length: 26 * RATE },
+      (_, index) => Math.sqrt(3) * 10 ** (level(index / RATE) / 20) * random(),
+    );
+    const { swells } = analyse(signal);
+    expect(swells).toHaveLength(2);
+    const [rise, drop] = swells;
+    expect(rise).toMatchObject({ kind: 'crescendo', sudden: false });
+    expect(rise!.changeDb).toBeGreaterThan(25);
+    expect(Math.abs(rise!.fromSample / RATE - 5)).toBeLessThan(1.5);
+    expect(Math.abs(rise!.toSample / RATE - 13)).toBeLessThan(1.5);
+    expect(drop).toMatchObject({ kind: 'decrescendo', sudden: true });
+    expect(drop!.changeDb).toBeLessThan(-25);
+    expect(Math.abs(drop!.fromSample / RATE - 20)).toBeLessThan(0.5);
+  });
+
   it('reports silence without tempo, beats or accents', () => {
     const result = analyse(new Float32Array(10 * RATE));
     expect(result).toMatchObject({ tempo: null, meter: null, beats: [], accents: [], samples: 10 * RATE });
     expect(result.sections).toEqual([{ fromSample: 0, toSample: 10 * RATE, kind: 'quiet', loudnessDb: -120 }]);
     expect(result.loudness.every((value) => value === -120)).toBe(true);
+    expect(result).toMatchObject({ key: null, swells: [], silences: [{ fromSample: 0, toSample: 10 * RATE }] });
   });
 
   it('finds no tempo in a held tone with a single onset', () => {

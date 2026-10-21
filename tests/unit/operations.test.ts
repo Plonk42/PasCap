@@ -525,11 +525,27 @@ describe('operation routes', () => {
         get: () => ({ id: 'song-1', name: 'song.wav' }),
         analysisJob: () => null,
         analysis: async () => ({
+          sampleRate: 48_000,
           tempo: { bpm: 89.91, confidence: 0.8, curve: [{ fromSample: 0, bpm: 89.91 }] },
           meter: { beatsPerBar: 4, confidence: 0.6 },
           beats,
           accents: [{ sample: Math.round(70 * samplesPerFrame), strength: 0.9 }],
           sections: [{ fromSample: 0, toSample: Math.round(200 * samplesPerFrame), kind: 'build', loudnessDb: -14 }],
+          tone: Array.from({ length: 10 }, () => [-20, -30, -50]),
+          key: { tonic: 'A', mode: 'minor', confidence: 0.7 },
+          swells: [
+            {
+              fromSample: Math.round(20 * samplesPerFrame),
+              toSample: Math.round(40 * samplesPerFrame),
+              kind: 'crescendo',
+              changeDb: 8,
+              sudden: false,
+            },
+          ],
+          silences: [
+            { fromSample: Math.round(40 * samplesPerFrame), toSample: Math.round(45 * samplesPerFrame) },
+            { fromSample: Math.round(100 * samplesPerFrame), toSample: Math.round(110 * samplesPerFrame) },
+          ],
         }),
       },
     } as unknown as Parameters<typeof runners.music_analysis>[0];
@@ -541,7 +557,10 @@ describe('operation routes', () => {
       analysis: 'analysed',
       tempo: { bpm: 89.9 },
       accents: [],
-      sections: [{ start: 0, end: 120, kind: 'build' }],
+      key: { tonic: 'A', mode: 'minor' },
+      sections: [{ start: 0, end: 120, kind: 'build', tone: { lowDb: -20, midDb: -30, highDb: -50 } }],
+      swells: [{ start: 20, end: 40, kind: 'crescendo', changeDb: 8, sudden: false }],
+      silences: [{ start: 40, end: 45 }],
     });
     expect(music.clips[0]!.beats.map((beat) => [beat.frame, beat.downbeat])).toEqual([
       [10, true],

@@ -726,7 +726,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       expect(Math.abs(seconds - 0.25 - Math.round((seconds - 0.25) * 2) / 2)).toBeLessThanOrEqual(0.035);
     }
     expect(analysis!.loudness).toHaveLength(120);
-    expect(path.basename(service.audio.analysisPath(asset))).toBe('music-v2.json');
+    expect(path.basename(service.audio.analysisPath(asset))).toBe('music-v3.json');
     expect(path.dirname(service.audio.analysisPath(asset))).toBe(path.dirname(service.audio.playbackPath(asset)));
 
     // A re-written PCM cache makes the analysis stale rather than wrong.

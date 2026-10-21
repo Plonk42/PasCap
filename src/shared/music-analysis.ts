@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { MAX_BOOKMARKS, type MusicTrack } from './model.js';
 import { MUSIC_SAMPLE_RATE, MUSIC_SAMPLES_PER_FRAME } from './music-format.js';
 
-/** Version 2 (#254) changed beats, downbeats and sections; `music-v1.json` caches are ignored, never deleted. */
-export const MUSIC_ANALYSIS_VERSION = 2;
+/** Version 3 (#257) adds tone, key, silences and swells; earlier caches are ignored, never deleted. */
+export const MUSIC_ANALYSIS_VERSION = 3;
 /** Feature rate: one onset-envelope value every 10 ms. */
 export const MUSIC_ANALYSIS_HOP = 480;
 
@@ -12,8 +12,11 @@ const unit = z.number().min(0).max(1);
 const bpm = z.number().positive();
 
 export const sectionKinds = ['quiet', 'build', 'peak', 'release'] as const;
+export const swellKinds = ['crescendo', 'decrescendo'] as const;
+export const pitchNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
+const decibels = z.number().min(-120).max(0);
 
-/** `music-v2.json` beside the PCM cache; positions are samples of that 48 kHz cache. */
+/** `music-v3.json` beside the PCM cache; positions are samples of that 48 kHz cache. */
 export const musicAnalysisSchema = z
   .object({
     version: z.literal(MUSIC_ANALYSIS_VERSION),
@@ -43,7 +46,25 @@ export const musicAnalysisSchema = z
     beats: z.array(z.object({ sample, strength: unit, downbeat: z.boolean() }).strict()),
     accents: z.array(z.object({ sample, strength: unit }).strict()),
     /** dBFS of the mono mix per 100 ms. */
-    loudness: z.array(z.number().min(-120).max(0)),
+    loudness: z.array(decibels),
+    /** Per second: dBFS of the low (below 250 Hz), mid and high (from 4 kHz) frequencies. */
+    tone: z.array(z.tuple([decibels, decibels, decibels])),
+    key: z
+      .object({ tonic: z.enum(pitchNames), mode: z.enum(['major', 'minor']), confidence: unit })
+      .strict()
+      .nullable(),
+    silences: z.array(z.object({ fromSample: sample, toSample: sample }).strict()),
+    swells: z.array(
+      z
+        .object({
+          fromSample: sample,
+          toSample: sample,
+          kind: z.enum(swellKinds),
+          changeDb: z.number(),
+          sudden: z.boolean(),
+        })
+        .strict(),
+    ),
     sections: z.array(
       z.object({ fromSample: sample, toSample: sample, kind: z.enum(sectionKinds), loudnessDb: z.number() }).strict(),
     ),

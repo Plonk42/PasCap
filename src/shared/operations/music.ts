@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { editCommandSchema } from '../command-schema.js';
 import { described } from '../described.js';
 import { frameSchema, idSchema } from '../model.js';
-import { sectionKinds } from '../music-analysis.js';
+import { pitchNames, sectionKinds, swellKinds } from '../music-analysis.js';
 import { defineOperation } from './spec.js';
 import { durationSchema, timecodeSchema } from './timecode.js';
 
@@ -25,7 +25,7 @@ const placedBeat = z
 export const musicAnalysis = defineOperation({
   name: 'music_analysis',
   description:
-    "Read the tempo, meter, beats, downbeats, accents (strong hits worth cutting on) and sections (quiet, build, peak, release) of the project's music clips, at project frames: where each plays on the timeline, repeated across loops. Use a frame window for long music. A clip whose music is not analysed yet says so; ask the user to analyse it in Audio → Music.",
+    "Read the music of the project's music clips at project frames (where each plays on the timeline, repeated across loops): tempo, meter, beats, downbeats, accents (strong hits worth cutting on), key and mode, sections (quiet, build, peak, release) with their loudness and tone (low, mid and high frequency levels), swells (crescendos and decrescendos, sudden or gradual) and silences. Use a frame window for long music. A clip whose music is not analysed yet says so; ask the user to analyse it in Audio → Music.",
   input: z
     .object({
       projectId,
@@ -56,6 +56,13 @@ export const musicAnalysis = defineOperation({
               `True when more than ${MAX_LISTED_BEATS} beats fall in the window; ask for a narrower one.`,
             ),
             accents: z.array(z.object({ frame: frameSchema, strength: z.number() }).strict()),
+            key: described(
+              z
+                .object({ tonic: z.enum(pitchNames), mode: z.enum(['major', 'minor']), confidence: z.number() })
+                .strict()
+                .nullable(),
+              'Key of the whole recording; a relative major and minor (C major, A minor) can be confused.',
+            ),
             sections: z.array(
               z
                 .object({
@@ -63,9 +70,25 @@ export const musicAnalysis = defineOperation({
                   end: described(frameSchema, 'Exclusive.'),
                   kind: z.enum(sectionKinds),
                   loudnessDb: z.number(),
+                  tone: described(
+                    z.object({ lowDb: z.number(), midDb: z.number(), highDb: z.number() }).strict(),
+                    'Mean level below 250 Hz (bass, kick), 250 Hz–4 kHz (most instruments and voice) and above 4 kHz (cymbals, air), dBFS.',
+                  ),
                 })
                 .strict(),
             ),
+            swells: z.array(
+              z
+                .object({
+                  start: frameSchema,
+                  end: described(frameSchema, 'Exclusive.'),
+                  kind: z.enum(swellKinds),
+                  changeDb: described(z.number(), 'Loudness change over the swell.'),
+                  sudden: described(z.boolean(), 'Within about a second: a hit or a cut-off, not a gradual swell.'),
+                })
+                .strict(),
+            ),
+            silences: z.array(z.object({ start: frameSchema, end: described(frameSchema, 'Exclusive.') }).strict()),
           })
           .strict(),
       ),
