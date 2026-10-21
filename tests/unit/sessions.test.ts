@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -62,7 +62,7 @@ async function setup(options: { ready?: boolean; checkpoints?: number; leaseMs?:
     library: { get: (id: string) => (id === 'rec-1' ? asset : Promise.reject(new Error('unknown'))) },
     audio: { get: () => ({}) },
     stills: {},
-    images: { stillWidth: 480, sheetCellWidth: 240, sheetCells: 9 },
+    images: { stillWidth: 480, sheetCellWidth: 240, sheetCells: 9, sessionPictures: 16 },
   } as unknown as Omit<ServiceContext, 'caller'>;
   const project = await projects.save(
     projectSchema.parse({
@@ -156,6 +156,34 @@ describe('assistant sessions', () => {
     expect(
       await call('assistant', 'edit', { projectId: 'flight', expectedRevision: 1, commands: [bookmark(30)] }),
     ).toMatchObject({ revision: 2 });
+  });
+
+  it("counts the session's pictures, refuses them past the budget and starts again for a new conversation", async () => {
+    const { sessions, dataDir } = await setup();
+    // Without a session nothing is counted.
+    await sessions.assertPictures('flight', 1, 2);
+    expect(await sessions.countPictures('flight', 1, 2)).toBeNull();
+    await sessions.start(
+      'flight',
+      1,
+      { notes: '', musicTrackId: null, targetSeconds: null, allowedMovement: null, maxClips: null },
+      'assistant',
+    );
+    expect(await sessions.countPictures('flight', 1, 2)).toBe(1);
+    await sessions.assertPictures('flight', 1, 2);
+    expect(await sessions.countPictures('flight', 1, 2)).toBe(0);
+    await expect(sessions.assertPictures('flight', 1, 2)).rejects.toMatchObject({ statusCode: 422 });
+    await expect(sessions.assertPictures('flight', 1, 2)).rejects.toThrow(
+      /2 of the 2 pictures one conversation may hold/,
+    );
+    await sessions.resetPictures('flight');
+    await sessions.assertPictures('flight', 1, 2);
+    expect((await sessions.current('flight'))?.pictures).toBe(0);
+    // Session files written before pictures were counted still open.
+    const file = path.join(dataDir, 'assistant', 'flight', 'session.json');
+    const { pictures: _pictures, ...earlier } = JSON.parse(await readFile(file, 'utf8')) as Record<string, unknown>;
+    await writeFile(file, JSON.stringify(earlier));
+    expect((await sessions.current('flight'))?.pictures).toBe(0);
   });
 
   it('refuses to start on a stale revision or beside an active session', async () => {

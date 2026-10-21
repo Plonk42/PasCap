@@ -58,6 +58,10 @@ export const sessionSchema = z
       z.string().max(MAX_SESSION_NOTES).nullable(),
       "The assistant's notes for the user when it finished.",
     ),
+    pictures: described(
+      z.number().int().nonnegative().default(0),
+      'Pictures returned during the session (in the current conversation, after a newConversation reset).',
+    ),
   })
   .strict();
 export type AssistantSession = z.infer<typeof sessionSchema>;
