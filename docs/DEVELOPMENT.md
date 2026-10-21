@@ -415,6 +415,28 @@ total-process memory; reports expose private paths/snapshots, so review before s
 | Web      | [App](../src/web/App.tsx), [autosave](../src/web/autosave.ts)                                                                                                    | Panels, contextual controls, transient pointer/input drafts, session history and serial saves |
 | Service  | [HTTP app](../src/server/app.ts), [library](../src/server/library.ts), [jobs](../src/server/jobs.ts), [composited export](../src/server/layered-export.ts)       | Guarded registered-source access, bounded native work and verified immutable exports          |
 
+### Service operations
+
+New service capabilities are **operations**, defined once and served as `POST /api/ops/<name>`
+behind the usual loopback and client guards; the future MCP endpoint will expose the same
+definitions ([operation registry](design/ASSISTANT_MCP.md#the-operation-registry)). To add one:
+
+1. Define it in `src/shared/operations/<name>.ts` with `defineOperation`: snake_case name,
+   a description written for an LLM, a strict Zod input whose every field has
+   `.meta({ description })`, the output schema, `access` and `audience`. Add it to
+   `operations` in [the registry](../src/shared/operations/index.ts).
+2. Implement its runner in `src/server/operations/<name>.ts` and add it to `runners` in
+   [the server registry](../src/server/operations/index.ts); type checking requires one.
+3. Run `npm run operations:catalogue` to update the catalogue in the design guide. Unit tests
+   fail on duplicate names, missing descriptions, schemas JSON Schema cannot express or a
+   stale catalogue.
+4. The editor calls it with `callOperation(name, input)` from [the client](../src/web/operations.ts),
+   which validates the response.
+
+Existing REST routes move to operations when touched or when an operation needs them. A new
+edit command belongs in [`editCommandSchema`](../src/shared/command-schema.ts), with
+descriptions; the `edit` operation then accepts it.
+
 Preview decodes editing proxies with WebCodecs in a worker, using **two decoders and
 textures per track, up to 16 for eight**, plus one source-review decoder, not one per
 clip ([WebCodecs preview decoding](design/WEBCODECS_PREVIEW.md)). Each track can dissolve independently. Generalized

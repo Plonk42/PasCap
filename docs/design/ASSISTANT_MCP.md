@@ -154,41 +154,45 @@ length: a 10-minute song has about 1,500 beats and 6,000 loudness values.
 
 ## The operation registry
 
-Every new capability is one file in `src/server/operations/`, exporting one definition:
+Every capability is one definition in `src/shared/operations/` (pure Zod, so the web
+client can validate responses with it) and its `run` in `src/server/operations/`:
 
 ```ts
-export interface Operation<I, O> {
-  name: string; // unique snake_case; the tool name and the route segment
+export interface OperationSpec<N, I, O> {
+  name: N; // unique snake_case; the tool name and the route segment
   description: string; // written for the LLM: when to use it, what it returns
-  input: z.ZodType<I>; // fields carry .meta({ description }) and examples
-  output: z.ZodType<O> | { image: 'image/jpeg' }; // JSON, or bytes plus a JSON legend
-  access: 'read' | 'write'; // write needs the session lease and bumps the revision
+  input: I; // a Zod object whose fields carry .meta({ description })
+  output: O; // a Zod schema; later also images (bytes plus a JSON legend)
+  access: 'read' | 'write'; // write bumps the revision (and later needs the session lease)
   audience: readonly ('editor' | 'assistant')[]; // required, no default
-  run(context: ServiceContext, input: I): Promise<O>;
 }
+// src/server/operations/index.ts
+export const runners: { [N in OperationName]: (context, input) => Promise<output> };
 ```
 
-`operations.ts` exports the array; a definition that is not in the array does not exist.
+`src/shared/operations/index.ts` exports the `operations` array; a definition that is not
+in the array does not exist, and an operation without a runner fails type checking.
 From that array:
 
-- **HTTP**: one loop registers `POST /api/ops/:name` per operation (parse `input`, call
-  `run`, send `output`); the existing REST routes stay as they are and migrate one at a
-  time when touched or when an operation needs them.
+- **HTTP**: one loop registers `POST /api/ops/<name>` per operation (parse `input`, call
+  `run`, check and send `output`) behind the existing loopback and client guards; the
+  existing REST routes stay as they are and migrate one at a time when touched or when
+  an operation needs them.
 - **MCP**: one loop registers one tool per operation whose `audience` includes
   `assistant`, with `z.toJSONSchema(op.input)` and `op.description`; image outputs
   become MCP image content plus the legend as text.
-- **Web client**: `ops.<name>(input)` typed from `typeof operations`, one generic
-  function, so the editor can use new operations (bulk actions, beats to bookmarks)
-  without a wrapper in `api.ts`.
-- **Docs**: a script writes the operation catalogue (name, audience, description, input
-  fields) into this guide's catalogue section; `npm run check` fails when it drifts, as
-  `licenses:check` does for notices.
+- **Web client**: `callOperation(name, input)` ([operations](../../src/web/operations.ts)),
+  typed from the array and validating the response with the operation's output schema,
+  so the editor can use new operations (bulk actions, beats to bookmarks) without a
+  wrapper in `api.ts`.
+- **Docs**: `npm run operations:catalogue` writes the [catalogue](#operation-catalogue)
+  below from the array; a unit test, and so `npm run check`, fails when it drifts.
 
-Drift gates, as unit tests over the array: unique names; non-empty descriptions; every
-input and output converts to JSON Schema without unrepresentable types; every field of a
-write operation is described; `audience` set explicitly. One table-driven contract test
-runs each operation with the same fixture through the HTTP route and through an in-memory
-MCP client against the in-process endpoint, and compares the results.
+Drift gates, as unit tests over the array: unique snake_case names; non-empty
+descriptions; every input and output converts to JSON Schema; every input field is
+described; `audience` set explicitly; one runner per operation. A contract test runs the
+operations through their HTTP routes on a disposable service; Phase 5 adds the same
+fixture through an in-memory MCP client against the in-process endpoint.
 
 What stays manual: the playbook (when to use what), noted descriptions where a
 `.refine()` rule cannot appear in JSON Schema (clip `sourceOut > sourceIn`, the layout
@@ -198,14 +202,80 @@ and test.
 
 ### `editCommandSchema`
 
-`EditCommand` ([commands](../../src/shared/commands.ts)) becomes a Zod discriminated union
-on `type`, each variant and field with a `.meta({ description })` written for the LLM
-(for example `trim`: "Change a clip's source range; placement stays, Ripple re-sequences
-the suffix; frames outside the recording or the selects are rejected"). `EditCommand` is
-then `z.infer<typeof editCommandSchema>`; a compile-time equality test keeps the union
-identical during the migration and `applyCommand` is unchanged. The `edit` operation's
-input is `{ commands: editCommandSchema.array().max(64), expectedRevision }`. Any command
+`EditCommand` ([commands](../../src/shared/commands.ts)) is `z.infer` of
+`editCommandSchema` ([command schema](../../src/shared/command-schema.ts)), a Zod
+discriminated union on `type`, each variant and field with a `.meta({ description })`
+written for the LLM. A compile-time equality test keeps it identical to the former
+hand-written union, and `applyCommand` is unchanged. The `edit` operation's input is
+`{ projectId, expectedRevision, commands: editCommandSchema.array().max(64) }`. Any command
 added later for the editor is exposed to the assistant the moment it is in the union.
+
+### Operation catalogue
+
+<!-- operation-catalogue:start -->
+
+<!-- Generated from src/shared/operations by `npm run operations:catalogue`; edit the definitions, not this text. -->
+
+#### `describe_project`
+
+Read; for editor and assistant. Summarise a saved project: its revision, duration, video tracks with their clips in timeline order (project frames and timecodes, source ranges, speed, direction), transitions, music tracks, the recordings with the ranges the user kept, and bookmarks. Frames are integers at 30000/1001 fps. Read it before editing and after each edit batch.
+
+| Input       | Type   | Description              |
+| ----------- | ------ | ------------------------ |
+| `projectId` | string | ID of the saved project. |
+
+#### `edit`
+
+Write; for editor and assistant. Apply up to 64 edit commands to a saved project, in order, as one step: either every command applies and the project is saved once with the next revision, or nothing changes and the first rejected command's reason is returned. A stale expectedRevision is rejected; read the project again first.
+
+| Input              | Type            | Description                                                          |
+| ------------------ | --------------- | -------------------------------------------------------------------- |
+| `projectId`        | string          | ID of the saved project.                                             |
+| `expectedRevision` | integer         | Revision the commands were written against, from describe_project.   |
+| `commands`         | array of object | Commands applied in order; each sees the result of the previous one. |
+
+#### Edit commands
+
+The `commands` of `edit`; their fields are described in the JSON Schema of the tool.
+
+| Command               | Fields                                         | Description                                                                                                                                                                                                                                                                                               |
+| --------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `insert`              | `clip`, `index`                                | Insert a new video clip into the project clip array. A Ripple track plays its clips in array order, packed from its first clip; a track without Ripple places it at clip.start, and it must not overlap another clip.                                                                                     |
+| `delete`              | `clipId`                                       | Remove a clip. A Ripple track closes the gap; on a track without Ripple the other clips keep their starts.                                                                                                                                                                                                |
+| `reorder`             | `clipIds`                                      | Reorder the whole project clip array; Ripple tracks play their clips in this order. Transitions between clips that are no longer adjacent become cuts.                                                                                                                                                    |
+| `trim`                | `clipId`, `sourceIn`, `sourceOut`              | Change a clip's source range. Its start stays; a Ripple track re-sequences the clips after it. Transitions or fades that no longer fit reject the edit.                                                                                                                                                   |
+| `trim-place`          | `clipId`, `sourceIn`, `sourceOut`, `start`     | Change a clip's source range and start together, like a left-edge trim. On a Ripple track only the first clip's start can change; later starts follow the sequence.                                                                                                                                       |
+| `split`               | `clipId`, `sourceFrame`, `newClipId`           | Split a clip into two clips with independent settings, joined by a cut; the second clip on the timeline gets newClipId. A reversed clip keeps its higher source frames first.                                                                                                                             |
+| `remove-source-range` | `clipId`, `sourceIn`, `sourceOut`, `newClipId` | Cut source frames [sourceIn, sourceOut) out of a clip. Removing the middle leaves two clips; removing an end trims the clip; removing everything deletes it. A Ripple track closes the gap; otherwise the remaining pieces keep their timeline positions. The range must lie within the clip's own range. |
+| `duplicate`           | `clipId`, `newClipId`                          | Copy a clip (range, speed, direction and detail) right after it. A Ripple track inserts the copy into its sequence; otherwise it starts at the original's end and must not overlap another clip.                                                                                                          |
+| `colour`              | `layerId`, `colour`                            | Replace a video track's complete Colour; it applies to every clip on the track. Settings with track keyframes follow their keyframes instead of these base values.                                                                                                                                        |
+| `speed`               | `clipId`, `speed`                              | Set a clip's speed. Its duration changes with it: a Ripple track re-sequences the clips after it, and overlaps or transitions that no longer fit reject the edit.                                                                                                                                         |
+| `reverse`             | `clipId`, `reverse`                            | Play a clip backwards or forwards; its duration and placement do not change.                                                                                                                                                                                                                              |
+| `transform`           | `layerId`, `transform`                         | Replace a video track's Transform; it applies to every clip on the track at project time.                                                                                                                                                                                                                 |
+| `detail`              | `clipId`, `detail`                             | Set a clip's static detail filters, applied before the track's Colour.                                                                                                                                                                                                                                    |
+| `music`               | `music`                                        | Replace every music track of the project.                                                                                                                                                                                                                                                                 |
+| `opacity`             | `layerId`, `opacity`                           | Set a video track's Opacity where it has no Opacity keyframes; it applies to every clip.                                                                                                                                                                                                                  |
+| `layer-key-toggle`    | `layerId`, `frame`, `setting`, `value`         | Enable a setting at a track keyframe with value, creating the keyframe at frame if needed; or disable it there if it is already enabled, removing the keyframe with its last setting.                                                                                                                     |
+| `layer-key-value`     | `layerId`, `frame`, `setting`, `value`         | Change the value of a setting already enabled at a track keyframe.                                                                                                                                                                                                                                        |
+| `layer-key-move`      | `layerId`, `frame`, `nextFrame`                | Move a whole track keyframe, with all its settings and Easing, to another project frame; an occupied frame rejects the edit.                                                                                                                                                                              |
+| `layer-key-remove`    | `layerId`, `frame`                             | Remove a whole track keyframe.                                                                                                                                                                                                                                                                            |
+| `layer-key-default`   | `layerId`, `frame`                             | Add a default keyframe, which returns every Colour setting and Opacity to neutral from its frame on, or remove the default keyframe already there. Rejected where an ordinary keyframe exists.                                                                                                            |
+| `layer-key-easing`    | `layerId`, `frame`, `setting`, `interpolation` | Set the Easing of a track keyframe's settings toward their next keyframes.                                                                                                                                                                                                                                |
+| `layer-add`           | `layer`                                        | Add a video track on top of the others; a project has at most 8.                                                                                                                                                                                                                                          |
+| `layer-update`        | `layer`                                        | Replace a video track's settings. Turning Ripple on packs its clips from the first one's start; turning it off keeps their current starts.                                                                                                                                                                |
+| `layer-remove`        | `layerId`                                      | Delete a video track and its clips; the last track cannot be deleted.                                                                                                                                                                                                                                     |
+| `layer-order`         | `layerIds`                                     | Set the composition order of the video tracks, bottom first.                                                                                                                                                                                                                                              |
+| `place`               | `clipId`, `layerId`, `start`, `index`          | Move a clip to a track and position. On a Ripple track the array position decides its place in the sequence and start must equal the resulting start, unless it is the first clip.                                                                                                                        |
+| `move-clips`          | `clipIds`, `delta`, `layerId`                  | Move several clips together by the same number of frames. Overlaps, a start before frame 0 or transitions that no longer fit reject the whole move.                                                                                                                                                       |
+| `transition`          | `transition`                                   | Set the transition between two adjacent clips of a track. Non-cut transitions need touching clips or an existing dissolve; without Ripple a dissolve or pause moves the right clip.                                                                                                                       |
+| `fades`               | `layerId`, `opening`, `closing`                | Set a video track's fade from black at its first clip and to black at its last clip.                                                                                                                                                                                                                      |
+| `bookmark-add`        | `frame`                                        | Add a bookmark, a snap point that is never rendered; at most 1,000.                                                                                                                                                                                                                                       |
+| `bookmark-move`       | `frame`, `nextFrame`                           | Move a bookmark; an occupied frame rejects the edit.                                                                                                                                                                                                                                                      |
+| `bookmark-remove`     | `frame`                                        | Remove a bookmark.                                                                                                                                                                                                                                                                                        |
+| `select-set`          | `mediaId`, `ranges`                            | Replace a recording's kept ranges; an empty list makes the whole recording available again. Kept ranges never retime or render anything.                                                                                                                                                                  |
+| `select-narrow`       | `mediaId`, `ranges`                            | Replace a recording's kept ranges with ranges inside the existing ones; it never keeps more frames.                                                                                                                                                                                                       |
+
+<!-- operation-catalogue:end -->
 
 ## Operations
 

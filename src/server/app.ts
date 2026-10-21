@@ -6,10 +6,7 @@ import path from 'node:path';
 import { z, ZodError } from 'zod';
 import { exportRequestSchema } from '../shared/export.js';
 import { MAX_FOOTAGE_FILES } from '../shared/footage.js';
-import type { SourceFingerprint } from '../shared/media.js';
-import { frameSchema, idSchema, projectSchema, type ProjectDocument } from '../shared/model.js';
-import { musicClips } from '../shared/music-lanes.js';
-import { validateSourceRanges } from '../shared/source-range.js';
+import { frameSchema, idSchema, projectSchema } from '../shared/model.js';
 import { AudioLibrary } from './audio.js';
 import { BrowsePreviews } from './browse-previews.js';
 import { createConfig, type ServiceConfig } from './config.js';
@@ -20,6 +17,8 @@ import { preflightExport, startExport } from './export.js';
 import { assertNoSymlinks, assertSourceIdentity, parseByteRange } from './files.js';
 import { FootageBrowser } from './footage.js';
 import { JobQueue } from './jobs.js';
+import { registerOperations } from './operations/index.js';
+import { assertProjectSources } from './project-sources.js';
 import { submitFolderRelink } from './relink.js';
 import { MediaLibrary, MediaQueueError } from './library.js';
 import { startReference } from './reference.js';
@@ -119,44 +118,6 @@ export async function serveRegisteredFile(
   } finally {
     await file.close();
   }
-}
-
-/** Saved projects may only reference registered, unchanged recordings and music within their frames. */
-async function assertProjectSources(
-  document: ProjectDocument,
-  library: MediaLibrary,
-  audio: AudioLibrary,
-): Promise<void> {
-  document.media.videoIds.forEach((id) => library.get(id));
-  document.media.audioIds.forEach((id) => audio.get(id));
-  const sources = new Map<string, { sourcePath: string; fingerprint: SourceFingerprint }>();
-  const frameCounts = new Map(
-    [...document.clips.map((clip) => clip.mediaId), ...Object.keys(document.selects)].map((mediaId) => {
-      const asset = library.get(mediaId);
-      return [asset.id, asset.metadata.frameCount] as const;
-    }),
-  );
-  try {
-    validateSourceRanges(document, frameCounts);
-  } catch (error) {
-    throw new ServiceError(errorMessage(error), 422);
-  }
-  for (const clip of document.clips) {
-    const asset = library.get(clip.mediaId);
-    if (clip.sourceOut > asset.metadata.frameCount)
-      throw new ServiceError(`Clip ${clip.id} exceeds its registered source frames.`, 422);
-    sources.set(`video:${asset.id}`, asset);
-  }
-  for (const track of musicClips(document.music)) {
-    const asset = audio.get(track.mediaId);
-    if (track.sourceOut > asset.metadata.frameCount)
-      throw new ServiceError('Music exceeds its registered source frames.', 422);
-    sources.set(`audio:${asset.id}`, asset);
-  }
-  await [...sources.values()].reduce(async (previous, asset) => {
-    await previous;
-    await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
-  }, Promise.resolve());
 }
 
 export async function createApp(config = createConfig()) {
@@ -368,6 +329,7 @@ export async function createApp(config = createConfig()) {
     }
     return reply.code(201).send({ document: await projects.save(document, 0) });
   });
+  registerOperations(app, { projects, library, audio });
   app.get('/api/jobs', (_request, reply) => reply.send({ jobs: jobs.list() }));
   app.get('/api/jobs/:id', (request, reply) => reply.send({ job: jobs.get(idParams.parse(request.params).id) }));
   app.post('/api/jobs/:id/cancel', (request, reply) => {
