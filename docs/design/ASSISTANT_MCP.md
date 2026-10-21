@@ -298,7 +298,7 @@ Read; for editor and assistant. Map where a video recording is usable and how it
 | `projectId`       | string  | ID of the saved project, whose kept ranges and session brief apply.                                                                           |
 | `mediaId`         | string  | ID of a video recording in the project, from describe_project.                                                                                |
 | `allowedMovement` | number  | How much the movement may change in a steady range (0.5–6, lower is steadier), as in Source preview; defaults to the session brief's, else 2. |
-| `sheet`           | boolean | True adds a contact sheet of the steady ranges, one of the pictures the session may show.                                                     |
+| `sheet`           | boolean | True adds a contact sheet of the middle frames of the steady ranges.                                                                          |
 
 #### `music_analysis`
 
@@ -347,13 +347,12 @@ Write; for editor and assistant. Take the project's write lease for an assistant
 
 #### `session_status`
 
-Read; for editor and assistant. Read the project's latest assistant session (null if none): whether it is active, its brief, its edit log and the notes it ended with, the project's saved revision and its checkpoints, newest first. Pictures returned during the session count against the pictures one conversation may hold; in a new conversation continuing an active session, pass newConversation true.
+Read; for editor and assistant. Read the project's latest assistant session (null if none): whether it is active, its brief, its edit log and the notes it ended with, the project's saved revision and its checkpoints, newest first.
 
-| Input             | Type    | Description                                                                                         |
-| ----------------- | ------- | --------------------------------------------------------------------------------------------------- |
-| `projectId`       | string  | ID of the saved project.                                                                            |
-| `checkpoints`     | boolean | False leaves out the checkpoint list.                                                               |
-| `newConversation` | boolean | True when this conversation does not hold the session's earlier pictures: their count starts again. |
+| Input         | Type    | Description                           |
+| ------------- | ------- | ------------------------------------- |
+| `projectId`   | string  | ID of the saved project.              |
+| `checkpoints` | boolean | False leaves out the checkpoint list. |
 
 #### `session_end`
 
@@ -446,11 +445,10 @@ Read; for editor and assistant. Render several project frames as one contact she
 
 Read; for editor and assistant. Render source frames of one video recording's editing proxy as a contact sheet, without any track Colour or Transform, to choose footage before placing it. A single frame renders at the still width.
 
-| Input       | Type             | Description                                               |
-| ----------- | ---------------- | --------------------------------------------------------- |
-| `projectId` | string           | ID of the saved project holding the recording.            |
-| `mediaId`   | string           | ID of a prepared video recording.                         |
-| `frames`    | array of integer | Source frames of the recording in the order to show them. |
+| Input     | Type             | Description                                               |
+| --------- | ---------------- | --------------------------------------------------------- |
+| `mediaId` | string           | ID of a prepared video recording.                         |
+| `frames`  | array of integer | Source frames of the recording in the order to show them. |
 
 #### `compare_recordings`
 
@@ -588,15 +586,15 @@ The image budget is service configuration with conservative defaults:
 1–24). A request may ask for less, never more; a single-frame sheet renders at the still
 width. At the defaults a still is about 35 KB and a 4 × 4 sheet 972 × 556.
 
-Every picture stays in the client's conversation, and clients refuse a request carrying more
-than a fixed number: VS Code with Claude refuses more than 20 pictures, after which the
-conversation cannot continue ([#243](https://github.com/Plonk42/PasCap/issues/243): a run that
-looked at each candidate in its own sheet reached 21). So an active session counts the pictures
-it returns (`still`, the sheets and `describe_recording`'s sheet, which is now opt-in) and
-refuses one past `PASCAP_ASSISTANT_SESSION_PICTURES` (16, 1–200, leaving room for the user's)
-with a reason naming what to do without pictures; each picture's output gives `picturesLeft`.
-A new conversation continuing the session calls `session_status` with `newConversation` to
-start the count again. Pictures outside a session are not counted.
+Every picture stays in the client's conversation, and many clients limit how many it may
+hold: VS Code with Claude refuses a request carrying more than 20, after which the conversation
+cannot continue ([#243](https://github.com/Plonk42/PasCap/issues/243): a run that looked at
+each candidate in its own sheet reached 21). That limit belongs to the client, not to PasCap,
+which enforces none (owner, 2026-10-21): the guide asks the assistant to spend pictures where
+they decide something (one `compare_recordings` sheet of many candidates, one `timeline_sheet`
+of the cut) and, when its client has subagents, to let them look at groups of recordings in
+their own conversations. `describe_recording`'s sheet is opt-in, and sheets hold 16 cells by
+default.
 
 Measured read-only on the owner's flight (one track, Shadows keyed; 16-thread host): a still
 takes 0.6–0.8 s and a 9-frame sheet 6 s. Shadows, Highlights, HDR, Local contrast and Detail

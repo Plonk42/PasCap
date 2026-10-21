@@ -57,7 +57,9 @@ export class AssistantSessions {
     try {
       if (!(await assertNoSymlinks(filename)).isFile())
         throw new ServiceError('A session must be a regular file.', 500);
-      return sessionSchema.parse(JSON.parse(await readFile(filename, 'utf8')));
+      // A picture count briefly kept on the mcp branch (#243) means nothing now.
+      const { pictures: _pictures, ...saved } = JSON.parse(await readFile(filename, 'utf8')) as Record<string, unknown>;
+      return sessionSchema.parse(saved);
     } catch (error) {
       if (isNotFound(error)) return null;
       throw error;
@@ -154,7 +156,6 @@ export class AssistantSessions {
           endedAt: null,
           endedBy: null,
           notes: null,
-          pictures: 0,
         }),
       );
     });
@@ -169,39 +170,6 @@ export class AssistantSessions {
         return session;
       }
       return this.write({ ...session, endedAt: this.now(), endedBy: by, notes, lastActivityAt: this.now() });
-    });
-  }
-
-  /**
-   * Refuses `count` more pictures when the active session would show more than `limit`: they all stay in the
-   * client's conversation, and clients refuse requests carrying too many. Without an active session, nothing is
-   * counted.
-   */
-  async assertPictures(projectId: string, count: number, limit: number): Promise<void> {
-    const session = await this.current(projectId);
-    if (session?.endedAt !== null || session.pictures + count <= limit) return;
-    throw new ServiceError(
-      `This session has shown ${session.pictures} of the ${limit} pictures one conversation may hold: every picture stays in the conversation, and chat clients refuse requests with more (often 20). Continue without pictures (describe_project, describe_recording with sheet false, check_alignment), or end the session with notes asking the user to look; a new conversation may call session_status with newConversation true to show pictures again.`,
-      422,
-    );
-  }
-
-  /** Counts pictures returned during the active session; the pictures left, or null without one. */
-  countPictures(projectId: string, count: number, limit: number): Promise<number | null> {
-    return this.#writer.run(async () => {
-      const session = await this.#current(projectId);
-      if (session?.endedAt !== null) return null;
-      const pictures = session.pictures + count;
-      await this.write({ ...session, pictures, lastActivityAt: this.now() });
-      return Math.max(0, limit - pictures);
-    });
-  }
-
-  /** A new conversation continuing the active session starts without pictures. */
-  resetPictures(projectId: string): Promise<void> {
-    return this.#writer.run(async () => {
-      const session = await this.#current(projectId);
-      if (session?.endedAt === null) await this.write({ ...session, pictures: 0 });
     });
   }
 

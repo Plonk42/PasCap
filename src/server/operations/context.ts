@@ -28,9 +28,6 @@ export interface ServiceContext {
     | 'copy'
     | 'recordEdit'
     | 'touch'
-    | 'assertPictures'
-    | 'countPictures'
-    | 'resetPictures'
   >;
   library: Pick<MediaLibrary, 'get' | 'motion' | 'motionJob'>;
   audio: Pick<AudioLibrary, 'get' | 'analysis' | 'analysisJob'>;
