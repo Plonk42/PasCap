@@ -94,7 +94,7 @@ test('follows an assistant session read-only, then takes over and restores the p
   await ready(page);
   const banner = page.locator('.assistant-banner.editing');
   await expect(banner).toContainText('An assistant is editing this project');
-  await expect(banner).toContainText('0 edits · no edits yet');
+  await expect(banner).toContainText('0 edits so far · no edits yet');
 
   // The editor is read-only: an edit is refused with the reason and nothing is saved.
   await page.getByRole('region', { name: 'Video timeline', exact: true }).focus();
@@ -110,7 +110,7 @@ test('follows an assistant session read-only, then takes over and restores the p
   memory.session = session(1);
   await expect.poll(() => bookmarks(page), { timeout: 10_000 }).toEqual([30]);
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(30);
-  await expect(banner).toContainText('1 edit · last: bookmark-add');
+  await expect(banner).toContainText('1 edit so far · last: bookmark added');
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   expect(memory.saves).toBe(0);
 
@@ -274,7 +274,7 @@ test('hands off with a brief after showing what the assistant can use, then open
   await expect(ended).toContainText('Marked the first cut.');
   await expect.poll(() => bookmarks(page)).toEqual([30]);
   await ended.getByText('Edit log').click();
-  await expect(ended.getByRole('listitem')).toContainText(['bookmark-add']);
+  await expect(ended.getByRole('listitem')).toContainText(['bookmark added']);
   await page.evaluate(() => window.pascapLab!.engine.seek(0));
   await ended.getByRole('button', { name: 'Go to the edit at 00:01:00' }).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(30);
