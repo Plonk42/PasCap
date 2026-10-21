@@ -1,8 +1,9 @@
 import { applyCommand, type EditCommand } from './commands.js';
-import type { MusicTrack, ProjectDocument, Transition } from './model.js';
+import type { MusicTrack, ProjectDocument, Transition, VideoClip } from './model.js';
 import { MUSIC_SAMPLES_PER_FRAME } from './music-format.js';
 import type { PlacedBeat } from './music-analysis.js';
 import { trimAtPlayhead } from './rush-editing.js';
+import { trimByOutputFrames } from './source-range.js';
 import { calculateLayout, type PlacedTransition } from './timeline.js';
 
 /** Project frames where a source sample of a music clip plays, once per loop repeat. */
@@ -90,55 +91,102 @@ export interface SnappedBoundary {
   leftId: string;
   rightId: string;
   before: number;
-  /** The beat aimed at, or null when none lies at or before the boundary. */
+  /** The beat reached, else the nearest one, or null without beats. */
   beat: number | null;
   after: number;
   /** Why the boundary was left where it is, or null. */
   skipped: string | null;
 }
 
-function lastAtOrBefore(sorted: readonly number[], frame: number): number | null {
-  let found: number | null = null;
-  for (const value of sorted) if (value <= frame) found = value;
-  return found;
+/** The nearest target at or before `frame` and the nearest after it, nearest first. */
+function candidates(sorted: readonly number[], frame: number): number[] {
+  let earlier: number | undefined;
+  for (const value of sorted) if (value <= frame) earlier = value;
+  const later = sorted.find((value) => value > frame);
+  return [earlier, later]
+    .filter((value): value is number => value !== undefined)
+    .sort((left, right) => Math.abs(left - frame) - Math.abs(right - frame));
 }
 
-/** One boundary's trim on the project as edited so far, or why it is skipped. */
+/** The registered length of a recording, and the source ranges kept of it (undefined: all of it). */
+export interface SnapSources {
+  frameCount: (mediaId: string) => number;
+  kept: (mediaId: string) => readonly { sourceIn: number; sourceOut: number }[] | undefined;
+}
+
+type Step = { command: EditCommand; document: ProjectDocument; after: number } | { skipped: string };
+
+/** Lengthens a clip's displayed end by `frames` output frames: its source OUT, or IN when reversed. */
+function lengthen(clip: VideoClip, frames: number, frameCount: number): EditCommand {
+  return clip.reverse
+    ? trimByOutputFrames(clip, 'in', -frames, frameCount)
+    : trimByOutputFrames(clip, 'out', frames, frameCount);
+}
+
+/** The trim moving the left clip's end (its source OUT, or IN when reversed) to `beat`, or why it cannot. */
+function reachBeat(
+  document: ProjectDocument,
+  layerId: string,
+  leftId: string,
+  before: number,
+  beat: number,
+  minimumFrames: number,
+  sources: SnapSources,
+): Step {
+  const left = calculateLayout(document).clips.find((placed) => placed.clip.id === leftId)!;
+  const delta = beat - before;
+  if (left.end - left.start + delta < minimumFrames)
+    return { skipped: 'Reaching the beat would make the left clip shorter than the minimum.' };
+  try {
+    const { clip } = left;
+    const command =
+      delta < 0
+        ? trimAtPlayhead(document, leftId, left.end + delta - 1, 'out')
+        : lengthen(clip, delta, sources.frameCount(clip.mediaId));
+    if (command.type === 'trim') {
+      const kept = sources.kept(clip.mediaId);
+      if (kept && !kept.some((range) => command.sourceIn >= range.sourceIn && command.sourceOut <= range.sourceOut))
+        return { skipped: 'Reaching the beat would play frames outside the ranges the user kept.' };
+    }
+    const next = applyCommand(document, command);
+    const after = boundaries(next, layerId).find((item) => item.leftId === leftId)!.frame;
+    // Speed rounding can leave a boundary one frame from the beat; further means the footage ran out.
+    if (Math.abs(after - beat) > 1) return { skipped: 'The recording has no footage to reach the beat.' };
+    return { command, document: next, after };
+  } catch (error) {
+    return { skipped: error instanceof Error ? error.message : 'The trim was rejected.' };
+  }
+}
+
+/** One boundary's trim on the project as edited so far, toward the nearest beat it can reach, or why none. */
 function snapBoundary(
   document: ProjectDocument,
   layerId: string,
   pair: { leftId: string; rightId: string },
   targets: readonly number[],
   minimumFrames: number,
+  sources: SnapSources,
 ): { entry: SnappedBoundary; command: EditCommand | null; document: ProjectDocument } {
   const before = boundaries(document, layerId).find((item) => item.leftId === pair.leftId)!.frame;
-  const beat = lastAtOrBefore(targets, before);
-  const entry: SnappedBoundary = { ...pair, before, beat, after: before, skipped: null };
-  if (beat === null) return { entry: { ...entry, skipped: 'No beat at or before it.' }, command: null, document };
-  if (beat === before) return { entry, command: null, document };
-  const left = calculateLayout(document).clips.find((placed) => placed.clip.id === pair.leftId)!;
-  const end = left.end - (before - beat);
-  if (end - left.start < minimumFrames)
-    return {
-      entry: { ...entry, skipped: 'Reaching the beat would make the left clip shorter than the minimum.' },
-      command: null,
-      document,
-    };
-  try {
-    const command = trimAtPlayhead(document, pair.leftId, end - 1, 'out');
-    const next = applyCommand(document, command);
-    const after = boundaries(next, layerId).find((item) => item.leftId === pair.leftId)!.frame;
-    return { entry: { ...entry, after }, command, document: next };
-  } catch (error) {
-    const skipped = error instanceof Error ? error.message : 'The trim was rejected.';
-    return { entry: { ...entry, skipped }, command: null, document };
+  const options = candidates(targets, before);
+  const entry: SnappedBoundary = { ...pair, before, beat: options[0] ?? null, after: before, skipped: null };
+  if (!options.length) return { entry: { ...entry, skipped: 'No beat near it.' }, command: null, document };
+  if (options[0] === before) return { entry, command: null, document };
+  let skipped = '';
+  for (const beat of options) {
+    const step = reachBeat(document, layerId, pair.leftId, before, beat, minimumFrames, sources);
+    if ('command' in step)
+      return { entry: { ...entry, beat, after: step.after }, command: step.command, document: step.document };
+    skipped ||= step.skipped;
   }
+  return { entry: { ...entry, skipped }, command: null, document };
 }
 
 /**
- * Shortens the clips of one Ripple track so that each boundary, left to right, lands on the nearest
- * beat (or downbeat) at or before it, keeping each clip at least `minimumFrames` long. Shortening the
- * left clip's OUT moves every later clip, so boundaries are taken one at a time on the edited project.
+ * Trims the clips of one Ripple track so that each boundary, left to right, lands on the nearest beat (or
+ * downbeat): shortening the left clip, or lengthening it where its recording has footage inside the kept
+ * ranges, else the nearest beat on the other side; each clip stays at least `minimumFrames` long. A trim
+ * moves every later clip, so boundaries are taken one at a time on the edited project.
  */
 export function snapCutsToBeats(
   project: ProjectDocument,
@@ -146,6 +194,7 @@ export function snapCutsToBeats(
   beats: readonly PlacedBeat[],
   downbeatsOnly: boolean,
   minimumFrames: number,
+  sources: SnapSources,
 ): SnapResult {
   const layer = project.layers.find((item) => item.id === layerId);
   if (!layer) throw new Error(`The project has no video track ${layerId}.`);
@@ -155,7 +204,7 @@ export function snapCutsToBeats(
   const commands: EditCommand[] = [];
   const result: SnappedBoundary[] = [];
   for (const { leftId, rightId } of layer.transitions) {
-    const step = snapBoundary(document, layerId, { leftId, rightId }, targets, minimumFrames);
+    const step = snapBoundary(document, layerId, { leftId, rightId }, targets, minimumFrames, sources);
     document = step.document;
     if (step.command) commands.push(step.command);
     result.push(step.entry);

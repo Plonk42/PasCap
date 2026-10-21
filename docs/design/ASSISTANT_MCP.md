@@ -316,7 +316,7 @@ Read; for editor and assistant. Measure how the cut follows the music: for every
 
 #### `snap_cuts_to_beats`
 
-Write; for editor and assistant. Move the boundaries of one Ripple video track onto the music: left to right, shorten each boundary's left clip so the change lands on the nearest beat (or downbeat) at or before it, keeping each clip at least minimumSeconds long and leaving transitions as they are; later clips follow. Clips only get shorter, so they stay inside the kept ranges. Returns the proposed trim commands and each boundary before and after; with apply, saves them as one edit (needs the session and expectedRevision). Do the arithmetic with this rather than by hand.
+Write; for editor and assistant. Move the boundaries of one Ripple video track onto the music: left to right, trim each boundary's left clip so the change lands on the nearest beat (or downbeat), shortening it, or lengthening it where its recording has footage inside the kept ranges, else taking the nearest beat on the other side; each clip stays at least minimumSeconds long and transitions keep their durations; later clips follow. Returns the proposed trim commands and each boundary before and after; with apply, saves them as one edit (needs the session and expectedRevision). Do the arithmetic with this rather than by hand.
 
 | Input              | Type                 | Description                                                                                |
 | ------------------ | -------------------- | ------------------------------------------------------------------------------------------ |
@@ -694,15 +694,17 @@ clip on the timeline (or one), merged by frame.
   a fade through black's boundary), the nearest beat and downbeat with signed offsets in
   frames (positive: the change comes after the beat), and a summary: boundaries within one
   frame of a beat or downbeat and the mean absolute offset.
-- `snap_cuts_to_beats`: on one Ripple track, left to right, shortens each boundary's left
-  clip (its OUT as displayed, so source IN for a reversed clip, through the editor's **Trim
-  end**) so the perceived moment lands on the nearest beat or downbeat at or before it,
-  keeping each clip at least `minimumSeconds` long; transitions keep their durations and
-  later clips follow. Clips only shrink, so they stay inside their kept ranges. A boundary
-  whose trim would break the minimum or a transition stays put with the reason. Returns the
-  `trim` commands and each boundary before and after as a proposal, or with `apply` and
-  `expectedRevision` saves them as one `edit` (the session rules apply). With slow motion a
-  boundary can land a frame from the beat; `after` says where.
+- `snap_cuts_to_beats`: on one Ripple track, left to right, trims each boundary's left clip
+  (its OUT as displayed, so source IN for a reversed clip) so the perceived moment lands on
+  the nearest beat or downbeat, before or after it. Moving it earlier shortens the clip, like
+  the editor's **Trim end**; moving it later lengthens the clip, when its recording has the
+  footage inside its kept ranges. When the nearest beat cannot be reached, the nearest on the
+  other side is tried. Each clip stays at least `minimumSeconds` long; transitions keep their
+  durations and later clips follow, so a cut keeps about its length instead of drifting
+  earlier at every boundary. A boundary that reaches neither beat stays put with the reason.
+  Returns the `trim` commands and each boundary before and after as a proposal, or with
+  `apply` and `expectedRevision` saves them as one `edit` (the session rules apply). With slow
+  motion a boundary can land a frame from the beat; `after` says where.
 - No `beats_to_bookmarks` operation: bookmarks are `bookmark-add` commands at the frames
   `music_analysis` lists. Not done: the first/last video frame against the music's first and
   last beat, and lengthening clips.

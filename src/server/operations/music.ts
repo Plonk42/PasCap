@@ -181,7 +181,10 @@ export const runSnapCutsToBeats: OperationRunner<typeof snapOperation> = async (
   const fps = PROJECT_FPS.numerator / PROJECT_FPS.denominator;
   let result;
   try {
-    result = snapCutsToBeats(project, layerId, beats, prefer === 'downbeat', Math.round(minimumSeconds * fps));
+    result = snapCutsToBeats(project, layerId, beats, prefer === 'downbeat', Math.round(minimumSeconds * fps), {
+      frameCount: (mediaId) => context.library.get(mediaId).metadata.frameCount,
+      kept: (mediaId) => project.selects[mediaId],
+    });
   } catch (error) {
     throw new ServiceError(error instanceof Error ? error.message : 'Cannot snap the cuts of this track.', 422);
   }
