@@ -35,6 +35,8 @@ export interface AssistantImageBudget {
   sheetCellWidth: number;
   /** Frames per contact sheet. */
   sheetCells: number;
+  /** Pictures returned during one assistant session, all of which stay in the client's conversation. */
+  sessionPictures: number;
 }
 
 function integerSetting(name: string, fallback: number, min: number, max: number): number {
@@ -54,7 +56,8 @@ function assistantImageBudget(): AssistantImageBudget {
   return {
     stillWidth: integerSetting('PASCAP_ASSISTANT_STILL_WIDTH', 480, 160, 1280),
     sheetCellWidth: integerSetting('PASCAP_ASSISTANT_SHEET_CELL_WIDTH', 240, 96, 640),
-    sheetCells: integerSetting('PASCAP_ASSISTANT_SHEET_CELLS', 9, 1, 24),
+    sheetCells: integerSetting('PASCAP_ASSISTANT_SHEET_CELLS', 16, 1, 24),
+    sessionPictures: integerSetting('PASCAP_ASSISTANT_SESSION_PICTURES', 16, 1, 200),
   };
 }
 

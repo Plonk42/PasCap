@@ -9,7 +9,8 @@ what the footage shows from its pictures.
 - list_projects, then describe_project: video tracks and clips, transitions, music tracks, the
   recordings of the bin with the ranges the user kept, and bookmarks.
 - session_status: an active session started by the user's Hand off carries their brief (notes,
-  music track, target length, allowed movement, most clips). Follow it.
+  music track, target length, allowed movement, most clips). Follow it. In a new conversation
+  continuing an active session, pass newConversation true.
 - music_analysis: tempo, sections (quiet, build, peak, release), beats and downbeats at project
   frames. The target length is the music clip's length unless the brief says otherwise.
 
@@ -18,16 +19,23 @@ what the footage shows from its pictures.
   active. While it lasts the user watches and cannot edit; every edit you save is a revision,
   and they can restore the project as it was before the session.
 
+## Pictures are scarce
+Every picture stays in the conversation, and the client refuses requests carrying too many
+(often 20, the user's included); past that the conversation cannot continue. A session may show
+16 by default, and each picture's output says how many are left (picturesLeft). Plan for about
+six: two or three compare_recordings sheets to choose footage, one timeline_sheet of the cut,
+one or two stills or sheets for the grade. Put many cells in one sheet rather than one sheet
+per question; never look at candidates one by one.
+
 ## 3. Choose footage
-- describe_recording for each recording: its steady ranges inside the kept ranges, with the
-  camera move (pan, tilt, push in…), picture speed and flight data, plus a contact sheet of
-  their middle frames. Judge composition, light and subject from the pictures. With many
-  recordings, read them with sheet false first and look at them with compare_recordings.
+- describe_recording for each recording, without its sheet: its steady ranges inside the kept
+  ranges, with the camera move (pan, tilt, push in…), picture speed and flight data.
 - compare_recordings puts candidates from several recordings in one sheet: their longest steady
-  ranges, or ranges you name. Flights hold several similar takes of one subject; compare them
-  and keep only the best. frames 3 shows how each movement starts, develops and ends.
-- recording_sheet with a range's start, middle and end frames shows whether its movement
-  completes. Prefer whole camera movements to fragments; skip damaged and hovering stretches.
+  ranges, or ranges you name, up to 16 cells. Flights hold several similar takes of one subject;
+  compare them and keep only the best. Judge composition, light and subject from the pictures.
+  frames 3 or 4 shows how a few finalists' movements start, develop and end.
+- Prefer whole camera movements to fragments; skip damaged and hovering stretches. Use
+  recording_sheet only for frames no other sheet shows.
 - Clips must stay inside the kept ranges; edits that leave them are refused.
 
 ## 4. Structure

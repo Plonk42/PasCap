@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { described } from '../described.js';
 import { SMOOTH_TOLERANCE } from '../motion-analysis.js';
 import { frameSchema, idSchema } from '../model.js';
-import { imageSchema } from './pictures.js';
+import { imageSchema, picturesLeftSchema } from './pictures.js';
 import { defineOperation } from './spec.js';
 import { durationSchema, timecodeSchema } from './timecode.js';
 
@@ -12,7 +12,7 @@ const metres = (text: string) => described(z.number().nullable(), `${text}; null
 
 export const describeRecording = defineOperation({
   name: 'describe_recording',
-  description: `Map where a video recording is usable and how its camera moves, measured from its camera motion analysis and the drone's flight data, inside the ranges the user kept: its steady ranges with their length, picture movement (${speed}), roughness, a camera move name (static, pan, tilt, push in, pull out, rotate; a sideways flight looks like a pan) and mean flight data, plus damaged frames and how much of it hovers still. It never says what the footage shows: unless sheet is false, it also returns a contact sheet with the middle frame of each steady range (the longest ones when they do not all fit), for you to judge. Use recording_sheet for any other frames.`,
+  description: `Map where a video recording is usable and how its camera moves, measured from its camera motion analysis and the drone's flight data, inside the ranges the user kept: its steady ranges with their length, picture movement (${speed}), roughness, a camera move name (static, pan, tilt, push in, pull out, rotate; a sideways flight looks like a pan) and mean flight data, plus damaged frames and how much of it hovers still. It never says what the footage shows: with sheet true, it also returns a contact sheet with the middle frame of each steady range (the longest ones when they do not all fit), for you to judge. To compare several recordings, compare_recordings shows them in one picture; recording_sheet shows any other frames.`,
   input: z
     .object({
       projectId: described(idSchema, 'ID of the saved project, whose kept ranges and session brief apply.'),
@@ -21,7 +21,10 @@ export const describeRecording = defineOperation({
         z.number().min(SMOOTH_TOLERANCE.min).max(SMOOTH_TOLERANCE.max).optional(),
         `How much the movement may change in a steady range (${SMOOTH_TOLERANCE.min}–${SMOOTH_TOLERANCE.max}, lower is steadier), as in Source preview; defaults to the session brief's, else ${SMOOTH_TOLERANCE.initial}.`,
       ),
-      sheet: described(z.boolean().default(true), 'False leaves out the contact sheet.'),
+      sheet: described(
+        z.boolean().default(false),
+        'True adds a contact sheet of the steady ranges, one of the pictures the session may show.',
+      ),
     })
     .strict(),
   output: z
@@ -86,6 +89,7 @@ export const describeRecording = defineOperation({
           .strict(),
       ),
       image: imageSchema.optional(),
+      picturesLeft: picturesLeftSchema.optional(),
     })
     .strict(),
   access: 'read',

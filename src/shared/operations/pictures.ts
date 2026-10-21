@@ -22,6 +22,11 @@ export const imageSchema = described(
   'The picture.',
 );
 const projectId = described(idSchema, 'ID of the saved project.');
+/** Every picture stays in the client's conversation, so a session may only show so many. */
+export const picturesLeftSchema = described(
+  z.number().int().nonnegative().nullable(),
+  'Pictures this conversation may still receive during the session (null without an active session). Every picture stays in the conversation and clients refuse requests with too many: spend them on sheets that answer several questions at once.',
+);
 const commands = described(
   z.array(referencedEditCommandSchema).min(1).max(MAX_EDIT_COMMANDS).optional(),
   'Edit commands applied in memory to the saved project before rendering, to compare a candidate change without saving it.',
@@ -44,6 +49,7 @@ const projectPicture = z
     revision: described(frameSchema, 'Saved revision rendered, before any in-memory commands.'),
     image: imageSchema,
     legend: timelineLegend,
+    picturesLeft: picturesLeftSchema,
   })
   .strict();
 
@@ -101,6 +107,7 @@ export const recordingSheet = defineOperation({
     "Render source frames of one video recording's editing proxy as a contact sheet, without any track Colour or Transform, to choose footage before placing it. A single frame renders at the still width.",
   input: z
     .object({
+      projectId: described(idSchema, 'ID of the saved project holding the recording.'),
       mediaId: described(idSchema, 'ID of a prepared video recording.'),
       frames: described(
         z.array(frameSchema).min(1).max(MAX_SHEET_FRAMES),
@@ -117,6 +124,7 @@ export const recordingSheet = defineOperation({
         ),
         'The source frame and its timecode in the recording, per cell.',
       ),
+      picturesLeft: picturesLeftSchema,
     })
     .strict(),
   access: 'read',
@@ -179,6 +187,7 @@ export const compareRecordings = defineOperation({
         ),
         'What each candidate shows; no text is drawn on the picture.',
       ),
+      picturesLeft: picturesLeftSchema,
     })
     .strict(),
   access: 'read',

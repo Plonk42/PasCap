@@ -291,14 +291,14 @@ Read; for editor and assistant. Read every appearance value of one video track: 
 
 #### `describe_recording`
 
-Read; for editor and assistant. Map where a video recording is usable and how its camera moves, measured from its camera motion analysis and the drone's flight data, inside the ranges the user kept: its steady ranges with their length, picture movement (% of the image width per second), roughness, a camera move name (static, pan, tilt, push in, pull out, rotate; a sideways flight looks like a pan) and mean flight data, plus damaged frames and how much of it hovers still. It never says what the footage shows: unless sheet is false, it also returns a contact sheet with the middle frame of each steady range (the longest ones when they do not all fit), for you to judge. Use recording_sheet for any other frames.
+Read; for editor and assistant. Map where a video recording is usable and how its camera moves, measured from its camera motion analysis and the drone's flight data, inside the ranges the user kept: its steady ranges with their length, picture movement (% of the image width per second), roughness, a camera move name (static, pan, tilt, push in, pull out, rotate; a sideways flight looks like a pan) and mean flight data, plus damaged frames and how much of it hovers still. It never says what the footage shows: with sheet true, it also returns a contact sheet with the middle frame of each steady range (the longest ones when they do not all fit), for you to judge. To compare several recordings, compare_recordings shows them in one picture; recording_sheet shows any other frames.
 
 | Input             | Type    | Description                                                                                                                                   |
 | ----------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `projectId`       | string  | ID of the saved project, whose kept ranges and session brief apply.                                                                           |
 | `mediaId`         | string  | ID of a video recording in the project, from describe_project.                                                                                |
 | `allowedMovement` | number  | How much the movement may change in a steady range (0.5–6, lower is steadier), as in Source preview; defaults to the session brief's, else 2. |
-| `sheet`           | boolean | False leaves out the contact sheet.                                                                                                           |
+| `sheet`           | boolean | True adds a contact sheet of the steady ranges, one of the pictures the session may show.                                                     |
 
 #### `music_analysis`
 
@@ -347,12 +347,13 @@ Write; for editor and assistant. Take the project's write lease for an assistant
 
 #### `session_status`
 
-Read; for editor and assistant. Read the project's latest assistant session (null if none): whether it is active, its brief, its edit log and the notes it ended with, the project's saved revision and its checkpoints, newest first.
+Read; for editor and assistant. Read the project's latest assistant session (null if none): whether it is active, its brief, its edit log and the notes it ended with, the project's saved revision and its checkpoints, newest first. Pictures returned during the session count against the pictures one conversation may hold; in a new conversation continuing an active session, pass newConversation true.
 
-| Input         | Type    | Description                           |
-| ------------- | ------- | ------------------------------------- |
-| `projectId`   | string  | ID of the saved project.              |
-| `checkpoints` | boolean | False leaves out the checkpoint list. |
+| Input             | Type    | Description                                                                                         |
+| ----------------- | ------- | --------------------------------------------------------------------------------------------------- |
+| `projectId`       | string  | ID of the saved project.                                                                            |
+| `checkpoints`     | boolean | False leaves out the checkpoint list.                                                               |
+| `newConversation` | boolean | True when this conversation does not hold the session's earlier pictures: their count starts again. |
 
 #### `session_end`
 
@@ -445,10 +446,11 @@ Read; for editor and assistant. Render several project frames as one contact she
 
 Read; for editor and assistant. Render source frames of one video recording's editing proxy as a contact sheet, without any track Colour or Transform, to choose footage before placing it. A single frame renders at the still width.
 
-| Input     | Type             | Description                                               |
-| --------- | ---------------- | --------------------------------------------------------- |
-| `mediaId` | string           | ID of a prepared video recording.                         |
-| `frames`  | array of integer | Source frames of the recording in the order to show them. |
+| Input       | Type             | Description                                               |
+| ----------- | ---------------- | --------------------------------------------------------- |
+| `projectId` | string           | ID of the saved project holding the recording.            |
+| `mediaId`   | string           | ID of a prepared video recording.                         |
+| `frames`    | array of integer | Source frames of the recording in the order to show them. |
 
 #### `compare_recordings`
 
@@ -582,9 +584,19 @@ does ([detail filters](DETAIL_FILTERS.md#kernel)).
 
 The image budget is service configuration with conservative defaults:
 `PASCAP_ASSISTANT_STILL_WIDTH` (480; still width and largest crop side, 160–1280),
-`PASCAP_ASSISTANT_SHEET_CELL_WIDTH` (240, 96–640) and `PASCAP_ASSISTANT_SHEET_CELLS` (9,
+`PASCAP_ASSISTANT_SHEET_CELL_WIDTH` (240, 96–640) and `PASCAP_ASSISTANT_SHEET_CELLS` (16,
 1–24). A request may ask for less, never more; a single-frame sheet renders at the still
-width. At the defaults a still is about 35 KB and a 3 × 3 sheet 728 × 416, about 80 KB.
+width. At the defaults a still is about 35 KB and a 4 × 4 sheet 972 × 556.
+
+Every picture stays in the client's conversation, and clients refuse a request carrying more
+than a fixed number: VS Code with Claude refuses more than 20 pictures, after which the
+conversation cannot continue ([#243](https://github.com/Plonk42/PasCap/issues/243): a run that
+looked at each candidate in its own sheet reached 21). So an active session counts the pictures
+it returns (`still`, the sheets and `describe_recording`'s sheet, which is now opt-in) and
+refuses one past `PASCAP_ASSISTANT_SESSION_PICTURES` (16, 1–200, leaving room for the user's)
+with a reason naming what to do without pictures; each picture's output gives `picturesLeft`.
+A new conversation continuing the session calls `session_status` with `newConversation` to
+start the count again. Pictures outside a session are not counted.
 
 Measured read-only on the owner's flight (one track, Shadows keyed; 16-thread host): a still
 takes 0.6–0.8 s and a 9-frame sheet 6 s. Shadows, Highlights, HDR, Local contrast and Detail
@@ -627,7 +639,7 @@ inside the kept ranges at the session's allowed movement, else its first kept ra
 whole recording), shown in 1–4 cells at the centres of equal parts of the range, one row per
 candidate when there are several cells. Its legend gives each candidate's cells, range, length
 and frames. Like the other sheets it is limited by the image budget's cells per sheet
-(9 by default: nine candidates, or three with three cells each).
+(16 by default: sixteen candidates, or four with four cells each).
 
 ### Server-side Auto adjust, white balance and detail measurement
 
