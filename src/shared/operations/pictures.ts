@@ -122,3 +122,65 @@ export const recordingSheet = defineOperation({
   access: 'read',
   audience: ['editor', 'assistant'],
 });
+
+/** Pictures per candidate in compare_recordings. */
+export const MAX_COMPARE_FRAMES = 4;
+
+const candidateSchema = z
+  .object({
+    mediaId: described(idSchema, 'ID of a prepared video recording of the project.'),
+    sourceIn: described(
+      frameSchema.optional(),
+      'First source frame of the candidate range; give both ends or neither.',
+    ),
+    sourceOut: described(frameSchema.optional(), 'Source frame after the candidate range (exclusive).'),
+  })
+  .strict()
+  .refine((candidate) => (candidate.sourceIn === undefined) === (candidate.sourceOut === undefined), {
+    message: 'Give both sourceIn and sourceOut, or neither.',
+  });
+
+export const compareRecordings = defineOperation({
+  name: 'compare_recordings',
+  description:
+    "Show candidate shots from several video recordings in one contact sheet, without track Colour or Transform, to pick the best of similar takes before placing it. Each candidate takes `frames` cells in a row, spread across its range (frames 1 lays the candidates out row by row). A candidate without a range shows its recording's longest steady range inside the kept ranges at the session's allowed movement, as describe_recording lists them, else its first kept range or the whole recording. The number of cells is limited by the service's image budget.",
+  input: z
+    .object({
+      projectId,
+      candidates: described(
+        z.array(candidateSchema).min(1).max(MAX_SHEET_FRAMES),
+        'Candidates in the order to show them; a recording may appear more than once with different ranges.',
+      ),
+      frames: described(
+        z.number().int().min(1).max(MAX_COMPARE_FRAMES).optional(),
+        'Cells per candidate, the centres of equal parts of its range; defaults to 1, its middle. 3 shows how its movement starts, develops and ends.',
+      ),
+    })
+    .strict(),
+  output: z
+    .object({
+      image: imageSchema,
+      candidates: described(
+        z.array(
+          z
+            .object({
+              cells: described(
+                z.array(z.number().int().nonnegative()),
+                'Its cells, row by row from the top left, from 0.',
+              ),
+              mediaId: idSchema,
+              name: described(z.string(), 'Recording file name.'),
+              sourceIn: frameSchema,
+              sourceOut: frameSchema,
+              seconds: described(z.number(), 'Length of the range.'),
+              frames: described(z.array(frameSchema), 'Source frame shown in each of its cells.'),
+            })
+            .strict(),
+        ),
+        'What each candidate shows; no text is drawn on the picture.',
+      ),
+    })
+    .strict(),
+  access: 'read',
+  audience: ['assistant'],
+});

@@ -7,7 +7,7 @@ import { estimate } from './estimate.js';
 import { handOffReadiness } from './hand-off.js';
 import { listProjects } from './list-projects.js';
 import { checkAlignment, musicAnalysis, snapCutsToBeats } from './music.js';
-import { recordingSheet, still, timelineSheet } from './pictures.js';
+import { compareRecordings, recordingSheet, still, timelineSheet } from './pictures.js';
 import {
   checkpoint,
   checkpointCopy,
@@ -39,6 +39,7 @@ export const operations = [
   still,
   timelineSheet,
   recordingSheet,
+  compareRecordings,
   estimate,
 ] as const;
 

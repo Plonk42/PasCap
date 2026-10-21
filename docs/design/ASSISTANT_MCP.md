@@ -450,6 +450,16 @@ Read; for editor and assistant. Render source frames of one video recording's ed
 | `mediaId` | string           | ID of a prepared video recording.                         |
 | `frames`  | array of integer | Source frames of the recording in the order to show them. |
 
+#### `compare_recordings`
+
+Read; for assistant. Show candidate shots from several video recordings in one contact sheet, without track Colour or Transform, to pick the best of similar takes before placing it. Each candidate takes `frames` cells in a row, spread across its range (frames 1 lays the candidates out row by row). A candidate without a range shows its recording's longest steady range inside the kept ranges at the session's allowed movement, as describe_recording lists them, else its first kept range or the whole recording. The number of cells is limited by the service's image budget.
+
+| Input        | Type            | Description                                                                                                                                  |
+| ------------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId`  | string          | ID of the saved project.                                                                                                                     |
+| `candidates` | array of object | Candidates in the order to show them; a recording may appear more than once with different ranges.                                           |
+| `frames`     | integer         | Cells per candidate, the centres of equal parts of its range; defaults to 1, its middle. 3 shows how its movement starts, develops and ends. |
+
 #### `estimate`
 
 Read; for editor and assistant. Measure footage the way the editor's automatic tools do, from proxy frames, and return the values with the edit commands that apply them (pass them to edit; nothing changes until then). kind auto-adjust is Track → Colour → Auto: eleven Colour settings balancing exposure, contrast, white balance and colour. white-balance is Auto white balance: Temperature and Tint. detail measures noise and softness and suggests the clip's Denoise and Sharpen (never Clarity, a look). Analyse a clip (clipId: the whole clip, or with frame the second around that project frame, as at the playhead), a whole track (layerId: all its clips by duration; not for detail) or a recording range (mediaId, sourceIn, sourceOut: values only, no commands). Judge the result with a still.
@@ -609,6 +619,15 @@ flight data, without decoding:
 The thumbnails' picture facts first proposed (mean luma, colourfulness) were dropped: the
 model sees the pictures. A recording without motion analysis returns no ranges and
 `motionAnalysed: false`; an unprepared one is refused.
+
+Flights often hold several near-identical takes of one subject, of which the user keeps only
+the best. `compare_recordings` shows candidates from several recordings in one ungraded
+sheet: each candidate is a recording and a source range (by default its longest steady range
+inside the kept ranges at the session's allowed movement, else its first kept range or the
+whole recording), shown in 1–4 cells at the centres of equal parts of the range, one row per
+candidate when there are several cells. Its legend gives each candidate's cells, range, length
+and frames. Like the other sheets it is limited by the image budget's cells per sheet
+(9 by default: nine candidates, or three with three cells each).
 
 ### Server-side Auto adjust, white balance and detail measurement
 
@@ -871,7 +890,8 @@ The LLM is told what good looks like and what PasCap can do; the tools do the ar
    naming the structure, the choices and anything the user should look at.
 
 The served text ([assistant-guide.ts](../../src/server/assistant-guide.ts)) follows these
-steps with the tools that exist: footage from `describe_recording` and `recording_sheet`, the
+steps with the tools that exist: footage from `describe_recording`, `compare_recordings` and
+`recording_sheet`, the
 music from `music_analysis`, `preview_edits` before a batch, and grading from `estimate` and
 `describe_track` with candidate `still`s.
 

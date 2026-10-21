@@ -270,9 +270,12 @@ export class StillRenderer {
     size: { width: number; height: number },
     cellWidth: number,
     signal: AbortSignal,
+    columnCount?: number,
   ): Promise<JpegImage> {
     const cellHeight = scaledHeight(cellWidth, size);
-    const { columns, rows } = sheetGrid(pictures.length);
+    const { columns, rows } = columnCount
+      ? { columns: columnCount, rows: Math.ceil(pictures.length / columnCount) }
+      : sheetGrid(pictures.length);
     const tiled = pictures.length > 1;
     const filters = [`scale=${cellWidth}:${cellHeight}:flags=area`];
     if (tiled) filters.push(`tile=${columns}x${rows}:padding=${SHEET_PADDING}:color=black`);
@@ -344,6 +347,22 @@ export class StillRenderer {
         pictures.push(await this.#decode(asset, frame, signal));
       });
       return this.#encode(pictures, STILL_SIZE, frames.length > 1 ? budget.sheetCellWidth : budget.stillWidth, signal);
+    });
+  }
+
+  /** Proxy frames of several recordings in one sheet, `columns` per row (else a square grid). */
+  sourceSheet(
+    cells: readonly { mediaId: string; frame: number }[],
+    columns: number | null,
+    budget: AssistantImageBudget,
+  ): Promise<JpegImage> {
+    return this.#run(async (signal) => {
+      const pictures: Buffer[] = [];
+      await forEachSerial(cells, async ({ mediaId, frame }) => {
+        pictures.push(await this.#decode(this.readyAsset(mediaId), frame, signal));
+      });
+      const width = cells.length > 1 ? budget.sheetCellWidth : budget.stillWidth;
+      return this.#encode(pictures, STILL_SIZE, width, signal, columns ?? undefined);
     });
   }
 

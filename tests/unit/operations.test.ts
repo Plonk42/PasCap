@@ -394,6 +394,93 @@ describe('operation routes', () => {
     ).rejects.toMatchObject({ statusCode: 404 });
   });
 
+  it('compares candidate ranges of several recordings in one sheet, a row per candidate', async () => {
+    const pan = Array.from({ length: 600 }, (_, frame) => (frame === 0 ? null : frame < 300 ? 3 : -3));
+    const zero = pan.map((value) => (value === null ? null : 0));
+    const project: ProjectDocument = projectSchema.parse({
+      ...createProject('compare', 'Compare'),
+      media: { videoIds: ['rec-1', 'rec-2', 'rec-3'], audioIds: [] },
+      selects: { 'rec-1': [{ sourceIn: 30, sourceOut: 570 }] },
+    });
+    const assets: Record<string, object> = {
+      'rec-1': { id: 'rec-1', name: 'A.MP4', status: 'ready', damage: [], metadata: { frameCount: 600 } },
+      'rec-2': { id: 'rec-2', name: 'B.MP4', status: 'ready', damage: [], metadata: { frameCount: 600 } },
+      'rec-3': { id: 'rec-3', name: 'C.MP4', status: 'preparing', damage: [], metadata: { frameCount: 600 } },
+    };
+    const sheets: { cells: unknown; columns: number | null }[] = [];
+    const context = {
+      projects: { load: async () => project },
+      library: {
+        get: (id: string) => assets[id],
+        motion: async (id: string) =>
+          id === 'rec-1'
+            ? {
+                version: 3,
+                verifiedAt: 'now',
+                frameCount: 600,
+                tx: pan,
+                ty: zero,
+                zoom: zero,
+                rotation: zero,
+                telemetry: [],
+              }
+            : null,
+      },
+      sessions: { current: async () => null },
+      stills: {
+        sourceSheet: async (cells: unknown, columns: number | null) => {
+          sheets.push({ cells, columns });
+          return { mimeType: 'image/jpeg', data: 'jpeg', width: 484, height: 274 };
+        },
+      },
+      images: { stillWidth: 480, sheetCellWidth: 240, sheetCells: 6 },
+    } as unknown as Parameters<typeof runners.compare_recordings>[0];
+    const described = await runners.describe_recording(
+      context as unknown as Parameters<typeof runners.describe_recording>[0],
+      { projectId: 'compare', mediaId: 'rec-1', sheet: false },
+    );
+    const longest = [...described.steadyRanges].sort(
+      (a, b) => b.sourceOut - b.sourceIn - (a.sourceOut - a.sourceIn),
+    )[0]!;
+    const compared = await runners.compare_recordings(context, {
+      projectId: 'compare',
+      candidates: [{ mediaId: 'rec-1' }, { mediaId: 'rec-2' }, { mediaId: 'rec-2', sourceIn: 10, sourceOut: 40 }],
+      frames: 2,
+    });
+    expect(compared.candidates.map(({ cells, sourceIn, sourceOut }) => ({ cells, sourceIn, sourceOut }))).toEqual([
+      // The longest steady range; without motion analysis or kept ranges, the whole recording.
+      { cells: [0, 1], sourceIn: longest.sourceIn, sourceOut: longest.sourceOut },
+      { cells: [2, 3], sourceIn: 0, sourceOut: 600 },
+      { cells: [4, 5], sourceIn: 10, sourceOut: 40 },
+    ]);
+    expect(compared.candidates.slice(1).map((candidate) => candidate.frames)).toEqual([
+      [150, 450],
+      [17, 32],
+    ]);
+    expect(sheets).toEqual([
+      {
+        cells: compared.candidates.flatMap(({ mediaId, frames }) => frames.map((frame) => ({ mediaId, frame }))),
+        columns: 2,
+      },
+    ]);
+    await runners.compare_recordings(context, { projectId: 'compare', candidates: [{ mediaId: 'rec-2' }] });
+    expect(sheets.at(-1)!.columns).toBeNull();
+    const compare = (candidates: object[], frames?: number) =>
+      runners.compare_recordings(context, { projectId: 'compare', candidates, frames } as never);
+    await expect(compare([{ mediaId: 'rec-1' }], 4)).resolves.toBeTruthy();
+    await expect(compare([{ mediaId: 'rec-1' }, { mediaId: 'rec-2' }], 4)).rejects.toMatchObject({ statusCode: 422 });
+    await expect(compare([{ mediaId: 'rec-3' }])).rejects.toMatchObject({ statusCode: 409 });
+    await expect(compare([{ mediaId: 'rec-9' }])).rejects.toMatchObject({ statusCode: 404 });
+    await expect(compare([{ mediaId: 'rec-2', sourceIn: 10, sourceOut: 700 }])).rejects.toMatchObject({
+      statusCode: 422,
+    });
+    expect(
+      operations
+        .find((operation) => operation.name === 'compare_recordings')!
+        .input.safeParse({ projectId: 'compare', candidates: [{ mediaId: 'rec-2', sourceIn: 10 }] }).success,
+    ).toBe(false);
+  });
+
   it('reads the music at project frames, measures the cuts against its beats and proposes snapped trims', async () => {
     const samplesPerFrame = (48_000 * 1_001) / 30_000;
     const base = createProject('music', 'Music');
