@@ -10,7 +10,7 @@ import { timecodeSchema } from './timecode.js';
 export const MAX_STILL_WIDTH = 1280;
 export const MAX_SHEET_FRAMES = 24;
 
-const imageSchema = described(
+export const imageSchema = described(
   z
     .object({
       mimeType: z.literal('image/jpeg'),

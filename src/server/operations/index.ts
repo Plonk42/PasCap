@@ -3,6 +3,7 @@ import { operations, type Operation } from '../../shared/operations/index.js';
 import { ServiceError } from '../errors.js';
 import type { OperationRunner, OperationRunners, ServiceContext, ServiceResources } from './context.js';
 import { runDescribeProject } from './describe-project.js';
+import { runDescribeRecording } from './describe-recording.js';
 import { runDescribeTrack } from './describe-track.js';
 import { runEdit } from './edit.js';
 import { runHandOffReadiness } from './hand-off.js';
@@ -22,6 +23,7 @@ export const runners: OperationRunners = {
   list_projects: runListProjects,
   describe_project: runDescribeProject,
   describe_track: runDescribeTrack,
+  describe_recording: runDescribeRecording,
   session_start: runSessionStart,
   session_status: runSessionStatus,
   session_end: runSessionEnd,

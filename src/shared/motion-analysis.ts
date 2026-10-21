@@ -9,7 +9,7 @@ export const MOTION_ANALYSIS_VERSION = 3;
 /** Image tolerance (% of image width per s²): lower suggests only steadier footage. */
 export const SMOOTH_TOLERANCE = { min: 0.5, max: 6, step: 0.1, initial: 2 } as const;
 const SMOOTH_GAP_SECONDS = 0.5;
-const SMOOTH_MIN_SECONDS = 2;
+export const SMOOTH_MIN_SECONDS = 2;
 const SMOOTH_MARGIN_SECONDS = 0.2;
 /** Below this camera movement (% of image width per s) a frame is still: ~3 min to pan one width. */
 export const STILL_SPEED = 0.5;
