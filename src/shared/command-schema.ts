@@ -28,6 +28,7 @@ const newClipId = (use: string) =>
 const sourceIn = described(frameSchema, 'First kept source frame of the recording (inclusive).');
 const sourceOut = described(frameSchema, 'Source frame after the last kept one (exclusive); must be after sourceIn.');
 const keyFrame = described(frameSchema, 'Project frame of the existing track keyframe.');
+const trackName = described(z.string().trim().min(1).max(100), 'Track name, 1–100 characters.');
 const neutralNotZero = COLOUR_CONTROLS.filter((control) => NEUTRAL_COLOUR[control.key] !== 0).map(
   (control) => `${control.key} ${NEUTRAL_COLOUR[control.key]}`,
 );
@@ -231,6 +232,21 @@ export const editCommandSchema = z.discriminatedUnion('type', [
     "Replace a video track's settings. Turning Ripple on packs its clips from the first one's start; turning it off keeps their current starts.",
     { layer: described(layerSchema, 'The complete track with the same id as an existing one.') },
   ),
+  command(
+    'layer-create',
+    'Add a video track on top of the others, with neutral Colour and Transform, Opacity 1, Ripple on and no clips; a project has at most 8.',
+    { layerId: described(idSchema, 'Unused ID of the new track.'), name: trackName },
+  ),
+  command(
+    'layer-options',
+    "Rename a video track, show or hide it, or turn its Ripple on or off; omitted fields keep their value. Turning Ripple on packs its clips from the first one's start; turning it off keeps their current starts.",
+    {
+      layerId,
+      name: described(trackName.optional(), 'New track name, 1–100 characters.'),
+      enabled: described(z.boolean().optional(), 'Whether the track is shown and rendered.'),
+      ripple: described(z.boolean().optional(), 'Whether its clips play one after another.'),
+    },
+  ),
   command('layer-remove', 'Delete a video track and its clips; the last track cannot be deleted.', { layerId }),
   command('layer-order', 'Set the composition order of the video tracks, bottom first.', {
     layerIds: described(z.array(idSchema), 'Every track ID exactly once, bottom first.'),
@@ -299,7 +315,18 @@ export const editCommandSchema = z.discriminatedUnion('type', [
 
 export type EditCommand = z.infer<typeof editCommandSchema>;
 
-const commandTypes = editCommandSchema.options.map((option) => option.shape.type.value);
+/** Editor commands carrying a whole track: half of edit's schema, and the assistant has a command per setting. */
+const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set(['layer-add', 'layer-update']);
+
+/** The commands of the edit operation. */
+export const assistantEditCommandSchema = z.discriminatedUnion(
+  'type',
+  editCommandSchema.options.filter(
+    (option) => !EDITOR_ONLY_COMMANDS.has(option.shape.type.value),
+  ) as unknown as typeof editCommandSchema.options,
+);
+
+const commandTypes = assistantEditCommandSchema.options.map((option) => option.shape.type.value);
 
 /**
  * A command for tools other than edit (previews and pictures): published as a type plus fields, so each tool
@@ -309,4 +336,4 @@ export const referencedEditCommandSchema = z
   .object({ type: described(z.enum(commandTypes as [EditCommand['type'], ...EditCommand['type'][]]), 'Command type.') })
   .catchall(z.unknown())
   .meta({ description: "An edit command exactly as the edit tool takes it: its type and that command's fields." })
-  .pipe(editCommandSchema);
+  .pipe(assistantEditCommandSchema);

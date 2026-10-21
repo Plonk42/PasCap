@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyCommand, type EditCommand } from '../../src/shared/commands.js';
-import { createProject, type ProjectDocument } from '../../src/shared/model.js';
+import { createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
 
 /** A track with every kind of appearance away from neutral, and Exposure and Scale keyed. */
 function graded(): ProjectDocument {
@@ -122,5 +122,20 @@ describe('partial track appearance commands', () => {
       applyCommand(project, { type: 'transform-setting', layerId: 'video-9', setting: 'rotation', value: 0 }),
     ).toThrow('Track no longer exists.');
     expect(project).toEqual(graded());
+  });
+
+  it('creates a neutral track and changes its options without sending the whole track', () => {
+    const project = graded();
+    const created = applyCommand(project, { type: 'layer-create', layerId: 'overlay', name: ' Overlay ' });
+    expect(created.layers.at(-1)).toEqual(createLayer('overlay', 'Overlay'));
+    expect(() => applyCommand(created, { type: 'layer-create', layerId: 'overlay', name: 'Again' })).toThrow();
+    const hidden = applyCommand(created, { type: 'layer-options', layerId: 'overlay', enabled: false, name: 'Top' });
+    expect(hidden.layers.at(-1)).toEqual({ ...createLayer('overlay', 'Top'), enabled: false });
+    const layer = project.layers[0]!;
+    const off = applyCommand(project, { type: 'layer-options', layerId: layer.id, ripple: false });
+    expect(off.layers[0]).toEqual({ ...layer, ripple: false });
+    expect(() => applyCommand(project, { type: 'layer-options', layerId: 'video-9', ripple: true })).toThrow(
+      'Track no longer exists.',
+    );
   });
 });
