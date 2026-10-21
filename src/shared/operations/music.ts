@@ -121,7 +121,7 @@ export const checkAlignment = defineOperation({
 export const snapCutsToBeats = defineOperation({
   name: 'snap_cuts_to_beats',
   description:
-    "Move the boundaries of one Ripple video track onto the music: left to right, shorten each boundary's left clip so the change lands on the nearest beat (or downbeat) at or before it, keeping each clip at least minimumSeconds long and leaving transitions as they are; later clips follow. Clips only get shorter, so they stay inside the kept ranges. Returns the proposed trim commands and each boundary before and after; with apply, saves them as one edit (needs the session and expectedRevision). Do the arithmetic with this rather than by hand.",
+    "Move the boundaries of one Ripple video track onto the music: left to right, trim each boundary's left clip so the change lands on the nearest beat (or downbeat), shortening it, or lengthening it where its recording has footage inside the kept ranges, else taking the nearest beat on the other side; each clip stays at least minimumSeconds long and transitions keep their durations; later clips follow. Returns the proposed trim commands and each boundary before and after; with apply, saves them as one edit (needs the session and expectedRevision). Do the arithmetic with this rather than by hand.",
   input: z
     .object({
       projectId,
