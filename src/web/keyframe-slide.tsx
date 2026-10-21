@@ -12,7 +12,7 @@ import {
 } from 'react';
 import type { EditCommand } from '../shared/commands.js';
 import type { ProjectDocument } from '../shared/model.js';
-import { snapFrame, snapPoints } from '../shared/snap.js';
+import { snapFrame, snapPoints, type BeatSnap } from '../shared/snap.js';
 import type { DraftPreview } from './Timeline.js';
 import { editorShortcut } from './shortcuts.js';
 
@@ -66,6 +66,8 @@ interface Options<T extends KeyframeSlideTarget> {
   width: number;
   disabled: boolean;
   snapping: boolean;
+  /** Beats snapped to as well as the kind's targets. */
+  beats: BeatSnap;
   viewport: RefObject<HTMLDivElement | null>;
   onPause: () => void;
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
@@ -215,7 +217,7 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
     animation.current = requestAnimationFrame(autoScroll);
   };
   const begin = (event: PointerEvent<HTMLButtonElement>, target: T): void => {
-    const { viewport, disabled, project, scale, width, frame, kind, onPause } = latest.current;
+    const { viewport, disabled, project, scale, width, frame, kind, beats, onPause } = latest.current;
     if (disabled || session.current || event.button !== 0 || !viewport.current) return;
     event.preventDefault();
     event.stopPropagation();
@@ -241,7 +243,9 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
       playhead: frame,
       moved: false,
       alt: event.altKey,
-      targets: [...new Set([...(kind.snapTargets?.(project, target) ?? snapPoints(project)), frame])],
+      targets: [
+        ...new Set([...(kind.snapTargets?.(project, target) ?? snapPoints(project)), ...beats(project), frame]),
+      ],
       plan,
     };
     event.currentTarget.setPointerCapture(event.pointerId);

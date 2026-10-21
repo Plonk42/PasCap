@@ -1797,6 +1797,7 @@ export function App() {
         onSelectMusic={selectMusic}
         onImport={importMusicFiles}
         onEdit={edit}
+        onSeek={seek}
       />
     ),
     [
@@ -1810,6 +1811,7 @@ export function App() {
       selectMusic,
       importMusicFiles,
       edit,
+      seek,
     ],
   );
   const dockStyle = workspaceDockStyle(workspace.layout, workspace.sizes);

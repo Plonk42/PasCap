@@ -624,6 +624,22 @@ insertion remains boundary-based even with Snap off or Alt held; only an explici
 move of its retained first clip changes the anchor. The
 toggle persists for the current timeline session, not the renderable document.
 
+### Snap to beats
+
+**Snap to beats** (metronome icon beside **Snap**) adds the analysed beats of every
+music clip ([music analysis](SPEED_AND_AUDIO.md#music-analysis)) to the snap targets of
+every snapping gesture above, so cuts land on the beat. Its menu chooses **Off**,
+**Beats** or **Downbeats only**; the button toggles between Off and the last choice, and
+the choice is a browser preference. It works only while **Snap** is on (otherwise the
+button explains why), and Alt still bypasses it. The beats are computed from each music
+clip's current placement, source range and loops at the start of every gesture, so they
+follow the clip when it moves, is trimmed or changes recording; a music clip being
+moved or trimmed never snaps to its own beats. Nothing is written to the project:
+bookmarks stay the user's own. While beat snapping is active, the beats it uses appear
+as ticks along the bottom of the time ruler (downbeats taller), thinned like the clip
+ticks below when they are closer than 4 pixels. Music without an analysis or without a
+steady beat adds no targets.
+
 ### Bookmarks
 
 A **bookmark** marks one project-time frame, for example a beat or an event in the
@@ -656,19 +672,13 @@ music or keyframes and are never rendered or exported.
 - Every gesture that snaps to clip boundaries also snaps to bookmarks within the
   same eight pixels: trims, clip moves and drops, music placement/trim, track and
   clip speed-keyframe drags, ruler clicks/ranges and playhead scrubbing. Snapping
-  to existing boundaries is unchanged.
-- **Beats → bookmarks** in **Audio → Music** turns the selected music clip's beats
-  ([music analysis](SPEED_AND_AUDIO.md#music-analysis)) into bookmarks, so cuts snap to
-  the beat. Its popover offers **All beats** or **Downbeats only**, each with the number
-  it would add: the beats at project frames within the clip's placement, repeated
-  across loops, skipping existing bookmarks. One choice is one Undo step. A choice that
-  would exceed 1,000 bookmarks, or would add nothing, is unavailable with its reason
-  (**All beats** then suggests downbeats only); nothing is ever added partially. The
-  button is unavailable, with the reason, until the analysis has found a steady beat.
+  to existing boundaries is unchanged. To snap to the music's beats, use
+  [Snap to beats](#snap-to-beats) rather than bookmarks.
 
-Each analysed music clip shows its beats as ticks along its bottom edge, downbeats
+Each analysed music clip shows its beats as ticks above its tone strip, downbeats
 taller and brighter, following its placement, source range and loops; when beats are
-closer than 4 pixels only downbeats are drawn, then none. The ticks are display only.
+closer than 4 pixels only downbeats are drawn, then none. The ticks are display only;
+the clip also shows the music's structure ([music analysis](SPEED_AND_AUDIO.md#music-analysis)).
 
 Adding, moving and deleting are each one Undo step and autosave like other edits.
 Bookmarks are project-wide: not per track, named, coloured or ranged.

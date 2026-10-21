@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { analyseFeatures, MusicFeatureExtractor } from '../../src/server/music-analysis.js';
 import {
-  beatBookmarks,
+  keyName,
   musicBeatFrames,
+  musicSpans,
   type MusicAnalysis,
   type MusicMeasurement,
 } from '../../src/shared/music-analysis.js';
 import { MUSIC_SAMPLES_PER_FRAME } from '../../src/shared/music-format.js';
-import { MAX_BOOKMARKS, type MusicTrack } from '../../src/shared/model.js';
+import { createProject, type MusicTrack } from '../../src/shared/model.js';
+import { musicBeatSnap, snapPoints } from '../../src/shared/snap.js';
+import { singleClipLane } from '../music-lanes.js';
 
 const RATE = 48_000;
 const TOLERANCE = 0.035 * RATE;
@@ -427,27 +430,59 @@ describe('music beats at project frames', () => {
     ]);
   });
 
-  it('turns beats or downbeats into new bookmarks only, never a partial add past the limit', () => {
-    const music = track({ sourceIn: 5, sourceOut: 30, duration: 70, loop: true });
-    expect(beatBookmarks([], music, beats, 'beats')).toEqual({
-      frames: [105, 115, 130, 140, 155, 165],
-      reason: '',
-    });
-    expect(beatBookmarks([0, 115, 140], music, beats, 'downbeats')).toEqual({ frames: [165], reason: '' });
-    expect(beatBookmarks([115, 140, 165], music, beats, 'downbeats')).toEqual({
-      frames: [],
-      reason: 'Every downbeat of this music clip is already a bookmark.',
-    });
-    const full = Array.from({ length: MAX_BOOKMARKS - 4 }, (_, index) => 1_000 + index);
-    expect(beatBookmarks(full, music, beats, 'beats')).toEqual({
-      frames: [105, 115, 130, 140, 155, 165],
-      reason: '6 beats would exceed 1,000 bookmarks (996 already set). Add downbeats only instead.',
-    });
-    expect(beatBookmarks(full, music, beats, 'downbeats').reason).toBe('');
-    const unaccented = beats.map((beat) => ({ ...beat, downbeat: false }));
-    expect(beatBookmarks([], music, unaccented, 'downbeats')).toEqual({
-      frames: [],
-      reason: "No downbeats fall within this music clip's placement.",
-    });
+  it('snaps to the beats or downbeats of every music clip where it plays now, never to excluded clips', () => {
+    const document = createProject('beat-snap', 'Beat snap');
+    document.music = [
+      singleClipLane(track({ id: 'looped', sourceIn: 5, sourceOut: 30, duration: 70, loop: true })),
+      singleClipLane(track({ id: 'other', mediaId: 'unanalysed', start: 400 })),
+    ];
+    const beatsOf = (mediaId: string) => (mediaId === 'audio-1' ? beats : null);
+    expect(musicBeatSnap(beatsOf, false)(document)).toEqual([105, 115, 130, 140, 155, 165]);
+    expect(musicBeatSnap(beatsOf, true)(document)).toEqual([115, 140, 165]);
+    expect(musicBeatSnap(beatsOf, false)(document, new Set(['looped']))).toEqual([]);
+    expect(snapPoints(document)).toEqual([0, 100, 170, 400, 450]);
+    expect(snapPoints(document, musicBeatSnap(beatsOf, true))).toEqual([0, 100, 115, 140, 165, 170, 400, 450]);
+    // Moving the clip moves its beats; nothing is written to the project.
+    const moved = structuredClone(document);
+    moved.music[0]!.clips[0]!.start = 200;
+    expect(musicBeatSnap(beatsOf, true)(moved)).toEqual([215, 240, 265]);
+    expect(document.bookmarks).toEqual([]);
+  });
+});
+
+describe('music structure at project frames', () => {
+  const track = (patch: Partial<MusicTrack>): MusicTrack => ({
+    id: 'music',
+    mediaId: 'audio-1',
+    sourceIn: 0,
+    sourceOut: 50,
+    start: 100,
+    duration: 50,
+    gainDb: 0,
+    fadeIn: 0,
+    fadeOut: 0,
+    loop: false,
+    ...patch,
+  });
+  const samples = (frame: number): number => frame * MUSIC_SAMPLES_PER_FRAME;
+
+  it('clips a stretch to the source range and placement, once per loop', () => {
+    expect(musicSpans(track({}), samples(10), samples(20))).toEqual([{ start: 110, end: 120 }]);
+    expect(musicSpans(track({ sourceIn: 15, sourceOut: 40, duration: 25 }), samples(10), samples(20))).toEqual([
+      { start: 100, end: 105 },
+    ]);
+    expect(musicSpans(track({ sourceIn: 15, sourceOut: 40, duration: 25 }), samples(40), samples(45))).toEqual([]);
+    expect(
+      musicSpans(track({ sourceIn: 5, sourceOut: 30, duration: 70, loop: true }), samples(20), samples(40)),
+    ).toEqual([
+      { start: 115, end: 125 },
+      { start: 140, end: 150 },
+      { start: 165, end: 170 },
+    ]);
+  });
+
+  it('names keys with a sharp sign', () => {
+    expect(keyName({ tonic: 'G#', mode: 'major', confidence: 0.5 })).toBe('G♯ major');
+    expect(keyName({ tonic: 'C', mode: 'minor', confidence: 0.5 })).toBe('C minor');
   });
 });

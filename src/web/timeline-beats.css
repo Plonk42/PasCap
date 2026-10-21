@@ -1,0 +1,71 @@
+.timeline-beat-snap {
+  display: inline-flex;
+  align-items: center;
+}
+
+.product-workspace .timeline-beat-snap .secondary-button[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.timeline-beat-snap-menu > summary.editor-popover-trigger {
+  width: 18px;
+  height: 30px;
+  border-radius: 4px;
+}
+
+.timeline-beat-snap-modes {
+  display: grid;
+  gap: 2px;
+  width: 210px;
+  font-size: 12px;
+}
+
+/* Beat the generic popover field layout: a compact radio menu, not stacked form fields. */
+.editor-popover-content .timeline-beat-snap-modes > label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  color: inherit;
+  cursor: pointer;
+}
+
+.editor-popover-content .timeline-beat-snap-modes > label:hover,
+.editor-popover-content .timeline-beat-snap-modes > label:has(:checked) {
+  background: var(--accent-dim);
+}
+
+.editor-popover-content .timeline-beat-snap-modes input[type='radio'] {
+  flex: none;
+  width: auto;
+  margin: 0;
+}
+
+.timeline-beat-snap-modes > p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* The beats snapping uses, along the bottom of the time ruler, under bookmarks and the playhead. */
+.timeline-ruler-beats {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+.timeline-ruler-beats path {
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.timeline-ruler-beats .beat {
+  stroke: rgb(243 217 164 / 55%);
+}
+
+.timeline-ruler-beats .downbeat {
+  stroke: rgb(243 217 164 / 95%);
+}
