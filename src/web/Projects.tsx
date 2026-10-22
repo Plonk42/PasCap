@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type RefObject } from 'react';
+import { useEffect, useId, useRef, useState, type RefObject } from 'react';
 import type { ProjectSummary } from '../shared/projects.js';
 import { framesToSeconds } from '../shared/timing.js';
 import { durationLabel } from './display.js';
@@ -71,7 +71,14 @@ export function Projects({
   const deleteTrigger = useRef<HTMLButtonElement | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const pendingAction = useRef(false);
+  const focusSearchOnClose = useRef(false);
   const [localError, setLocalError] = useState('');
+  // The modal confirmation makes the list inert until its dialog has closed.
+  useEffect(() => {
+    if (deleting || !focusSearchOnClose.current) return;
+    focusSearchOnClose.current = false;
+    document.getElementById(`${id}-search`)?.focus();
+  }, [deleting, id]);
   const submitting = busy || pending !== null;
   const visible = filterProjects(projects, query, filter);
   const compatibleCount = projects.filter((project) => project.compatible).length;
@@ -153,8 +160,8 @@ export function Projects({
     setLocalError('');
     try {
       if (await onDelete(deleting)) {
+        focusSearchOnClose.current = true;
         setDeleting(null);
-        requestAnimationFrame(() => document.getElementById(`${id}-search`)?.focus());
       } else setLocalError('The project could not be deleted. It is kept in the list; check the reported error.');
     } catch (cause) {
       setLocalError(cause instanceof Error ? cause.message : 'The project could not be deleted.');
