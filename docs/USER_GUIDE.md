@@ -146,7 +146,8 @@ the time readout lists them with their timecodes and lengths. Click a row (or a 
 strip) to edit that range, use the trash to remove it, **Add range** to keep another (from the displayed
 frame when it is free, else in the largest free stretch) and **Add all N** to add one clip per kept range.
 **Shift-drag** on the strip draws a new kept range. Handles stop next to the other kept ranges, and the
-reset icon returns to the whole recording, removing every kept range.
+reset icon returns to the whole recording, removing every kept range; the trash after it deletes only the
+selected kept range.
 Ranges cannot overlap or touch. Clips can still use any frame of the recording.
 Details: [kept ranges](TIMELINE_EDITING.md#kept-ranges).
 
