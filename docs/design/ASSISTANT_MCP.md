@@ -423,6 +423,14 @@ Read; for editor. What an assistant can use in a project: each video recording o
 | ----------- | ------ | ------------------------ |
 | `projectId` | string | ID of the saved project. |
 
+#### `music_waveform`
+
+Read; for editor. The level of a prepared music recording for drawing its waveform in the editor: the lowest and highest sample of either channel for every 10 ms of its playback cache, read from a saved cache or drawn from the cache once.
+
+| Input     | Type   | Description                       |
+| --------- | ------ | --------------------------------- |
+| `mediaId` | string | ID of a prepared music recording. |
+
 #### `still`
 
 Read; for editor and assistant. Render one project frame as the export composes it (every enabled track with its Colour, Detail, Transform, Opacity and transitions), from the 720p editing proxies, as a JPEG. Use crop for a 1:1 detail of the 1280 × 720 composition, for example to judge Sharpen or Denoise. Width and crop size are limited by the service's image budget.

@@ -316,6 +316,10 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
         await route.continue();
         return;
       }
+      if (method === 'POST' && path === '/api/ops/music_waveform') {
+        await route.continue();
+        return;
+      }
       if (guard.allowPCM && path === `/api/audio/${song!.id}/playback` && (method === 'GET' || method === 'HEAD')) {
         if (method === 'GET') {
           const range = /^bytes=(\d+)-(\d+)$/.exec(request.headers()['range'] ?? '');

@@ -572,6 +572,33 @@ its timeline position as a button that moves the playhead there: the keyboard an
 screen-reader route to the same information. Unanalysed music shows only the analysis
 line.
 
+### Music waveform
+
+The waveform on each music clip draws the level of the music at the clip's own pixel
+resolution, so a hit, a drop or a silence sits where it plays. Display only: nothing is saved
+in the project, and playback, the PCM cache and mixing are unchanged.
+
+- **Data.** The `music_waveform` operation returns, for every 480 samples (10 ms) of the PCM
+  cache, the lowest and highest sample of either channel as signed bytes (−127…127 for full
+  scale, rounded away from zero so a barely audible sample still shows): 200 bytes per second
+  of music, about 120 kB for 10 minutes, whatever the zoom. The service reads the PCM once, in
+  120 KiB blocks and serially, the first time the editor asks, and saves it as
+  `waveform-v1.json` beside `playback.pcm`, tied to the same content checksum, size and
+  modification time as the analysis. A missing, stale or unreadable file is only a cache miss: it
+  is drawn again, never deleted or migrated, and re-preparing the music makes the old one stale.
+  A 10-minute synthetic cache took 0.13 s on the development machine.
+- **Drawing.** A clip draws one column per pixel, never more than the buckets it spans or 8,192
+  columns; each column covers every bucket it spans, so a short hit stays visible however far
+  the clip is zoomed out. Columns follow the clip's source range, trims and loops (a column
+  that crosses a loop wrap reads both sides). Zooming in adds columns up to the 10 ms
+  buckets (1.8 pixels at the highest zoom). The outline is one SVG shape per clip; with more
+  than 8,192 pixels a column is wider than a pixel.
+- **Meanwhile.** Until the detail arrives, or when it cannot be read, the recording's
+  up-to-2,048 stored peaks are drawn the same way, symmetrically.
+
+The tone strip, sections, swells, silences and beat ticks are drawn as before; the waveform
+remains an image named **Waveform for music track…**.
+
 ## Versioning
 
 The current project schema requires explicit `media.videoIds` and `media.audioIds` arrays,
