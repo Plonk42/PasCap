@@ -2549,7 +2549,7 @@ test('applied ranges are the recording’s kept ranges: saved with the project, 
   const kept = async () => (await current(page)).selects[id];
   const strip = page.locator('.source-range-strip');
   const trigger = page.locator('summary[aria-label="Kept ranges"]');
-  const addRange = page.getByRole('button', { name: 'Add range', exact: true });
+  const addRange = page.getByRole('button', { name: 'New range', exact: true });
   const choose = (index: number) => page.getByRole('button', { name: new RegExp(`^Kept range ${index},`) });
   const openList = async () => {
     if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
@@ -2563,7 +2563,7 @@ test('applied ranges are the recording’s kept ranges: saved with the project, 
   await expect(page.locator('.source-review')).toBeVisible(); // Applying never leaves Source preview.
   await expect(trigger).toHaveText(/1 kept range\b/);
 
-  // Add range keeps a range from a free displayed frame, else in the largest free stretch, one Undo step each.
+  // New range keeps a range from a free displayed frame, else in the largest free stretch, one Undo step each.
   await sourceFrame(page, 60);
   await openList();
   await addRange.click();
@@ -2655,7 +2655,7 @@ test('applied ranges are the recording’s kept ranges: saved with the project, 
   // Add all adds one clip per kept range in one Undo step, without leaving Source preview.
   const clips = (await current(page)).clips.length;
   await openList();
-  await page.getByRole('button', { name: /^Add all 3 kept ranges to / }).click();
+  await page.getByRole('button', { name: /^Add 3 clips to / }).click();
   await expect(page.locator('.source-add-feedback')).toHaveText('3 clips added · one per range');
   const added = (await current(page)).clips.slice(clips);
   expect(added.map(({ sourceIn, sourceOut }) => ({ sourceIn, sourceOut }))).toEqual(await kept());
