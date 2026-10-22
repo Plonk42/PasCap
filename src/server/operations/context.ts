@@ -30,7 +30,7 @@ export interface ServiceContext {
     | 'touch'
   >;
   library: Pick<MediaLibrary, 'get' | 'motion' | 'motionJob'>;
-  audio: Pick<AudioLibrary, 'get' | 'analysis' | 'analysisJob'>;
+  audio: Pick<AudioLibrary, 'get' | 'analysis' | 'analysisJob' | 'detailWaveform'>;
   jobs: Pick<JobQueue, 'list'>;
   stills: Pick<
     StillRenderer,

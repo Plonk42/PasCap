@@ -713,7 +713,7 @@ audio-source/plan arrays (one plan per music clip); older snapshots/invalid arra
 rejected while the receipt and finished output remain preserved. Current PCM format is unchanged.
 
 Each music track has its own timeline lane holding its clips, each with its
-backend-prepared waveform: a clip shows the recording name (and **loop**), kept at the
+backend-prepared waveform (the level every 10 ms, one column per pixel, [details](SPEED_AND_AUDIO.md#music-waveform)): a clip shows the recording name (and **loop**), kept at the
 left edge while the clip starts off-screen, and a boundary button (**Cut**, **Crossfade**, **Fade** or **Pause**) sits between adjacent clips. Clicking a clip, or Enter on it, selects it and
 its track, as does **Audio → Music → Music track** (then **Clip**); a boundary button
 selects the clip before it and focuses that transition in Audio. **Add music track**
