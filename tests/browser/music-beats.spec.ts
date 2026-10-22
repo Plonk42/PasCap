@@ -437,9 +437,9 @@ test('hits show as band marks where they play, in the readout and list, and Hits
   await expect(clip.locator('.music-readout')).toContainText('strong mid hit');
   // Beats are named too, so the pulse and the hits can be told apart.
   await page.mouse.move(await frameX(page, 95.5), body.y + body.height / 2);
-  await expect(clip.locator('.music-readout')).toContainText('00:03:05 · downbeat ·');
+  await expect(clip.locator('.music-readout')).toHaveText('00:03:05 · downbeat');
   await page.mouse.move(await frameX(page, 65.5), body.y + body.height / 2);
-  await expect(clip.locator('.music-readout')).toContainText('00:02:05 · beat ·');
+  await expect(clip.locator('.music-readout')).toHaveText('00:02:05 · beat');
   await page.mouse.move(body.x + body.width / 2, body.y - 40);
 
   await page.getByText('Music structure', { exact: true }).click();
