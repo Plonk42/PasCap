@@ -12,6 +12,7 @@ import {
 import {
   MUSIC_ANALYSIS_VERSION,
   musicBeatFrames,
+  musicHitFrames,
   musicSpans,
   type MusicAnalysis,
 } from '../../src/shared/music-analysis.js';
@@ -33,6 +34,21 @@ const BEATS: MusicAnalysis['beats'] = Array.from({ length: 12 }, (_, index) => (
   sample: Math.round((5 + 15 * index) * MUSIC_SAMPLES_PER_FRAME),
   strength: 0.8,
   downbeat: index % 4 === 0,
+}));
+/** Hits at source frames 12 (strong low), 20 (light high), 41 (strong mid), 70 (light mid) and 100 (strong high). */
+const HITS: MusicAnalysis['hits'] = (
+  [
+    [12, 'low', true],
+    [20, 'high', false],
+    [41, 'mid', true],
+    [70, 'mid', false],
+    [100, 'high', true],
+  ] as const
+).map(([frame, band, strong]) => ({
+  sample: Math.round(frame * MUSIC_SAMPLES_PER_FRAME),
+  strength: strong ? 0.9 : 0.3,
+  band,
+  strong,
 }));
 const TRACK: MusicTrack = {
   id: 'beats-music',
@@ -57,7 +73,7 @@ function synthetic(): MusicAnalysis {
     tempo: { bpm: 120, confidence: 0.9, curve: [{ fromSample: 0, bpm: 120 }] },
     meter: { beatsPerBar: 4, confidence: 0.8 },
     beats: BEATS,
-    accents: [],
+    hits: [],
     loudness: [],
     tone: [],
     key: null,
@@ -378,6 +394,82 @@ test('the music clip and Audio tab show the key, sections, swells, silences and 
   await page.getByRole('region', { name: 'Swells' }).getByRole('button', { name: '00:04:10', exact: true }).click();
   await expect.poll(() => playhead(page)).toBe(130);
   await expect(page.getByRole('region', { name: 'Silences' }).getByRole('listitem')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+});
+
+test('hits show as band marks where they play, in the readout and list, and Hits snapping uses strong ones', async ({
+  page,
+}) => {
+  analysis = { ...synthetic(), hits: HITS };
+  await open(page);
+  await expect(page.getByRole('status').filter({ hasText: '120 BPM · 4/4 · 12 beats · 5 hits' })).toBeVisible();
+  const placed = musicHitFrames({ ...TRACK, mediaId: song.id }, HITS);
+  const strong = placed.filter((hit) => hit.strong);
+  expect(placed.map((hit) => hit.frame)).toEqual([42, 50, 71, 100, 130, 162, 170, 191, 220]);
+  const clip = page.locator('[data-music-id="beats-music"]');
+  const marks = clip.locator('.music-hits');
+  await expect(marks).toHaveAttribute('data-strong-hits', String(strong.length));
+  await expect(marks).toHaveAttribute('data-light-hits', String(placed.length - strong.length));
+  // Every mark sits on its hit's project frame, in its band, strong ones taller.
+  const scale = (await clip.evaluate((element) => element.getBoundingClientRect().width)) / TRACK.duration;
+  const drawn = await marks.evaluate((svg) =>
+    [...svg.querySelectorAll('path')].flatMap((path) =>
+      [...(path.getAttribute('d') ?? '').matchAll(/M([\d.]+) ([\d.]+)V/g)].map((match) => ({
+        x: Number(match[1]),
+        top: Number(match[2]),
+        className: path.getAttribute('class'),
+      })),
+    ),
+  );
+  const byFrame = drawn
+    .map((mark) => ({ ...mark, frame: Math.round(TRACK.start + (mark.x - 0.5) / scale) }))
+    .sort((left, right) => left.frame - right.frame);
+  expect(byFrame).toHaveLength(placed.length);
+  byFrame.forEach((mark, index) => {
+    const hit = placed[index]!;
+    expect(Math.abs(mark.frame - hit.frame)).toBeLessThanOrEqual(1);
+    expect(mark.className).toBe(`${hit.band} ${hit.strong ? 'strong' : 'light'}`);
+    expect(mark.top).toBe(hit.strong ? 50 : 56);
+  });
+
+  const body = (await clip.locator('.music-body').boundingBox())!;
+  await page.mouse.move(await frameX(page, 71), body.y + body.height / 2);
+  await expect(clip.locator('.music-readout')).toContainText('strong mid hit');
+  // Beats are named too, so the pulse and the hits can be told apart.
+  await page.mouse.move(await frameX(page, 95.5), body.y + body.height / 2);
+  await expect(clip.locator('.music-readout')).toHaveText('00:03:05 · downbeat');
+  await page.mouse.move(await frameX(page, 65.5), body.y + body.height / 2);
+  await expect(clip.locator('.music-readout')).toHaveText('00:02:05 · beat');
+  await page.mouse.move(body.x + body.width / 2, body.y - 40);
+
+  await page.getByText('Music structure', { exact: true }).click();
+  const list = page.getByRole('region', { name: 'Strong hits' });
+  await expect(list.getByRole('listitem')).toHaveCount(strong.length);
+  await expect(list.getByRole('listitem').first()).toContainText('Low hit');
+  await list.getByRole('button', { name: '00:04:10', exact: true }).click();
+  await expect.poll(() => playhead(page)).toBe(130);
+
+  const toggle = page.getByRole('button', { name: 'Snap to beats', exact: true });
+  const rulerBeats = page.locator('.timeline-ruler-beats');
+  await page.getByRole('group', { name: 'Beat snapping' }).locator('summary').click();
+  await page.getByRole('radio', { name: 'Hits', exact: true }).check();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(toggle).toHaveAttribute('title', 'Snapping to the strong hits of music clips · click to stop');
+  await expect(rulerBeats).toHaveAttribute('data-hits', String(strong.length));
+  await expect(rulerBeats).toHaveAttribute('data-beats', '0');
+  await expect(rulerBeats).toHaveAttribute('data-downbeats', '0');
+  await clickRuler(page, 73, 71);
+  // A light hit, and the beat at 95, are not targets.
+  await clickRuler(page, 102, 102);
+  await clickRuler(page, 97, 97);
+
+  await page.getByRole('group', { name: 'Beat snapping' }).locator('summary').click();
+  await page.getByRole('radio', { name: 'Beats and hits', exact: true }).check();
+  await expect(rulerBeats).toHaveAttribute('data-hits', String(strong.length));
+  await expect(rulerBeats).toHaveAttribute('data-downbeats', String(expected(true).length));
+  await clickRuler(page, 97, 95);
+  await clickRuler(page, 73, 71);
+  expect((await current(page)).bookmarks).toEqual([]);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 

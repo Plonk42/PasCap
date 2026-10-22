@@ -72,7 +72,7 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
   a browser-local preference that survives reloads.
 - Bottom: frame-scaled multi-track timeline, playhead timecode, highlighted active
   insertion track, one marker per stored track keyframe, dimmed hidden clips and Activity.
-  The responsive toolbar starts with **Snap** and **Snap to beats** (with its Beats / Downbeats only menu, [snap to beats](TIMELINE_EDITING.md#snap-to-beats)), then the **Bookmark** group (Previous bookmark, add at the playhead or delete the one there, Next bookmark), then keeps Split, Trim start/end and Delete (which deletes the selected range while one is selected)
+  The responsive toolbar starts with **Snap** and **Snap to beats** (with its Beats / Downbeats only / Hits / Beats and hits menu, [snap to beats](TIMELINE_EDITING.md#snap-to-beats)), then the **Bookmark** group (Previous bookmark, add at the playhead or delete the one there, Next bookmark), then keeps Split, Trim start/end and Delete (which deletes the selected range while one is selected)
   directly visible; Duplicate is in the clip's right-click menu (Ctrl+D), and start
   nudging beside Clip → Placement's start field. Zoom keeps its slider and Fit,
   with Zoom out / Zoom in buttons beside them.

@@ -11,7 +11,8 @@ what the footage shows from its pictures.
 - session_status: an active session started by the user's Hand off carries their brief (notes,
   music track, target length, allowed movement, most clips). Follow it.
 - music_analysis: tempo, key, sections (quiet, build, peak, release) with their loudness and tone,
-  swells, silences, beats and downbeats at project frames. The target length is the music clip's
+  swells, silences, beats and downbeats, and hits (kicks, snares, crashes that stand out, with their
+  band and whether they are strong) at project frames. The target length is the music clip's
   length unless the brief says otherwise.
 
 ## 2. Take the project
@@ -44,6 +45,7 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   sections.
 - Plan clip lengths from the sections and the beat grid: longer clips on slow or quiet music,
   shorter ones and cuts on downbeats at peaks. Two to eight beats per clip is a usual range.
+  Music without a steady beat still has hits: cut on its strong hits instead.
 - Read the music's character too: a minor key, little high-frequency content and soft sections
   suit slow, calm movements; bright, loud sections suit faster, dramatic ones. Let a crescendo
   build with the movement (a rise, a push in), cut or reveal on a sudden swell, and place
@@ -52,8 +54,8 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
 ## 5. Build
 - One Ripple video track, filled with one edit batch of insert commands in timeline order.
   Use preview_edits to check a batch before saving it.
-- snap_cuts_to_beats (first without apply, then with apply) moves each cut onto the beat;
-  check_alignment reports how the cut follows the music.
+- snap_cuts_to_beats (first without apply, then with apply) moves each cut onto the beat, or with
+  prefer hit or beat-or-hit onto a strong hit; check_alignment reports how the cut follows the music.
 - Transitions: cuts on beats; short cross-dissolves (8–15 frames) between related shots; fade
   through black between sections; opening and closing fades on the track to match the music.
 - Use a second track only for an overlay or a clip that needs its own grade.

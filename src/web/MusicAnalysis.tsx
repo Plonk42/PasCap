@@ -126,25 +126,26 @@ function subscribeAny(listener: () => void): () => void {
   return () => anyListeners.delete(listener);
 }
 
-/** The analysed beats of these recordings once read; the music lanes load their analyses. */
-export function useAnalysedBeats(assets: readonly AudioAsset[]): (mediaId: string) => MusicAnalysis['beats'] | null {
+/** The analyses of these recordings once read; the music lanes load them. */
+export function useAnalyses(assets: readonly AudioAsset[]): (mediaId: string) => MusicAnalysis | null {
   const current = useSyncExternalStore(subscribeAny, () => revision);
   return useMemo(() => {
-    const beats = new Map<string, MusicAnalysis['beats']>();
+    const analyses = new Map<string, MusicAnalysis>();
     for (const asset of assets) {
       const phase = asset.status === 'ready' ? entries.get(entryKey(asset))?.phase : undefined;
-      if (phase?.kind === 'ready') beats.set(asset.id, phase.analysis.beats);
+      if (phase?.kind === 'ready') analyses.set(asset.id, phase.analysis);
     }
-    return (mediaId: string) => beats.get(mediaId) ?? null;
+    return (mediaId: string) => analyses.get(mediaId) ?? null;
     // `current` changes whenever an analysis is read.
   }, [assets, current]);
 }
 
 function summary(analysis: MusicAnalysis): string {
   const key = analysis.key ? ` · ${keyName(analysis.key)}` : '';
-  if (!analysis.tempo) return `No steady beat found${key}`;
+  const hits = analysis.hits.length ? ` · ${analysis.hits.length} hits` : '';
+  if (!analysis.tempo) return `No steady beat found${key}${hits}`;
   const meter = analysis.meter ? ` · ${analysis.meter.beatsPerBar}/4` : '';
-  return `${Math.round(analysis.tempo.bpm)} BPM${meter}${key} · ${analysis.beats.length} beats`;
+  return `${Math.round(analysis.tempo.bpm)} BPM${meter}${key} · ${analysis.beats.length} beats${hits}`;
 }
 
 function statusText(phase: MusicAnalysisPhase): string {
@@ -176,7 +177,7 @@ export function MusicAnalysisStatus({ asset, music, onSeek }: Readonly<StatusPro
           <button
             type="button"
             className="text-button"
-            title="Find the tempo, beats and sections of this music in the background"
+            title="Find the tempo, beats, hits and sections of this music in the background"
             onClick={analyse}
           >
             Analyse music

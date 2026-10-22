@@ -2,8 +2,8 @@ import { z } from 'zod';
 import type { MusicTrack } from './model.js';
 import { MUSIC_SAMPLE_RATE, MUSIC_SAMPLES_PER_FRAME } from './music-format.js';
 
-/** Version 3 (#257) adds tone, key, silences and swells; earlier caches are ignored, never deleted. */
-export const MUSIC_ANALYSIS_VERSION = 3;
+/** Version 4 (#261) replaces accents with hits (band, strong); earlier caches are ignored, never deleted. */
+export const MUSIC_ANALYSIS_VERSION = 4;
 /** Feature rate: one onset-envelope value every 10 ms. */
 export const MUSIC_ANALYSIS_HOP = 480;
 
@@ -14,9 +14,11 @@ const bpm = z.number().positive();
 export const sectionKinds = ['quiet', 'build', 'peak', 'release'] as const;
 export const swellKinds = ['crescendo', 'decrescendo'] as const;
 export const pitchNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'] as const;
+/** The band that rose most at a hit: below 250 Hz (kick, bass), 250 Hz–4 kHz (snare, most instruments), above. */
+export const hitBands = ['low', 'mid', 'high'] as const;
 const decibels = z.number().min(-120).max(0);
 
-/** `music-v3.json` beside the PCM cache; positions are samples of that 48 kHz cache. */
+/** `music-v4.json` beside the PCM cache; positions are samples of that 48 kHz cache. */
 export const musicAnalysisSchema = z
   .object({
     version: z.literal(MUSIC_ANALYSIS_VERSION),
@@ -44,7 +46,7 @@ export const musicAnalysisSchema = z
       .strict()
       .nullable(),
     beats: z.array(z.object({ sample, strength: unit, downbeat: z.boolean() }).strict()),
-    accents: z.array(z.object({ sample, strength: unit }).strict()),
+    hits: z.array(z.object({ sample, strength: unit, band: z.enum(hitBands), strong: z.boolean() }).strict()),
     /** dBFS of the mono mix per 100 ms. */
     loudness: z.array(decibels),
     /** Per second: dBFS of the low (below 250 Hz), mid and high (from 4 kHz) frequencies. */
@@ -80,28 +82,77 @@ export interface PlacedBeat {
   strength: number;
 }
 
+export interface PlacedHit {
+  frame: number;
+  band: (typeof hitBands)[number];
+  strong: boolean;
+  strength: number;
+}
+
 /**
- * Beats of a music clip at project frames, repeated across loops. A beat at a fractional
- * source frame lands on the nearest project frame of the placement.
+ * Items at source samples of a music clip at project frames, repeated across loops. An item at a
+ * fractional source frame lands on the nearest project frame of the placement; the first item on a
+ * frame wins it.
  */
-export function musicBeatFrames(music: MusicTrack, beats: MusicAnalysis['beats']): PlacedBeat[] {
+function placeSamples<T extends { sample: number }>(
+  music: MusicTrack,
+  items: readonly T[],
+): { frame: number; item: T }[] {
   const length = music.sourceOut - music.sourceIn;
   const end = music.start + music.duration;
-  const inRange = beats.flatMap((beat) => {
-    const offset = beat.sample / MUSIC_SAMPLES_PER_FRAME - music.sourceIn;
-    return offset >= 0 && offset < length ? [{ offset, beat }] : [];
+  const inRange = items.flatMap((item) => {
+    const offset = item.sample / MUSIC_SAMPLES_PER_FRAME - music.sourceIn;
+    return offset >= 0 && offset < length ? [{ offset, item }] : [];
   });
   const repeats = music.loop ? Math.ceil(music.duration / length) : 1;
-  const placed: PlacedBeat[] = [];
+  const placed: { frame: number; item: T }[] = [];
   for (let repeat = 0; repeat < repeats; repeat++) {
-    for (const { offset, beat } of inRange) {
+    for (const { offset, item } of inRange) {
       const frame = music.start + repeat * length + Math.round(offset);
       if (frame >= end) break;
       if (placed.at(-1)?.frame === frame) continue;
-      placed.push({ frame, downbeat: beat.downbeat, strength: beat.strength });
+      placed.push({ frame, item });
     }
   }
   return placed;
+}
+
+/** Beats of a music clip at project frames, repeated across loops. */
+export function musicBeatFrames(music: MusicTrack, beats: MusicAnalysis['beats']): PlacedBeat[] {
+  return placeSamples(music, beats).map(({ frame, item }) => ({
+    frame,
+    downbeat: item.downbeat,
+    strength: item.strength,
+  }));
+}
+
+/** Hits of a music clip at project frames, repeated across loops. */
+export function musicHitFrames(music: MusicTrack, hits: MusicAnalysis['hits']): PlacedHit[] {
+  return placeSamples(music, hits).map(({ frame, item }) => ({
+    frame,
+    band: item.band,
+    strong: item.strong,
+    strength: item.strength,
+  }));
+}
+
+/** What snapping and cut alignment follow: beats, downbeats only, strong hits, or beats and strong hits. */
+export const musicTargets = ['beats', 'downbeats', 'hits', 'beats-hits'] as const;
+export type MusicTarget = (typeof musicTargets)[number];
+
+/** The project frames of a music clip that `target` snaps to, ascending and unique. */
+export function musicTargetFrames(
+  music: MusicTrack,
+  analysis: Pick<MusicAnalysis, 'beats' | 'hits'>,
+  target: MusicTarget,
+): number[] {
+  const frames: number[] = [];
+  if (target !== 'hits')
+    for (const beat of musicBeatFrames(music, analysis.beats))
+      if (target !== 'downbeats' || beat.downbeat) frames.push(beat.frame);
+  if (target === 'hits' || target === 'beats-hits')
+    for (const hit of musicHitFrames(music, analysis.hits)) if (hit.strong) frames.push(hit.frame);
+  return [...new Set(frames)].sort((a, b) => a - b);
 }
 
 /** A stretch of a music clip at project frames, OUT exclusive. */
