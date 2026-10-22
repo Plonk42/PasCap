@@ -81,9 +81,24 @@ export interface DraftPreview {
   document: ProjectDocument;
   frame: number;
 }
+/** Zoom out stops here, or lower while the whole timeline extent still needs a smaller scale to fit. */
 const ZOOM_MIN = 12;
 const ZOOM_MAX = 180;
 const ZOOM_FACTOR = 1.25;
+/** Space kept right of the last point, so Fit leaves it fully visible without a scrollbar. */
+const TRAILING_MIN = 96;
+const TICK_STEPS = [10, 30, 60, 300, 600, 1800, 3600, 36000];
+
+/** Seconds between ruler labels, keeping labels at least 120 px apart below 24 px/s at any zoom. */
+function rulerTickStep(pixelsPerSecond: number): number {
+  if (pixelsPerSecond >= 60) return 1;
+  if (pixelsPerSecond >= 24) return 5;
+  const listed = TICK_STEPS.find((step) => step * pixelsPerSecond >= 120);
+  if (listed) return listed;
+  let step = TICK_STEPS.at(-1)!;
+  while (step * pixelsPerSecond < 120) step *= 10;
+  return step;
+}
 interface Props {
   project: ProjectDocument;
   assets: MediaAsset[];
@@ -843,7 +858,7 @@ export function Timeline(props: Readonly<Props>) {
   const leading = drag.current?.leading ?? movement.current?.leading ?? musicGesture?.leading ?? 32;
   const unusedTail =
     source && selected ? recoverableTail(selected, source.metadata.frameCount) - (layout.duration - selected.end) : 0;
-  const trailing = Math.max(96, unusedTail * scale + 24);
+  const trailing = Math.max(TRAILING_MIN, unusedTail * scale + 24);
   const musicEnd = timelineMusicExtent(project, musicGesture);
   // Stored points after video or music OUT stay reachable, without extending the playable duration.
   const lastKeyframe = Math.max(
@@ -854,17 +869,16 @@ export function Timeline(props: Readonly<Props>) {
     ]),
     project.bookmarks.at(-1) ?? 0,
   );
+  const storedExtent = Math.max(layout.duration, musicEnd, lastKeyframe);
   const width = Math.max(
     viewportWidth,
     leading +
       Math.max(
-        layout.duration,
-        musicEnd,
+        storedExtent,
         dropExtent(dropPlan),
         keyframes.draft?.frame ?? 0,
         transformKeys.draft?.frame ?? 0,
         bookmarks.draft?.frame ?? 0,
-        lastKeyframe,
       ) *
         scale +
       trailing,
@@ -892,18 +906,19 @@ export function Timeline(props: Readonly<Props>) {
   const musicTop = musicLanesTop(project.layers.length);
   const surfaceHeight = musicTop + timelineMusicHeight(project);
   const seconds = framesToSeconds(Math.max(layout.duration, baseLayout.duration), project.frameRate);
-  let tickStep = 10;
-  if (pixelsPerSecond >= 24) tickStep = 5;
-  if (pixelsPerSecond >= 60) tickStep = 1;
-  const ticks = Array.from({ length: Math.ceil(seconds / tickStep) + 1 }, (_, index) => index * tickStep);
+  const tickStep = rulerTickStep(pixelsPerSecond);
+  const ticks = Array.from({ length: Math.floor(seconds / tickStep) + 1 }, (_, index) => index * tickStep);
+  // The scale at which the whole stored extent, playable duration, music and later stored points, fills the viewport.
+  const fitScale = storedExtent
+    ? Math.max(0, viewportWidth - leading - TRAILING_MIN) / framesToSeconds(storedExtent, project.frameRate)
+    : ZOOM_MAX;
+  const zoomMin = Math.min(ZOOM_MIN, fitScale);
   const fitTimeline = (): void => {
-    if (layout.duration && !drag.current && !slideActive && !musicGesture)
-      setPixelsPerSecond(
-        Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, (viewportWidth - leading - 64) / framesToSeconds(layout.duration))),
-      );
+    if (storedExtent && !drag.current && !slideActive && !musicGesture)
+      setPixelsPerSecond(Math.min(ZOOM_MAX, fitScale));
   };
   const zoomBy = (factor: number): void =>
-    setPixelsPerSecond(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, pixelsPerSecond * factor)));
+    setPixelsPerSecond(Math.max(zoomMin, Math.min(ZOOM_MAX, pixelsPerSecond * factor)));
   const latestFit = useRef(fitTimeline);
   latestFit.current = fitTimeline;
   useEffect(() => {
@@ -1350,7 +1365,7 @@ export function Timeline(props: Readonly<Props>) {
             className="icon-button"
             aria-label="Zoom out"
             title="Zoom out"
-            disabled={interactionBlocked || pixelsPerSecond <= ZOOM_MIN}
+            disabled={interactionBlocked || pixelsPerSecond <= zoomMin}
             onClick={() => zoomBy(1 / ZOOM_FACTOR)}
           >
             <Icon name="minus" size={15} />
@@ -1359,10 +1374,10 @@ export function Timeline(props: Readonly<Props>) {
             id="timeline-zoom"
             type="range"
             aria-label="Timeline zoom"
-            min={ZOOM_MIN}
+            min={zoomMin}
             max={ZOOM_MAX}
-            step={1}
-            value={pixelsPerSecond}
+            step={zoomMin < ZOOM_MIN ? 'any' : 1}
+            value={Math.max(zoomMin, pixelsPerSecond)}
             disabled={interactionBlocked}
             onChange={(event) => setPixelsPerSecond(Number(event.target.value))}
           />
@@ -1378,7 +1393,7 @@ export function Timeline(props: Readonly<Props>) {
           <button
             className="text-button"
             title="Fit timeline (F)"
-            disabled={interactionBlocked || !layout.duration}
+            disabled={interactionBlocked || !storedExtent}
             onClick={fitTimeline}
           >
             Fit

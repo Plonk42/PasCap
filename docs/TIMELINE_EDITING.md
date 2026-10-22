@@ -906,6 +906,12 @@ own headings. **Track options**
 holds only rename/Ripple/stacking/deletion; a clip's right-click menu holds Duplicate,
 while the frequent split/trim/delete/cut actions stay directly visible. The timeline
 zoom keeps its slider and **Fit**, with **Zoom out / Zoom in** buttons beside it.
+Zoom is a session value from 12 to 180 px/s; zoom out goes lower, as far as the scale at which the
+whole timeline extent fits the viewport, so a project of any length can be shown in full. **Fit**
+(or **F**) sets that scale (at most 180 px/s): the extent is the playable duration, music and stored
+keyframes and bookmarks after it, and a short margin remains after its end, so no horizontal
+scrollbar appears. Recoverable footage past a selected last clip stays reachable by scrolling and
+can add one. Ruler labels stay at least 120 px apart below 24 px/s.
 Diagnostic counters, shader tests and the two-clip native comparison tool remain
 hidden behind Diagnostics. **Export** uses the bounded native multi-clip
 renderer, with profiles for 720p drafts and 4K finals. The diagnostic two-clip
