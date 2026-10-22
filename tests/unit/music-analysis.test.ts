@@ -116,6 +116,28 @@ describe('music analysis · synthetic signals', () => {
     expect(Math.abs(result.tempo!.bpm / bpm - 1)).toBeLessThanOrEqual(0.02);
   });
 
+  it('evens out hits played slightly early or late into a steady beat grid', () => {
+    const random = noise(23);
+    const grid = beatTimes(120, 0.3, 30);
+    // A player within ±25 ms of the pulse; the beats keep the pulse, not each hit.
+    const played = grid.map((time) => time + 0.025 * random());
+    const result = analyse(
+      render(
+        30,
+        played.map((time) => ({ time, gain: 0.5 })),
+        () => 0.02,
+      ),
+    );
+    expect(fMeasure(beatSamples(result), grid)).toBeGreaterThanOrEqual(0.95);
+    const intervals = result.beats
+      .slice(1)
+      .map((beat, index) => (beat.sample - result.beats[index]!.sample) / RATE)
+      .sort((a, b) => a - b);
+    const spread =
+      intervals[Math.floor(0.9 * (intervals.length - 1))]! - intervals[Math.floor(0.1 * (intervals.length - 1))]!;
+    expect(spread).toBeLessThan(0.025);
+  });
+
   it('keeps the beat under swung off-beats and background noise', () => {
     const truth = beatTimes(100, 0.5, 30);
     const hits = truth.flatMap((time) => [

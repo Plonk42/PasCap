@@ -475,6 +475,12 @@ downbeats, loudness per 100 ms, sections at least 8 s long from the novelty of 1
 band-level and pitch-class averages (**quiet**, **build**, **peak**, **release** from their
 loudness and its change), and hits (below).
 
+Beats and hits answer different questions. The **beats** are the pulse a listener taps along
+to: a regular grid inferred from how the onsets repeat, continuing through passages where
+nothing sounds on the beat; cutting on them keeps the edit in time, and clip lengths are
+counted in beats or bars. The **hits** are the sounds that stand out, on the beat or off it,
+in music with or without a pulse: places for a single cut or reveal.
+
 - **Tempo.** The song's tempo holds throughout. An 8 s window (every 2 s) takes its own
   tempo only where the song's tempo scores below half its own strongest periodicity, a
   real tempo change; otherwise soft passages followed their arpeggios or noise and the beats
@@ -483,6 +489,12 @@ loudness and its change), and hits (below).
   autocorrelation peak barely above its median) or a pulse clarity below 0.25 (the
   autocorrelation at the beat over the envelope's energy: scattered hits repeat little)
   report no tempo, meter or beats.
+- **Even grid.** Each tracked beat sits on the strongest onset within ±20 ms, so a note played
+  slightly early or late moved its beat with it (gaps of 444–497 ms, 10th to 90th percentile,
+  on a steady 128 BPM song). Each beat then moves onto the straightest line, against the beat
+  number, through itself and its 8 neighbours before it, around it or after it, whichever
+  fits best, so the grid is even (457–481 ms there, as regular as madmom's) while a tempo
+  change keeps its corner.
 - **Downbeats.** Each beat's salience is the standard score of its kick-band level plus that
   of its chord change (pitch-class profiles over the four beats before and after it).
   Dynamic programming over the beats gives each a bar position: the bar advances by one
@@ -539,8 +551,9 @@ progress. `GET /api/audio/<id>/analysis` returns `{ analysis, job }`;
 PCM cache and playback untouched. Beats and hits map to project frames through each music
 clip's placement, source range and loops (`musicBeatFrames`, `musicHitFrames`). Unit tests use
 synthetic click tracks, modulated noise, swing, a tempo change, a soft passage under an
-arpeggio, chord changes, a short bar, scattered hits, irregular and closely spaced hits, low,
-mid and high hits, steady noise and loudness steps; no real song is in the repository.
+arpeggio, hits played up to 25 ms off the pulse, chord changes, a short bar, scattered hits,
+irregular and closely spaced hits, low, mid and high hits, steady noise and loudness steps;
+no real song is in the repository.
 
 On three of the owner's songs, compared with madmom's RNN beat and downbeat trackers (an
 independent reference, used only for evaluation, at whichever level of the beat it chose
@@ -555,7 +568,10 @@ in each 15 s):
 Limits: the downbeat cues are weak on real songs (meter confidence about 0.15–0.2 even when
 they agree), so downbeats can still land on the third beat; the tempo confidence and
 clarity thresholds are set from these three songs; sections remain coarse where the timbre
-barely changes. Beats sit about 9 ms after madmom's, below what is audible.
+barely changes. Beats sit about 9 ms after madmom's, below what is audible. The even grid
+leaves this agreement unchanged. On the 142 BPM song madmom keeps half the tempo in places,
+so its bars there span two of ours. No one has yet listened to these beats against the music
+([#254](https://github.com/Plonk42/PasCap/issues/254)): the agreement is with madmom.
 
 The key agrees with librosa's constant-Q chroma and the same profiles (an independent
 reference) on two of the three songs (C minor, G♯ major); on the third it reports the
@@ -604,8 +620,9 @@ its placement, source range and loops:
   hits 12 pixels tall and opaque, light ones 6 pixels and paler. When hits are closer than
   4 pixels on average only the strong ones are drawn, then none, like beat ticks.
 
-Hovering a music clip shows a readout at the pointer: the timecode, any hit within 4 pixels
-(**strong low hit**), section, loudness (or silence), any swell and the three tone levels
+Hovering a music clip shows a readout at the pointer: the timecode, any beat (**beat** or
+**downbeat**) and hit (**strong low hit**) within 4 pixels, section, loudness (or silence),
+any swell and the three tone levels
 there. Under **Recording**, the analysis line adds the key and the hit count (**128 BPM ·
 4/4 · C minor · 290 beats · 120 hits**, or **No steady beat found · C minor · 80 hits**),
 and a **Music structure** disclosure lists the selected clip's sections (with their loudness

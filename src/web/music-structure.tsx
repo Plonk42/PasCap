@@ -1,6 +1,12 @@
 import { musicSourceFrame } from '../shared/audio.js';
 import type { MusicTrack } from '../shared/model.js';
-import { musicHitFrames, musicSpans, type MusicAnalysis, type PlacedSpan } from '../shared/music-analysis.js';
+import {
+  musicBeatFrames,
+  musicHitFrames,
+  musicSpans,
+  type MusicAnalysis,
+  type PlacedSpan,
+} from '../shared/music-analysis.js';
 import { MUSIC_SAMPLE_RATE, MUSIC_SAMPLES_PER_FRAME } from '../shared/music-format.js';
 import { formatTimecode } from '../shared/timing.js';
 
@@ -48,19 +54,27 @@ function toneText(tone: readonly number[] | undefined): string {
 const hitText = (hit: { strong: boolean; band: string }): string =>
   `${hit.strong ? 'strong' : 'light'} ${hit.band} hit`;
 
-/** What plays at a project frame of the clip, with a hit within `reach` frames: the hover readout. */
+/** The item nearest `frame` within `reach` frames. */
+function nearest<T extends { frame: number }>(items: readonly T[], frame: number, reach: number): T | undefined {
+  let found: T | undefined;
+  for (const item of items)
+    if (
+      Math.abs(item.frame - frame) <= reach &&
+      (!found || Math.abs(item.frame - frame) < Math.abs(found.frame - frame))
+    )
+      found = item;
+  return found;
+}
+
+/** What plays at a project frame of the clip, with a beat or hit within `reach` frames: the hover readout. */
 export function describeMusicMoment(music: MusicTrack, analysis: MusicAnalysis, frame: number, reach = 0): string {
   const sample = sampleAt(music, frame);
   if (sample === null) return formatTimecode(frame);
   const inside = (stretch: Stretch): boolean => sample >= stretch.fromSample && sample < stretch.toSample;
   const parts = [formatTimecode(frame)];
-  let hit: ReturnType<typeof musicHitFrames>[number] | undefined;
-  for (const candidate of musicHitFrames(music, analysis.hits))
-    if (
-      Math.abs(candidate.frame - frame) <= reach &&
-      (!hit || Math.abs(candidate.frame - frame) < Math.abs(hit.frame - frame))
-    )
-      hit = candidate;
+  const beat = nearest(musicBeatFrames(music, analysis.beats), frame, reach);
+  if (beat) parts.push(beat.downbeat ? 'downbeat' : 'beat');
+  const hit = nearest(musicHitFrames(music, analysis.hits), frame, reach);
   if (hit) parts.push(hitText(hit));
   const section = analysis.sections.find(inside);
   if (section) parts.push(section.kind);

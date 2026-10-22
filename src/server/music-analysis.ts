@@ -47,6 +47,8 @@ export const MUSIC_ANALYSIS = {
   refineFrames: 2,
   /** Leading and trailing beats weaker than this share of the beats' RMS are dropped. */
   trimShare: 0.5,
+  /** Beats move onto the straightest line through this many neighbours on one side, or around them (0: off). */
+  beatGridBeats: 8,
   downbeat: {
     /** Beat salience: standard scores of the kick bands and the chord change (onsets mark every beat alike). */
     weights: { onset: 0, low: 1, harmony: 1 },
@@ -610,7 +612,49 @@ function placeBeats(envelope: Float32Array, frames: number[], samples: number): 
   const kept: TrackedBeat[] = [];
   for (const beat of first < 0 ? [] : refined.slice(first, last + 1))
     if (!kept.length || beat.sample > kept.at(-1)!.sample) kept.push(beat);
-  return kept;
+  return MUSIC_ANALYSIS.beatGridBeats > 0 ? evenBeats(kept, MUSIC_ANALYSIS.beatGridBeats) : kept;
+}
+
+/** Least-squares line through the beats `from`–`to` (inclusive) against their index: its value at `at` and its RMS residual. */
+function lineFit(beats: TrackedBeat[], from: number, to: number, at: number): { value: number; residual: number } {
+  const count = to - from + 1;
+  const meanIndex = (from + to) / 2;
+  let meanSample = 0;
+  for (let index = from; index <= to; index++) meanSample += beats[index]!.sample / count;
+  let covariance = 0;
+  let variance = 0;
+  for (let index = from; index <= to; index++) {
+    covariance += (index - meanIndex) * (beats[index]!.sample - meanSample);
+    variance += (index - meanIndex) ** 2;
+  }
+  const slope = variance > 0 ? covariance / variance : 0;
+  let squares = 0;
+  for (let index = from; index <= to; index++)
+    squares += (beats[index]!.sample - meanSample - slope * (index - meanIndex)) ** 2;
+  return { value: meanSample + slope * (at - meanIndex), residual: Math.sqrt(squares / count) };
+}
+
+/**
+ * Evens out the beats' onset jitter: each beat moves onto the straightest local grid through it, the
+ * best of the lines fitted over the `reach` beats before it, around it and after it, so a tempo change
+ * keeps its corner.
+ */
+function evenBeats(beats: TrackedBeat[], reach: number): TrackedBeat[] {
+  if (beats.length <= reach) return beats;
+  const even = beats.map((beat, index) => {
+    let best: { value: number; residual: number } | null = null;
+    for (const [from, to] of [
+      [index - reach, index],
+      [index - (reach >> 1), index + (reach >> 1)],
+      [index, index + reach],
+    ] as const) {
+      if (from < 0 || to >= beats.length) continue;
+      const fit = lineFit(beats, from, to, index);
+      if (!best || fit.residual < best.residual) best = fit;
+    }
+    return best ? { ...beat, sample: Math.round(best.value) } : beat;
+  });
+  return even.filter((beat, index) => index === 0 || beat.sample > even[index - 1]!.sample);
 }
 
 function tempoCurve(beats: TrackedBeat[], windows: Periods['windows']): { fromSample: number; bpm: number }[] {
