@@ -2548,44 +2548,93 @@ test('applied ranges are the recording’s kept ranges: saved with the project, 
   const id = assets[0]!.id;
   const kept = async () => (await current(page)).selects[id];
   const strip = page.locator('.source-range-strip');
-  const keepAnother = page.getByRole('button', { name: 'Keep this range too', exact: true });
+  const trigger = page.locator('summary[aria-label="Kept ranges"]');
+  const addRange = page.getByRole('button', { name: 'Add range', exact: true });
+  const choose = (index: number) => page.getByRole('button', { name: new RegExp(`^Kept range ${index},`) });
+  const openList = async () => {
+    if ((await trigger.getAttribute('aria-expanded')) !== 'true') await trigger.click();
+    await expect(addRange).toBeVisible();
+  };
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
-  await expect(keepAnother).toHaveCount(0); // Nothing is kept yet: the whole recording is available.
+  await expect(trigger).toHaveText(/Whole recording/); // Nothing is kept yet: the whole recording is available.
   await sourceRange(page, 10, 40);
   expect(await kept()).toEqual([{ sourceIn: 10, sourceOut: 40 }]);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
   await expect(page.locator('.source-review')).toBeVisible(); // Applying never leaves Source preview.
+  await expect(trigger).toHaveText(/1 kept range\b/);
 
-  // Another range starts at the displayed frame, outside the kept ones.
-  await sourceFrame(page, 20);
-  await expect(keepAnother).toHaveAttribute('aria-disabled', 'true');
-  await expect(keepAnother).toHaveAccessibleDescription(/outside the kept ranges/);
+  // Add range keeps a range from a free displayed frame, else in the largest free stretch, one Undo step each.
   await sourceFrame(page, 60);
-  await expect(keepAnother).toHaveAttribute('aria-disabled', 'false');
-  await keepAnother.click();
+  await openList();
+  await addRange.click();
   expect(await kept()).toEqual([
     { sourceIn: 10, sourceOut: 40 },
-    { sourceIn: 60, sourceOut: 90 },
+    { sourceIn: 60, sourceOut: 120 },
   ]);
   await expect(strip).toHaveAttribute('data-source-in', '60');
-  await expect(strip).toHaveAttribute('data-source-out', '90');
-  await expect(page.getByRole('button', { name: 'Kept range 2', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(choose(2)).toHaveAttribute('aria-pressed', 'true');
+  await expect(choose(2)).toHaveAccessibleName('Kept range 2, 00:02:00 to 00:04:00, 2.00 s');
   await expect(page.locator('.source-range-kept')).toHaveCount(1);
-  await sourceRange(page, 62, 80);
+  await addRange.click(); // The displayed frame is kept: the largest free stretch, 41–59, takes it.
   expect(await kept()).toEqual([
     { sourceIn: 10, sourceOut: 40 },
-    { sourceIn: 62, sourceOut: 80 },
+    { sourceIn: 41, sourceOut: 59 },
+    { sourceIn: 60, sourceOut: 120 },
+  ]);
+  await expect(choose(2)).toHaveAttribute('aria-pressed', 'true');
+
+  // Removing one range is explicit and keeps the list open on the next row.
+  await page.getByRole('button', { name: 'Remove kept range 2', exact: true }).click();
+  expect(await kept()).toEqual([
+    { sourceIn: 10, sourceOut: 40 },
+    { sourceIn: 60, sourceOut: 120 },
+  ]);
+  await expect(page.getByRole('button', { name: 'Remove kept range 2', exact: true })).toBeFocused();
+  await choose(1).click();
+  await expect(strip).toHaveAttribute('data-source-in', '10');
+  await page.keyboard.press('Escape');
+
+  // Handles stop one frame from the neighbouring kept range instead of failing.
+  const end = page.getByRole('slider', { name: 'Trim source end', exact: true });
+  await expect(end).toHaveAttribute('aria-valuemax', '59');
+  await end.press('End');
+  expect(await kept()).toEqual([
+    { sourceIn: 10, sourceOut: 59 },
+    { sourceIn: 60, sourceOut: 120 },
+  ]);
+  await end.press('ArrowRight');
+  expect((await kept())![0]).toEqual({ sourceIn: 10, sourceOut: 59 });
+
+  // Typed values are never constrained: an overlap is rejected, never merged or clamped.
+  await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).fill('70');
+  await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).press('Enter');
+  await expect(page.locator('.source-range-error')).toContainText('separated by at least one frame');
+  await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).press('Escape');
+  expect(await kept()).toEqual([
+    { sourceIn: 10, sourceOut: 59 },
+    { sourceIn: 60, sourceOut: 120 },
   ]);
 
-  // Overlapping the other kept range is rejected, never merged or clamped.
-  await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('30');
-  await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).press('Enter');
-  await expect(page.locator('.source-range-error')).toContainText('separated by at least one frame');
-  await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).press('Escape');
+  // A click on another kept range on the strip edits that one; Shift-drag draws a new one in a free stretch.
+  const box = (await strip.boundingBox())!;
+  const at = (frame: number) => box.x + ((frame + 0.5) / 120) * box.width;
+  await page.mouse.click(at(90), box.y + box.height / 2);
+  await expect(strip).toHaveAttribute('data-source-in', '60');
+  await sourceRange(page, 70, 120);
+  await page.keyboard.down('Shift');
+  await page.mouse.move(at(62), box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(at(66), box.y + box.height / 2, { steps: 4 });
+  await page.mouse.move(at(100), box.y + box.height / 2, { steps: 4 }); // Stops one frame before the next range.
+  await expect(strip).toHaveAttribute('data-drawing', 'true');
+  await page.mouse.up();
+  await page.keyboard.up('Shift');
   expect(await kept()).toEqual([
-    { sourceIn: 10, sourceOut: 40 },
-    { sourceIn: 62, sourceOut: 80 },
+    { sourceIn: 10, sourceOut: 59 },
+    { sourceIn: 62, sourceOut: 69 },
+    { sourceIn: 70, sourceOut: 120 },
   ]);
+  await expect(strip).toHaveAttribute('data-source-in', '62');
 
   // The kept ranges are in the saved project and survive a reload; clips still copy the applied range.
   await flush(page);
@@ -2593,29 +2642,38 @@ test('applied ranges are the recording’s kept ranges: saved with the project, 
   await page.reload();
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   await expect(strip).toHaveAttribute('data-source-in', '10');
-  await page.getByRole('button', { name: 'Kept range 2', exact: true }).click();
+  await openList();
+  await choose(2).click();
   await expect(strip).toHaveAttribute('data-source-in', '62');
+  await page.keyboard.press('Escape');
   const clipId = await addExcerpt(page);
   expect((await current(page)).clips.find((item) => item.id === clipId)).toMatchObject({
     sourceIn: 62,
-    sourceOut: 80,
+    sourceOut: 69,
   });
 
-  // Reset removes the active kept range, and the entry with the last one; Undo restores each.
-  await page.getByRole('button', { name: 'Reset source range', exact: true }).click();
-  expect(await kept()).toEqual([{ sourceIn: 10, sourceOut: 40 }]);
-  await expect(page.getByRole('button', { name: 'Kept range 1', exact: true })).toHaveCount(0);
-  await expect(strip).toHaveAttribute('data-source-in', '10');
+  // Add all adds one clip per kept range in one Undo step, without leaving Source preview.
+  const clips = (await current(page)).clips.length;
+  await openList();
+  await page.getByRole('button', { name: /^Add all 3 kept ranges to / }).click();
+  await expect(page.locator('.source-add-feedback')).toHaveText('3 clips added · one per range');
+  const added = (await current(page)).clips.slice(clips);
+  expect(added.map(({ sourceIn, sourceOut }) => ({ sourceIn, sourceOut }))).toEqual(await kept());
+  await expect(page.locator('.source-review')).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect((await current(page)).clips).toHaveLength(clips);
+  await page.getByRole('tab', { name: 'Source preview', exact: true }).click();
+
+  // Reset returns to the whole recording, removing every kept range in one step; Undo restores them.
   await page.getByRole('button', { name: 'Reset source range', exact: true }).click();
   expect(await kept()).toBeUndefined();
   await expect(strip).toHaveAttribute('data-source-in', '0');
   await expect(strip).toHaveAttribute('data-source-out', '120');
-  await expect(keepAnother).toHaveCount(0);
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect(await kept()).toEqual([{ sourceIn: 10, sourceOut: 40 }]);
+  await expect(trigger).toHaveText(/Whole recording/);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await kept()).toEqual([
-    { sourceIn: 10, sourceOut: 40 },
-    { sourceIn: 62, sourceOut: 80 },
+    { sourceIn: 10, sourceOut: 59 },
+    { sourceIn: 62, sourceOut: 69 },
+    { sourceIn: 70, sourceOut: 120 },
   ]);
 });

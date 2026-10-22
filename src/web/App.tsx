@@ -42,7 +42,7 @@ import {
   type ProjectSummary,
 } from '../shared/projects.js';
 import { removeSelectedRange, splitSourceFrame, trimAtPlayhead, type TimelineRange } from '../shared/rush-editing.js';
-import { activeSelectIndex, appliedSelections, applySelectRange, keepAnotherRange } from '../shared/selects.js';
+import { activeSelectIndex, appliedSelections, applySelectRange } from '../shared/selects.js';
 import { forEachSerial } from '../shared/serial.js';
 import { validateSourceRanges } from '../shared/source-range.js';
 import { calculateLayout, layerClips } from '../shared/timeline.js';
@@ -1278,15 +1278,13 @@ export function App() {
     validate(next);
     if (commit(next)) setError('');
   };
-  const keepAnotherSourceRange = (mediaId: string, frame: number): void => {
-    const asset = latestAssets.current.find((item) => item.id === mediaId);
-    const result = asset && keepAnotherRange(current.current?.selects[mediaId] ?? [], frame, asset.metadata.frameCount);
-    if (!result) return;
-    if ('reason' in result) setError(result.reason);
-    else {
-      edit({ type: 'select-set', mediaId, ranges: result.ranges }, true);
-      setActiveSelects((chosen) => ({ ...chosen, [mediaId]: result.index }));
-    }
+  const setKeptRanges = (mediaId: string, ranges: readonly SelectRange[], active: number): void => {
+    if (!current.current) return;
+    const next = applyCommand(current.current, { type: 'select-set', mediaId, ranges: [...ranges] });
+    validate(next);
+    if (!commit(next)) return;
+    setError('');
+    setActiveSelects((chosen) => ({ ...chosen, [mediaId]: active }));
   };
   const selectLayer = useCallback(
     (id: string): void => {
@@ -2173,7 +2171,7 @@ export function App() {
                       activeSelects[reviewAsset.id],
                     )}
                     onActivateKept={(index) => setActiveSelects((chosen) => ({ ...chosen, [reviewAsset.id]: index }))}
-                    onKeepAnother={(frame) => keepAnotherSourceRange(reviewAsset.id, frame)}
+                    onKept={(kept, active) => setKeptRanges(reviewAsset.id, kept, active)}
                     excerpts={reviewExcerpts}
                     disabled={!project || busy || draft !== null}
                     onFrame={(frame) => reviews.displayed({ mediaId: reviewAsset.id, frame })}
