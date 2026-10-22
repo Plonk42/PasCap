@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { createClip, createProject, MAX_SELECTS, projectSchema } from '../../src/shared/model.js';
 import { removeProjectMedia } from '../../src/shared/projects.js';
-import { appliedSelections, applySelectRange, keepAnotherRange } from '../../src/shared/selects.js';
+import {
+  addKeptRange,
+  appliedSelections,
+  applySelectRange,
+  freeStretchAt,
+  freeStretches,
+  insertKeptRange,
+  keptRangeBounds,
+  removeKeptRange,
+} from '../../src/shared/selects.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
 
 function project() {
@@ -136,23 +145,54 @@ describe('Source preview selects', () => {
     expect(apply([], undefined, 0, 100)).toBeNull();
   });
 
-  it('keep another range at the displayed frame, only where the kept ranges leave room', () => {
-    expect(keepAnotherRange(kept, 40, 100)).toEqual({ ranges: [kept[0], range(40, 59), kept[1]], index: 1 });
-    expect(keepAnotherRange(kept, 85, 100)).toEqual({ ranges: [...kept, range(85, 100)], index: 2 });
-    expect(keepAnotherRange(kept, 2, 100)).toEqual({ ranges: [range(2, 9), ...kept], index: 0 });
-    expect(keepAnotherRange([range(10, 30)], 40, 200)).toEqual({ ranges: [range(10, 30), range(40, 70)], index: 1 });
-    for (const frame of [10, 20, 30, 80, 60])
-      expect(keepAnotherRange(kept, frame, 100)).toMatchObject({ reason: expect.stringContaining('outside') });
-    expect(keepAnotherRange([range(0, 30), range(33, 50)], 31, 100)).toEqual({
-      ranges: [range(0, 30), range(31, 32), range(33, 50)],
-      index: 1,
-    });
-    expect(keepAnotherRange([range(0, 30), range(33, 50)], 32, 100)).toMatchObject({
+  it('find the free stretches at least one frame from every kept range', () => {
+    expect(freeStretches([], 100)).toEqual([{ from: 0, to: 100 }]);
+    expect(freeStretches(kept, 100)).toEqual([
+      { from: 0, to: 9 },
+      { from: 31, to: 59 },
+      { from: 81, to: 100 },
+    ]);
+    expect(freeStretches([range(0, 30), range(32, 100)], 100)).toEqual([]);
+    expect(freeStretches([range(0, 30), range(33, 100)], 100)).toEqual([{ from: 31, to: 32 }]);
+    expect(freeStretchAt(kept, 31, 100)).toEqual({ from: 31, to: 59 });
+    for (const frame of [9, 10, 30, 59, 80]) expect(freeStretchAt(kept, frame, 100)).toBeNull();
+  });
+
+  it('add a range from a free displayed frame, else centred in the largest free stretch', () => {
+    expect(addKeptRange([], 20, 200)).toEqual({ range: range(20, 80) });
+    expect(addKeptRange(kept, 40, 100)).toEqual({ range: range(40, 59) });
+    expect(addKeptRange(kept, 2, 100)).toEqual({ range: range(2, 9) });
+    expect(addKeptRange(kept, 99, 100)).toEqual({ range: range(99, 100) });
+    // On a kept range: the largest stretch, 31–59, takes all of its 28 frames.
+    for (const frame of [10, 20, 30, 60, 80]) expect(addKeptRange(kept, frame, 100)).toEqual({ range: range(31, 59) });
+    expect(addKeptRange([range(100, 120)], 110, 400)).toEqual({ range: range(230, 290) });
+    expect(addKeptRange([range(0, 30), range(32, 100)], 10, 100)).toMatchObject({
       reason: expect.stringContaining('no room'),
     });
-    expect(keepAnotherRange(kept, 99, 100)).toEqual({ ranges: [...kept, range(99, 100)], index: 2 });
-    expect(keepAnotherRange(kept, 100, 100)).toMatchObject({ reason: expect.stringContaining('no room') });
     const crowded = Array.from({ length: MAX_SELECTS }, (_, index) => range(index * 3, index * 3 + 1));
-    expect(keepAnotherRange(crowded, 1_000, 2_000)).toMatchObject({ reason: expect.stringContaining('at most') });
+    expect(addKeptRange(crowded, 1_000, 2_000)).toMatchObject({ reason: expect.stringContaining('at most') });
+  });
+
+  it('insert a range in source order and refuse one that touches another, never merging it', () => {
+    expect(insertKeptRange(kept, range(40, 50))).toEqual({ ranges: [kept[0], range(40, 50), kept[1]], index: 1 });
+    expect(insertKeptRange(kept, range(0, 9))).toEqual({ ranges: [range(0, 9), ...kept], index: 0 });
+    expect(insertKeptRange([], range(5, 6))).toEqual({ ranges: [range(5, 6)], index: 0 });
+    for (const touching of [range(0, 10), range(30, 40), range(31, 60), range(20, 25), range(0, 100)])
+      expect(insertKeptRange(kept, touching)).toMatchObject({ reason: expect.stringContaining('one frame away') });
+  });
+
+  it('remove a range, keeping the edited one or moving to its neighbour', () => {
+    const three = [range(0, 10), range(20, 30), range(40, 50)];
+    expect(removeKeptRange(three, 1, 1)).toEqual({ ranges: [three[0], three[2]], active: 1 });
+    expect(removeKeptRange(three, 2, 2)).toEqual({ ranges: [three[0], three[1]], active: 1 });
+    expect(removeKeptRange(three, 0, 2)).toEqual({ ranges: [three[1], three[2]], active: 1 });
+    expect(removeKeptRange(three, 2, 0)).toEqual({ ranges: [three[0], three[1]], active: 0 });
+    expect(removeKeptRange([range(0, 10)], 0, 0)).toEqual({ ranges: [], active: 0 });
+  });
+
+  it('bound the active range one frame from its neighbours', () => {
+    expect(keptRangeBounds([], 0, 100)).toEqual({ minIn: 0, maxOut: 100 });
+    expect(keptRangeBounds(kept, 0, 100)).toEqual({ minIn: 0, maxOut: 59 });
+    expect(keptRangeBounds(kept, 1, 100)).toEqual({ minIn: 31, maxOut: 100 });
   });
 });

@@ -70,7 +70,9 @@ export function Popover({
   useEffect(() => {
     if (!open) return;
     const outsideClick = (event: globalThis.MouseEvent): void => {
-      if (event.target instanceof Node && !root.current?.contains(event.target)) close(false);
+      // A control its own click removed, such as a deleted row's button, was inside.
+      if (event.target instanceof Node && event.target.isConnected && !root.current?.contains(event.target))
+        close(false);
     };
     const keyboard = (event: globalThis.KeyboardEvent): void => {
       if (event.defaultPrevented) return;

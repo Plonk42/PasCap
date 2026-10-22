@@ -803,14 +803,26 @@ record what the user kept and never retime, render or export (assistant sessions
 
 Source preview edits the **active** kept range, the first by default: setting IN/OUT by handle, numeric field,
 I/O marks or **Use** (steadiest range) creates the entry with its first range and later changes that range;
-**Add clip** copies it. **Reset source range** removes the active range, and the entry with the last one
-(IN = 0, OUT = frame count again). Once a recording keeps a range, **Keep this range too** (plus icon at
-the end of the range fields) starts a further range of 30 frames at the displayed frame, limited by the next
-kept range, and makes it active. It is unavailable, with its reason, within a kept range or one frame of it,
-without room before the next one, and at 100 ranges. With several ranges, numbered **Kept range N** buttons
-choose the active one (moving to its IN), and the others show on the range strip as lighter outlined blocks.
-A range that overlaps or touches another kept range is rejected with an inline error, never merged or clamped.
-Applying never leaves Source preview. The active range is editor-only state; ranges kept before this field
+**Add clip** copies it. The handles stop one frame from the neighbouring kept ranges (their range sliders end
+there, Home/End too); typed IN/OUT that overlap or touch another kept range are rejected with an inline
+error, never merged or clamped. **Reset source range** returns to the whole recording (IN = 0, OUT = frame
+count), removing every kept range in one step.
+
+The **Kept ranges** button beside the readout (**Whole recording**, or **N kept ranges**) opens their list:
+one row per range with its IN → OUT timecodes and length, which makes that range active (moving to its IN),
+and a trash, **Remove kept range N** (removing the last one keeps the whole recording again). Below the list:
+
+- **Add range** keeps a further range of 60 frames, or less where the room ends: from the displayed frame when
+  it is at least one frame from every kept range, otherwise centred in the largest free stretch. It is
+  unavailable, with its reason, without room and at 100 ranges.
+- **Add all N** (with two or more ranges; **Add all N kept ranges to** the target track) inserts one clip per
+  kept range in recording order, like **Add all** steady ranges, in one Undo step.
+
+On the range strip, the other kept ranges are lighter outlined blocks: clicking one makes it active (and
+scrubs there), and **Shift-drag** in a free stretch draws a new kept range, which stops one frame from its
+neighbours and becomes active on release (a Shift-click without moving adds nothing). Escape, pointer
+cancellation or lost capture abandon the drawing. Each change is one Undo step, and applying never leaves
+Source preview. The active range is editor-only state; ranges kept before this field
 existed in the browser (`localStorage`) are not read.
 
 ### Camera motion and the steadiest range

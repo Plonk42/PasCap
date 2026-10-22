@@ -22,7 +22,14 @@ import {
 } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { SelectRange } from '../shared/model.js';
-import { keepAnotherRange } from '../shared/selects.js';
+import {
+  addKeptRange,
+  freeStretchAt,
+  insertKeptRange,
+  keptRangeBounds,
+  removeKeptRange,
+  type FreeStretch,
+} from '../shared/selects.js';
 import { formatTimecode } from '../shared/timing.js';
 import { DamageMarks } from './DamageMarks.js';
 import { mediaReady, sourceSeconds } from './display.js';
@@ -55,8 +62,8 @@ interface Props {
   kept: readonly SelectRange[];
   activeKept: number;
   onActivateKept: (index: number) => void;
-  /** Keeps a further range starting at the given displayed frame. */
-  onKeepAnother: (frame: number) => void;
+  /** Replaces the recording's kept ranges and edits the given one; throws when the project rejects them. */
+  onKept: (kept: readonly SelectRange[], active: number) => void;
   excerpts: readonly RushExcerpt[];
   disabled: boolean;
   onFrame: (frame: number) => void;
@@ -94,7 +101,11 @@ interface RangeProps {
   kept: readonly SelectRange[];
   activeKept: number;
   onActivateKept: (index: number) => void;
-  onKeepAnother: (frame: number) => void;
+  onKept: (kept: readonly SelectRange[], active: number) => void;
+  /** Adds one clip per kept range in one Undo step. */
+  onAddAll: (kept: readonly SelectRange[]) => void;
+  addAllDisabled: boolean;
+  targetLayer: string;
   frame: number;
   observedFrame: number | null;
   disabled: boolean;
@@ -111,13 +122,18 @@ interface RangeProps {
 }
 interface RangeDrag {
   pointerId: number;
-  element: HTMLButtonElement;
-  edge: MediaSelectionEdge;
+  element: HTMLElement;
+  /** A handle being dragged, or a new kept range being drawn with Shift on the strip. */
+  edge: MediaSelectionEdge | 'draw';
   base: MediaSelection;
   candidate: MediaSelection;
   startX: number;
   width: number;
   headBefore: number;
+  /** Drawing only: the frame it started at, the free stretch it stays in, and whether the pointer moved. */
+  anchor: number;
+  stretch: FreeStretch;
+  moved: boolean;
 }
 
 function message(cause: unknown): string {
@@ -125,7 +141,7 @@ function message(cause: unknown): string {
 }
 
 function addedFeedback(count: number): string {
-  return count > 1 ? `${count} clips added · one per steady range` : 'Clip added · mark another range';
+  return count > 1 ? `${count} clips added · one per range` : 'Clip added · mark another range';
 }
 
 /** One video-only proxy decoder, independent of the project preview and transport. */
@@ -136,7 +152,7 @@ export function SourceReview({
   kept,
   activeKept,
   onActivateKept,
-  onKeepAnother,
+  onKept,
   excerpts,
   disabled,
   onFrame,
@@ -422,7 +438,10 @@ export function SourceReview({
         kept={kept}
         activeKept={activeKept}
         onActivateKept={onActivateKept}
-        onKeepAnother={onKeepAnother}
+        onKept={onKept}
+        onAddAll={(ranges) => insertExcerpt(ranges.map((part) => ({ mediaId: asset.id, ...part })))}
+        addAllDisabled={insertDisabled || rangeDraft}
+        targetLayer={targetLayer}
         frame={shownFrame}
         observedFrame={observedFrame}
         disabled={disabled}
@@ -579,7 +598,10 @@ function SourceRangeEditor({
   kept,
   activeKept,
   onActivateKept,
-  onKeepAnother,
+  onKept,
+  onAddAll,
+  addAllDisabled,
+  targetLayer,
   frame,
   observedFrame,
   disabled,
@@ -602,10 +624,13 @@ function SourceRangeEditor({
   const animation = useRef<number | null>(null);
   const pointerX = useRef(0);
   const [draft, setDraft] = useState<MediaSelection | null>(null);
+  const [drawing, setDrawing] = useState(false);
   const [numbers, setNumbers] = useState({ sourceIn: String(range.sourceIn), sourceOut: String(range.sourceOut) });
   const [error, setError] = useState('');
   const errorId = useId();
   const selected = draft ?? range;
+  const bounds = keptRangeBounds(kept, activeKept, count);
+  const rate = asset.metadata.frameRate;
   const numbersDirty = numbers.sourceIn !== String(range.sourceIn) || numbers.sourceOut !== String(range.sourceOut);
 
   useEffect(() => {
@@ -637,6 +662,7 @@ function SourceRangeEditor({
     const active = clearDrag();
     const changed = active !== null || numbersDirty || !!error;
     setDraft(null);
+    setDrawing(false);
     setNumbers({ sourceIn: String(range.sourceIn), sourceOut: String(range.sourceOut) });
     setError('');
     if (active) onFrame(active.headBefore);
@@ -694,16 +720,41 @@ function SourceRangeEditor({
   else if (range.sourceIn === 0 && range.sourceOut === count && !numbersDirty && !error)
     resetBlocked = 'The range already covers the whole recording.';
   const resetRange = (): void => {
-    if (resetBlocked === null && !drag.current) commit({ mediaId: asset.id, sourceIn: 0, sourceOut: count });
+    if (resetBlocked !== null || drag.current) return;
+    if (kept.length > 1) applyKept([], 0);
+    else commit({ mediaId: asset.id, sourceIn: 0, sourceOut: count });
   };
-  const plan = keepAnotherRange(kept, frame, count);
-  let keepBlocked = 'reason' in plan ? plan.reason : '';
-  if (disabled || draft !== null) keepBlocked = 'Finish the current edit before keeping another range.';
-  const keepAnotherNow = (): void => {
-    if (keepBlocked === '' && !drag.current) {
-      onPause();
-      onKeepAnother(frame);
+  const applyKept = (ranges: readonly SelectRange[], active: number): boolean => {
+    if (disabled) return false;
+    onPause();
+    try {
+      onKept(ranges, active);
+      setError('');
+      return true;
+    } catch (cause) {
+      setError(message(cause));
+      return false;
     }
+  };
+  const addPlan = addKeptRange(kept, frame, count);
+  let addBlocked = 'reason' in addPlan ? addPlan.reason : '';
+  if (disabled || draft !== null) addBlocked = 'Finish the current edit before adding a range.';
+  const addRange = (): void => {
+    if (addBlocked !== '' || drag.current || 'reason' in addPlan) return;
+    const plan = insertKeptRange(kept, addPlan.range);
+    if ('reason' in plan) setError(plan.reason);
+    else if (applyKept(plan.ranges, plan.index)) onFrame(addPlan.range.sourceIn);
+  };
+  const removeRange = (index: number): void => {
+    if (drag.current || draft !== null) return;
+    const next = removeKeptRange(kept, index, activeKept);
+    applyKept(next.ranges, next.active);
+  };
+  const activate = (index: number): void => {
+    if (disabled || draft !== null) return;
+    onPause();
+    onActivateKept(index);
+    onFrame(kept[index]!.sourceIn);
   };
 
   const changeNumber = (event: ChangeEvent<HTMLInputElement>, edge: MediaSelectionEdge): void => {
@@ -723,12 +774,31 @@ function SourceRangeEditor({
     if (Number.isInteger(shown) && shown >= 0 && shown < count) onFrame(shown);
   };
 
+  const frameAt = (clientX: number): number => {
+    const box = strip.current?.getBoundingClientRect();
+    if (!box || box.width <= 0) return 0;
+    return Math.max(0, Math.min(count - 1, Math.floor(((clientX - box.left) / box.width) * count)));
+  };
   const moveAt = (clientX: number): void => {
     const active = drag.current;
     if (!active) return;
+    if (active.edge === 'draw') {
+      const at = Math.max(active.stretch.from, Math.min(active.stretch.to - 1, frameAt(clientX)));
+      active.moved ||= Math.abs(clientX - active.startX) >= 3;
+      active.candidate = {
+        mediaId: asset.id,
+        sourceIn: Math.min(active.anchor, at),
+        sourceOut: Math.max(active.anchor, at) + 1,
+      };
+      setDraft(active.candidate);
+      onFrame(at);
+      return;
+    }
     const initial = active.edge === 'in' ? active.base.sourceIn : active.base.sourceOut;
     const boundary = initial + Math.round(((clientX - active.startX) * count) / active.width);
-    active.candidate = moveMediaSelectionEdge(active.base, active.edge, boundary, count);
+    // A handle stops one frame from the neighbouring kept ranges instead of failing on release.
+    const limited = active.edge === 'in' ? Math.max(bounds.minIn, boundary) : Math.min(bounds.maxOut, boundary);
+    active.candidate = moveMediaSelectionEdge(active.base, active.edge, limited, count);
     setDraft(active.candidate);
     onFrame(active.edge === 'in' ? active.candidate.sourceIn : active.candidate.sourceOut - 1);
   };
@@ -749,13 +819,53 @@ function SourceRangeEditor({
       startX: event.clientX,
       width,
       headBefore: frame,
+      anchor: frame,
+      stretch: { from: 0, to: count },
+      moved: false,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
     setDraft({ ...range });
     setError('');
     onFrame(edge === 'in' ? range.sourceIn : range.sourceOut - 1);
   };
-  const move = (event: PointerEvent<HTMLButtonElement>): void => {
+  // Shift-drag on the strip draws a new kept range; a click on another kept range edits that one.
+  const stripPointerDown = (event: PointerEvent<HTMLDivElement>): void => {
+    if (event.button !== 0 || disabled || drag.current || draft !== null) return;
+    if (event.target instanceof Element && event.target.closest('.source-trim-handle')) return;
+    const at = frameAt(event.clientX);
+    if (!event.shiftKey) {
+      const index = kept.findIndex(
+        (item, position) => position !== activeKept && at >= item.sourceIn && at < item.sourceOut,
+      );
+      if (index >= 0) onActivateKept(index);
+      return;
+    }
+    const stretch = freeStretchAt(kept, at, count);
+    if (!stretch || !strip.current) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onPause();
+    const candidate = { mediaId: asset.id, sourceIn: at, sourceOut: at + 1 };
+    drag.current = {
+      pointerId: event.pointerId,
+      element: event.currentTarget,
+      edge: 'draw',
+      base: { ...range },
+      candidate,
+      startX: event.clientX,
+      width: strip.current.getBoundingClientRect().width,
+      headBefore: frame,
+      anchor: at,
+      stretch,
+      moved: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDrawing(true);
+    setDraft(candidate);
+    setError('');
+    onFrame(at);
+  };
+  const move = (event: PointerEvent<HTMLElement>): void => {
     if (event.pointerId !== drag.current?.pointerId) return;
     event.preventDefault();
     pointerX.current = event.clientX;
@@ -765,14 +875,23 @@ function SourceRangeEditor({
       moveAt(pointerX.current);
     });
   };
-  const finish = (event: PointerEvent<HTMLButtonElement>): void => {
+  const finish = (event: PointerEvent<HTMLElement>): void => {
     if (event.pointerId !== drag.current?.pointerId) return;
     event.preventDefault();
     event.stopPropagation();
     moveAt(event.clientX);
     const active = clearDrag();
     setDraft(null);
-    if (active) commit(active.candidate);
+    setDrawing(false);
+    if (!active) return;
+    if (active.edge !== 'draw') {
+      commit(active.candidate);
+      return;
+    }
+    if (!active.moved) return;
+    const plan = insertKeptRange(kept, { sourceIn: active.candidate.sourceIn, sourceOut: active.candidate.sourceOut });
+    if ('reason' in plan) setError(plan.reason);
+    else applyKept(plan.ranges, plan.index);
   };
   const trimKeyboard = (event: KeyboardEvent<HTMLButtonElement>, edge: MediaSelectionEdge): void => {
     if (disabled || drag.current) return;
@@ -781,14 +900,15 @@ function SourceRangeEditor({
     const positions: Readonly<Record<string, number>> = {
       ArrowLeft: value - step,
       ArrowRight: value + step,
-      Home: edge === 'in' ? 0 : range.sourceIn + 1,
-      End: edge === 'out' ? count : range.sourceOut - 1,
+      Home: edge === 'in' ? bounds.minIn : range.sourceIn + 1,
+      End: edge === 'out' ? bounds.maxOut : range.sourceOut - 1,
     };
     const next = positions[event.key];
     if (next === undefined) return;
     event.preventDefault();
     event.stopPropagation();
-    const candidate = moveMediaSelectionEdge(range, edge, next, count);
+    const limited = edge === 'in' ? Math.max(bounds.minIn, next) : Math.min(bounds.maxOut, next);
+    const candidate = moveMediaSelectionEdge(range, edge, limited, count);
     commit(candidate);
     onFrame(edge === 'in' ? candidate.sourceIn : candidate.sourceOut - 1);
   };
@@ -802,10 +922,25 @@ function SourceRangeEditor({
             className="source-range-strip"
             ref={strip}
             aria-label="Range"
+            title="Click or drag to scrub; click another kept range to edit it; Shift-drag to draw a new kept range"
             data-source-in={selected.sourceIn}
             data-source-out={selected.sourceOut}
             data-range-draft={draft ? 'true' : 'false'}
+            data-drawing={drawing ? 'true' : undefined}
             data-snapshots={snapshotsAvailable ? 'true' : 'false'}
+            onPointerDownCapture={stripPointerDown}
+            onPointerMove={(event) => {
+              if (drag.current?.edge === 'draw') move(event);
+            }}
+            onPointerUp={(event) => {
+              if (drag.current?.edge === 'draw') finish(event);
+            }}
+            onPointerCancel={() => {
+              if (drag.current?.edge === 'draw') cancel();
+            }}
+            onLostPointerCapture={() => {
+              if (drag.current?.edge === 'draw') cancel();
+            }}
           >
             <span className="source-filmstrip" aria-hidden="true">
               {snapshots.map((sourceFrame) => (
@@ -836,7 +971,7 @@ function SourceRangeEditor({
             />
             <DamageMarks damage={asset.damage} count={count} className="source-range-damaged" />
             {kept.map((item, index) =>
-              index === activeKept ? null : (
+              index === activeKept && !drawing ? null : (
                 <span
                   key={`${item.sourceIn}-${item.sourceOut}`}
                   className="source-range-kept"
@@ -878,8 +1013,8 @@ function SourceRangeEditor({
                   aria-label={`Trim source ${edge === 'in' ? 'start' : 'end'}`}
                   disabled={disabled}
                   style={{ left: `${(value / count) * 100}%` }}
-                  aria-valuemin={edge === 'in' ? 0 : selected.sourceIn + 1}
-                  aria-valuemax={edge === 'in' ? selected.sourceOut - 1 : count}
+                  aria-valuemin={edge === 'in' ? bounds.minIn : selected.sourceIn + 1}
+                  aria-valuemax={edge === 'in' ? selected.sourceOut - 1 : bounds.maxOut}
                   aria-valuenow={value}
                   aria-valuetext={`${value}, ${formatTimecode(value, asset.metadata.frameRate)}${edge === 'out' ? ', OUT exclusive' : ''}`}
                   title={`Source ${edge === 'in' ? 'IN' : 'OUT (exclusive)'}. Drag to trim or restore; arrows: 1 frame, Shift: 10.`}
@@ -914,30 +1049,19 @@ function SourceRangeEditor({
       </div>
       <div className="source-range-row">
         {readout}
-        {kept.length > 1 && (
-          <fieldset className="source-kept">
-            <legend className="sr-only">Kept ranges</legend>
-            {kept.map((item, index) => (
-              <button
-                key={`${item.sourceIn}-${item.sourceOut}`}
-                type="button"
-                className="secondary-button small"
-                aria-label={`Kept range ${index + 1}`}
-                aria-pressed={index === activeKept}
-                title={`Kept range ${index + 1}: ${formatTimecode(item.sourceIn, asset.metadata.frameRate)} → ${formatTimecode(item.sourceOut, asset.metadata.frameRate)}`}
-                disabled={disabled || draft !== null}
-                onKeyDown={onKeyDown}
-                onClick={() => {
-                  onPause();
-                  onActivateKept(index);
-                  onFrame(item.sourceIn);
-                }}
-              >
-                {index + 1}
-              </button>
-            ))}
-          </fieldset>
-        )}
+        <KeptRanges
+          kept={kept}
+          activeKept={activeKept}
+          rate={rate}
+          busy={disabled || draft !== null}
+          addBlocked={addBlocked}
+          addAllDisabled={addAllDisabled}
+          targetLayer={targetLayer}
+          onActivate={activate}
+          onRemove={removeRange}
+          onAdd={addRange}
+          onAddAll={() => onAddAll(kept)}
+        />
         <form
           className="source-range-numbers"
           onSubmit={(event) => event.preventDefault()}
@@ -992,26 +1116,17 @@ function SourceRangeEditor({
             aria-label="Reset source range"
             aria-disabled={resetBlocked !== null}
             tabIndex={resetBlocked === null ? 0 : -1}
-            title={resetBlocked ?? 'Reset IN and OUT to the whole recording'}
+            title={
+              resetBlocked ??
+              (kept.length > 1
+                ? 'Reset to the whole recording: removes every kept range'
+                : 'Reset IN and OUT to the whole recording')
+            }
             onKeyDown={onKeyDown}
             onClick={resetRange}
           >
             <Icon name="reset" size={13} />
           </button>
-          {kept.length > 0 && (
-            <button
-              type="button"
-              className="icon-button source-keep-another"
-              aria-label="Keep this range too"
-              aria-disabled={keepBlocked !== ''}
-              tabIndex={keepBlocked === '' ? 0 : -1}
-              title={keepBlocked || 'Keep another range of this recording, starting at the displayed frame'}
-              onKeyDown={onKeyDown}
-              onClick={keepAnotherNow}
-            >
-              <Icon name="plus" size={13} />
-            </button>
-          )}
         </form>
       </div>
       {error && (
@@ -1020,5 +1135,136 @@ function SourceRangeEditor({
         </div>
       )}
     </div>
+  );
+}
+
+/** The recording's kept ranges with timecodes and lengths: choose, remove and add them, or add one clip per range. */
+function KeptRanges({
+  kept,
+  activeKept,
+  rate,
+  busy,
+  addBlocked,
+  addAllDisabled,
+  targetLayer,
+  onActivate,
+  onRemove,
+  onAdd,
+  onAddAll,
+}: Readonly<{
+  kept: readonly SelectRange[];
+  activeKept: number;
+  rate: MediaAsset['metadata']['frameRate'];
+  busy: boolean;
+  addBlocked: string;
+  addAllDisabled: boolean;
+  targetLayer: string;
+  onActivate: (index: number) => void;
+  onRemove: (index: number) => void;
+  onAdd: () => void;
+  onAddAll: () => void;
+}>) {
+  const noun = kept.length === 1 ? 'range' : 'ranges';
+  const summary = kept.length ? `${kept.length} kept ${noun}` : 'Whole recording';
+  const list = useRef<HTMLDivElement>(null);
+  const remove = (index: number): void => {
+    onRemove(index);
+    // The removed row's button is gone: focus the row now at its place, else Add range.
+    requestAnimationFrame(() => {
+      const removes = list.current?.querySelectorAll<HTMLButtonElement>('.source-kept-remove');
+      const next = removes?.[Math.min(index, removes.length - 1)] ?? list.current?.querySelector('.source-kept-add');
+      if (next instanceof HTMLElement && !list.current?.contains(document.activeElement)) next.focus();
+    });
+  };
+  return (
+    <Popover
+      className="source-kept"
+      label="Kept ranges"
+      title={
+        kept.length
+          ? `${summary}: choose, remove or add ranges`
+          : 'The whole recording is kept: set IN and OUT, or add a range'
+      }
+      trigger={
+        <span>
+          {summary} <Icon name="chevron-down" size={12} />
+        </span>
+      }
+    >
+      <div className="source-kept-body" ref={list}>
+        <p className="source-kept-description">
+          {kept.length ? 'IN → OUT · OUT exclusive' : 'The whole recording is kept: set IN and OUT, or add a range.'}
+        </p>
+        {kept.length > 0 && (
+          <ol className="source-kept-list" aria-label="Kept ranges of this recording">
+            {kept.map((item, index) => (
+              <li
+                key={`${item.sourceIn}-${item.sourceOut}`}
+                className="source-kept-row"
+                data-active={index === activeKept ? 'true' : undefined}
+              >
+                <button
+                  type="button"
+                  className="source-kept-choose"
+                  aria-label={`Kept range ${index + 1}, ${formatTimecode(item.sourceIn, rate)} to ${formatTimecode(item.sourceOut, rate)}, ${sourceSeconds(item.sourceOut - item.sourceIn)}`}
+                  aria-pressed={index === activeKept}
+                  disabled={busy}
+                  onClick={() => onActivate(index)}
+                >
+                  <strong>{index + 1}</strong>
+                  <span className="source-kept-range">
+                    {formatTimecode(item.sourceIn, rate)} → {formatTimecode(item.sourceOut, rate)}
+                  </span>
+                  <span className="source-kept-length">{sourceSeconds(item.sourceOut - item.sourceIn)}</span>
+                </button>
+                <button
+                  type="button"
+                  className="icon-button source-kept-remove"
+                  aria-label={`Remove kept range ${index + 1}`}
+                  title={
+                    kept.length === 1
+                      ? 'Remove this range: the whole recording is kept again'
+                      : 'Remove this range from the kept ranges'
+                  }
+                  disabled={busy}
+                  onClick={() => remove(index)}
+                >
+                  <Icon name="trash" size={13} />
+                </button>
+              </li>
+            ))}
+          </ol>
+        )}
+        <div className="source-kept-actions">
+          <button
+            type="button"
+            className="secondary-button small source-kept-add"
+            aria-disabled={addBlocked !== ''}
+            title={
+              addBlocked ||
+              'Keep another range: from the displayed frame when it is free, else in the largest free stretch'
+            }
+            onClick={onAdd}
+          >
+            <Icon name="plus" size={13} />
+            Add range
+          </button>
+          {kept.length > 1 && (
+            <button
+              type="button"
+              className="secondary-button small"
+              aria-label={`Add all ${kept.length} kept ranges to ${targetLayer}`}
+              title={`Add one clip per kept range to ${targetLayer}, in one Undo step`}
+              disabled={addAllDisabled}
+              onClick={onAddAll}
+            >
+              <Icon name="plus" size={13} />
+              Add all {kept.length}
+            </button>
+          )}
+        </div>
+        <p className="source-kept-description">Shift-drag on the range strip to draw a range.</p>
+      </div>
+    </Popover>
   );
 }

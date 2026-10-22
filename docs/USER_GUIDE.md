@@ -141,9 +141,12 @@ Escape restores an unapplied draft. OUT is exclusive; **O** includes
 the displayed frame. Drag a handle back to an edge (or press **Home**/**End** on it)
 to restore that edge, or use the reset icon after **OUT** to restore the full recording.
 The applied range is a **kept range** of the recording, saved with the project (so it follows
-the project file, one Undo step each). Once a range is kept, **Keep this range too** (the plus after the
-range fields) keeps another range of the same recording, starting at the displayed frame; numbered
-**Kept range** buttons then choose which one the handles edit, and the reset icon removes the chosen one.
+the project file, one Undo step each). A recording can keep several: the **Kept ranges** button beside
+the time readout lists them with their timecodes and lengths. Click a row (or a lighter block on the
+strip) to edit that range, use the trash to remove it, **Add range** to keep another (from the displayed
+frame when it is free, else in the largest free stretch) and **Add all N** to add one clip per kept range.
+**Shift-drag** on the strip draws a new kept range. Handles stop next to the other kept ranges, and the
+reset icon returns to the whole recording, removing every kept range.
 Ranges cannot overlap or touch. Clips can still use any frame of the recording.
 Details: [kept ranges](TIMELINE_EDITING.md#kept-ranges).
 

@@ -117,7 +117,7 @@ selects: Record<mediaId, SelectRange[]>; // SelectRange = { sourceIn, sourceOut 
   (`narrow` only). The service enforces this in `edit` during a session.
 - Migration: add `selects: {}`. The Source preview keeps its applied IN/OUT; applying a
   range writes it as the recording's single select (one Undo step through a new
-  `select-set` command); a later **Keep this range too** adds a second one. Clips still copy
+  `select-set` command); a later **Add range** adds a second one. Clips still copy
   the applied range as before.
 
 ### Assistant session and checkpoint (service files, not schema)
