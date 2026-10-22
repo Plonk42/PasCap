@@ -4,7 +4,7 @@ export const TIMELINE_RULER_HEIGHT = 31;
 /** Clip top inside its lane; the lane and its track header share one box. */
 export const LANE_OFFSET = 5;
 export const LANE_HEIGHT = 78;
-export const MUSIC_LANE_HEIGHT = 96;
+export const MUSIC_LANE_HEIGHT = 80;
 const ROW_TOP = TIMELINE_RULER_HEIGHT + LANE_OFFSET;
 
 export interface TimelineRow {
