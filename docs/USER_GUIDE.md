@@ -293,6 +293,10 @@ release), swells, silences and a low/mid/high tone strip; hover one for a readou
 [snap to beats](TIMELINE_EDITING.md#snap-to-beats) and
 [music analysis](SPEED_AND_AUDIO.md#music-analysis).
 
+The waveform on every music clip shows the music's level every 10 ms, one column per pixel of
+the clip, so a short hit or a silence sits where it plays; zoom in for more detail. It follows
+trims and loops. Details: [music waveform](SPEED_AND_AUDIO.md#music-waveform).
+
 Boundary **Cut / Fade / Pause / Dissolve** and **Fades** belong to the selected
 track in **Track**; clicking a boundary button opens that tab and scrolls to the
 boundary, expanded.

@@ -10,6 +10,7 @@ import { MUSIC_ANALYSIS_VERSION, musicAnalysisSchema, type MusicAnalysis } from 
 import { MUSIC_BYTES_PER_SAMPLE, MUSIC_SAMPLE_RATE, MUSIC_SAMPLES_PER_FRAME } from '../shared/music-stream.js';
 import { forEachSerial, whileSerial } from '../shared/serial.js';
 import { parseRate, PROJECT_FPS } from '../shared/timing.js';
+import { WAVEFORM_BUCKET, WAVEFORM_VERSION, waveformCacheSchema, type DetailWaveform } from '../shared/waveform.js';
 import type { ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import {
@@ -181,6 +182,55 @@ async function sampleWaveform(filename: string, durationSeconds: number, signal:
   }
 }
 
+/**
+ * The lowest and highest level of either channel for every 480 samples of the PCM cache, as signed bytes
+ * (minimum, then maximum, -127…127), read in 120 KiB blocks: 200 bytes per second of music, whatever its length.
+ */
+export async function detailWaveformLevels(filename: string): Promise<Int8Array> {
+  const file = await open(filename, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const frames = Math.floor((await file.stat()).size / MUSIC_BYTES_PER_SAMPLE);
+    const levels = new Int8Array(2 * Math.ceil(frames / WAVEFORM_BUCKET));
+    const block = Buffer.alloc(WAVEFORM_BUCKET * MUSIC_BYTES_PER_SAMPLE * 64);
+    // The cache is little-endian PCM16, as are the supported hosts.
+    const samples = new Int16Array(block.buffer, block.byteOffset, block.length / 2);
+    let done = 0;
+    await whileSerial(
+      () => done < frames,
+      async () => {
+        const wanted = Math.min(block.length, (frames - done) * MUSIC_BYTES_PER_SAMPLE);
+        let got = 0;
+        await whileSerial(
+          () => got < wanted,
+          async () => {
+            const { bytesRead } = await file.read(block, got, wanted - got, done * MUSIC_BYTES_PER_SAMPLE + got);
+            if (bytesRead === 0) throw new ServiceError('The music cache ended while its waveform was drawn.', 422);
+            got += bytesRead;
+          },
+        );
+        const complete = wanted / MUSIC_BYTES_PER_SAMPLE;
+        for (let first = 0; first < complete; first += WAVEFORM_BUCKET) {
+          let low = 0;
+          let high = 0;
+          const end = Math.min(complete, first + WAVEFORM_BUCKET) * 2;
+          for (let index = first * 2; index < end; index++) {
+            const sample = samples[index]!;
+            if (sample < low) low = sample;
+            else if (sample > high) high = sample;
+          }
+          const bucket = (done + first) / WAVEFORM_BUCKET;
+          levels[bucket * 2] = Math.floor((low * 127) / 32_768);
+          levels[bucket * 2 + 1] = Math.ceil((high * 127) / 32_768);
+        }
+        done += complete;
+      },
+    );
+    return levels;
+  } finally {
+    await file.close();
+  }
+}
+
 async function verifyPlayback(filename: string, original: AudioAsset['metadata']): Promise<void> {
   const info = await assertNoSymlinks(filename);
   const samples = info.size / MUSIC_BYTES_PER_SAMPLE;
@@ -204,6 +254,8 @@ export class AudioLibrary {
   readonly #preparing = new Map<string, string>();
   readonly #relinking = new Map<string, string>();
   readonly #analysing = new Map<string, string>();
+  readonly #waveforms = new Map<string, Promise<DetailWaveform>>();
+  readonly #waveformQueue = new SerialWriter();
   constructor(
     readonly config: ServiceConfig,
     readonly jobs: JobQueue,
@@ -285,6 +337,9 @@ export class AudioLibrary {
   analysisPath(asset: AudioAsset): string {
     return path.join(this.assetDir(asset), `music-v${MUSIC_ANALYSIS_VERSION}.json`);
   }
+  waveformPath(asset: AudioAsset): string {
+    return path.join(this.assetDir(asset), `waveform-v${WAVEFORM_VERSION}.json`);
+  }
   /** The PCM cache an analysis describes: re-preparing it or a changed original makes the analysis stale. */
   async #cacheIdentity(asset: AudioAsset): Promise<MusicAnalysis['source'] | null> {
     if (asset.status !== 'ready' || !asset.content) return null;
@@ -321,6 +376,56 @@ export class AudioLibrary {
     return saved.content === source.content && saved.bytes === source.bytes && saved.mtimeMs === source.mtimeMs
       ? parsed.data
       : null;
+  }
+  /**
+   * The detail waveform of the current PCM cache: read from its cache file, or drawn from the PCM once, serially,
+   * and saved. A missing, stale or unreadable file is only a cache miss.
+   */
+  detailWaveform(id: string): Promise<DetailWaveform> {
+    const running = this.#waveforms.get(id);
+    if (running) return running;
+    const work = this.#waveformQueue.run(() => this.#readOrDrawWaveform(id)).finally(() => this.#waveforms.delete(id));
+    this.#waveforms.set(id, work);
+    return work;
+  }
+  async #readOrDrawWaveform(id: string): Promise<DetailWaveform> {
+    const asset = this.get(id);
+    const source = await this.#cacheIdentity(asset);
+    if (!source) throw new ServiceError('Prepare the music before drawing its waveform.', 409);
+    await verifyPlayback(this.playbackPath(asset), asset.metadata);
+    const cached = await this.#cachedDetailWaveform(asset, source);
+    if (cached) return cached;
+    const levels = await detailWaveformLevels(this.playbackPath(asset));
+    const after = await this.#cacheIdentity(this.get(id));
+    if (after?.mtimeMs !== source.mtimeMs || after.bytes !== source.bytes || after.content !== source.content)
+      throw new ServiceError('The music cache changed while its waveform was drawn. Try again.', 409);
+    const data = Buffer.from(levels.buffer, levels.byteOffset, levels.byteLength).toString('base64');
+    const cache = waveformCacheSchema.parse({
+      version: WAVEFORM_VERSION,
+      source,
+      bucketSamples: WAVEFORM_BUCKET,
+      data,
+    });
+    await atomicWrite(this.waveformPath(asset), JSON.stringify(cache));
+    return { bucketSamples: cache.bucketSamples, data };
+  }
+  async #cachedDetailWaveform(asset: AudioAsset, source: MusicAnalysis['source']): Promise<DetailWaveform | null> {
+    let text: string;
+    try {
+      text = await readFile(this.waveformPath(asset), 'utf8');
+    } catch (error) {
+      if (isNotFound(error)) return null;
+      throw error;
+    }
+    try {
+      const cache = waveformCacheSchema.parse(JSON.parse(text));
+      const saved = cache.source;
+      return saved.content === source.content && saved.bytes === source.bytes && saved.mtimeMs === source.mtimeMs
+        ? { bucketSamples: cache.bucketSamples, data: cache.data }
+        : null;
+    } catch {
+      return null;
+    }
   }
   /** The queued or running analysis of this music, if any. */
   analysisJob(id: string): MediaJob | null {

@@ -181,6 +181,50 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     expect((await service.app.inject({ url: '/api/audio/unregistered/playback', headers })).statusCode).toBe(404);
   });
 
+  it('draws a 10 ms detail waveform once, caches it beside the PCM and ignores a stale cache', async () => {
+    const asset = await readyTone();
+    const ask = async () => {
+      const response = await service.app.inject({
+        method: 'POST',
+        url: '/api/ops/music_waveform',
+        headers,
+        payload: { mediaId: asset.id },
+      });
+      expect(response.statusCode, response.body).toBe(200);
+      return response.json<{ bucketSamples: number; data: string }>();
+    };
+    const filename = service.audio.waveformPath(asset);
+    const first = await ask();
+    const levels = Buffer.from(first.data, 'base64');
+    const frames = (await readFile(service.audio.playbackPath(asset))).length / 4;
+    expect(first.bucketSamples).toBe(480);
+    expect(levels).toHaveLength(2 * Math.ceil(frames / 480));
+    // lavfi's sine has an amplitude of 1/8: about 16 of 127 each way, in every bucket but a short last one.
+    expect(levels.readInt8(2)).toBeLessThanOrEqual(-15);
+    expect(levels.readInt8(3)).toBeGreaterThanOrEqual(15);
+    expect(levels.readInt8(3)).toBeLessThanOrEqual(17);
+    const saved = JSON.parse(await readFile(filename, 'utf8')) as { data: string; source: { content: string } };
+    expect(saved.data).toBe(first.data);
+    expect(saved.source.content).toBe(asset.content?.digest);
+    // A second request reads the file; a file that does not describe this PCM is drawn again.
+    await writeFile(filename, JSON.stringify({ ...saved, data: 'AAAA' }));
+    expect((await ask()).data).toBe('AAAA');
+    await writeFile(filename, JSON.stringify({ ...saved, source: { ...saved.source, bytes: 1 } }));
+    expect((await ask()).data).toBe(first.data);
+    await writeFile(filename, '{ not json');
+    expect((await ask()).data).toBe(first.data);
+    expect(
+      (
+        await service.app.inject({
+          method: 'POST',
+          url: '/api/ops/music_waveform',
+          headers,
+          payload: { mediaId: 'unregistered' },
+        })
+      ).statusCode,
+    ).toBe(404);
+  });
+
   it('generates zero-valued peaks for silence and reloads ready metadata without starting work', async () => {
     const asset = await registerReady(silencePath);
     expect(asset.waveform.length).toBeGreaterThan(0);

@@ -128,6 +128,7 @@ test.beforeEach(async ({ page, request }) => {
     }
     if (
       (method === 'GET' && pathname.startsWith(`/api/media/${video.id}/`)) ||
+      (method === 'POST' && pathname === '/api/ops/music_waveform') ||
       ((method === 'GET' || method === 'HEAD') && pathname === `/api/audio/${song.id}/playback`)
     ) {
       await route.continue();
@@ -208,6 +209,57 @@ test('beat ticks follow the music track placement and loops', async ({ page }) =
   // Without sections, swells, silences or tone, the clip shows none of them.
   await expect(clip.locator('.music-section, .music-silence, .music-swells, .music-tone')).toHaveCount(0);
   await expect(page.getByText('Music structure', { exact: true })).toHaveCount(0);
+});
+
+test('the waveform draws every 10 ms for each pixel of the clip, through loops, and refines when zoomed', async ({
+  page,
+}) => {
+  // Silence with one 50 ms hit 2.002 s into the recording (source frame 60), as the service reads it.
+  const levels = new Int8Array(2 * Math.ceil(song.metadata.durationSeconds * 100));
+  for (let bucket = 200; bucket < 205; bucket++) levels.set([-100, 127], bucket * 2);
+  await page.route('**/api/ops/music_waveform', (route) =>
+    route.fulfill({ json: { bucketSamples: 480, data: Buffer.from(levels.buffer).toString('base64') } }),
+  );
+  await open(page);
+  const clip = page.locator('[data-music-id="beats-music"]');
+  const waveform = clip.getByRole('img', { name: /^Waveform for music track 1/ });
+  const outline = waveform.locator('path');
+  /** The clip's frame offset of every drawn column that reaches near full scale, grouped into hits. */
+  const hits = async (): Promise<{ columns: number; hits: number[] }> =>
+    outline.evaluate((shape) => {
+      const columns = Number(shape.parentElement!.getAttribute('viewBox')!.split(' ')[2]);
+      const tokens = [...shape.getAttribute('d')!.matchAll(/([HV])(-?[\d.]+)/g)];
+      let top = Number(/^M0 ([\d.]+)/.exec(shape.getAttribute('d')!)![1]);
+      let from = 0;
+      const tall: number[] = [];
+      for (const [, command, value] of tokens) {
+        if (command === 'V') top = Number(value);
+        else {
+          const to = Number(value);
+          if (top < 5) tall.push((from + to) / 2);
+          from = to;
+          if (to === columns) break;
+        }
+      }
+      const groups: number[] = [];
+      for (const column of tall) if (groups.length === 0 || column - groups.at(-1)! > 3) groups.push(column);
+      return { columns, hits: groups };
+    });
+  const width = async (): Promise<number> => (await clip.boundingBox())!.width;
+  const first = await hits();
+  // One column per pixel rather than a fixed 128 bars; the hit plays at 59.94 and, after the loop, at 179.94 frames.
+  expect(Math.abs(first.columns - (await width()))).toBeLessThanOrEqual(1);
+  expect(first.columns).toBeGreaterThan(128);
+  expect(first.hits).toHaveLength(2);
+  first.hits.forEach((column, index) =>
+    expect(Math.abs((column / first.columns) * TRACK.duration - (59.94 + 120 * index))).toBeLessThan(2),
+  );
+
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await expect.poll(async () => (await hits()).columns).toBeGreaterThan(first.columns);
+  const zoomed = await hits();
+  expect(zoomed.columns).toBeLessThanOrEqual(Math.ceil((TRACK.duration * MUSIC_SAMPLES_PER_FRAME) / 480));
+  expect(zoomed.hits).toHaveLength(2);
 });
 
 test('Snap to beats snaps to the beats or downbeats where the music plays now, without editing the project', async ({

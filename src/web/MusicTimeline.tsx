@@ -9,17 +9,18 @@ import {
   type RefObject,
 } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
-import { musicSourceFrame } from '../shared/audio.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MusicTrack, ProjectDocument } from '../shared/model.js';
 import { musicBeatFrames, type MusicAnalysis } from '../shared/music-analysis.js';
 import { removeMusicClips } from '../shared/music-lanes.js';
 import { snapFrame, type BeatSnap } from '../shared/snap.js';
 import { formatTimecode } from '../shared/timing.js';
+import { waveformColumnCount, waveformColumns } from '../shared/waveform.js';
 import './music-ui.css';
 import { planMusicGesture, type MusicGestureKind } from './music-ui.js';
 import { useMusicAnalysis } from './MusicAnalysis.js';
 import { describeMusicMoment, MusicStructure } from './music-structure.js';
+import { useWaveform, waveformPath } from './music-waveform.js';
 import { placementSnapPoints, snapPlacement } from './timeline-placement.js';
 import type { DraftPreview } from './Timeline.js';
 import { beatTickPaths, type BeatTicks } from './timeline-beats.js';
@@ -144,24 +145,13 @@ export function MusicTimeline(props: Readonly<Props>) {
     () => analysed && <MusicStructure music={music} analysis={analysed} scale={clipScale} />,
     [music, analysed, clipScale],
   );
-  const peaks = asset
-    ? Array.from({ length: 128 }, (_, index) => {
-        const source = musicSourceFrame(
-          music,
-          music.start + Math.min(music.duration - 1, Math.floor((index / 128) * music.duration)),
-        )!;
-        return {
-          x: index * 4 + 1,
-          peak:
-            asset.waveform[
-              Math.min(
-                asset.waveform.length - 1,
-                Math.floor((source / asset.metadata.frameCount) * asset.waveform.length),
-              )
-            ] ?? 0,
-        };
-      })
-    : [];
+  const wave = useWaveform(asset);
+  const columns = wave ? waveformColumnCount(wave, music.duration, music.duration * clipScale) : 0;
+  const { sourceIn, sourceOut, duration, loop } = music;
+  const outline = useMemo(
+    () => (wave ? waveformPath(waveformColumns(wave, { sourceIn, sourceOut, duration, loop }, columns)) : null),
+    [wave, sourceIn, sourceOut, duration, loop, columns],
+  );
   const update = (): void => {
     const active = drag.current;
     const viewport = latest.current.viewport.current;
@@ -345,19 +335,12 @@ export function MusicTimeline(props: Readonly<Props>) {
         {structure}
         <svg
           className="music-waveform"
-          viewBox="0 0 512 45"
+          viewBox={`0 0 ${Math.max(1, columns)} 45`}
           preserveAspectRatio="none"
           aria-label={`Waveform for ${name}`}
           role="img"
         >
-          {peaks.map(({ x, peak }) => (
-            <path
-              key={x}
-              d={`M${x} ${22 - Math.max(1, peak * 20)}v${Math.max(2, peak * 40)}`}
-              stroke="#acb8ee"
-              strokeWidth="2"
-            />
-          ))}
+          {outline && <path d={outline} fill="#acb8ee" />}
         </svg>
         {ticks && (
           <svg
