@@ -117,8 +117,8 @@
 }
 
 .music-instance-lane .music-body svg.music-waveform {
-  top: 14px;
-  height: calc(100% - 24px);
+  top: 20px;
+  height: calc(100% - 30px);
 }
 
 /* Sections tint the clip behind the waveform, labelled at their top right when wide enough. */
@@ -396,16 +396,16 @@
   margin-top: 4px;
 }
 
-/* A music transition's button sits on its lane, centred in the 48 px row. */
+/* A music transition's button sits on its lane, centred in the 90 px clip. */
 .music-instance-lane .boundary-button.music-boundary {
-  top: 12px;
+  top: 36px;
   color: #ccd4f2;
   background: #2a3150;
   border-color: #5d6894;
 }
 
 .music-lane-wrapper.music-instance-lane {
-  height: 64px;
+  height: 96px;
   border-bottom: 1px solid #414963;
   background: #191d2d;
 }
@@ -416,10 +416,12 @@
 
 .music-lane-wrapper.music-instance-lane .music-timeline-clip {
   top: 3px;
-  height: 58px;
+  height: 90px;
 }
 
 .music-instance-lane .music-body {
+  display: flex;
+  align-items: flex-start;
   overflow: clip;
 }
 
@@ -450,7 +452,7 @@
 .music-instance-lane .music-transition-slot {
   position: absolute;
   top: 3px;
-  height: 58px;
+  height: 90px;
   border: 1px dashed #5d6894;
   border-radius: 4px;
   background: #0d1018;

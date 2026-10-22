@@ -548,7 +548,7 @@ Each analysed music clip shows its beats as ticks, and **Snap to beats** in the 
 toolbar snaps every snapping gesture to them ([snap to beats](TIMELINE_EDITING.md#snap-to-beats)).
 
 The editor also shows the rest of the analysis, display only (nothing is saved). Music
-lanes are 64 pixels tall. On each analysed music clip, at the positions they play after
+lanes are 96 pixels tall. On each analysed music clip, at the positions they play after
 its placement, source range and loops:
 
 - **Sections** tint the clip behind its waveform, with a coloured top edge: **quiet**
