@@ -1210,7 +1210,7 @@ function KeptRanges({
   const list = useRef<HTMLDivElement>(null);
   const remove = (index: number): void => {
     onRemove(index);
-    // The removed row's button is gone: focus the row now at its place, else Add range.
+    // The removed row's button is gone: focus the row now at its place, else New range.
     requestAnimationFrame(() => {
       const removes = list.current?.querySelectorAll<HTMLButtonElement>('.source-kept-remove');
       const next = removes?.[Math.min(index, removes.length - 1)] ?? list.current?.querySelector('.source-kept-add');
@@ -1224,7 +1224,7 @@ function KeptRanges({
       title={
         kept.length
           ? `${summary}: choose, remove or add ranges`
-          : 'The whole recording is kept: set IN and OUT, or add a range'
+          : 'The whole recording is kept: set IN and OUT, or keep a new range'
       }
       trigger={
         <span>
@@ -1234,7 +1234,9 @@ function KeptRanges({
     >
       <div className="source-kept-body" ref={list}>
         <p className="source-kept-description">
-          {kept.length ? 'IN → OUT · OUT exclusive' : 'The whole recording is kept: set IN and OUT, or add a range.'}
+          {kept.length
+            ? 'IN → OUT · OUT exclusive'
+            : 'The whole recording is kept: set IN and OUT, or keep a new range.'}
         </p>
         {kept.length > 0 && (
           <ol className="source-kept-list" aria-label="Kept ranges of this recording">
@@ -1283,28 +1285,30 @@ function KeptRanges({
             aria-disabled={addBlocked !== ''}
             title={
               addBlocked ||
-              'Keep another range: from the displayed frame when it is free, else in the largest free stretch'
+              'Keep another range of this recording: from the displayed frame when it is free, else in the largest free stretch'
             }
             onClick={onAdd}
           >
             <Icon name="plus" size={13} />
-            Add range
+            New range
           </button>
-          {kept.length > 1 && (
+          <span className="source-kept-description">or Shift-drag on the strip</span>
+        </div>
+        {kept.length > 1 && (
+          <div className="source-kept-timeline">
             <button
               type="button"
-              className="secondary-button small"
-              aria-label={`Add all ${kept.length} kept ranges to ${targetLayer}`}
+              className="primary-button small"
+              aria-label={`Add ${kept.length} clips to ${targetLayer}`}
               title={`Add one clip per kept range to ${targetLayer}, in one Undo step`}
               disabled={addAllDisabled}
               onClick={onAddAll}
             >
               <Icon name="plus" size={13} />
-              Add all {kept.length}
+              Add {kept.length} clips to timeline
             </button>
-          )}
-        </div>
-        <p className="source-kept-description">Shift-drag on the range strip to draw a range.</p>
+          </div>
+        )}
       </div>
     </Popover>
   );

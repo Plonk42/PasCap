@@ -814,11 +814,11 @@ The **Kept ranges** button beside the readout (**Whole recording**, or **N kept 
 one row per range with its IN → OUT timecodes and length, which makes that range active (moving to its IN),
 and a trash, **Remove kept range N** (removing the last one keeps the whole recording again). Below the list:
 
-- **Add range** keeps a further range of 60 frames, or less where the room ends: from the displayed frame when
+- **New range** keeps a further range of 60 frames, or less where the room ends: from the displayed frame when
   it is at least one frame from every kept range, otherwise centred in the largest free stretch. It is
   unavailable, with its reason, without room and at 100 ranges.
-- **Add all N** (with two or more ranges; **Add all N kept ranges to** the target track) inserts one clip per
-  kept range in recording order, like **Add all** steady ranges, in one Undo step.
+- **Add N clips to timeline**, set apart below (with two or more ranges; **Add N clips to** the target track),
+  inserts one clip per kept range in recording order, like **Add all** steady ranges, in one Undo step.
 
 On the range strip, the other kept ranges are lighter outlined blocks: clicking one makes it active (and
 scrubs there), and **Shift-drag** in a free stretch draws a new kept range, which stops one frame from its
