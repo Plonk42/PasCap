@@ -621,7 +621,9 @@ stationary playhead; their own old edges/transition regions are excluded. Holdin
 Alt bypasses these magnets. A trailing-edge snap starts the clip its own duration
 before the magnet. Ripple-on
 insertion remains boundary-based even with Snap off or Alt held; only an explicit
-move of its retained first clip changes the anchor. The
+move of its retained first clip, or a drop on an empty Ripple track, sets the anchor,
+and that free start snaps like a Ripple-off move (its leading or trailing edge, never to
+the clips that follow it on that track). The
 toggle persists for the current timeline session, not the renderable document.
 
 ### Snap to beats
