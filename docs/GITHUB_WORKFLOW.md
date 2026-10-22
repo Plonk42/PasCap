@@ -76,7 +76,7 @@ branch cancels the older run.
 
 | Job                                      | Runs                                                                                                       |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Checks / Node 22 (and Node 24 on `main`) | `npm run check` (including formatting); `npm audit` on `main`                                              |
+| Checks / Node 22 (and Node 24 on `main`) | `npm run check` as separate format, unit test and build steps; `npm audit` on `main`                       |
 | Native media / FFmpeg 8.0.1              | Synthetic native suite (`npm run test:media`)                                                              |
 | Chrome browser 1/4 to 4/4                | Full Chrome suite sharded by spec file, fresh fixtures per shard                                           |
 | Firefox music and playback               | Scoped Firefox regressions ([details](DEVELOPMENT.md#firefox-music-regression-and-optional-investigation)) |
