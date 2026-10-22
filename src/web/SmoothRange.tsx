@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { damagedAt, type MediaAsset, type MediaJob } from '../shared/media.js';
 import type { MediaSelection } from '../shared/media-selection.js';
+import type { SelectRange } from '../shared/model.js';
 import {
   motionProfile,
   smoothRanges,
@@ -395,6 +396,29 @@ function toleranceAt(y: number): number {
   return Number(Math.max(SMOOTH_TOLERANCE.min, Math.min(SMOOTH_TOLERANCE.max, stepped)).toFixed(1));
 }
 
+/** Steady ranges in source order, as kept ranges. */
+export function steadyKeptRanges(ranges: readonly SmoothRange[]): SelectRange[] {
+  return [...ranges]
+    .sort((a, b) => a.sourceIn - b.sourceIn)
+    .map(({ sourceIn, sourceOut }) => ({ sourceIn, sourceOut }));
+}
+
+function sameRanges(kept: readonly SelectRange[], ranges: readonly SmoothRange[]): boolean {
+  const steady = steadyKeptRanges(ranges);
+  return (
+    kept.length === steady.length &&
+    kept.every(
+      (item, index) => item.sourceIn === steady[index]!.sourceIn && item.sourceOut === steady[index]!.sourceOut,
+    )
+  );
+}
+
+function useAllHint(count: number, applied: boolean): string {
+  if (!count) return 'No steady range of 2 s or more at this allowed movement';
+  if (applied) return `The kept ranges are the ${count} steady ranges`;
+  return `Keep the ${count} steady ranges, replacing the kept ranges; adds nothing to the timeline`;
+}
+
 function suggestionText(best: SmoothRange | undefined, applied: boolean, rate: FrameRate) {
   if (!best)
     return {
@@ -407,8 +431,8 @@ function suggestionText(best: SmoothRange | undefined, applied: boolean, rate: F
   const span = `${sourceSeconds(best.sourceOut - best.sourceIn)} · ${from} – ${to}`;
   return {
     span,
-    label: `Use steadiest range ${from} to ${to}`,
-    hint: applied ? `In use: ${span}` : `Set IN and OUT to the steadiest range ${span}`,
+    label: `Use longest steady range ${from} to ${to}`,
+    hint: applied ? `In use: ${span}` : `Set IN and OUT to the longest steady range ${span}`,
   };
 }
 
@@ -625,11 +649,10 @@ interface PanelProps {
   view: CameraMotionView;
   disabled: boolean;
   onApply: (range: SmoothRange) => void;
-  /** Name of the video track that receives added clips. */
-  targetLayer: string;
-  addDisabled: boolean;
-  /** Adds one clip per steady range, in one Undo step. */
-  onAddAll: (ranges: readonly SmoothRange[]) => void;
+  /** The recording's kept ranges, to tell when they already are the steady ranges. */
+  kept: readonly SelectRange[];
+  /** Keeps exactly the steady ranges, in one Undo step; adds nothing to the timeline. */
+  onUseAll: (ranges: readonly SmoothRange[]) => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
 }
 
@@ -644,9 +667,8 @@ export function CameraMotionPanel({
   view,
   disabled,
   onApply,
-  targetLayer,
-  addDisabled,
-  onAddAll,
+  kept,
+  onUseAll,
   onKeyDown,
 }: Readonly<PanelProps>) {
   const { profile, telemetry, ranges, savedTolerance, setTolerance, previewTolerance } = smooth;
@@ -656,6 +678,7 @@ export function CameraMotionPanel({
   const best = ranges[0];
   const applied = best?.sourceIn === range.sourceIn && best?.sourceOut === range.sourceOut;
   const { span, label, hint } = suggestionText(best, applied, asset.metadata.frameRate);
+  const allApplied = ranges.length > 0 && sameRanges(kept, ranges);
 
   return (
     <section
@@ -681,7 +704,8 @@ export function CameraMotionPanel({
         <HelpPopover label="Camera motion" guide="find-the-steadiest-range">
           <p>
             The lanes under the range show how the camera moves: the amber area marks jolts, the white line its movement
-            and the green bands steady ranges. Use sets IN and OUT to the steadiest one.
+            and the green bands steady ranges. Use longest sets IN and OUT to the longest one; Use all keeps every
+            steady range.
           </p>
           <p className="editor-help-tip">
             Tip: drag the dashed line, or move Allowed movement, to accept more or less movement.
@@ -701,7 +725,7 @@ export function CameraMotionPanel({
           <AnalysisStatus smooth={smooth} disabled={disabled} onKeyDown={onKeyDown} />
         )}
         {profile && !collapsed && (
-          <>
+          <div className="smooth-panel-actions">
             <button
               className="secondary-button small smooth-use-button"
               type="button"
@@ -713,25 +737,22 @@ export function CameraMotionPanel({
               onClick={() => best && onApply(best)}
             >
               <Icon name={applied ? 'check' : 'wand'} size={14} />
-              <span>{applied ? 'In use' : 'Use'}</span>
+              <span>{applied ? 'In use' : 'Use longest'}</span>
             </button>
             <button
-              className="secondary-button small smooth-add-all-button"
+              className="secondary-button small smooth-use-all-button"
               type="button"
-              aria-label={`Add all ${ranges.length} steady ranges to ${targetLayer}`}
-              title={
-                ranges.length
-                  ? `Add one clip per steady range to ${targetLayer}, in recording order`
-                  : 'No steady range of 2 s or more at this allowed movement'
-              }
-              disabled={addDisabled || !ranges.length}
+              data-applied={allApplied || undefined}
+              aria-label={`Use all ${ranges.length} steady ranges as kept ranges`}
+              title={useAllHint(ranges.length, allApplied)}
+              disabled={disabled || !ranges.length || allApplied}
               onKeyDown={onKeyDown}
-              onClick={() => onAddAll(ranges)}
+              onClick={() => onUseAll(ranges)}
             >
-              <Icon name="plus" size={14} />
-              <span>Add all {ranges.length}</span>
+              <Icon name={allApplied ? 'check' : 'wand'} size={14} />
+              <span>{allApplied ? 'All in use' : `Use all ${ranges.length}`}</span>
             </button>
-          </>
+          </div>
         )}
       </div>
       {profile && !collapsed && (

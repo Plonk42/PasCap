@@ -38,6 +38,7 @@ import { Popover } from './Popover.js';
 import {
   CameraMotionPanel,
   MotionLanes,
+  steadyKeptRanges,
   useCameraMotionView,
   useSmoothRange,
   type MotionLanesProps,
@@ -92,6 +93,8 @@ interface RangeCommands {
   mark: (edge: MediaSelectionEdge) => void;
   /** Applies a range as the editor's own edit, so a rejection shows inline. */
   apply: (range: MediaSelection) => void;
+  /** Replaces the kept ranges as the editor's own edit, so a rejection shows inline; true when applied. */
+  keep: (ranges: readonly SelectRange[], active: number) => boolean;
   cancel: () => boolean;
 }
 interface RangeProps {
@@ -487,15 +490,11 @@ export function SourceReview({
             scrub(suggestion.sourceIn);
             commands.current?.apply({ mediaId: asset.id, ...suggestion });
           }}
-          targetLayer={targetLayer}
-          addDisabled={insertDisabled || rangeDraft}
-          onAddAll={(steady) =>
-            insertExcerpt(
-              [...steady]
-                .sort((a, b) => a.sourceIn - b.sourceIn)
-                .map((part) => ({ mediaId: asset.id, sourceIn: part.sourceIn, sourceOut: part.sourceOut })),
-            )
-          }
+          kept={kept}
+          onUseAll={(steady) => {
+            const ranges = steadyKeptRanges(steady);
+            if (commands.current?.keep(ranges, 0)) scrub(ranges[0]!.sourceIn);
+          }}
           onKeyDown={keyboard}
         />
       )}
@@ -732,7 +731,7 @@ function SourceRangeEditor({
     if (disabled || observedFrame === null || drag.current) return;
     commit(markMediaSelection(range, edge, observedFrame, count));
   };
-  useImperativeHandle(ref, () => ({ mark, apply: commit, cancel }));
+  useImperativeHandle(ref, () => ({ mark, apply: commit, keep: applyKept, cancel }));
 
   const commitNumbers = (): void => {
     if (!numbersDirty || draft !== null) return;
