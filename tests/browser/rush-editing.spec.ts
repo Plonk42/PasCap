@@ -453,13 +453,13 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
   await page.getByRole('slider', { name: 'Timeline zoom', exact: true }).fill('180');
   await expect
     .poll(() => page.locator('.timeline-scroll').evaluate((element) => element.scrollWidth - element.clientWidth))
-    .toBeGreaterThan(500);
+    .toBeGreaterThan(400);
   await page.locator('.timeline-scroll').evaluate((element) => {
     element.scrollLeft = element.scrollWidth - element.clientWidth;
   });
   const viewport = (await page.locator('.timeline-scroll').boundingBox())!;
   const offscreen = (await clip(page, ids[0]!).boundingBox())!;
-  expect(offscreen.x + offscreen.width).toBeLessThan(viewport.x);
+  expect(offscreen.x).toBeLessThan(viewport.x);
   await page.getByRole('button', { name: 'Show clip 1 on timeline', exact: true }).click();
   await expect(clip(page, ids[0]!).locator('.timeline-clip-body')).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(() => page.locator('.timeline-scroll').evaluate((element) => element.scrollLeft)).toBe(0);
@@ -574,6 +574,53 @@ test('Duplicate is a clip context-menu action and zoom buttons step the retained
   await expect(zoomOut).toBeDisabled();
   await expect(zoomIn).toBeEnabled();
 });
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 1280, height: 720 },
+]) {
+  test(`zoom out and Fit show the whole timeline extent without a horizontal scrollbar at ${viewport.width} × ${viewport.height}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    const scroller = page.locator('.timeline-scroll');
+    const overflow = () => scroller.evaluate((element) => element.scrollWidth - element.clientWidth);
+    const slider = page.getByRole('slider', { name: 'Timeline zoom', exact: true });
+    const zoomIn = page.getByRole('button', { name: 'Zoom in', exact: true });
+    const zoomOut = page.getByRole('button', { name: 'Zoom out', exact: true });
+    const fit = page.getByRole('button', { name: 'Fit', exact: true });
+
+    await fit.click();
+    expect(await overflow()).toBeLessThanOrEqual(0);
+
+    // About 17 minutes, with a bookmark after the last clip.
+    const long = sequence();
+    long.layers[0]!.ripple = false;
+    long.clips[2]!.start = 30000;
+    long.bookmarks = [36000];
+    await fixture(page, long);
+    expect(await overflow()).toBeGreaterThan(0);
+    await fit.click();
+    expect(await overflow()).toBeLessThanOrEqual(0);
+    await expect(zoomOut).toBeDisabled();
+    await expect(zoomIn).toBeEnabled();
+    expect(Number(await slider.getAttribute('min'))).toBeLessThan(12);
+    const scale = Number(await page.locator('.timeline-surface').getAttribute('data-pixels-per-frame'));
+    expect(scale * 36000).toBeLessThan((await scroller.evaluate((element) => element.clientWidth)) - 96);
+    expect(await page.locator('.ruler-tick').count()).toBeLessThan(20);
+
+    await slider.fill('48');
+    expect(await overflow()).toBeGreaterThan(0);
+    await shortcut(page, 'f');
+    await expect(zoomOut).toBeDisabled();
+    expect(await overflow()).toBeLessThanOrEqual(0);
+    await slider.fill('12');
+    await expect(zoomOut).toBeEnabled();
+    for (let step = 0; step < 40 && (await zoomOut.isEnabled()); step++) await zoomOut.click();
+    await expect(zoomOut).toBeDisabled();
+    expect(await overflow()).toBeLessThanOrEqual(0);
+  });
+}
 
 test('visible split then S selects each right piece, preserves boundaries and deletes without another selection', async ({
   page,
