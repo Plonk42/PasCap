@@ -51,6 +51,8 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
     exportRunning: false,
     connection: { url: 'http://127.0.0.1:4318/mcp', tokenFile: '/data/mcp-token', lastCall: null, client: null },
   };
+  // The waveform of a placed synthetic music fixture is a read of its prepared cache.
+  await page.route('**/api/ops/music_waveform', (route) => route.continue());
   await page.route(
     /\/api\/ops\/(session_status|session_start|session_end|checkpoint_restore|checkpoint_copy|hand_off_readiness)$/,
     async (route) => {

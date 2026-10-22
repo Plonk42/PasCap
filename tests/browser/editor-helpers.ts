@@ -1,4 +1,4 @@
-import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Locator, type Page, type Request } from '@playwright/test';
 import {
   EMPTY_KEY_VALUES,
   type Interpolation,
@@ -7,7 +7,20 @@ import {
   layerKeyframe,
 } from '../../src/shared/keyframes.js';
 import { jobSchema, type MediaJob } from '../../src/shared/media.js';
+import { operations } from '../../src/shared/operations/index.js';
 import { forEachSerial } from '../../src/shared/serial.js';
+
+const readOperations = new Set(operations.filter((op) => op.access === 'read').map((op) => `/api/ops/${op.name}`));
+
+/** A request that can change state: not a GET, nor a read operation, which the editor POSTs. */
+export function isWrite(request: Request): boolean {
+  return request.method() !== 'GET' && !readOperations.has(new URL(request.url()).pathname);
+}
+
+/** A POST that can change state, such as an import or a preparation. */
+export function isWritePost(request: Request): boolean {
+  return request.method() === 'POST' && isWrite(request);
+}
 
 export async function openOptions(page: Page, label: string): Promise<void> {
   const trigger = page.locator(`summary[aria-label="${label}"]`);

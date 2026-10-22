@@ -5,6 +5,7 @@ import type { AudioAsset } from '../../src/shared/audio.js';
 import type { AudioDirectory, FootageDirectory, FootageRoot } from '../../src/shared/footage.js';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
 import { createProject } from '../../src/shared/model.js';
+import { isWritePost } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let memory: MemoryProjects;
@@ -101,7 +102,7 @@ async function mockBrowsing(
 function postCount(page: Page): () => number {
   let posts = 0;
   page.on('request', (request) => {
-    if (request.method() === 'POST') posts++;
+    if (isWritePost(request)) posts++;
   });
   return () => posts;
 }
@@ -123,7 +124,7 @@ test('browse and import original paths, prepare verified proxies, persist projec
   const sourceNames = await readdir(path.dirname(originalPath));
   const writes: { url: string; body: unknown; type: string | undefined }[] = [];
   page.on('request', (request) => {
-    if (request.method() === 'POST')
+    if (isWritePost(request))
       writes.push({
         url: new URL(request.url()).pathname,
         body: request.postDataJSON(),
@@ -200,8 +201,7 @@ test('one folder view lists folders, video and music recordings; filters and sel
         : [{ kind: 'audio', name: 'Theme.mp3', path: '/approved/Theme.mp3', size: 5 * 1024 ** 2 }],
   );
   page.on('request', (request) => {
-    if (request.method() === 'POST')
-      posts.push({ pathname: new URL(request.url()).pathname, body: request.postDataJSON() });
+    if (isWritePost(request)) posts.push({ pathname: new URL(request.url()).pathname, body: request.postDataJSON() });
   });
   await page.route('**/api/media/register-paths', (route) =>
     route.fulfill({
@@ -424,8 +424,7 @@ test('a typed path imports a recording or a folder outside the locations, throug
 }) => {
   const posts: { pathname: string; body: unknown }[] = [];
   page.on('request', (request) => {
-    if (request.method() === 'POST')
-      posts.push({ pathname: new URL(request.url()).pathname, body: request.postDataJSON() });
+    if (isWritePost(request)) posts.push({ pathname: new URL(request.url()).pathname, body: request.postDataJSON() });
   });
   await page.route('**/api/media/register', (route) =>
     route.fulfill({ status: 202, json: { asset: ready, job: null } }),
