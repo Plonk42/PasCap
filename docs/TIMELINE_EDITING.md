@@ -618,7 +618,9 @@ the stationary playhead captured at pointer down, with their captured zoom throu
 autoscroll; a speed keyframe snapped to its clip's end lands on its exclusive OUT. Ripple-off moves match either leading or trailing edge to other clip/music/
 transition boundaries, bookmarks, frame zero or the captured
 stationary playhead; their own old edges/transition regions are excluded. Holding
-Alt bypasses these magnets. A trailing-edge snap starts the clip its own duration
+Alt bypasses these magnets. Clip moves and Media drops are native browser drags, which
+Chrome on Wayland reports without modifier keys: hold Alt as the drag starts, and it then
+bypasses snapping for the whole drag. A trailing-edge snap starts the clip its own duration
 before the magnet. Ripple-on
 insertion remains boundary-based even with Snap off or Alt held; only an explicit
 move of its retained first clip, or a drop on an empty Ripple track, sets the anchor,

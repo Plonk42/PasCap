@@ -699,6 +699,7 @@ export function Timeline(props: Readonly<Props>) {
   const movement = useRef<MoveContext | null>(null);
   const dropScroll = useRef(0);
   const dropPointer = useRef<{ x: number; y: number; alt: boolean } | null>(null);
+  const dragStartAlt = useRef(false);
   const latestDrop = useRef<() => DropPlan | null>(() => null);
   const autoScroll = useRef(0);
   const pointerX = useRef(0);
@@ -983,6 +984,14 @@ export function Timeline(props: Readonly<Props>) {
     else if (left > element.scrollLeft + element.clientWidth - 60)
       element.scrollLeft = Math.max(0, left - element.clientWidth / 3);
   }, [selectedMusicId, viewportHeight]);
+  useEffect(() => {
+    // Chrome on Wayland reports no modifiers on drag events: Alt held as a drag starts lasts the whole drag.
+    const remember = (event: globalThis.DragEvent): void => {
+      dragStartAlt.current = event.altKey;
+    };
+    document.addEventListener('dragstart', remember, true);
+    return () => document.removeEventListener('dragstart', remember, true);
+  }, []);
   const clearMove = (): void => {
     movingClip.current = false;
     movement.current = null;
@@ -1240,7 +1249,7 @@ export function Timeline(props: Readonly<Props>) {
           base: project,
           playhead: frame,
         };
-      dropPointer.current = { x: event.clientX, y: event.clientY, alt: event.altKey };
+      dropPointer.current = { x: event.clientX, y: event.clientY, alt: event.altKey || dragStartAlt.current };
       const candidate = latestDrop.current();
       let effect: 'none' | 'copy' | 'move' = movement.current?.payload.kind === 'media' ? 'copy' : 'move';
       if (!candidate || candidate.error) effect = 'none';
@@ -1273,7 +1282,7 @@ export function Timeline(props: Readonly<Props>) {
           base: project,
           playhead: frame,
         };
-      dropPointer.current = { x: event.clientX, y: event.clientY, alt: event.altKey };
+      dropPointer.current = { x: event.clientX, y: event.clientY, alt: event.altKey || dragStartAlt.current };
       const candidate = latestDrop.current();
       if (!candidate) throw new Error('Drop onto a video track.');
       if (candidate.error) throw new Error(candidate.error);

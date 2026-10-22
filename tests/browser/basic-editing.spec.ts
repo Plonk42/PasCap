@@ -72,7 +72,13 @@ async function installOverlay(page: Page, start = 20): Promise<void> {
   await page.evaluate(() => window.pascapLab!.flush());
 }
 
-async function beginMove(page: Page, desiredStart: number, grab = 12, alt = false, layerId = 'upper'): Promise<number> {
+async function beginMove(
+  page: Page,
+  desiredStart: number,
+  grab = 12,
+  alt: boolean | 'start' = false,
+  layerId = 'upper',
+): Promise<number> {
   const clip = page.locator('[data-clip-id="moving"]');
   await clip.scrollIntoViewIfNeeded();
   const box = (await clip.boundingBox())!;
@@ -85,6 +91,7 @@ async function beginMove(page: Page, desiredStart: number, grab = 12, alt = fals
   await page.mouse.move(box.x + grab * scale, box.y + 30);
   await page.mouse.down();
   await page.mouse.move(box.x + grab * scale + 12, box.y + 30, { steps: 3 });
+  if (alt === 'start') await page.keyboard.up('Alt');
   await page.mouse.move(origin + (desiredStart + grab) * scale, targetY, { steps: 8 });
   await page.mouse.move(origin + (desiredStart + grab) * scale, targetY);
   await expect(page.locator('.timeline-drop-preview')).toBeVisible();
@@ -160,6 +167,16 @@ test('snaps either edge to the shown guide, bypasses with Alt, and never snaps t
   await page.keyboard.press('Escape');
   await page.mouse.up();
   expect((await current(page)).clips[1]?.start).toBe(92);
+});
+
+test('Alt held as the drag starts bypasses snapping for the whole drag, as Wayland reports no later modifiers', async ({
+  page,
+}) => {
+  await installOverlay(page);
+  expect(await beginMove(page, 92, 12, 'start')).toBe(92);
+  await expect(page.locator('.snap-guide')).toHaveCount(0);
+  await page.mouse.up();
+  await expect.poll(async () => (await current(page)).clips.find((clip) => clip.id === 'moving')?.start).toBe(92);
 });
 
 test('the first clip of a Ripple track snaps its free start to a bookmark', async ({ page }) => {
