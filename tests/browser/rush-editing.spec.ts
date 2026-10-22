@@ -2052,7 +2052,7 @@ test('the motion timeline shows jolts, allowed movement and the steadiest range;
   expect(headBox!.y).toBeLessThan(stripBox!.y);
   expect(headBox!.y + headBox!.height).toBeCloseTo(timelineBox!.y + timelineBox!.height, 0);
 
-  const use = page.getByRole('button', { name: /^Use steadiest range / });
+  const use = page.getByRole('button', { name: /^Use longest steady range / });
   await expect(row.locator('.smooth-panel-summary')).toContainText(seconds(steady));
   await use.click();
   const strip = page.locator('.source-range-strip');
@@ -2155,7 +2155,9 @@ test('the motion timeline shows jolts, allowed movement and the steadiest range;
   await expectOnlyRangesSaved(page);
 });
 
-test('Add all adds one clip per steady range to the target track in one Undo step', async ({ page }) => {
+test('Use all keeps every steady range as a kept range in one Undo step, adding nothing to the timeline', async ({
+  page,
+}) => {
   const asset = assets[0]!;
   const fps = 30000 / 1001;
   const analysis = jerkyThenSteady(asset);
@@ -2163,21 +2165,19 @@ test('Add all adds one clip per steady range to the target track in one Undo ste
   await page.route(`**/api/media/${asset.id}/motion`, (route) => route.fulfill({ json: { analysis, job: null } }));
   const before = await current(page);
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
-  const addAll = page.getByRole('button', { name: /^Add all \d+ steady ranges to / });
-  await expect(addAll).toHaveText(`Add all ${steady.length}`);
-  await addAll.click();
-  await expect(page.locator('.source-add-feedback')).toHaveAttribute('data-added-clip-id', /.+/);
-  const after = await current(page);
-  const added = after.clips.filter((item) => !before.clips.some((existing) => existing.id === item.id));
-  expect(added.map(({ mediaId, sourceIn, sourceOut }) => ({ mediaId, sourceIn, sourceOut }))).toEqual(
-    [...steady]
-      .sort((a, b) => a.sourceIn - b.sourceIn)
-      .map(({ sourceIn, sourceOut }) => ({ mediaId: asset.id, sourceIn, sourceOut })),
-  );
-  // The applied source range is untouched: Add all inserts the steady ranges, it does not apply them.
-  await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', '0');
+  const useAll = page.getByRole('button', { name: /^Use all \d+ steady ranges as kept ranges$/ });
+  await expect(useAll).toHaveText(`Use all ${steady.length}`);
+  await useAll.click();
+  const ranges = [...steady]
+    .sort((a, b) => a.sourceIn - b.sourceIn)
+    .map(({ sourceIn, sourceOut }) => ({ sourceIn, sourceOut }));
+  await expect.poll(async () => (await current(page)).selects[asset.id]).toEqual(ranges);
+  expect((await current(page)).clips).toEqual(before.clips);
+  await expect(page.locator('.source-range-strip')).toHaveAttribute('data-source-in', String(ranges[0]!.sourceIn));
+  await expect(useAll).toBeDisabled();
+  await expect(useAll).toHaveText('All in use');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect.poll(async () => (await current(page)).clips.length).toBe(before.clips.length);
+  await expect.poll(async () => (await current(page)).selects[asset.id]).toBeUndefined();
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 

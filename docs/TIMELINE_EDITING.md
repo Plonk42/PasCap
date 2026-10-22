@@ -802,7 +802,7 @@ record what the user kept and never retime, render or export (assistant sessions
 `select-narrow` (a subset of the existing ranges only).
 
 Source preview edits the **active** kept range, the first by default: setting IN/OUT by handle, numeric field,
-I/O marks or **Use** (steadiest range) creates the entry with its first range and later changes that range;
+I/O marks or **Use longest** (steadiest range) creates the entry with its first range and later changes that range;
 **Add clip** copies it. The handles stop one frame from the neighbouring kept ranges (their range sliders end
 there, Home/End too); typed IN/OUT that overlap or touch another kept range are rejected with an inline
 error, never merged or clamped. **Reset source range** returns to the whole recording (IN = 0, OUT = frame
@@ -818,7 +818,7 @@ and a trash, **Remove kept range N** (removing the last one keeps the whole reco
   it is at least one frame from every kept range, otherwise centred in the largest free stretch. It is
   unavailable, with its reason, without room and at 100 ranges.
 - **Add N clips to timeline**, set apart below (with two or more ranges; **Add N clips to** the target track),
-  inserts one clip per kept range in recording order, like **Add all** steady ranges, in one Undo step.
+  inserts one clip per kept range in recording order, in one Undo step.
 
 On the range strip, the other kept ranges are lighter outlined blocks: clicking one makes it active (and
 scrubs there), and **Shift-drag** in a free stretch draws a new kept range, which stops one frame from its
@@ -867,7 +867,7 @@ label shows its value under the pointer (flight data interpolated between its
 once-per-second samples) and the image lane the timecode. Clicking or dragging any lane
 scrubs like the strip. Below the IN/OUT fields, separated by a hairline, the **Camera
 motion** section has a header row: its title (a chevron button, **Collapse camera
-motion**), its help, **Steadiest range** with its length and IN–OUT timecode, and **Use**.
+motion**), its help, **Steadiest range** with its length and IN–OUT timecode, **Use longest** and **Use all N**.
 A controls row follows: the **Allowed movement** setting, the shared slider with exact
 field and Reset (0.5–6, initially 2; neutral is the initial value), and **Flight data**
 (**Flight data lanes**), a menu choosing which flight data values this recording has get
@@ -878,15 +878,14 @@ allowed movement, bridging jolts shorter than 0.5 s and keeping 0.2 s clear of r
 edges inside the recording. A stretch where the camera stands still is not a steady range:
 when at least 99.5 % of its frames move less than 0.5 % of the image width per second
 (about three minutes to pan one width), the drone is hovering with nothing happening in
-the picture, so it gets no band, suggestion or Add all clip. Move the **Allowed movement** slider, or drag the dashed line
+the picture, so it gets no band or suggestion. Move the **Allowed movement** slider, or drag the dashed line
 itself (it highlights within 6 px, and the image lane shows its value; dragging the line
-never scrubs). **Use** applies the suggestion as the applied source range (and shows its
-IN frame), like any other range choice: no project edit, history or save; it reads **In
-use** once applied. **Add all N** (**Add all N steady ranges to** the target track)
-inserts one independent clip per steady range at the current allowed movement, in
-recording order, exactly like **Add clip** with that range: Ripple-on tracks append,
-positioned tracks start at the playhead, and the whole batch is one Undo step. It leaves
-the applied source range unchanged. While its analysis waits or runs, the header shows
+never scrubs). **Use longest** applies the suggestion, the longest steady range, as the active kept range (and
+shows its IN frame), like any other range choice, in one Undo step; it reads **In use** once applied.
+**Use all N** (**Use all N steady ranges as kept ranges**) replaces the recording's kept ranges with the steady
+ranges at the current allowed movement, in recording order, in one Undo step, and makes the first one active;
+it reads **All in use** once they are. Neither adds anything to the timeline: add the kept ranges from the
+**Kept ranges** list. While its analysis waits or runs, the header shows
 **Camera motion queued…** or its progress. Recordings prepared before this analysis existed show **Analyse
 camera motion** in the header instead, which queues one **Camera motion analysis** job
 (shown in Activity). Forward

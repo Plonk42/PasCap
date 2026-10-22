@@ -484,7 +484,7 @@
 }
 
 .smooth-panel .smooth-use-button,
-.smooth-panel .smooth-add-all-button {
+.smooth-panel .smooth-use-all-button {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -492,11 +492,14 @@
   padding-block: 0;
 }
 
-.smooth-panel .smooth-use-button {
+.smooth-panel-actions {
+  display: flex;
+  gap: 6px;
   margin-left: auto;
 }
 
-.smooth-use-button[data-applied]:disabled {
+.smooth-use-button[data-applied]:disabled,
+.smooth-use-all-button[data-applied]:disabled {
   border-color: var(--accent);
   color: var(--accent);
   opacity: 1;
