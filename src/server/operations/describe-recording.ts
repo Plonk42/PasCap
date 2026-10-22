@@ -9,13 +9,9 @@ import type { OperationRunner, ServiceContext } from './context.js';
 
 const FPS = PROJECT_FPS.numerator / PROJECT_FPS.denominator;
 
-/** The shots a contact sheet of `cells` shows: all of them, else the longest, in source order. */
+/** The shots a contact sheet of `cells` shows: all of them, else the best-ranked, in source order. */
 function pictured(shots: readonly SteadyShot[], cells: number): SteadyShot[] {
-  if (shots.length <= cells) return [...shots];
-  const longest = new Set(
-    [...shots].sort((a, b) => b.sourceOut - b.sourceIn - (a.sourceOut - a.sourceIn)).slice(0, cells),
-  );
-  return shots.filter((shot) => longest.has(shot));
+  return shots.filter((shot) => shot.rank <= cells);
 }
 
 /** The allowed movement asked for, else the active session's, else the editor's initial one. */

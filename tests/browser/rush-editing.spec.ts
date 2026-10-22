@@ -9,6 +9,7 @@ import {
   smoothRanges,
   type MotionAnalysis,
 } from '../../src/shared/motion-analysis.js';
+import { rankedSmoothRanges } from '../../src/shared/recording-shots.js';
 import {
   createClip,
   createLayer,
@@ -2009,15 +2010,16 @@ function jerkyThenSteady(asset: MediaAsset): MotionAnalysis {
   };
 }
 
-test('the motion timeline shows jolts, allowed movement and the steadiest range; Use applies it as IN/OUT', async ({
+test('the motion timeline shows jolts, allowed movement and the best steady range; Use applies it as IN/OUT', async ({
   page,
 }) => {
   const asset = assets[0]!;
   const fps = 30000 / 1001;
   const analysis = jerkyThenSteady(asset);
   const profile = motionProfile(analysis, fps);
-  const steady = smoothRanges(profile, SMOOTH_TOLERANCE.initial, fps)[0]!;
-  const tolerant = smoothRanges(profile, SMOOTH_TOLERANCE.max, fps)[0]!;
+  const best = (tolerance: number) => rankedSmoothRanges(analysis, smoothRanges(profile, tolerance, fps), fps)[0]!;
+  const steady = best(SMOOTH_TOLERANCE.initial);
+  const tolerant = best(SMOOTH_TOLERANCE.max);
   const seconds = (part: { sourceIn: number; sourceOut: number }): string =>
     `${((part.sourceOut - part.sourceIn) / fps).toFixed(2)} s`;
   expect(steady.sourceIn).toBeGreaterThan(20);
@@ -2052,8 +2054,9 @@ test('the motion timeline shows jolts, allowed movement and the steadiest range;
   expect(headBox!.y).toBeLessThan(stripBox!.y);
   expect(headBox!.y + headBox!.height).toBeCloseTo(timelineBox!.y + timelineBox!.height, 0);
 
-  const use = page.getByRole('button', { name: /^Use longest steady range / });
-  await expect(row.locator('.smooth-panel-summary')).toContainText(seconds(steady));
+  const use = page.getByRole('button', { name: /^Use best steady range / });
+  // A sideways pan while the drone flies reads as an orbit.
+  await expect(row.locator('.smooth-panel-summary')).toContainText(`orbit · ${seconds(steady)}`);
   await use.click();
   const strip = page.locator('.source-range-strip');
   await expect(strip).toHaveAttribute('data-source-in', String(steady.sourceIn));
@@ -2136,7 +2139,7 @@ test('the motion timeline shows jolts, allowed movement and the steadiest range;
   await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
   expect(requests).toEqual(['GET']);
 
-  // The dashed line itself is a handle: dragging it to the bottom asks for the steadiest footage.
+  // The dashed line itself is a handle: dragging it to the bottom asks for the steadiest footage only.
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', /^\d+$/);
   const frameBefore = await page.locator('.source-preview').getAttribute('data-source-frame');
   const box = (await imageLane.boundingBox())!;

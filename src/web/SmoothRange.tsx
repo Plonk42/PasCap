@@ -21,6 +21,7 @@ import {
   type SmoothRange,
   type TelemetrySample,
 } from '../shared/motion-analysis.js';
+import { rankedSmoothRanges, shotKind, type ShotKind } from '../shared/recording-shots.js';
 import { formatTimecode, type FrameRate } from '../shared/timing.js';
 import { api, ApiError } from './api.js';
 import { DamageMarks } from './DamageMarks.js';
@@ -67,6 +68,13 @@ type Phase =
 /** Analyses already fetched this session, per verified proxy. */
 const known = new Map<string, MotionAnalysis>();
 const NO_TELEMETRY: readonly TelemetrySample[] = [];
+const KIND_NAMES: Readonly<Record<ShotKind, string>> = {
+  orbit: 'orbit',
+  reveal: 'reveal',
+  move: 'camera move',
+  approach: 'approach',
+  static: 'nearly still',
+};
 
 function readTolerance(): number {
   const value = Number(readPreference(TOLERANCE_PREFERENCE));
@@ -95,7 +103,10 @@ export interface SmoothRangeState {
   phase: Phase;
   profile: MotionProfile | null;
   telemetry: readonly TelemetrySample[];
+  /** Steady ranges, the best first: orbits and reveals before other moves, approaches and still footage. */
   ranges: readonly SmoothRange[];
+  /** What the best range shows; null without one. */
+  bestKind: ShotKind | null;
   /** The allowed movement in effect, including a slider drag in progress. */
   tolerance: number;
   /** The kept allowed movement, without a drag in progress. */
@@ -106,7 +117,7 @@ export interface SmoothRangeState {
   find: () => void;
 }
 
-/** Steadiest-range suggestions for one recording, from the analysis made when its proxy was prepared. */
+/** Steady-range suggestions for one recording, from the analysis made when its proxy was prepared. */
 export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
   const ready = mediaReady(asset);
   const key = `${asset.id}/${asset.prepared?.verification.verifiedAt ?? ''}`;
@@ -186,21 +197,26 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
 
   const rate = asset.metadata.frameRate;
   const fps = rate.numerator / rate.denominator;
-  const profile = useMemo(() => (phase.kind === 'ready' ? motionProfile(phase.analysis, fps) : null), [phase, fps]);
+  const analysis = phase.kind === 'ready' ? phase.analysis : null;
+  const profile = useMemo(() => (analysis ? motionProfile(analysis, fps) : null), [analysis, fps]);
   const ranges = useMemo(
-    () => (profile ? smoothRanges(profile, tolerance, fps, asset.damage) : []),
-    [profile, tolerance, fps, asset.damage],
+    () =>
+      analysis && profile ? rankedSmoothRanges(analysis, smoothRanges(profile, tolerance, fps, asset.damage), fps) : [],
+    [analysis, profile, tolerance, fps, asset.damage],
   );
+  const best = ranges[0];
+  const bestKind = analysis && best ? shotKind(analysis, best.sourceIn, best.sourceOut, fps) : null;
   const keepTolerance = useCallback((value: number) => {
     setSavedTolerance(value);
     writePreference(TOLERANCE_PREFERENCE, String(value));
   }, []);
-  const telemetry = phase.kind === 'ready' ? phase.analysis.telemetry : NO_TELEMETRY;
+  const telemetry = analysis ? analysis.telemetry : NO_TELEMETRY;
   return {
     phase,
     profile,
     telemetry,
     ranges,
+    bestKind,
     tolerance,
     savedTolerance,
     setTolerance: keepTolerance,
@@ -419,20 +435,20 @@ function useAllHint(count: number, applied: boolean): string {
   return `Keep the ${count} steady ranges, replacing the kept ranges; adds nothing to the timeline`;
 }
 
-function suggestionText(best: SmoothRange | undefined, applied: boolean, rate: FrameRate) {
-  if (!best)
+function suggestionText(best: SmoothRange | undefined, kind: ShotKind | null, applied: boolean, rate: FrameRate) {
+  if (!best || !kind)
     return {
       span: '',
-      label: 'No steadiest range to use',
+      label: 'No steady range to use',
       hint: 'No steady range of 2 s or more at this allowed movement',
     };
   const from = formatTimecode(best.sourceIn, rate);
   const to = formatTimecode(best.sourceOut, rate);
-  const span = `${sourceSeconds(best.sourceOut - best.sourceIn)} · ${from} – ${to}`;
+  const span = `${KIND_NAMES[kind]} · ${sourceSeconds(best.sourceOut - best.sourceIn)} · ${from} – ${to}`;
   return {
     span,
-    label: `Use longest steady range ${from} to ${to}`,
-    hint: applied ? `In use: ${span}` : `Set IN and OUT to the longest steady range ${span}`,
+    label: `Use best steady range ${from} to ${to}`,
+    hint: applied ? `In use: ${span}` : `Set IN and OUT to the best steady range, ${span}`,
   };
 }
 
@@ -601,7 +617,7 @@ function AnalysisStatus({ smooth, disabled, onKeyDown }: Readonly<StatusProps>) 
       <button
         className="secondary-button small"
         type="button"
-        title="Measure the camera motion of this recording (a background job) and suggest its steadiest range"
+        title="Measure the camera motion of this recording (a background job) and suggest its best steady range"
         disabled={disabled}
         onKeyDown={onKeyDown}
         onClick={smooth.find}
@@ -657,7 +673,7 @@ interface PanelProps {
 }
 
 /**
- * The camera motion controls below the range fields: a header with the steadiest range and Use,
+ * The camera motion controls below the range fields: a header with the best steady range and Use,
  * then the allowed movement and the flight data choice. Collapsing also hides the lanes.
  */
 export function CameraMotionPanel({
@@ -671,13 +687,13 @@ export function CameraMotionPanel({
   onUseAll,
   onKeyDown,
 }: Readonly<PanelProps>) {
-  const { profile, telemetry, ranges, savedTolerance, setTolerance, previewTolerance } = smooth;
+  const { profile, telemetry, ranges, bestKind, savedTolerance, setTolerance, previewTolerance } = smooth;
   const toleranceId = useId();
   const { collapsed } = view;
   const available = useMemo(() => availableSeries(telemetry), [telemetry]);
   const best = ranges[0];
   const applied = best?.sourceIn === range.sourceIn && best?.sourceOut === range.sourceOut;
-  const { span, label, hint } = suggestionText(best, applied, asset.metadata.frameRate);
+  const { span, label, hint } = suggestionText(best, bestKind, applied, asset.metadata.frameRate);
   const allApplied = ranges.length > 0 && sameRanges(kept, ranges);
 
   return (
@@ -701,11 +717,11 @@ export function CameraMotionPanel({
           <Icon name={collapsed ? 'chevron-down' : 'chevron-up'} size={14} />
           <strong>Camera motion</strong>
         </button>
-        <HelpPopover label="Camera motion" guide="find-the-steadiest-range">
+        <HelpPopover label="Camera motion" guide="find-the-best-steady-range">
           <p>
             The lanes under the range show how the camera moves: the amber area marks jolts, the white line its movement
-            and the green bands steady ranges. Use longest sets IN and OUT to the longest one; Use all keeps every
-            steady range.
+            and the green bands steady ranges. Use best sets IN and OUT to the best one, favouring orbits and reveals
+            over approaches and nearly still footage; Use all keeps every steady range.
           </p>
           <p className="editor-help-tip">
             Tip: drag the dashed line, or move Allowed movement, to accept more or less movement.
@@ -714,11 +730,11 @@ export function CameraMotionPanel({
         {profile ? (
           <span
             className="smooth-panel-summary"
-            title={best ? `Steadiest range ${span}` : 'No steady range of 2 s or more'}
+            title={best ? `Best steady range: ${span}` : 'No steady range of 2 s or more'}
           >
             {best ? (
               <>
-                Steadiest range <b>{span}</b>
+                Best steady range <b>{span}</b>
               </>
             ) : (
               'No steady range of 2 s or more'
@@ -740,7 +756,7 @@ export function CameraMotionPanel({
               onClick={() => best && onApply(best)}
             >
               <Icon name={applied ? 'check' : 'wand'} size={14} />
-              <span>{applied ? 'In use' : 'Use longest'}</span>
+              <span>{applied ? 'In use' : 'Use best'}</span>
             </button>
             <button
               className="secondary-button small smooth-use-all-button"

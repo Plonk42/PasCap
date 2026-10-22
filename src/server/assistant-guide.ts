@@ -30,8 +30,9 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
 
 ## 3. Choose footage
 - describe_recording for each recording, without its sheet: its steady ranges inside the kept
-  ranges, with the camera move (pan, tilt, push in…), picture speed and flight data.
-- compare_recordings puts candidates from several recordings in one sheet: their longest steady
+  ranges, with the camera move (pan, tilt, push in…), what it shows (orbit, reveal, approach…),
+  its rank, picture speed and flight data.
+- compare_recordings puts candidates from several recordings in one sheet: their best steady
   ranges, or ranges you name, up to 16 cells. Flights hold several similar takes of one subject;
   compare them and keep only the best. Judge composition, light and subject from the pictures.
   frames 3 or 4 shows how a few finalists' movements start, develop and end.

@@ -263,7 +263,7 @@ export const api = {
       undefined,
       options,
     ),
-  /** Queues the camera-motion analysis that steadiest-range suggestions need. */
+  /** Queues the camera-motion analysis that steady-range suggestions need. */
   analyseMotion: (id: string) => request(`/api/media/${id}/motion`, z.object({ job: jobSchema }), 'POST', {}),
   /** The tempo, beat and section analysis of the current music cache, or null, and its queued or running job. */
   musicAnalysis: (id: string, options?: RequestOptions) =>
