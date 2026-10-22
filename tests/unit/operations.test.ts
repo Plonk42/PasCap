@@ -529,7 +529,10 @@ describe('operation routes', () => {
           tempo: { bpm: 89.91, confidence: 0.8, curve: [{ fromSample: 0, bpm: 89.91 }] },
           meter: { beatsPerBar: 4, confidence: 0.6 },
           beats,
-          accents: [{ sample: Math.round(70 * samplesPerFrame), strength: 0.9 }],
+          hits: [
+            { sample: Math.round(20 * samplesPerFrame), strength: 0.3, band: 'high', strong: false },
+            { sample: Math.round(58 * samplesPerFrame), strength: 0.9, band: 'low', strong: true },
+          ],
           sections: [{ fromSample: 0, toSample: Math.round(200 * samplesPerFrame), kind: 'build', loudnessDb: -14 }],
           tone: Array.from({ length: 10 }, () => [-20, -30, -50]),
           key: { tonic: 'A', mode: 'minor', confidence: 0.7 },
@@ -556,7 +559,11 @@ describe('operation routes', () => {
       trackId: 'track-1',
       analysis: 'analysed',
       tempo: { bpm: 89.9 },
-      accents: [],
+      hits: [
+        { frame: 20, timecode: '00:00:20', band: 'high', strong: false, strength: 0.3 },
+        { frame: 58, timecode: '00:01:28', band: 'low', strong: true, strength: 0.9 },
+      ],
+      hitsTruncated: false,
       key: { tonic: 'A', mode: 'minor' },
       sections: [{ start: 0, end: 120, kind: 'build', tone: { lowDb: -20, midDb: -30, highDb: -50 } }],
       swells: [{ start: 20, end: 40, kind: 'crescendo', changeDb: 8, sudden: false }],
@@ -569,8 +576,26 @@ describe('operation routes', () => {
     ]);
 
     const report = await runners.check_alignment(context, { projectId: 'music' });
-    expect(report.boundaries).toMatchObject([{ frame: 60, beat: { frame: 50, offset: 10 }, downbeat: { frame: 50 } }]);
-    expect(report.summary).toEqual({ boundaries: 1, onBeat: 0, onDownbeat: 0, meanOffset: 10 });
+    expect(report.boundaries).toMatchObject([
+      { frame: 60, beat: { frame: 50, offset: 10 }, downbeat: { frame: 50 }, hit: { frame: 58, offset: 2 } },
+    ]);
+    expect(report.summary).toEqual({ boundaries: 1, onBeat: 0, onDownbeat: 0, onHit: 0, meanOffset: 10 });
+    expect(report.hits).toBe(1);
+
+    for (const [prefer, sourceOut] of [
+      ['hit', 58],
+      ['beat-or-hit', 58],
+      ['downbeat', 50],
+    ] as const) {
+      const snapped = await runners.snap_cuts_to_beats(context, {
+        projectId: 'music',
+        layerId: base.layers[0]!.id,
+        prefer,
+        minimumSeconds: 1,
+        apply: false,
+      });
+      expect(snapped.commands, prefer).toEqual([{ type: 'trim', clipId: 'a', sourceIn: 0, sourceOut }]);
+    }
 
     const proposal = await runners.snap_cuts_to_beats(context, {
       projectId: 'music',

@@ -465,7 +465,7 @@ cancellation cleans only owned scratch/partials and preserves completed outputs.
 ### Music analysis
 
 Once music is ready, a **Music analysis** background job (after every other queued job,
-like camera motion analysis) finds its tempo, beats, downbeats, accents, loudness, tone,
+like camera motion analysis) finds its tempo, beats, downbeats, hits, loudness, tone,
 key, swells, silences and sections. It runs on one worker thread, streaming the PCM cache in 1 MiB blocks as a
 mono float mix (never the whole file): 2,048-sample Hann windows every 480 samples
 (10 ms), 40 mel bands from 30 Hz to 16 kHz, a spectral-flux onset envelope, tempo from
@@ -473,8 +473,13 @@ its autocorrelation (50–220 BPM; the fastest strong periodicity, with a mild p
 120 BPM), dynamic-programming beat tracking refined to the strongest onset within ±20 ms,
 downbeats, loudness per 100 ms, sections at least 8 s long from the novelty of 1 s
 band-level and pitch-class averages (**quiet**, **build**, **peak**, **release** from their
-loudness and its change), and accents (onset peaks above the 90th percentile, at least
-150 ms apart).
+loudness and its change), and hits (below).
+
+Beats and hits answer different questions. The **beats** are the pulse a listener taps along
+to: a regular grid inferred from how the onsets repeat, continuing through passages where
+nothing sounds on the beat; cutting on them keeps the edit in time, and clip lengths are
+counted in beats or bars. The **hits** are the sounds that stand out, on the beat or off it,
+in music with or without a pulse: places for a single cut or reveal.
 
 - **Tempo.** The song's tempo holds throughout. An 8 s window (every 2 s) takes its own
   tempo only where the song's tempo scores below half its own strongest periodicity, a
@@ -484,6 +489,12 @@ loudness and its change), and accents (onset peaks above the 90th percentile, at
   autocorrelation peak barely above its median) or a pulse clarity below 0.25 (the
   autocorrelation at the beat over the envelope's energy: scattered hits repeat little)
   report no tempo, meter or beats.
+- **Even grid.** Each tracked beat sits on the strongest onset within ±20 ms, so a note played
+  slightly early or late moved its beat with it (gaps of 444–497 ms, 10th to 90th percentile,
+  on a steady 128 BPM song). Each beat then moves onto the straightest line, against the beat
+  number, through itself and its 8 neighbours before it, around it or after it, whichever
+  fits best, so the grid is even (457–481 ms there, as regular as madmom's) while a tempo
+  change keeps its corner.
 - **Downbeats.** Each beat's salience is the standard score of its kick-band level plus that
   of its chord change (pitch-class profiles over the four beats before and after it).
   Dynamic programming over the beats gives each a bar position: the bar advances by one
@@ -505,23 +516,44 @@ loudness and its change), and accents (onset peaks above the 90th percentile, at
   turning points is a crescendo or decrescendo, timed from 10% to 90% of its change on
   loudness averaged over 0.5 s; under 1 s it is sudden. A step of at least 9 dB between
   the 2 s before and after a moment, inside a longer swell, is a sudden swell of its own.
+- **Hits.** The rhythmic hits that stand out, the waveform's teeth: places worth cutting on,
+  on the beat or between beats, in music with or without a steady beat. Two kinds of
+  candidate:
+  - an onset: a peak of the onset envelope, the highest within ±30 ms, at least 2.5 of the
+    envelope's song-wide standard deviations and 2 local standard deviations above its local
+    mean over ±1 s, so a steady or quiet passage gets none. It must also raise the spectral
+    flux by 4 over its mean over ±0.5 s or the waveform's peak level by 1.5 dB over the
+    270 ms before: steady noise has rare large fluctuations in its few low-frequency bins;
+  - a tooth: the highest sample of each 10 ms, in dB, 6 dB above its mean over ±0.5 s and
+    the highest within ±50 ms, above the silence level.
+
+  Candidates closer than 50 ms keep the most salient. Each hit has the band whose flux rose
+  most, each band in units of its own spread over the song: **low** (below 250 Hz: kick,
+  bass), **mid** (snare, most instruments) or **high** (from 4 kHz: hi-hat, cymbals). A hit
+  is **strong** when it stands out clearly (an onset 3 song-wide and 4 local standard
+  deviations up, or a tooth) and its peak level is within 6 dB of the loudest hit within
+  ±2 s; the others are light. Hits in the last 21 ms, where the analysis window runs past
+  the end, are left out.
 
 Every constant is in `MUSIC_ANALYSIS` ([analysis](../src/server/music-analysis.ts)); a
 10-minute song takes about 5 s and under 10 MB.
 
-The result is cached as `music-v3.json` beside `playback.pcm`, positions in PCM samples,
+The result is cached as `music-v4.json` beside `playback.pcm`, positions in PCM samples,
 tied to the original's content checksum and the cache file's size and modification time:
 re-preparing the cache makes it stale (ignored, never rewritten silently). Results of
-earlier analyses (`music-v1.json`, `music-v2.json`) are ignored, never deleted. Music analysed before this
+earlier analyses (`music-v1.json` to `music-v3.json`, which had accents instead of hits) are
+ignored, never deleted. Music analysed before this
 version, or whose analysis is stale, failed or was cancelled, shows
 **Tempo and beats not analysed** with **Analyse music** under **Recording** in
 **Audio → Music**; otherwise that line shows the tempo, meter and beat count, or the job's
 progress. `GET /api/audio/<id>/analysis` returns `{ analysis, job }`;
 `POST /api/audio/<id>/analysis` queues the job. A cancelled or failed analysis leaves the
-PCM cache and playback untouched. Beats map to project frames through each music clip's
-placement, source range and loops (`musicBeatFrames`). Unit tests use synthetic click
-tracks, modulated noise, swing, a tempo change, a soft passage under an arpeggio, chord
-changes, a short bar, scattered hits and loudness steps; no real song is in the repository.
+PCM cache and playback untouched. Beats and hits map to project frames through each music
+clip's placement, source range and loops (`musicBeatFrames`, `musicHitFrames`). Unit tests use
+synthetic click tracks, modulated noise, swing, a tempo change, a soft passage under an
+arpeggio, hits played up to 25 ms off the pulse, chord changes, a short bar, scattered hits,
+irregular and closely spaced hits, low, mid and high hits, steady noise and loudness steps;
+no real song is in the repository.
 
 On three of the owner's songs, compared with madmom's RNN beat and downbeat trackers (an
 independent reference, used only for evaluation, at whichever level of the beat it chose
@@ -536,7 +568,10 @@ in each 15 s):
 Limits: the downbeat cues are weak on real songs (meter confidence about 0.15–0.2 even when
 they agree), so downbeats can still land on the third beat; the tempo confidence and
 clarity thresholds are set from these three songs; sections remain coarse where the timbre
-barely changes. Beats sit about 9 ms after madmom's, below what is audible.
+barely changes. Beats sit about 9 ms after madmom's, below what is audible. The even grid
+leaves this agreement unchanged. On the 142 BPM song madmom keeps half the tempo in places,
+so its bars there span two of ours. No one has yet listened to these beats against the music
+([#254](https://github.com/Plonk42/PasCap/issues/254)): the agreement is with madmom.
 
 The key agrees with librosa's constant-Q chroma and the same profiles (an independent
 reference) on two of the three songs (C minor, G♯ major); on the third it reports the
@@ -544,8 +579,27 @@ relative major (C major for A minor). On those songs the swells follow the loudn
 99 s crescendo of 25 dB, a sudden 20 dB cut-off before the end. Instruments, voice and
 lyrics are not analysed ([#257](https://github.com/Plonk42/PasCap/issues/257)).
 
-Each analysed music clip shows its beats as ticks, and **Snap to beats** in the timeline
-toolbar snaps every snapping gesture to them ([snap to beats](TIMELINE_EDITING.md#snap-to-beats)).
+Hits on the same songs, compared with madmom's CNN onset detector (an independent reference,
+used only for evaluation, onsets with an activation of at least 0.5), agreeing within 50 ms;
+accents were the hits' predecessor, peaks above the song's 90th percentile 150 ms apart:
+
+| Song           | Accents: count, agreeing              | Hits: count (strong), agreeing          |
+| -------------- | ------------------------------------- | --------------------------------------- |
+| 148 s, 128 BPM | 372, 51% of them, 96% of madmom's 198 | 127 (44), 90% of them, 58% of madmom's  |
+| 278 s, 142 BPM | 657, 94% of them, 84% of madmom's 736 | 347 (216), 93% of them, 44% of madmom's |
+| 218 s, no beat | 518, 24% of them, 88% of madmom's 142 | 182 (78), 51% of them, 65% of madmom's  |
+
+Accents marked 2.4 places per second everywhere, quiet passages included. Hits keep fewer and
+follow the waveform's visible teeth; most of madmom's onsets they leave out are regular
+onsets already on the beat ticks (on the 142 BPM song) or soft notes. Their band agrees with
+librosa's onsets in the same band (an independent reference) for 78–95% of low, 84–98% of mid
+and 63–100% of high hits. Limits: soft onsets without a level jump, such as a new chord on a
+pad, are not hits; a click in a loud mix counts only when the waveform's peak rises; strong
+means strong within its passage, so a quiet song still has strong hits.
+
+Each analysed music clip shows its beats as ticks and its hits as marks, and **Snap to beats**
+in the timeline toolbar snaps every snapping gesture to its beats, downbeats or strong hits
+([snap to beats](TIMELINE_EDITING.md#snap-to-beats)).
 
 The editor also shows the rest of the analysis, display only (nothing is saved). Music
 lanes are 80 pixels tall. On each analysed music clip, at the positions they play after
@@ -561,16 +615,21 @@ its placement, source range and loops:
 - **Tone** is a strip along the bottom, three rows: low (below 250 Hz, orange), mid
   (green) and high (from 4 kHz, blue), each brighter where that band is louder, over the
   40 dB below its loudest second, in six steps, sampled every 3 pixels (at most 600
-  columns per clip).
+  columns per clip);
+- **Hits** are short marks standing on the tone strip, in the colour of their band: strong
+  hits 12 pixels tall and opaque, light ones 6 pixels and paler. When hits are closer than
+  4 pixels on average only the strong ones are drawn, then none, like beat ticks.
 
-Hovering a music clip shows a readout at the pointer: the timecode, section, loudness
-(or silence), any swell and the three tone levels there. Under **Recording**, the analysis
-line adds the key (**128 BPM · 4/4 · C minor · 290 beats**, or **No steady beat found ·
-C minor**), and a **Music structure** disclosure lists the selected clip's sections (with
-their loudness and average tone), swells (with their change in dB) and silences, each with
-its timeline position as a button that moves the playhead there: the keyboard and
-screen-reader route to the same information. Unanalysed music shows only the analysis
-line.
+Hovering a music clip shows a readout at the pointer: the timecode, any beat (**beat** or
+**downbeat**) and hit (**strong low hit**) within 4 pixels, section, loudness (or silence),
+any swell and the three tone levels
+there. Under **Recording**, the analysis line adds the key and the hit count (**128 BPM ·
+4/4 · C minor · 290 beats · 120 hits**, or **No steady beat found · C minor · 80 hits**),
+and a **Music structure** disclosure lists the selected clip's sections (with their loudness
+and average tone), swells (with their change in dB), silences and strong hits (with their
+band), each with its timeline position as a button that moves the playhead there: the
+keyboard and screen-reader route to the same information. Unanalysed music shows only the
+analysis line.
 
 ### Music waveform
 
@@ -596,7 +655,7 @@ in the project, and playback, the PCM cache and mixing are unchanged.
 - **Meanwhile.** Until the detail arrives, or when it cannot be read, the recording's
   up-to-2,048 stored peaks are drawn the same way, symmetrically.
 
-The tone strip, sections, swells, silences and beat ticks are drawn as before; the waveform
+The tone strip, sections, swells, silences, beat ticks and hit marks are drawn as before; the waveform
 remains an image named **Waveform for music track…**.
 
 ## Versioning

@@ -73,8 +73,11 @@ export function boundaries(project: ProjectDocument, layerId?: string): Boundary
     }));
 }
 
-/** The nearest beat to a frame, and the signed offset frame − beat; null without beats. */
-export function nearestBeat(beats: readonly PlacedBeat[], frame: number): { beat: number; offset: number } | null {
+/** The nearest beat (or hit) to a frame, and the signed offset frame − beat; null without any. */
+export function nearestBeat(
+  beats: readonly { frame: number }[],
+  frame: number,
+): { beat: number; offset: number } | null {
   let best: { beat: number; offset: number } | null = null;
   for (const beat of beats)
     if (!best || Math.abs(frame - beat.frame) < Math.abs(best.offset))
@@ -183,23 +186,21 @@ function snapBoundary(
 }
 
 /**
- * Trims the clips of one Ripple track so that each boundary, left to right, lands on the nearest beat (or
- * downbeat): shortening the left clip, or lengthening it where its recording has footage inside the kept
- * ranges, else the nearest beat on the other side; each clip stays at least `minimumFrames` long. A trim
- * moves every later clip, so boundaries are taken one at a time on the edited project.
+ * Trims the clips of one Ripple track so that each boundary, left to right, lands on the nearest target
+ * frame (beat, downbeat or hit): shortening the left clip, or lengthening it where its recording has footage
+ * inside the kept ranges, else the nearest target on the other side; each clip stays at least `minimumFrames`
+ * long. A trim moves every later clip, so boundaries are taken one at a time on the edited project.
  */
 export function snapCutsToBeats(
   project: ProjectDocument,
   layerId: string,
-  beats: readonly PlacedBeat[],
-  downbeatsOnly: boolean,
+  targets: readonly number[],
   minimumFrames: number,
   sources: SnapSources,
 ): SnapResult {
   const layer = project.layers.find((item) => item.id === layerId);
   if (!layer) throw new Error(`The project has no video track ${layerId}.`);
   if (!layer.ripple) throw new Error('Snapping cuts needs a Ripple track, where later clips follow a shortened one.');
-  const targets = beats.filter((beat) => !downbeatsOnly || beat.downbeat).map((beat) => beat.frame);
   let document = project;
   const commands: EditCommand[] = [];
   const result: SnappedBoundary[] = [];

@@ -626,19 +626,21 @@ toggle persists for the current timeline session, not the renderable document.
 
 ### Snap to beats
 
-**Snap to beats** (metronome icon beside **Snap**) adds the analysed beats of every
+**Snap to beats** (metronome icon beside **Snap**) adds the analysed beats or hits of every
 music clip ([music analysis](SPEED_AND_AUDIO.md#music-analysis)) to the snap targets of
-every snapping gesture above, so cuts land on the beat. Its menu chooses **Off**,
-**Beats** or **Downbeats only**; the button toggles between Off and the last choice, and
-the choice is a browser preference. It works only while **Snap** is on (otherwise the
-button explains why), and Alt still bypasses it. The beats are computed from each music
+every snapping gesture above, so cuts land on the music. Its menu chooses **Off**,
+**Beats**, **Downbeats only**, **Hits** (strong hits only) or **Beats and hits** (beats and
+strong hits); the button, labelled with the last choice, toggles between Off and that
+choice, and the choice is a browser preference. Hits suit music without a steady beat and
+the irregular hits between beats. It works only while **Snap** is on (otherwise the
+button explains why), and Alt still bypasses it. The targets are computed from each music
 clip's current placement, source range and loops at the start of every gesture, so they
 follow the clip when it moves, is trimmed or changes recording; a music clip being
-moved or trimmed never snaps to its own beats. Nothing is written to the project:
-bookmarks stay the user's own. While beat snapping is active, the beats it uses appear
-as ticks along the bottom of the time ruler (downbeats taller), thinned like the clip
-ticks below when they are closer than 4 pixels. Music without an analysis or without a
-steady beat adds no targets.
+moved or trimmed never snaps to its own beats or hits. Nothing is written to the project:
+bookmarks stay the user's own. While beat snapping is active, the targets it uses appear
+as ticks along the bottom of the time ruler (downbeats taller, strong hits in the colour of
+their band), thinned like the clip ticks below when they are closer than 4 pixels. Music
+without an analysis adds no targets, and music without a steady beat only hits.
 
 ### Bookmarks
 
@@ -677,8 +679,10 @@ music or keyframes and are never rendered or exported.
 
 Each analysed music clip shows its beats as ticks above its tone strip, downbeats
 taller and brighter, following its placement, source range and loops; when beats are
-closer than 4 pixels only downbeats are drawn, then none. The ticks are display only;
-the clip also shows the music's structure ([music analysis](SPEED_AND_AUDIO.md#music-analysis)).
+closer than 4 pixels only downbeats are drawn, then none. Its hits are short marks standing
+on the tone strip in the colour of their band, strong ones taller, thinned the same way. The
+ticks and marks are display only; the clip also shows the music's structure
+([music analysis](SPEED_AND_AUDIO.md#music-analysis)).
 
 Adding, moving and deleting are each one Undo step and autosave like other edits.
 Bookmarks are project-wide: not per track, named, coloured or ranged.

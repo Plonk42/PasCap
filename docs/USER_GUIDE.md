@@ -291,11 +291,13 @@ are saved with the project but never rendered or exported. Details:
 
 To cut on the music, turn on **Snap to beats** (metronome icon beside **Snap**): every
 snapping gesture then also lands on the analysed beats of the music clips, wherever they
-are placed, and the ruler shows those beats as ticks. Its arrow chooses **Beats** or
-**Downbeats only**. Analysed music clips also show their sections (quiet, build, peak,
-release), swells, silences and a low/mid/high tone strip; hover one for a readout, or open
-**Audio → Music structure** for a list with the key. Details:
-[snap to beats](TIMELINE_EDITING.md#snap-to-beats) and
+are placed, and the ruler shows those beats as ticks. Its arrow chooses **Beats**,
+**Downbeats only**, **Hits** (the strong hits: a kick, a snare or a crash that stands out,
+also in music without a steady beat) or **Beats and hits**. Analysed music clips also show
+their hits as marks coloured by band (low, mid, high; strong ones taller), sections (quiet,
+build, peak, release), swells, silences and a low/mid/high tone strip; hover one for a
+readout, or open **Audio → Music structure** for a list with the key and the strong hits.
+Details: [snap to beats](TIMELINE_EDITING.md#snap-to-beats) and
 [music analysis](SPEED_AND_AUDIO.md#music-analysis).
 
 The waveform on every music clip shows the music's level every 10 ms, one column per pixel of

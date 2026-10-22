@@ -69,3 +69,16 @@
 .timeline-ruler-beats .downbeat {
   stroke: rgb(243 217 164 / 95%);
 }
+
+/* Strong hits in the colours of the tone strip's bands. */
+.timeline-ruler-beats .hit.low {
+  stroke: #ff9b73;
+}
+
+.timeline-ruler-beats .hit.mid {
+  stroke: #b6e388;
+}
+
+.timeline-ruler-beats .hit.high {
+  stroke: #8cc7ff;
+}
