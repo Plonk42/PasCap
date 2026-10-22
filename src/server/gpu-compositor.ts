@@ -19,6 +19,7 @@ import {
   type GpuWorkerConfig,
 } from '../shared/gpu-protocol.js';
 import { forEachSerial } from '../shared/serial.js';
+import { signalChild } from './child-signal.js';
 import { ServiceError } from './errors.js';
 import type { ContentBounds } from './layered-frame.js';
 
@@ -562,8 +563,8 @@ export class GpuCompositor {
     this.#next = null;
     const child = this.#child;
     if (child?.exitCode === null && child.signalCode === null) {
-      child.kill('SIGTERM');
-      const killed = setTimeout(() => child.kill('SIGKILL'), 3_000);
+      signalChild(child, 'SIGTERM');
+      const killed = setTimeout(() => signalChild(child, 'SIGKILL'), 3_000);
       await this.#exited.promise;
       clearTimeout(killed);
     }

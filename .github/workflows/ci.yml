@@ -34,7 +34,8 @@ jobs:
       # npm run check, one step per phase: the jobs API names the phase even when a lost runner leaves no log (#263).
       - run: npm run format:check
         timeout-minutes: 3
-      - run: npm test
+      # Own session: a signal to the tests' process group must never reach the runner, which loses the log (#263).
+      - run: setsid --wait npm test
         timeout-minutes: 8
       - run: npm run build
         timeout-minutes: 5

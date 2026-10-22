@@ -8,6 +8,7 @@ import {
   type TelemetrySample,
 } from '../shared/motion-analysis.js';
 import { whileSerial } from '../shared/serial.js';
+import { signalChild } from './child-signal.js';
 import { ServiceError } from './errors.js';
 import { MotionPool } from './motion-pool.js';
 import { runProcess } from './process.js';
@@ -360,8 +361,11 @@ export async function analyseProxy(
       'rawvideo',
       'pipe:1',
     ],
-    { stdio: ['ignore', 'pipe', 'pipe'], signal },
+    // Not spawn's own signal option, whose abort signals a failed spawn too.
+    { stdio: ['ignore', 'pipe', 'pipe'] },
   );
+  const stop = (): void => signalChild(child, 'SIGTERM');
+  signal.addEventListener('abort', stop, { once: true });
   let stderr = '';
   child.stderr.on('data', (chunk: Buffer) => {
     if (stderr.length < 4096) stderr += chunk.toString();
@@ -437,7 +441,8 @@ export async function analyseProxy(
       () => append(),
     );
   } finally {
-    if (child.exitCode === null) child.kill('SIGKILL');
+    signal.removeEventListener('abort', stop);
+    if (child.exitCode === null) signalChild(child, 'SIGKILL');
     await Promise.allSettled(pending);
     await pool?.close();
   }

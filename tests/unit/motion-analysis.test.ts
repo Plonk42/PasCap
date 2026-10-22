@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { blockSpectra, estimateMotion, measureFrames, parseTelemetry } from '../../src/server/motion.js';
+import { ChildProcess } from 'node:child_process';
+import { describe, expect, it, vi } from 'vitest';
+import { analyseProxy, blockSpectra, estimateMotion, measureFrames, parseTelemetry } from '../../src/server/motion.js';
 import { MotionPool } from '../../src/server/motion-pool.js';
 import {
   MOTION_ANALYSIS_VERSION,
@@ -155,6 +156,24 @@ describe('camera motion estimation', () => {
       await pool.close();
     }
     expect(MotionPool.forHost(2)).toBeNull();
+  });
+
+  it('never signals a decoder that failed to start, which Node would send to the whole process group (#263)', async () => {
+    // Recorded, not sent: the signal of a failed spawn goes to kill(0), the test runner's own group.
+    const kill = vi.spyOn(ChildProcess.prototype, 'kill').mockReturnValue(false);
+    try {
+      const controller = new AbortController();
+      controller.abort();
+      // A job reaches the decoder within a microtask, before the failed spawn reports itself on the next tick.
+      await Promise.resolve();
+      await expect(
+        analyseProxy('/pascap-missing-ffmpeg', 'proxy.mp4', 30, 'verified', controller.signal, () => {}),
+      ).rejects.toThrow('Job cancelled.');
+      const unstarted = (kill.mock.contexts as ChildProcess[]).filter((child) => child.pid === undefined);
+      expect(unstarted.map((child) => child.spawnfile)).toEqual([]);
+    } finally {
+      kill.mockRestore();
+    }
   });
 });
 
