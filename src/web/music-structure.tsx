@@ -1,6 +1,6 @@
 import { musicSourceFrame } from '../shared/audio.js';
 import type { MusicTrack } from '../shared/model.js';
-import { musicSpans, type MusicAnalysis, type PlacedSpan } from '../shared/music-analysis.js';
+import { musicHitFrames, musicSpans, type MusicAnalysis, type PlacedSpan } from '../shared/music-analysis.js';
 import { MUSIC_SAMPLE_RATE, MUSIC_SAMPLES_PER_FRAME } from '../shared/music-format.js';
 import { formatTimecode } from '../shared/timing.js';
 
@@ -44,12 +44,24 @@ function toneText(tone: readonly number[] | undefined): string {
   return tone ? TONE_BANDS.map((band, index) => `${band} ${decibels(tone[index]!)}`).join(' · ') : '';
 }
 
-/** What plays at a project frame of the clip: the hover readout. */
-export function describeMusicMoment(music: MusicTrack, analysis: MusicAnalysis, frame: number): string {
+/** "strong low hit": a hit's strength and band. */
+const hitText = (hit: { strong: boolean; band: string }): string =>
+  `${hit.strong ? 'strong' : 'light'} ${hit.band} hit`;
+
+/** What plays at a project frame of the clip, with a hit within `reach` frames: the hover readout. */
+export function describeMusicMoment(music: MusicTrack, analysis: MusicAnalysis, frame: number, reach = 0): string {
   const sample = sampleAt(music, frame);
   if (sample === null) return formatTimecode(frame);
   const inside = (stretch: Stretch): boolean => sample >= stretch.fromSample && sample < stretch.toSample;
   const parts = [formatTimecode(frame)];
+  let hit: ReturnType<typeof musicHitFrames>[number] | undefined;
+  for (const candidate of musicHitFrames(music, analysis.hits))
+    if (
+      Math.abs(candidate.frame - frame) <= reach &&
+      (!hit || Math.abs(candidate.frame - frame) < Math.abs(hit.frame - frame))
+    )
+      hit = candidate;
+  if (hit) parts.push(hitText(hit));
   const section = analysis.sections.find(inside);
   if (section) parts.push(section.kind);
   const silent = analysis.silences.some(inside);
@@ -193,7 +205,7 @@ function StructureItem({
   );
 }
 
-/** The clip's sections, swells and silences at their timeline positions, for reading and keyboard access. */
+/** The clip's sections, swells, silences and strong hits at their timeline positions, for reading and keyboard access. */
 export function MusicStructureList({
   music,
   analysis,
@@ -202,7 +214,8 @@ export function MusicStructureList({
   const sections = placeAll(music, analysis.sections);
   const swells = placeAll(music, analysis.swells);
   const silences = placeAll(music, analysis.silences);
-  if (!sections.length && !swells.length && !silences.length) return null;
+  const hits = musicHitFrames(music, analysis.hits).filter((hit) => hit.strong);
+  if (!sections.length && !swells.length && !silences.length && !hits.length) return null;
   return (
     <details className="music-structure">
       <summary>Music structure</summary>
@@ -252,6 +265,21 @@ export function MusicStructureList({
                 frame={span.start}
                 onSeek={onSeek}
                 text={`Silence to ${formatTimecode(span.end)}`}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
+      {hits.length > 0 && (
+        <section aria-label="Strong hits">
+          <h4>Strong hits</h4>
+          <ul>
+            {hits.map((hit) => (
+              <StructureItem
+                key={`hit-${hit.frame}`}
+                frame={hit.frame}
+                onSeek={onSeek}
+                text={`${hit.band[0]!.toUpperCase()}${hit.band.slice(1)} hit`}
               />
             ))}
           </ul>

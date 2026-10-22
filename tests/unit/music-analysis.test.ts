@@ -3,6 +3,7 @@ import { analyseFeatures, MusicFeatureExtractor } from '../../src/server/music-a
 import {
   keyName,
   musicBeatFrames,
+  musicHitFrames,
   musicSpans,
   type MusicAnalysis,
   type MusicMeasurement,
@@ -14,6 +15,8 @@ import { singleClipLane } from '../music-lanes.js';
 
 const RATE = 48_000;
 const TOLERANCE = 0.035 * RATE;
+/** A hit is marked within 15 ms of its onset. */
+const HIT_TOLERANCE = 0.015 * RATE;
 
 /** Deterministic white noise in −1…1. */
 function noise(seed: number): () => number {
@@ -263,22 +266,97 @@ describe('music analysis · synthetic signals', () => {
     expect(result.sections.map((section) => section.kind)).toContain('build');
   });
 
-  it('marks accents on hits far stronger than the rest', () => {
-    const truth = beatTimes(120, 0.2, 30);
-    const strong = new Set([10, 31, 47]);
-    const result = analyse(
-      render(
-        30,
-        truth.map((time, index) => ({ time, gain: strong.has(index) ? 1 : 0.1 })),
-      ),
+  it('marks irregular hits between regular beats, at their sample and strong', () => {
+    const beats = beatTimes(120, 0.2, 28);
+    const random = noise(11);
+    // Twelve louder hits at irregular moments 0.2–0.3 s after a beat, never beside one.
+    const extra = Array.from(
+      { length: 12 },
+      (_, index) => 0.4 + 0.5 * (3 + Math.floor(4.6 * index)) + 0.1 * Math.abs(random()),
     );
-    const accents = result.accents.filter((accent) => accent.strength > 0.6).map((accent) => accent.sample);
+    const result = analyse(
+      render(28, [...beats.map((time) => ({ time, gain: 0.15 })), ...extra.map((time) => ({ time, gain: 0.9 }))]),
+    );
+    const strong = result.hits.filter((hit) => hit.strong).map((hit) => hit.sample);
+    expect(fMeasure(strong, extra)).toBe(1);
+    // The quiet beats are hits too, light ones.
     expect(
       fMeasure(
-        accents,
-        [...strong].map((index) => truth[index]!),
+        result.hits.map((hit) => hit.sample),
+        [...beats, ...extra],
       ),
     ).toBe(1);
+    for (const time of extra) {
+      const hit = result.hits.find((candidate) => Math.abs(candidate.sample - time * RATE) <= HIT_TOLERANCE);
+      expect(hit, `hit at ${time.toFixed(3)} s`).toBeDefined();
+    }
+  });
+
+  it('keeps closely spaced hits apart', () => {
+    const times = [1, 1.08, 3, 3.06, 5, 5.12];
+    const result = analyse(
+      render(
+        7,
+        times.map((time) => ({ time, gain: 0.6 })),
+        () => 0.01,
+      ),
+    );
+    expect(
+      fMeasure(
+        result.hits.map((hit) => hit.sample),
+        times,
+      ),
+    ).toBe(1);
+  });
+
+  it('names the band that rose most at each hit', () => {
+    const tone = (hz: number, start: number) => (time: number) =>
+      time >= start && time < start + 0.1 ? Math.exp(-(time - start) / 0.03) * Math.sin(2 * Math.PI * hz * time) : 0;
+    const random = noise(17);
+    let previous = 0;
+    const hiss = (time: number): number => {
+      // Differenced noise: a hi-hat's energy sits above 4 kHz.
+      const value = random();
+      const high = value - previous;
+      previous = value;
+      return time >= 5 && time < 5.05 ? 0.3 * Math.exp(-(time - 5) / 0.01) * high : 0;
+    };
+    const kick = tone(60, 1);
+    const snare = tone(1_000, 3);
+    const signal = Float32Array.from({ length: 7 * RATE }, (_, index) => {
+      const time = index / RATE;
+      return 0.6 * kick(time) + 0.4 * snare(time) + hiss(time);
+    });
+    const { hits } = analyse(signal);
+    const at = (time: number) => hits.find((hit) => Math.abs(hit.sample - time * RATE) <= HIT_TOLERANCE)?.band;
+    expect([at(1), at(3), at(5)]).toEqual(['low', 'mid', 'high']);
+  });
+
+  it('tells strong hits from light ones', () => {
+    const loud = [2, 6, 10];
+    const soft = [4, 8];
+    const result = analyse(
+      render(
+        12,
+        [...loud.map((time) => ({ time, gain: 0.8 })), ...soft.map((time) => ({ time, gain: 0.08 }))],
+        () => 0.01,
+      ),
+    );
+    const near = (time: number) => result.hits.find((hit) => Math.abs(hit.sample - time * RATE) <= HIT_TOLERANCE);
+    for (const time of loud) expect(near(time)?.strong, `${time} s`).toBe(true);
+    for (const time of soft) expect(near(time)?.strong ?? false, `${time} s`).toBe(false);
+  });
+
+  it.each([
+    { name: 'steady noise', sample: (_: number, random: () => number) => 0.3 * random() },
+    { name: 'loud steady noise', sample: (_: number, random: () => number) => 0.9 * random() },
+    { name: 'quiet steady noise', sample: (_: number, random: () => number) => 0.01 * random() },
+    { name: 'a held tone', sample: (time: number) => 0.5 * Math.sin(2 * Math.PI * 440 * time) },
+  ])('marks no hits in $name', ({ sample }) => {
+    const random = noise(21);
+    const signal = Float32Array.from({ length: 10 * RATE }, (_, index) => sample(index / RATE, random));
+    // The onset of a held tone at the very start is not a hit after it.
+    expect(analyse(signal).hits.filter((hit) => hit.sample > 0.2 * RATE)).toEqual([]);
   });
 
   it('is deterministic and independent of the streamed block size', () => {
@@ -372,9 +450,9 @@ describe('music analysis · synthetic signals', () => {
     expect(Math.abs(drop!.fromSample / RATE - 20)).toBeLessThan(0.5);
   });
 
-  it('reports silence without tempo, beats or accents', () => {
+  it('reports silence without tempo, beats or hits', () => {
     const result = analyse(new Float32Array(10 * RATE));
-    expect(result).toMatchObject({ tempo: null, meter: null, beats: [], accents: [], samples: 10 * RATE });
+    expect(result).toMatchObject({ tempo: null, meter: null, beats: [], hits: [], samples: 10 * RATE });
     expect(result.sections).toEqual([{ fromSample: 0, toSample: 10 * RATE, kind: 'quiet', loudnessDb: -120 }]);
     expect(result.loudness.every((value) => value === -120)).toBe(true);
     expect(result).toMatchObject({ key: null, swells: [], silences: [{ fromSample: 0, toSample: 10 * RATE }] });
@@ -395,6 +473,10 @@ describe('music beats at project frames', () => {
     strength: 1,
     downbeat: index % 2 === 0,
   }));
+  const hits: MusicAnalysis['hits'] = [
+    { sample: Math.round(12 * MUSIC_SAMPLES_PER_FRAME), strength: 0.3, band: 'high', strong: false },
+    { sample: Math.round(27 * MUSIC_SAMPLES_PER_FRAME), strength: 0.9, band: 'low', strong: true },
+  ];
   const track = (patch: Partial<MusicTrack>): MusicTrack => ({
     id: 'music',
     mediaId: 'audio-1',
@@ -430,22 +512,35 @@ describe('music beats at project frames', () => {
     ]);
   });
 
+  it('places hits with their band and strength across loop wraps', () => {
+    expect(musicHitFrames(track({ sourceIn: 5, sourceOut: 30, duration: 70, loop: true }), hits)).toEqual([
+      { frame: 107, band: 'high', strong: false, strength: 0.3 },
+      { frame: 122, band: 'low', strong: true, strength: 0.9 },
+      { frame: 132, band: 'high', strong: false, strength: 0.3 },
+      { frame: 147, band: 'low', strong: true, strength: 0.9 },
+      { frame: 157, band: 'high', strong: false, strength: 0.3 },
+    ]);
+  });
+
   it('snaps to the beats or downbeats of every music clip where it plays now, never to excluded clips', () => {
     const document = createProject('beat-snap', 'Beat snap');
     document.music = [
       singleClipLane(track({ id: 'looped', sourceIn: 5, sourceOut: 30, duration: 70, loop: true })),
       singleClipLane(track({ id: 'other', mediaId: 'unanalysed', start: 400 })),
     ];
-    const beatsOf = (mediaId: string) => (mediaId === 'audio-1' ? beats : null);
-    expect(musicBeatSnap(beatsOf, false)(document)).toEqual([105, 115, 130, 140, 155, 165]);
-    expect(musicBeatSnap(beatsOf, true)(document)).toEqual([115, 140, 165]);
-    expect(musicBeatSnap(beatsOf, false)(document, new Set(['looped']))).toEqual([]);
+    const beatsOf = (mediaId: string) => (mediaId === 'audio-1' ? { beats, hits } : null);
+    expect(musicBeatSnap(beatsOf, 'beats')(document)).toEqual([105, 115, 130, 140, 155, 165]);
+    expect(musicBeatSnap(beatsOf, 'downbeats')(document)).toEqual([115, 140, 165]);
+    expect(musicBeatSnap(beatsOf, 'beats')(document, new Set(['looped']))).toEqual([]);
+    // Only strong hits snap: the light one at source frame 12 is left out.
+    expect(musicBeatSnap(beatsOf, 'hits')(document)).toEqual([122, 147]);
+    expect(musicBeatSnap(beatsOf, 'beats-hits')(document)).toEqual([105, 115, 122, 130, 140, 147, 155, 165]);
     expect(snapPoints(document)).toEqual([0, 100, 170, 400, 450]);
-    expect(snapPoints(document, musicBeatSnap(beatsOf, true))).toEqual([0, 100, 115, 140, 165, 170, 400, 450]);
+    expect(snapPoints(document, musicBeatSnap(beatsOf, 'downbeats'))).toEqual([0, 100, 115, 140, 165, 170, 400, 450]);
     // Moving the clip moves its beats; nothing is written to the project.
     const moved = structuredClone(document);
     moved.music[0]!.clips[0]!.start = 200;
-    expect(musicBeatSnap(beatsOf, true)(moved)).toEqual([215, 240, 265]);
+    expect(musicBeatSnap(beatsOf, 'downbeats')(moved)).toEqual([215, 240, 265]);
     expect(document.bookmarks).toEqual([]);
   });
 });

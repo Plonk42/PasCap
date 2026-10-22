@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { editCommandSchema } from '../command-schema.js';
 import { described } from '../described.js';
 import { frameSchema, idSchema } from '../model.js';
-import { pitchNames, sectionKinds, swellKinds } from '../music-analysis.js';
+import { hitBands, pitchNames, sectionKinds, swellKinds } from '../music-analysis.js';
 import { defineOperation } from './spec.js';
 import { durationSchema, timecodeSchema } from './timecode.js';
 
@@ -21,11 +21,23 @@ const placedBeat = z
     strength: described(z.number(), 'Onset strength, 0–1.'),
   })
   .strict();
+const placedHit = z
+  .object({
+    frame: frameSchema,
+    timecode: timecodeSchema,
+    band: described(
+      z.enum(hitBands),
+      'The band that rose most: low below 250 Hz (kick, bass), mid (snare, most instruments), high above 4 kHz (hi-hat, cymbals).',
+    ),
+    strong: described(z.boolean(), 'Stands out strongly: the hits a viewer notices, which snapping uses.'),
+    strength: described(z.number(), 'How strongly it stands out, 0–1.'),
+  })
+  .strict();
 
 export const musicAnalysis = defineOperation({
   name: 'music_analysis',
   description:
-    "Read the music of the project's music clips at project frames (where each plays on the timeline, repeated across loops): tempo, meter, beats, downbeats, accents (strong hits worth cutting on), key and mode, sections (quiet, build, peak, release) with their loudness and tone (low, mid and high frequency levels), swells (crescendos and decrescendos, sudden or gradual) and silences. Use a frame window for long music. A clip whose music is not analysed yet says so; ask the user to analyse it in Audio → Music.",
+    "Read the music of the project's music clips at project frames (where each plays on the timeline, repeated across loops): tempo, meter, beats, downbeats, hits (rhythmic hits that stand out from their surroundings, such as a kick, a snare or a cymbal crash, each with the band that rose most and whether it is strong: the places worth cutting on), key and mode, sections (quiet, build, peak, release) with their loudness and tone (low, mid and high frequency levels), swells (crescendos and decrescendos, sudden or gradual) and silences. Use a frame window for long music. A clip whose music is not analysed yet says so; ask the user to analyse it in Audio → Music.",
   input: z
     .object({
       projectId,
@@ -55,7 +67,11 @@ export const musicAnalysis = defineOperation({
               z.boolean(),
               `True when more than ${MAX_LISTED_BEATS} beats fall in the window; ask for a narrower one.`,
             ),
-            accents: z.array(z.object({ frame: frameSchema, strength: z.number() }).strict()),
+            hits: z.array(placedHit),
+            hitsTruncated: described(
+              z.boolean(),
+              `True when more than ${MAX_LISTED_BEATS} hits fall in the window; ask for a narrower one.`,
+            ),
             key: described(
               z
                 .object({ tonic: z.enum(pitchNames), mode: z.enum(['major', 'minor']), confidence: z.number() })
@@ -106,13 +122,14 @@ const offset = described(
 export const checkAlignment = defineOperation({
   name: 'check_alignment',
   description:
-    'Measure how the cut follows the music: for every boundary of every video track (or one), the frame the viewer perceives as the change (the cut, the middle of a dissolve, the middle of a black pause), its nearest beat and downbeat and the signed offsets in frames, and a summary. Within one frame of a beat counts as on the beat.',
+    'Measure how the cut follows the music: for every boundary of every video track (or one), the frame the viewer perceives as the change (the cut, the middle of a dissolve, the middle of a black pause), its nearest beat, downbeat and strong hit and the signed offsets in frames, and a summary. Within one frame of a beat or hit counts as on it.',
   input: z
     .object({ projectId, layerId: described(idSchema.optional(), 'One video track only.'), musicClipId })
     .strict(),
   output: z
     .object({
       beats: described(z.number().int().nonnegative(), 'Beats of the analysed music clips considered.'),
+      hits: described(z.number().int().nonnegative(), 'Strong hits of the analysed music clips considered.'),
       boundaries: z.array(
         z
           .object({
@@ -124,6 +141,7 @@ export const checkAlignment = defineOperation({
             timecode: timecodeSchema,
             beat: offset,
             downbeat: offset,
+            hit: offset,
           })
           .strict(),
       ),
@@ -132,6 +150,7 @@ export const checkAlignment = defineOperation({
           boundaries: z.number().int().nonnegative(),
           onBeat: described(z.number().int().nonnegative(), 'Boundaries within one frame of a beat.'),
           onDownbeat: described(z.number().int().nonnegative(), 'Boundaries within one frame of a downbeat.'),
+          onHit: described(z.number().int().nonnegative(), 'Boundaries within one frame of a strong hit.'),
           meanOffset: described(z.number().nullable(), 'Mean absolute offset from the nearest beat, in frames.'),
         })
         .strict(),
@@ -144,12 +163,15 @@ export const checkAlignment = defineOperation({
 export const snapCutsToBeats = defineOperation({
   name: 'snap_cuts_to_beats',
   description:
-    "Move the boundaries of one Ripple video track onto the music: left to right, trim each boundary's left clip so the change lands on the nearest beat (or downbeat), shortening it, or lengthening it where its recording has footage inside the kept ranges, else taking the nearest beat on the other side; each clip stays at least minimumSeconds long and transitions keep their durations; later clips follow. Returns the proposed trim commands and each boundary before and after; with apply, saves them as one edit (needs the session and expectedRevision). Do the arithmetic with this rather than by hand.",
+    "Move the boundaries of one Ripple video track onto the music: left to right, trim each boundary's left clip so the change lands on the nearest beat (or downbeat, or strong hit), shortening it, or lengthening it where its recording has footage inside the kept ranges, else taking the nearest one on the other side; each clip stays at least minimumSeconds long and transitions keep their durations; later clips follow. Returns the proposed trim commands and each boundary before and after; with apply, saves them as one edit (needs the session and expectedRevision). Do the arithmetic with this rather than by hand.",
   input: z
     .object({
       projectId,
       layerId: described(idSchema, 'ID of a video track with Ripple on.'),
-      prefer: described(z.enum(['beat', 'downbeat']).default('beat'), 'Snap to every beat or to downbeats only.'),
+      prefer: described(
+        z.enum(['beat', 'downbeat', 'hit', 'beat-or-hit']).default('beat'),
+        'Snap to every beat, to downbeats only, to strong hits only, or to beats and strong hits.',
+      ),
       minimumSeconds: described(
         z.number().min(0).max(60).default(1),
         'Shortest a clip may become; a boundary that would need a shorter clip stays where it is.',
@@ -170,7 +192,7 @@ export const snapCutsToBeats = defineOperation({
             leftId: idSchema,
             rightId: idSchema,
             before: frameSchema,
-            beat: frameSchema.nullable(),
+            beat: described(frameSchema.nullable(), 'The beat or hit reached, else the nearest one.'),
             after: frameSchema,
             skipped: described(z.string().nullable(), 'Why the boundary stays where it is.'),
           })

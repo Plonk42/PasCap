@@ -1462,11 +1462,11 @@ export function Timeline(props: Readonly<Props>) {
                 leading={leading}
                 scale={scale}
               />
-              {beatSnap.active && (
+              {beatSnap.active && beatSnap.mode !== 'off' && (
                 <RulerBeats
                   project={visible}
-                  beatsOf={beatSnap.beatsOf}
-                  downbeatsOnly={beatSnap.mode === 'downbeats'}
+                  analysisOf={beatSnap.analysisOf}
+                  target={beatSnap.mode}
                   leading={leading}
                   scale={scale}
                   width={width}

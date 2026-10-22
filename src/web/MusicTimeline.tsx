@@ -11,7 +11,7 @@ import {
 import type { AudioAsset } from '../shared/audio.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MusicTrack, ProjectDocument } from '../shared/model.js';
-import { musicBeatFrames, type MusicAnalysis } from '../shared/music-analysis.js';
+import { musicBeatFrames, musicHitFrames, type MusicAnalysis } from '../shared/music-analysis.js';
 import { removeMusicClips } from '../shared/music-lanes.js';
 import { snapFrame, type BeatSnap } from '../shared/snap.js';
 import { formatTimecode } from '../shared/timing.js';
@@ -23,7 +23,18 @@ import { describeMusicMoment, MusicStructure } from './music-structure.js';
 import { useWaveform, waveformPath } from './music-waveform.js';
 import { placementSnapPoints, snapPlacement } from './timeline-placement.js';
 import type { DraftPreview } from './Timeline.js';
-import { beatTickPaths, type BeatTicks } from './timeline-beats.js';
+import { beatTickPaths, hitTickPaths, type BeatTicks, type HitTicks } from './timeline-beats.js';
+
+/** Hit marks end just above the tone strip, light ones half as tall as strong ones. */
+const HIT_ROWS = { strong: 50, light: 56, bottom: 62 } as const;
+/** The hover readout names a hit within this many pixels. */
+const HIT_HOVER_PX = 4;
+
+/** SVG paths of a music clip's hits within its clip, at the clip's scale. */
+function hitTicks(music: MusicTrack, hits: MusicAnalysis['hits'] | null, scale: number): HitTicks | null {
+  if (!hits?.length) return null;
+  return hitTickPaths(musicHitFrames(music, hits), (frame) => (frame - music.start) * scale, HIT_ROWS, scale);
+}
 
 /** SVG paths of a music track's beats within its clip, at the clip's scale. */
 function beatTicks(music: MusicTrack, beats: MusicAnalysis['beats'] | null, scale: number): BeatTicks | null {
@@ -141,6 +152,7 @@ export function MusicTimeline(props: Readonly<Props>) {
   const clipScale = drag.current?.scale ?? scale;
   const analysed = phase.kind === 'ready' ? phase.analysis : null;
   const ticks = useMemo(() => beatTicks(music, analysed?.beats ?? null, clipScale), [music, analysed, clipScale]);
+  const hitMarks = useMemo(() => hitTicks(music, analysed?.hits ?? null, clipScale), [music, analysed, clipScale]);
   const structure = useMemo(
     () => analysed && <MusicStructure music={music} analysis={analysed} scale={clipScale} />,
     [music, analysed, clipScale],
@@ -306,7 +318,7 @@ export function MusicTimeline(props: Readonly<Props>) {
     if (!analysed || !clip || event.currentTarget.className !== 'music-body') return setHover(null);
     const x = event.clientX - clip.getBoundingClientRect().left;
     const at = music.start + Math.max(0, Math.min(music.duration - 1, Math.floor(x / clipScale)));
-    setHover({ x, text: describeMusicMoment(music, analysed, at) });
+    setHover({ x, text: describeMusicMoment(music, analysed, at, Math.max(0, Math.floor(HIT_HOVER_PX / clipScale))) });
   }
   return (
     <div
@@ -351,6 +363,18 @@ export function MusicTimeline(props: Readonly<Props>) {
           >
             <path className="beat" d={ticks.beats} />
             <path className="downbeat" d={ticks.downbeats} />
+          </svg>
+        )}
+        {hitMarks && (
+          <svg
+            className="music-hits"
+            aria-hidden="true"
+            data-strong-hits={hitMarks.strongCount}
+            data-light-hits={hitMarks.lightCount}
+          >
+            {hitMarks.paths.map((path) => (
+              <path key={path.className} className={path.className} d={path.d} />
+            ))}
           </svg>
         )}
         <span>

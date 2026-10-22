@@ -121,6 +121,42 @@
   height: calc(100% - 30px);
 }
 
+/* Hits standing on the tone strip, in its band colours, with a dark halo over the waveform; strong ones taller. */
+.music-body .music-hits {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+  filter: drop-shadow(0 0 1px rgb(8 10 18)) drop-shadow(0 0 1px rgb(8 10 18));
+  pointer-events: none;
+}
+
+.music-hits path {
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.music-hits .strong {
+  stroke-width: 2;
+}
+
+.music-hits .light {
+  opacity: 0.85;
+}
+
+.music-hits .low {
+  stroke: #ff9b73;
+}
+
+.music-hits .mid {
+  stroke: #b6e388;
+}
+
+.music-hits .high {
+  stroke: #8cc7ff;
+}
+
 /* Sections tint the clip behind the waveform, labelled at their top right when wide enough. */
 .music-body .music-section {
   position: absolute;

@@ -2,6 +2,7 @@ import { constants } from 'node:fs';
 import { open } from 'node:fs/promises';
 import { Worker } from 'node:worker_threads';
 import {
+  hitBands,
   MUSIC_ANALYSIS_HOP,
   pitchNames,
   sectionKinds,
@@ -58,8 +59,28 @@ export const MUSIC_ANALYSIS = {
     /** Downbeats this many standard deviations above the other beats make the meter certain. */
     sureContrast: 1.5,
   },
-  accentFrames: 15,
-  accentPercentile: 0.9,
+  /**
+   * Hits: envelope peaks, the highest within ±`peakFrames`, at least `floor` (in the envelope's song-wide
+   * standard deviations) and `spread` local standard deviations above the local mean over ±`windowFrames`;
+   * strong ones clear `strongFloor` and `strongSpread`. Teeth: the 10 ms peak level `db` above its mean
+   * over ±`reachFrames`, the highest within ±`peakFrames`, above the silence level; strong from `strongDb`,
+   * as strong as the song's strongest onsets at `fullDb`. Hits closer than `spacingFrames` keep the strongest.
+   * An onset counts only with a flux rise of `confirm.flux` over its local mean or a peak-level rise of
+   * `confirm.peakDb`. A strong hit is also within `strongDropDb` of the loudest hit within ±`strongWindowFrames`.
+   */
+  hits: {
+    peakFrames: 3,
+    windowFrames: 100,
+    spread: 2,
+    floor: 2.5,
+    spacingFrames: 5,
+    strongSpread: 4,
+    strongFloor: 3,
+    tooth: { reachFrames: 50, db: 6, peakFrames: 5, strongDb: 6, fullDb: 12 },
+    confirm: { flux: 4, peakDb: 1.5 },
+    strongWindowFrames: 200,
+    strongDropDb: 6,
+  },
   /** Section boundaries: novelty over ±8 s, sections at least 8 s long. */
   sectionBlocks: 8,
   sectionNovelty: 0.25,
@@ -190,6 +211,10 @@ export interface MusicFeatures {
   samples: number;
   /** Spectral flux per 10 ms frame. */
   flux: Float32Array;
+  /** Spectral flux of the low, mid and high bands (the tone bands), three per frame. */
+  bandFlux: Float32Array;
+  /** dBFS of the highest sample of each 10 ms (samples `[i · hop, (i + 1) · hop)`): the waveform's teeth. */
+  peaks: Float32Array;
   /** Mean log level of the kick bands per frame. */
   low: Float32Array;
   /** Pitch-class magnitudes, twelve per frame. */
@@ -228,6 +253,9 @@ export class MusicFeatureExtractor {
   readonly #level = new Float64Array(BANDS);
   readonly #previous = new Float64Array(BANDS);
   readonly #flux: number[] = [];
+  readonly #bandFlux: number[] = [];
+  readonly #toneOfBand: Int8Array;
+  readonly #frameBandFlux = new Float64Array(TONE_BANDS);
   readonly #low: number[] = [];
   readonly #chroma: number[] = [];
   readonly #frameChroma = new Float64Array(CHROMA);
@@ -235,6 +263,8 @@ export class MusicFeatureExtractor {
   readonly #blockLevels = new Float64Array(BANDS);
   readonly #blockChroma = new Float64Array(CHROMA);
   readonly #loudness: number[] = [];
+  readonly #peaks: number[] = [];
+  #peak = 0;
   #blockFrames = 0;
   #received = 0;
   #frame = 0;
@@ -244,6 +274,10 @@ export class MusicFeatureExtractor {
     const { weights, centres } = bandWeights();
     this.#weights = weights;
     this.#kick = centres.flatMap((hz, band) => (hz < MUSIC_ANALYSIS.kickHz ? [band] : []));
+    this.#toneOfBand = Int8Array.from(centres, (hz) => {
+      if (hz < MUSIC_ANALYSIS.toneHz[0]) return 0;
+      return hz < MUSIC_ANALYSIS.toneHz[1] ? 1 : 2;
+    });
     this.#pitch = Int8Array.from({ length: HALF + 1 }, (_, bin) => {
       const hz = binHz(bin);
       if (hz < MUSIC_ANALYSIS.chromaHz[0] || hz > MUSIC_ANALYSIS.chromaHz[1]) return -1;
@@ -264,17 +298,22 @@ export class MusicFeatureExtractor {
       this.#ring[this.#received & (RING - 1)] = value;
       this.#received++;
       this.#squares += value * value;
+      this.#peak = Math.max(this.#peak, Math.abs(value));
+      if (this.#received % HOP === 0) this.#flushPeak();
       if (++this.#loudnessSamples === LOUDNESS_SAMPLES) this.#flushLoudness();
       if (this.#frame * HOP + HALF <= this.#received) this.#analyseFrame();
     }
   }
   finish(): MusicFeatures {
     while (this.#frame * HOP < this.#received) this.#analyseFrame();
+    if (this.#received % HOP !== 0) this.#flushPeak();
     if (this.#loudnessSamples > 0) this.#flushLoudness();
     if (this.#blockFrames > 0) this.#flushBlock();
     return {
       samples: this.#received,
       flux: Float32Array.from(this.#flux),
+      bandFlux: Float32Array.from(this.#bandFlux),
+      peaks: Float32Array.from(this.#peaks),
       low: Float32Array.from(this.#low),
       chroma: Float32Array.from(this.#chroma),
       tone: Float32Array.from(this.#tone),
@@ -285,6 +324,10 @@ export class MusicFeatureExtractor {
       blocks: this.#blocks,
       loudness: this.#loudness,
     };
+  }
+  #flushPeak(): void {
+    this.#peaks.push(this.#peak > 0 ? Math.max(SILENT_DB, 20 * Math.log10(this.#peak)) : SILENT_DB);
+    this.#peak = 0;
   }
   #flushLoudness(): void {
     const rms = Math.sqrt(this.#squares / this.#loudnessSamples);
@@ -320,9 +363,15 @@ export class MusicFeatureExtractor {
       this.#power[band] = this.#power[band]! + weight * (this.#re[bin]! ** 2 + this.#im[bin]! ** 2);
     let flux = 0;
     let low = 0;
+    this.#frameBandFlux.fill(0);
     for (let band = 0; band < BANDS; band++) {
       const level = Math.log1p(1000 * Math.sqrt(this.#power[band]!) * this.#scale);
-      if (this.#frame > 0) flux += Math.max(0, level - this.#previous[band]!);
+      if (this.#frame > 0) {
+        const rise = Math.max(0, level - this.#previous[band]!);
+        flux += rise;
+        const tone = this.#toneOfBand[band]!;
+        this.#frameBandFlux[tone] = this.#frameBandFlux[tone]! + rise;
+      }
       this.#previous[band] = level;
       this.#level[band] = level;
       this.#blockLevels[band] = this.#blockLevels[band]! + level;
@@ -330,6 +379,7 @@ export class MusicFeatureExtractor {
     for (const band of this.#kick) low += this.#level[band]!;
     this.#accumulateToneAndChroma();
     this.#flux.push(flux);
+    for (const rise of this.#frameBandFlux) this.#bandFlux.push(rise);
     this.#low.push(this.#kick.length ? low / this.#kick.length : 0);
     this.#frame++;
     if (++this.#blockFrames === BLOCK_FRAMES) this.#flushBlock();
@@ -666,26 +716,182 @@ function downbeats(
   };
 }
 
-function accents(envelope: Float32Array, samples: number): MusicMeasurement['accents'] {
-  const threshold = percentile(envelope, MUSIC_ANALYSIS.accentPercentile);
-  const reach = MUSIC_ANALYSIS.accentFrames;
-  const top = percentile(envelope, 0.999) || 1;
-  const peaks: number[] = [];
-  for (let index = 1; index + 1 < envelope.length; index++) {
-    const value = envelope[index]!;
-    if (value > threshold && value >= envelope[index - 1]! && value > envelope[index + 1]!) peaks.push(index);
+/** Mean and standard deviation of `values` over ±reach around every index. */
+function localStatistics(values: Float32Array, reach: number): { mean: Float64Array; deviation: Float64Array } {
+  const n = values.length;
+  const sums = new Float64Array(n + 1);
+  const squares = new Float64Array(n + 1);
+  for (let index = 0; index < n; index++) {
+    sums[index + 1] = sums[index]! + values[index]!;
+    squares[index + 1] = squares[index]! + values[index]! ** 2;
   }
-  peaks.sort((a, b) => envelope[b]! - envelope[a]! || a - b);
-  const taken: number[] = [];
-  for (const peak of peaks) if (taken.every((other) => Math.abs(other - peak) >= reach)) taken.push(peak);
-  taken.sort((a, b) => a - b);
-  return taken.map((frame) => ({
-    sample: Math.max(
-      0,
-      Math.min(samples - 1, Math.round(refine(envelope, frame).position * HOP + MUSIC_ANALYSIS.onsetLead)),
-    ),
-    strength: Math.round(Math.min(1, envelope[frame]! / top) * 1000) / 1000,
-  }));
+  const mean = new Float64Array(n);
+  const deviation = new Float64Array(n);
+  for (let index = 0; index < n; index++) {
+    const from = Math.max(0, index - reach);
+    const to = Math.min(n, index + reach + 1);
+    const average = (sums[to]! - sums[from]!) / (to - from);
+    mean[index] = average;
+    deviation[index] = Math.sqrt(Math.max(0, (squares[to]! - squares[from]!) / (to - from) - average ** 2));
+  }
+  return { mean, deviation };
+}
+
+/** Which band rose most at a hit, each band's flux in units of its own spread over the song. */
+function hitBand(bandFlux: Float32Array, frame: number, spreads: readonly number[]): (typeof hitBands)[number] {
+  const frames = bandFlux.length / hitBands.length;
+  let best = 0;
+  let bestScore = -Infinity;
+  hitBands.forEach((_, band) => {
+    let rise = 0;
+    for (let at = Math.max(0, frame - 1); at <= Math.min(frames - 1, frame + 1); at++)
+      rise = Math.max(rise, bandFlux[at * hitBands.length + band]!);
+    const score = rise / spreads[band]!;
+    if (score > bestScore) {
+      best = band;
+      bestScore = score;
+    }
+  });
+  return hitBands[best]!;
+}
+
+interface HitCandidate {
+  frame: number;
+  sample: number;
+  /** Onset envelope at the hit. */
+  onset: number;
+  /** How far the waveform's peak level rises above its surroundings, dB; 0 without a tooth. */
+  tooth: number;
+  strongOnset: boolean;
+}
+
+/** Peaks of the waveform's 10 ms peak level standing `db` above its mean over ±`reachFrames`, above silence. */
+function teeth(peaks: Float32Array, loudness: number[]): { bucket: number; rise: number }[] {
+  const { reachFrames, db, peakFrames } = MUSIC_ANALYSIS.hits.tooth;
+  const { mean } = localStatistics(peaks, reachFrames);
+  const silent = silenceThreshold(loudness);
+  const rise = Float64Array.from(peaks, (level, index) => level - mean[index]!);
+  const found: { bucket: number; rise: number }[] = [];
+  for (let index = 0; index < rise.length; index++) {
+    const value = rise[index]!;
+    if (value < db || peaks[index]! < silent) continue;
+    let highest = true;
+    for (let other = Math.max(0, index - peakFrames); other <= Math.min(rise.length - 1, index + peakFrames); other++)
+      if (rise[other]! > value || (rise[other] === value && other < index)) highest = false;
+    if (highest) found.push({ bucket: index, rise: value });
+  }
+  return found;
+}
+
+/** Envelope peaks standing out from their surroundings: a local threshold, so steady or quiet passages get none. */
+function onsetPeaks(envelope: Float32Array, samples: number): HitCandidate[] {
+  const { peakFrames, windowFrames, spread, floor, strongSpread, strongFloor } = MUSIC_ANALYSIS.hits;
+  const { mean, deviation } = localStatistics(envelope, windowFrames);
+  const found: HitCandidate[] = [];
+  for (let index = 0; index < envelope.length; index++) {
+    const value = envelope[index]!;
+    if (value < floor || value < mean[index]! + spread * deviation[index]!) continue;
+    let highest = true;
+    for (
+      let other = Math.max(0, index - peakFrames);
+      other <= Math.min(envelope.length - 1, index + peakFrames);
+      other++
+    )
+      if (envelope[other]! > value || (envelope[other] === value && other < index)) highest = false;
+    if (!highest) continue;
+    found.push({
+      frame: index,
+      sample: Math.max(
+        0,
+        Math.min(samples - 1, Math.round(refine(envelope, index).position * HOP + MUSIC_ANALYSIS.onsetLead)),
+      ),
+      onset: value,
+      tooth: 0,
+      strongOnset: value >= strongFloor && value >= mean[index]! + strongSpread * deviation[index]!,
+    });
+  }
+  return found;
+}
+
+/** The highest 10 ms peak level just after a sample, and how far it rises above the 270 ms before. */
+function peakAt(peaks: Float32Array, sample: number): { level: number; rise: number } {
+  const bucket = Math.floor(sample / HOP);
+  let level = SILENT_DB;
+  for (let index = Math.max(0, bucket - 1); index <= Math.min(peaks.length - 1, bucket + 4); index++)
+    level = Math.max(level, peaks[index]!);
+  let before = 0;
+  let count = 0;
+  for (let index = Math.max(0, bucket - 30); index < bucket - 3; index++) {
+    before += peaks[index]!;
+    count++;
+  }
+  return { level, rise: count ? level - before / count : 0 };
+}
+
+/**
+ * Rhythmic hits: onsets standing out from their surroundings and the waveform's teeth (sharp
+ * peaks of its level), the most salient kept at least `spacingFrames` apart; each with the band
+ * that rose most and whether it stands out strongly.
+ */
+function hits(envelope: Float32Array, features: MusicFeatures): MusicMeasurement['hits'] {
+  const { spacingFrames, tooth, confirm, strongWindowFrames, strongDropDb } = MUSIC_ANALYSIS.hits;
+  const { mean: fluxMean } = localStatistics(features.flux, MUSIC_ANALYSIS.meanFrames);
+  const fluxRise = (frame: number): number => {
+    let rise = 0;
+    for (let index = Math.max(0, frame - 2); index <= Math.min(features.flux.length - 1, frame + 2); index++)
+      rise = Math.max(rise, features.flux[index]! - fluxMean[index]!);
+    return rise;
+  };
+  // A small onset needs a real change of level or spectrum: steady noise has rare large fluctuations.
+  const candidates = onsetPeaks(envelope, features.samples).filter(
+    (candidate) =>
+      fluxRise(candidate.frame) >= confirm.flux || peakAt(features.peaks, candidate.sample).rise >= confirm.peakDb,
+  );
+  for (const { bucket, rise } of teeth(features.peaks, features.loudness)) {
+    const sample = Math.min(features.samples - 1, bucket * HOP + HOP / 2);
+    const near = candidates.find((candidate) => Math.abs(candidate.sample - sample) < spacingFrames * HOP);
+    if (near) near.tooth = Math.max(near.tooth, rise);
+    else {
+      const frame = Math.max(0, Math.min(envelope.length - 1, Math.round((sample - MUSIC_ANALYSIS.onsetLead) / HOP)));
+      candidates.push({ frame, sample, onset: envelope[frame]!, tooth: rise, strongOnset: false });
+    }
+  }
+  const top = percentile(envelope, 0.999) || 1;
+  const strength = (candidate: HitCandidate): number =>
+    Math.min(1, Math.max(candidate.onset / top, candidate.tooth / tooth.fullDb));
+  candidates.sort((a, b) => strength(b) - strength(a) || a.sample - b.sample);
+  const taken: HitCandidate[] = [];
+  // The last frames' windows run past the end, where a cut-off sound looks like a hit.
+  const last = features.samples - HALF;
+  for (const candidate of candidates)
+    if (
+      candidate.sample < last &&
+      taken.every((other) => Math.abs(other.sample - candidate.sample) >= spacingFrames * HOP)
+    )
+      taken.push(candidate);
+  taken.sort((a, b) => a.sample - b.sample);
+  const bandFrames = features.bandFlux.length / hitBands.length;
+  const spreads = hitBands.map((_, band) => {
+    let squares = 0;
+    for (let frame = 0; frame < bandFrames; frame++) squares += features.bandFlux[frame * hitBands.length + band]! ** 2;
+    return Math.sqrt(squares / Math.max(1, bandFrames)) || 1;
+  });
+  const levels = taken.map((candidate) => peakAt(features.peaks, candidate.sample).level);
+  const reach = strongWindowFrames * HOP;
+  return taken.map((candidate, index) => {
+    // Strong hits are also among the loudest around: a quiet tick between loud hits is light.
+    let loudest = levels[index]!;
+    for (let other = index - 1; other >= 0 && candidate.sample - taken[other]!.sample <= reach; other--)
+      loudest = Math.max(loudest, levels[other]!);
+    for (let other = index + 1; other < taken.length && taken[other]!.sample - candidate.sample <= reach; other++)
+      loudest = Math.max(loudest, levels[other]!);
+    return {
+      sample: candidate.sample,
+      strength: Math.round(strength(candidate) * 1000) / 1000,
+      band: hitBand(features.bandFlux, candidate.frame, spreads),
+      strong: (candidate.strongOnset || candidate.tooth >= tooth.strongDb) && levels[index]! >= loudest - strongDropDb,
+    };
+  });
 }
 
 /** Energy-averaged dB of loudness values (100 ms each). */
@@ -956,14 +1162,14 @@ function swells(loudness: number[]): MusicMeasurement['swells'] {
   return [...gradual, ...steps].sort((a, b) => a.fromSample - b.fromSample || a.toSample - b.toSample);
 }
 
-/** Tempo, beats, downbeats, accents and sections from the features. Deterministic. */
+/** Tempo, beats, downbeats, hits and sections from the features. Deterministic. */
 export function analyseFeatures(features: MusicFeatures): MusicMeasurement {
   const envelope = onsetEnvelope(features.flux);
   const base = {
     sampleRate: MUSIC_SAMPLE_RATE,
     hop: HOP,
     samples: features.samples,
-    accents: envelope ? accents(envelope, features.samples) : [],
+    hits: envelope ? hits(envelope, features) : [],
     loudness: features.loudness.map((value) => Math.round(value * 10) / 10),
     tone: Array.from({ length: features.tone.length / TONE_BANDS }, (_, second) => {
       const [low, mid, high] = features.tone.subarray(second * TONE_BANDS, (second + 1) * TONE_BANDS);

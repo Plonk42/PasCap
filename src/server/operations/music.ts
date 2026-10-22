@@ -1,13 +1,18 @@
 import {
   boundaries,
   mergeBeats,
-  musicSampleFrames,
   musicSampleRanges,
   nearestBeat,
   snapCutsToBeats,
 } from '../../shared/beat-alignment.js';
 import type { MusicTrack, ProjectDocument } from '../../shared/model.js';
-import { musicBeatFrames, type MusicAnalysis, type PlacedBeat } from '../../shared/music-analysis.js';
+import {
+  musicBeatFrames,
+  musicHitFrames,
+  type MusicAnalysis,
+  type PlacedBeat,
+  type PlacedHit,
+} from '../../shared/music-analysis.js';
 import { musicTracks } from '../../shared/music-lanes.js';
 import {
   MAX_LISTED_BEATS,
@@ -43,18 +48,21 @@ async function readAnalysis(audio: ServiceContext['audio'], mediaId: string): Pr
   }
 }
 
-/** The beats of the project's analysed music clips at project frames. */
+/** The beats and strong hits of the project's analysed music clips at project frames. */
 async function projectBeats(
   { audio }: ServiceContext,
   project: ProjectDocument,
   musicClipId: string | undefined,
-): Promise<PlacedBeat[]> {
+): Promise<{ beats: PlacedBeat[]; hits: number[] }> {
   const lists: PlacedBeat[][] = [];
+  const hits = new Set<number>();
   await forEachSerial(musicClipsOf(project, musicClipId), async ({ track }) => {
     const analysis = await readAnalysis(audio, track.mediaId);
-    if (analysis) lists.push(musicBeatFrames(track, analysis.beats));
+    if (!analysis) return;
+    lists.push(musicBeatFrames(track, analysis.beats));
+    for (const hit of musicHitFrames(track, analysis.hits)) if (hit.strong) hits.add(hit.frame);
   });
-  return mergeBeats(lists);
+  return { beats: mergeBeats(lists), hits: [...hits].sort((a, b) => a - b) };
 }
 
 function rounded(value: number, digits: number): number {
@@ -75,6 +83,7 @@ function describeMusicClip(
 ) {
   const inWindow = (frame: number) => frame >= window.from && frame < window.to;
   const beats = analysis ? musicBeatFrames(track, analysis.beats).filter((beat) => inWindow(beat.frame)) : [];
+  const hits = analysis ? musicHitFrames(track, analysis.hits).filter((hit) => inWindow(hit.frame)) : [];
   return {
     musicClipId: track.id,
     trackId,
@@ -95,13 +104,14 @@ function describeMusicClip(
       strength: rounded(beat.strength, 2),
     })),
     beatsTruncated: beats.length > MAX_LISTED_BEATS,
-    accents: (analysis?.accents ?? [])
-      .flatMap((accent) =>
-        musicSampleFrames(track, accent.sample).map((frame) => ({ frame, strength: rounded(accent.strength, 2) })),
-      )
-      .filter((accent) => inWindow(accent.frame))
-      .sort((left, right) => left.frame - right.frame)
-      .slice(0, MAX_LISTED_BEATS),
+    hits: hits.slice(0, MAX_LISTED_BEATS).map((hit: PlacedHit) => ({
+      frame: hit.frame,
+      timecode: formatTimecode(hit.frame),
+      band: hit.band,
+      strong: hit.strong,
+      strength: rounded(hit.strength, 2),
+    })),
+    hitsTruncated: hits.length > MAX_LISTED_BEATS,
     key: analysis?.key ?? null,
     sections: (analysis?.sections ?? [])
       .flatMap((section) =>
@@ -162,10 +172,10 @@ export const runMusicAnalysis: OperationRunner<typeof musicAnalysis> = async (
   return { clips };
 };
 
-function requireBeats(beats: readonly PlacedBeat[]): void {
-  if (!beats.length)
+function requireBeats({ beats, hits }: { beats: readonly PlacedBeat[]; hits: readonly number[] }): void {
+  if (!beats.length && !hits.length)
     throw new ServiceError(
-      'No analysed music beats fall on the timeline: place music and have it analysed in Audio → Music first.',
+      'No analysed music beats or hits fall on the timeline: place music and have it analysed in Audio → Music first.',
       409,
     );
 }
@@ -177,43 +187,62 @@ export const runCheckAlignment: OperationRunner<typeof checkAlignment> = async (
   const project = await context.projects.load(projectId);
   if (layerId !== undefined && !project.layers.some((layer) => layer.id === layerId))
     throw new ServiceError(`The project has no video track ${layerId}.`, 404);
-  const beats = await projectBeats(context, project, musicClipId);
-  requireBeats(beats);
+  const music = await projectBeats(context, project, musicClipId);
+  requireBeats(music);
+  const { beats } = music;
   const downbeats = beats.filter((beat) => beat.downbeat);
-  const report = boundaries(project, layerId).map((boundary) => {
-    const beat = nearestBeat(beats, boundary.frame);
-    const downbeat = nearestBeat(downbeats, boundary.frame);
-    return {
-      ...boundary,
-      timecode: formatTimecode(boundary.frame),
-      beat: beat && { frame: beat.beat, offset: beat.offset },
-      downbeat: downbeat && { frame: downbeat.beat, offset: downbeat.offset },
-    };
-  });
+  const hits = music.hits.map((frame) => ({ frame }));
+  const near = (offset: { beat: number; offset: number } | null) =>
+    offset && { frame: offset.beat, offset: offset.offset };
+  const report = boundaries(project, layerId).map((boundary) => ({
+    ...boundary,
+    timecode: formatTimecode(boundary.frame),
+    beat: near(nearestBeat(beats, boundary.frame)),
+    downbeat: near(nearestBeat(downbeats, boundary.frame)),
+    hit: near(nearestBeat(hits, boundary.frame)),
+  }));
+  const within = (offset: { offset: number } | null): boolean => offset !== null && Math.abs(offset.offset) <= 1;
   const offsets = report.flatMap((item) => (item.beat ? [Math.abs(item.beat.offset)] : []));
   return {
     beats: beats.length,
+    hits: hits.length,
     boundaries: report,
     summary: {
       boundaries: report.length,
-      onBeat: report.filter((item) => item.beat && Math.abs(item.beat.offset) <= 1).length,
-      onDownbeat: report.filter((item) => item.downbeat && Math.abs(item.downbeat.offset) <= 1).length,
+      onBeat: report.filter((item) => within(item.beat)).length,
+      onDownbeat: report.filter((item) => within(item.downbeat)).length,
+      onHit: report.filter((item) => within(item.hit)).length,
       meanOffset: offsets.length ? rounded(offsets.reduce((sum, value) => sum + value, 0) / offsets.length, 1) : null,
     },
   };
 };
+
+function snapTargets(
+  { beats, hits }: { beats: readonly PlacedBeat[]; hits: readonly number[] },
+  prefer: 'beat' | 'downbeat' | 'hit' | 'beat-or-hit',
+): number[] {
+  if (prefer === 'hit') return [...hits];
+  const frames = beats.filter((beat) => prefer !== 'downbeat' || beat.downbeat).map((beat) => beat.frame);
+  if (prefer === 'beat-or-hit') frames.push(...hits);
+  return [...new Set(frames)].sort((a, b) => a - b);
+}
 
 export const runSnapCutsToBeats: OperationRunner<typeof snapOperation> = async (context, input) => {
   const { projectId, layerId, prefer, minimumSeconds, musicClipId, apply, expectedRevision } = input;
   if (apply && expectedRevision === undefined)
     throw new ServiceError('Applying the snapped cuts needs expectedRevision, from describe_project.', 422);
   const project = await context.projects.load(projectId);
-  const beats = await projectBeats(context, project, musicClipId);
-  requireBeats(beats);
+  const music = await projectBeats(context, project, musicClipId);
+  const targets = snapTargets(music, prefer);
+  if (!targets.length)
+    throw new ServiceError(
+      `No analysed music ${prefer === 'hit' ? 'strong hits' : 'beats'} fall on the timeline: place music and have it analysed in Audio → Music first.`,
+      409,
+    );
   const fps = PROJECT_FPS.numerator / PROJECT_FPS.denominator;
   let result;
   try {
-    result = snapCutsToBeats(project, layerId, beats, prefer === 'downbeat', Math.round(minimumSeconds * fps), {
+    result = snapCutsToBeats(project, layerId, targets, Math.round(minimumSeconds * fps), {
       frameCount: (mediaId) => context.library.get(mediaId).metadata.frameCount,
       kept: (mediaId) => project.selects[mediaId],
     });

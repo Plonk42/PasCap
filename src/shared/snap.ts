@@ -1,25 +1,24 @@
 import type { ProjectDocument } from './model.js';
-import { musicBeatFrames, type MusicAnalysis } from './music-analysis.js';
+import { musicTargetFrames, type MusicAnalysis, type MusicTarget } from './music-analysis.js';
 import { musicClips, musicTracks } from './music-lanes.js';
 import { calculateLayout } from './timeline.js';
 
 /**
- * The beats a project's music clips snap to, at project frames, leaving out those of the
+ * The beats or hits a project's music clips snap to, at project frames, leaving out those of the
  * excluded clips (the ones being moved); none while beat snapping is off.
  */
 export type BeatSnap = (project: ProjectDocument, excludedMusicIds?: ReadonlySet<string>) => readonly number[];
 export const NO_BEATS: BeatSnap = () => [];
 
-/** Snaps to the analysed beats (or downbeats only) of every music clip, where they play now. */
+/** Snaps to the analysed beats, downbeats or strong hits of every music clip, where they play now. */
 export function musicBeatSnap(
-  beatsOf: (mediaId: string) => MusicAnalysis['beats'] | null,
-  downbeatsOnly: boolean,
+  analysisOf: (mediaId: string) => Pick<MusicAnalysis, 'beats' | 'hits'> | null,
+  target: MusicTarget,
 ): BeatSnap {
   return (project, excluded) =>
     musicTracks(project.music).flatMap((music) => {
-      const beats = excluded?.has(music.id) ? null : beatsOf(music.mediaId);
-      if (!beats) return [];
-      return musicBeatFrames(music, beats).flatMap((beat) => (downbeatsOnly && !beat.downbeat ? [] : [beat.frame]));
+      const analysis = excluded?.has(music.id) ? null : analysisOf(music.mediaId);
+      return analysis ? musicTargetFrames(music, analysis, target) : [];
     });
 }
 
