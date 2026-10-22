@@ -441,7 +441,6 @@
 
 .smooth-panel-header {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 6px 10px;
   min-height: 26px;
@@ -451,6 +450,7 @@
 
 .smooth-panel-toggle {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 6px;
   padding: 2px 8px 2px 4px;
@@ -466,9 +466,15 @@
   background: #2c3b30;
 }
 
+/* The summary shrinks rather than wrap the header, whose height the minimum viewport has no room for. */
 .smooth-panel-summary {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .smooth-panel-summary b {
@@ -494,6 +500,7 @@
 
 .smooth-panel-actions {
   display: flex;
+  flex: none;
   gap: 6px;
   margin-left: auto;
 }

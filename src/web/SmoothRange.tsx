@@ -712,7 +712,10 @@ export function CameraMotionPanel({
           </p>
         </HelpPopover>
         {profile ? (
-          <span className="smooth-panel-summary">
+          <span
+            className="smooth-panel-summary"
+            title={best ? `Steadiest range ${span}` : 'No steady range of 2 s or more'}
+          >
             {best ? (
               <>
                 Steadiest range <b>{span}</b>
