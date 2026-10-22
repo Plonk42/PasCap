@@ -82,7 +82,7 @@ export const runRecordingSheet: OperationRunner<typeof recordingSheet> = async (
   };
 };
 
-/** The range a candidate without one shows: the longest steady range, else the first kept range or all of it. */
+/** The range a candidate without one shows: the best steady range, else the first kept range or all of it. */
 async function defaultRange(
   { library, sessions }: ServiceContext,
   project: ProjectDocument,
@@ -94,11 +94,8 @@ async function defaultRange(
   if (analysis) {
     const tolerance = await allowedMovementFor(sessions, project.id);
     const { shots } = recordingShots(analysis, asset.damage, kept, tolerance, FPS);
-    const longest = shots.reduce<(typeof shots)[number] | null>(
-      (best, shot) => (!best || shot.sourceOut - shot.sourceIn > best.sourceOut - best.sourceIn ? shot : best),
-      null,
-    );
-    if (longest) return { sourceIn: longest.sourceIn, sourceOut: longest.sourceOut };
+    const best = shots.find((shot) => shot.rank === 1);
+    if (best) return { sourceIn: best.sourceIn, sourceOut: best.sourceOut };
   }
   return kept?.[0] ?? { sourceIn: 0, sourceOut: asset.metadata.frameCount };
 }

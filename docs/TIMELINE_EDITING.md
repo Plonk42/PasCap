@@ -806,7 +806,7 @@ record what the user kept and never retime, render or export (assistant sessions
 `select-narrow` (a subset of the existing ranges only).
 
 Source preview edits the **active** kept range, the first by default: setting IN/OUT by handle, numeric field,
-I/O marks or **Use longest** (steadiest range) creates the entry with its first range and later changes that range;
+I/O marks or **Use best** (best steady range) creates the entry with its first range and later changes that range;
 **Add clip** copies it. The handles stop one frame from the neighbouring kept ranges (their range sliders end
 there, Home/End too); typed IN/OUT that overlap or touch another kept range are rejected with an inline
 error, never merged or clamped. **Reset source range** returns to the whole recording (IN = 0, OUT = frame
@@ -831,10 +831,10 @@ cancellation or lost capture abandon the drawing. Each change is one Undo step, 
 Source preview. The active range is editor-only state; ranges kept before this field
 existed in the browser (`localStorage`) are not read.
 
-### Camera motion and the steadiest range
+### Camera motion and the best steady range
 
-Source preview suggests the steadiest stretch of a drone recording, where the camera
-moves without brutal changes of angle or speed. Once a proxy is verified the recording
+Source preview suggests the best steady stretch of a drone recording, where the camera
+moves without brutal changes of angle or speed and, preferably, shows something happen. Once a proxy is verified the recording
 is ready, and a **Camera motion analysis** job measures it in the background: that job
 runs after every other queued job, so a batch import makes all its proxies first. It
 decodes the verified editing proxy at 320 × 180 grey and measures, for
@@ -871,20 +871,39 @@ label shows its value under the pointer (flight data interpolated between its
 once-per-second samples) and the image lane the timecode. Clicking or dragging any lane
 scrubs like the strip. Below the IN/OUT fields, separated by a hairline, the **Camera
 motion** section has a header row: its title (a chevron button, **Collapse camera
-motion**), its help, **Steadiest range** with its length and IN–OUT timecode, **Use longest** and **Use all N**.
+motion**), its help, **Best steady range** with what it shows, its length and IN–OUT timecode, **Use best** and **Use all N**.
 A controls row follows: the **Allowed movement** setting, the shared slider with exact
 field and Reset (0.5–6, initially 2; neutral is the initial value), and **Flight data**
 (**Flight data lanes**), a menu choosing which flight data values this recording has get
 a lane, **Flight speed** initially. Collapsing hides the lanes and controls, keeping the
 title and the suggestion; the collapse, allowed movement and flight data choices are
-browser preferences. The suggestion is the longest stretch of at least 2 s below the
+browser preferences. Steady ranges are the stretches of at least 2 s below the
 allowed movement, bridging jolts shorter than 0.5 s and keeping 0.2 s clear of rough
 edges inside the recording. A stretch where the camera stands still is not a steady range:
 when at least 99.5 % of its frames move less than 0.5 % of the image width per second
 (about three minutes to pan one width), the drone is hovering with nothing happening in
-the picture, so it gets no band or suggestion. Move the **Allowed movement** slider, or drag the dashed line
+the picture, so it gets no band or suggestion.
+
+The suggestion is the steady range with the best score: its length up to 10 s (a shot rarely
+needs more), times a weight for what it shows, read from its mean picture movement and flight
+data (`shotKind` in [recording shots](../src/shared/recording-shots.ts)), ties going to the
+longer range, then the earlier:
+
+| Shows        | When                                                                                                                                             | Weight |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| orbit        | rotation carries 30 % of the movement (circling what the camera looks down at), or sideways movement 50 % while the drone flies at 1 m/s or more | 1      |
+| reveal       | the drone climbs at 1 m/s or more, or pulling out carries 40 % of the movement                                                                   | 1      |
+| camera move  | any other movement: pans, tilts, travel                                                                                                          | 0.7    |
+| approach     | pushing in carries 60 % of the movement, as when flying straight at a target                                                                     | 0.4    |
+| nearly still | the mean movement is under 0.5 % of the width per second                                                                                         | 0.2    |
+
+So a 6 s orbit outranks a 30 s straight approach or a long, nearly still stretch, and among
+ranges showing the same kind the longer one wins. Without flight data a sideways movement is
+read as a pan. Content moving down is never a reveal: a forward flight with the camera looking
+down moves it as a tilt up does. `describe_recording` gives the assistant each range's kind
+and rank. Move the **Allowed movement** slider, or drag the dashed line
 itself (it highlights within 6 px, and the image lane shows its value; dragging the line
-never scrubs). **Use longest** applies the suggestion, the longest steady range, as the active kept range (and
+never scrubs). **Use best** applies the suggestion as the active kept range (and
 shows its IN frame), like any other range choice, in one Undo step; it reads **In use** once applied.
 **Use all N** (**Use all N steady ranges as kept ranges**) replaces the recording's kept ranges with the steady
 ranges at the current allowed movement, in recording order, in one Undo step, and makes the first one active;

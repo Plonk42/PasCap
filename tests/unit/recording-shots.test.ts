@@ -1,10 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import {
   MOTION_ANALYSIS_VERSION,
+  motionProfile,
+  smoothRanges,
   type MotionAnalysis,
   type TelemetrySample,
 } from '../../src/shared/motion-analysis.js';
-import { cameraMotion, recordingShots } from '../../src/shared/recording-shots.js';
+import {
+  cameraMotion,
+  rankedSmoothRanges,
+  rankRanges,
+  recordingShots,
+  SHOT_SCORE_SECONDS,
+  shotKind,
+  shotScore,
+  type ShotKind,
+} from '../../src/shared/recording-shots.js';
 
 const FPS = 30000 / 1001;
 const FRAMES = 600;
@@ -85,5 +96,96 @@ describe('recording shots', () => {
     const damaged = recordingShots(analysis(), [{ start: 100, end: 160 }], undefined, 2, FPS).shots;
     expect(damaged.some((shot) => shot.sourceIn < 160 && shot.sourceOut > 100)).toBe(false);
     expect(damaged[0]!.flight).toBeNull();
+  });
+});
+
+type Movement = Partial<Record<'tx' | 'ty' | 'zoom' | 'rotation', number>>;
+
+/** Steady stretches of `seconds` with movement per frame, separated by one-second jolts. */
+function stretches(parts: { seconds: number; movement: Movement | ((frame: number) => Movement) }[]): MotionAnalysis {
+  const values = { tx: [], ty: [], zoom: [], rotation: [] } as Record<keyof Movement, (number | null)[]>;
+  const push = (movement: Movement) =>
+    (Object.keys(values) as (keyof Movement)[]).forEach((key) => values[key].push(movement[key] ?? 0));
+  parts.forEach((part, index) => {
+    if (index > 0)
+      for (let frame = 0; frame < 30; frame++) push({ tx: frame % 2 ? 25 : -25, ty: frame % 3 ? 20 : -20 });
+    for (let frame = 0; frame < Math.round(part.seconds * FPS); frame++)
+      push(typeof part.movement === 'function' ? part.movement(frame) : part.movement);
+  });
+  for (const key of Object.keys(values) as (keyof Movement)[]) values[key][0] = null;
+  return {
+    version: MOTION_ANALYSIS_VERSION,
+    verifiedAt: '2026-10-22T10:00:00.000Z',
+    frameCount: values.tx.length,
+    ...values,
+    telemetry: [],
+  };
+}
+
+/** Flight data every second with these speeds. */
+function flying(seconds: number, horizontalSpeed: number, verticalSpeed = 0): TelemetrySample[] {
+  return Array.from({ length: seconds }, (_, time) => ({ ...sample(time, 50), horizontalSpeed, verticalSpeed }));
+}
+
+describe('ranking steady ranges', () => {
+  // 1 analysis pixel per frame is about 9.4 % of the image width per second.
+  const approach = { tx: 0.02, zoom: 0.002 };
+  // A slow drift to and fro, faster than a hover now and then but barely moving on average.
+  const nearlyStill = (frame: number) => ({ tx: 0.03 + 0.04 * Math.sin((2 * Math.PI * frame) / 300) });
+  const orbit = { tx: 0.1, rotation: 0.002 };
+
+  it('ranks a short orbit above a long approach and a long nearly still stretch', () => {
+    const motion = stretches([
+      { seconds: 20, movement: approach },
+      { seconds: 20, movement: nearlyStill },
+      { seconds: 7, movement: orbit },
+    ]);
+    const { shots } = recordingShots(motion, [], undefined, 2, FPS);
+    expect(shots.map((shot) => [shot.kind, shot.rank])).toEqual([
+      ['approach', 2],
+      ['static', 3],
+      ['orbit', 1],
+    ]);
+    // Source preview suggests the same range as the assistant's rank 1.
+    const ranges = smoothRanges(motionProfile(motion, FPS), 2, FPS);
+    expect(ranges[0]).toMatchObject({ sourceIn: shots[0]!.sourceIn });
+    const best = rankedSmoothRanges(motion, ranges, FPS)[0]!;
+    expect([best.sourceIn, best.sourceOut]).toEqual([shots[2]!.sourceIn, shots[2]!.sourceOut]);
+  });
+
+  it('names orbits, reveals, approaches and other moves from the picture and the flight data', () => {
+    const kind = (movement: Movement, telemetry: TelemetrySample[] = []) =>
+      shotKind({ ...stretches([{ seconds: 10, movement }]), telemetry }, 0, 300, FPS);
+    // Sideways movement is an orbit while the drone flies, a pan while it hovers or without flight data.
+    expect(kind({ tx: 0.3 }, flying(10, 4))).toBe('orbit');
+    expect(kind({ tx: 0.3 }, flying(10, 0.2))).toBe('move');
+    expect(kind({ tx: 0.3 })).toBe('move');
+    expect(kind({ tx: 0.1, rotation: 0.002 })).toBe('orbit');
+    expect(kind({ zoom: -0.003 })).toBe('reveal');
+    expect(kind({ zoom: 0.003 }, flying(10, 6, 2))).toBe('reveal');
+    expect(kind({ zoom: 0.003 }, flying(10, 6))).toBe('approach');
+    // Content moving down may be a forward flight looking down: not a reveal.
+    expect(kind({ ty: 0.3 }, flying(10, 4))).toBe('move');
+    expect(kind({ tx: 0.02 })).toBe('static');
+  });
+
+  it('counts length up to ten seconds, then prefers the longer range, then the earlier', () => {
+    const ranges = [
+      { sourceIn: 0, sourceOut: 120 },
+      { sourceIn: 200, sourceOut: 500 },
+      { sourceIn: 600, sourceOut: 1200 },
+      { sourceIn: 1300, sourceOut: 1900 },
+    ];
+    const kinds = new Map<number, ShotKind>([
+      [0, 'orbit'],
+      [200, 'move'],
+      [600, 'approach'],
+      [1300, 'approach'],
+    ]);
+    // 10 s of move (7) beats 20 s of approach (4) and 4 s of orbit (4); equal approaches keep source order.
+    expect(rankRanges(ranges, (range) => kinds.get(range.sourceIn)!, FPS).map((range) => range.sourceIn)).toEqual([
+      200, 0, 600, 1300,
+    ]);
+    expect(shotScore('orbit', 600, FPS)).toBe(SHOT_SCORE_SECONDS);
   });
 });

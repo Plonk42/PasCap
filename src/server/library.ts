@@ -854,7 +854,7 @@ export class MediaLibrary {
   }
   async #measureMotion(asset: MediaAsset, context: JobContext, from: number, to: number): Promise<void> {
     const { verifiedAt, frameCount } = asset.prepared!.verification;
-    context.update(from, 'Measuring camera motion for steadiest-range suggestions');
+    context.update(from, 'Measuring camera motion for steady-range suggestions');
     const motion = await analyseProxy(
       this.config.ffmpeg,
       this.proxyPath(asset),
@@ -862,7 +862,7 @@ export class MediaLibrary {
       verifiedAt,
       context.signal,
       (fraction) =>
-        context.update(from + fraction * (to - from), 'Measuring camera motion for steadiest-range suggestions'),
+        context.update(from + fraction * (to - from), 'Measuring camera motion for steady-range suggestions'),
     );
     const telemetry = await readTelemetry(this.config, asset.sourcePath, context.signal);
     await atomicWrite(this.motionPath(asset), JSON.stringify({ ...motion, telemetry }));

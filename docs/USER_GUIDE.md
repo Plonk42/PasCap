@@ -177,7 +177,7 @@ whole selection) also copy the applied range
 (or the full recording without a choice). Later source choices never alter existing
 clips. Plus/double-click target the selected video track; a drop targets the track under the pointer.
 
-### Find the steadiest range
+### Find the best steady range
 
 After a drone recording is prepared, a background job measures its camera motion
 (Activity shows it after the other jobs, so every proxy of an import comes first). Lanes directly under the
@@ -186,8 +186,11 @@ sudden angle or speed changes), camera movement (white line) and the dashed allo
 movement (drag it); the green bands mark steady ranges, the suggested one strongest.
 Stretches where the camera does not move at all, such as a hover, are left out.
 Hover to read the values at that moment; click or drag to scrub. Below the IN/OUT
-fields, **Camera motion** gives the **Steadiest range** length and IN–OUT, and **Use longest**
-sets IN and OUT to it. **Use all N** keeps every steady range instead, in recording order and in one
+fields, **Camera motion** gives the **Best steady range**, what it shows, its length and IN–OUT, and **Use best**
+sets IN and OUT to it. The best one favours an orbit (the picture turns, or slides sideways while the
+drone flies) or a reveal (a climb or a pull out), then other camera moves, then an approach (only
+pushing in) and nearly still footage, each counting its length up to 10 s.
+**Use all N** keeps every steady range instead, in recording order and in one
 Undo step; neither adds clips: use the **Kept ranges** list for that.
 Move **Allowed movement** left for only very steady footage,
 right to accept more movement. **Flight data** adds or removes lanes: flight and

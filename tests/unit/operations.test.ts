@@ -377,7 +377,12 @@ describe('operation routes', () => {
     expect(ranges.map((range) => range.motion)).toEqual(['pan left', 'pan left', 'pan right']);
     expect(ranges[0]!.sourceIn).toBe(30);
     expect(ranges.at(-1)!.sourceOut).toBe(570);
-    // Two cells: the two longest ranges, in source order.
+    // Three pans without flight data: ranked by length. Two cells: the two best ranges, in source order.
+    expect(ranges.map((range) => [range.kind, range.rank])).toEqual([
+      ['move', 3],
+      ['move', 2],
+      ['move', 1],
+    ]);
     expect(ranges.map((range) => range.cell)).toEqual([null, 0, 1]);
     expect(sheets).toEqual([ranges.slice(1).map((range) => Math.floor((range.sourceIn + range.sourceOut) / 2))]);
     expect(described.image).toMatchObject({ mimeType: 'image/jpeg' });
@@ -439,17 +444,15 @@ describe('operation routes', () => {
       context as unknown as Parameters<typeof runners.describe_recording>[0],
       { projectId: 'compare', mediaId: 'rec-1', sheet: false },
     );
-    const longest = [...described.steadyRanges].sort(
-      (a, b) => b.sourceOut - b.sourceIn - (a.sourceOut - a.sourceIn),
-    )[0]!;
+    const best = described.steadyRanges.find((range) => range.rank === 1)!;
     const compared = await runners.compare_recordings(context, {
       projectId: 'compare',
       candidates: [{ mediaId: 'rec-1' }, { mediaId: 'rec-2' }, { mediaId: 'rec-2', sourceIn: 10, sourceOut: 40 }],
       frames: 2,
     });
     expect(compared.candidates.map(({ cells, sourceIn, sourceOut }) => ({ cells, sourceIn, sourceOut }))).toEqual([
-      // The longest steady range; without motion analysis or kept ranges, the whole recording.
-      { cells: [0, 1], sourceIn: longest.sourceIn, sourceOut: longest.sourceOut },
+      // The best steady range; without motion analysis or kept ranges, the whole recording.
+      { cells: [0, 1], sourceIn: best.sourceIn, sourceOut: best.sourceOut },
       { cells: [2, 3], sourceIn: 0, sourceOut: 600 },
       { cells: [4, 5], sourceIn: 10, sourceOut: 40 },
     ]);

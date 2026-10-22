@@ -295,7 +295,7 @@ Read; for editor and assistant. Read every appearance value of one video track: 
 
 #### `describe_recording`
 
-Read; for editor and assistant. Map where a video recording is usable and how its camera moves, measured from its camera motion analysis and the drone's flight data, inside the ranges the user kept: its steady ranges with their length, picture movement (% of the image width per second), roughness, a camera move name (static, pan, tilt, push in, pull out, rotate; a sideways flight looks like a pan) and mean flight data, plus damaged frames and how much of it hovers still. It never says what the footage shows: with sheet true, it also returns a contact sheet with the middle frame of each steady range (the longest ones when they do not all fit), for you to judge. To compare several recordings, compare_recordings shows them in one picture; recording_sheet shows any other frames.
+Read; for editor and assistant. Map where a video recording is usable and how its camera moves, measured from its camera motion analysis and the drone's flight data, inside the ranges the user kept: its steady ranges in source order with their length, picture movement (% of the image width per second), roughness, a camera move name (static, pan, tilt, push in, pull out, rotate; a sideways flight looks like a pan), what they show (orbit, reveal, move, approach, static), their rank (1 = the best, as Source preview suggests it) and mean flight data, plus damaged frames and how much of it hovers still. It never says what the footage shows: with sheet true, it also returns a contact sheet with the middle frame of each steady range (the best-ranked ones when they do not all fit), for you to judge. To compare several recordings, compare_recordings shows them in one picture; recording_sheet shows any other frames.
 
 | Input             | Type    | Description                                                                                                                                   |
 | ----------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -464,7 +464,7 @@ Read; for editor and assistant. Render source frames of one video recording's ed
 
 #### `compare_recordings`
 
-Read; for assistant. Show candidate shots from several video recordings in one contact sheet, without track Colour or Transform, to pick the best of similar takes before placing it. Each candidate takes `frames` cells in a row, spread across its range (frames 1 lays the candidates out row by row). A candidate without a range shows its recording's longest steady range inside the kept ranges at the session's allowed movement, as describe_recording lists them, else its first kept range or the whole recording. The number of cells is limited by the service's image budget.
+Read; for assistant. Show candidate shots from several video recordings in one contact sheet, without track Colour or Transform, to pick the best of similar takes before placing it. Each candidate takes `frames` cells in a row, spread across its range (frames 1 lays the candidates out row by row). A candidate without a range shows its recording's best steady range (rank 1) inside the kept ranges at the session's allowed movement, as describe_recording lists them, else its first kept range or the whole recording. The number of cells is limited by the service's image budget.
 
 | Input        | Type            | Description                                                                                                                                  |
 | ------------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -632,10 +632,15 @@ flight data, without decoding:
   two largest are named; under 0.5 % of the width per second it is `static`. A sideways
   flight looks like a pan and an orbit like a pan; the names describe the picture, not the
   flight;
+- each range's `kind` and `rank`, as Source preview ranks its suggestion
+  ([steady ranges](../TIMELINE_EDITING.md#camera-motion-and-the-best-steady-range)): `orbit`
+  (rotation carries 30 % of the movement, or sideways movement 50 % while the drone flies at
+  1 m/s or more), `reveal` (a climb of 1 m/s or more, or a pull out carrying 40 %), `approach`
+  (only pushing in), `static` (as above) or `move`; rank 1 is the best;
 - recording facts: name, duration, damaged ranges, the share of still frames (hovering)
   and whether flight data exists;
 - unless `sheet` is false, one contact sheet (`recording_sheet`) of each range's middle
-  frame, the longest ranges first when they do not all fit the image budget, with each
+  frame, the best-ranked ranges when they do not all fit the image budget, with each
   range's `cell`.
 
 The thumbnails' picture facts first proposed (mean luma, colourfulness) were dropped: the
@@ -644,7 +649,7 @@ model sees the pictures. A recording without motion analysis returns no ranges a
 
 Flights often hold several near-identical takes of one subject, of which the user keeps only
 the best. `compare_recordings` shows candidates from several recordings in one ungraded
-sheet: each candidate is a recording and a source range (by default its longest steady range
+sheet: each candidate is a recording and a source range (by default its best steady range
 inside the kept ranges at the session's allowed movement, else its first kept range or the
 whole recording), shown in 1–4 cells at the centres of equal parts of the range, one row per
 candidate when there are several cells. Its legend gives each candidate's cells, range, length
