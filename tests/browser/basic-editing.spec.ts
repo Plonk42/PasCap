@@ -162,6 +162,22 @@ test('snaps either edge to the shown guide, bypasses with Alt, and never snaps t
   expect((await current(page)).clips[1]?.start).toBe(92);
 });
 
+test('the first clip of a Ripple track snaps its free start to a bookmark', async ({ page }) => {
+  await installOverlay(page);
+  let document = await current(page);
+  document = {
+    ...document,
+    bookmarks: [77],
+    layers: document.layers.map((layer) => (layer.id === 'upper' ? { ...layer, ripple: true } : layer)),
+  };
+  await page.evaluate((next) => window.pascapLab!.setDocument(next), document);
+  await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+  expect(await beginMove(page, 75)).toBe(77);
+  await expect(page.locator('.snap-guide')).toBeVisible();
+  await page.mouse.up();
+  await expect.poll(async () => (await current(page)).clips.find((clip) => clip.id === 'moving')?.start).toBe(77);
+});
+
 test('invalid overlap is visibly rejected and cancelled movement never changes the source or placement', async ({
   page,
 }) => {

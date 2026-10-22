@@ -284,6 +284,40 @@ function snapRowPlacement(
   return { start, guide };
 }
 
+interface Placement {
+  index: number;
+  start: number;
+  guide: number | null;
+}
+
+/** The nearest sequence slot; only a free anchor (an empty track, or its first clip moved) starts where asked and snaps. */
+function ripplePlacement(
+  project: ProjectDocument,
+  payload: SinglePayload,
+  clips: readonly VideoClip[],
+  layerId: string,
+  requested: number,
+  { snapping, tolerance, playhead }: { snapping: PlacementSnapping; tolerance: number; playhead: number },
+): Placement {
+  const slots = rippleSlots(project, payload, layerId, clips[0]!.id, requested);
+  const slot = slots.reduce(
+    (nearest, candidate) =>
+      Math.abs(candidate.start - requested) < Math.abs(nearest.start - requested) ? candidate : nearest,
+    slots[0]!,
+  );
+  const trackClips = layerClips(project, layerId);
+  const emptyTrack = trackClips.every((clip) => payload.kind === 'clip' && clip.id === payload.clipId);
+  // Reordering preserves the old anchor, but explicitly moving the same
+  // first clip while it remains first is allowed to set a new anchor.
+  const movesAnchor = payload.kind === 'clip' && trackClips[0]?.id === payload.clipId && slot === slots[0];
+  if (!emptyTrack && !movesAnchor) return { index: slot.index, start: slot.start, guide: null };
+  if (!snapping) return { index: slot.index, start: requested, guide: null };
+  // The rest of the track follows its anchor, so its boundaries are no targets.
+  const excluded = new Set([...clips, ...trackClips].map((clip) => clip.id));
+  const points = snapPointsWithout(project, excluded, playhead, beatsOf(snapping));
+  return { index: slot.index, ...snapRowPlacement(clips, requested, points, tolerance) };
+}
+
 /** Both drag feedback and drop commit consume this same integer-frame plan. */
 export function planTimelineDrop(
   project: ProjectDocument,
@@ -314,39 +348,28 @@ function planSingleDrop(
   const first = clips[0]!;
   const requested = Math.max(0, Math.round(pointerFrame - (payload.kind === 'clip' ? payload.grabFrame : 0)));
   const mode = layer.ripple ? 'ripple' : 'position';
-  let index =
+  const index =
     payload.kind === 'clip' ? project.clips.findIndex((clip) => clip.id === payload.clipId) : project.clips.length;
-  let start = requested;
-  let guide: number | null = null;
-  const plan: DropPlan = { layerId, start, duration: 0, guide, mode, index, command: null, error: '' };
+  const plan: DropPlan = { layerId, start: requested, duration: 0, guide: null, mode, index, command: null, error: '' };
   try {
-    if (mode === 'ripple') {
-      const slots = rippleSlots(project, payload, layerId, first.id, requested);
-      const slot = slots.reduce(
-        (nearest, candidate) =>
-          Math.abs(candidate.start - requested) < Math.abs(nearest.start - requested) ? candidate : nearest,
-        slots[0]!,
+    let placement: Placement = { index, start: requested, guide: null };
+    if (mode === 'ripple')
+      placement = ripplePlacement(project, payload, clips, layerId, requested, { snapping, tolerance, playhead });
+    else if (snapping) {
+      const points = placementSnapPoints(
+        project,
+        payload.kind === 'clip' ? payload.clipId : null,
+        playhead,
+        beatsOf(snapping),
       );
-      index = slot.index;
-      start = slot.start;
-      // Reordering preserves the old anchor, but explicitly moving the same
-      // first clip while it remains first is allowed to set a new anchor.
-      const previousFirst = layerClips(project, layerId)[0];
-      if (payload.kind === 'clip' && previousFirst?.id === first.id && slot === slots[0]) start = requested;
-    } else if (snapping) {
-      const snapped = snapRowPlacement(
-        clips,
-        requested,
-        placementSnapPoints(project, payload.kind === 'clip' ? payload.clipId : null, playhead, beatsOf(snapping)),
-        tolerance,
-      );
-      start = snapped.start;
-      guide = snapped.guide;
+      placement = { index, ...snapRowPlacement(clips, requested, points, tolerance) };
     }
-    plan.index = index;
+    const { start } = placement;
+    plan.index = placement.index;
     plan.start = start;
-    plan.guide = guide;
-    plan.command = payload.kind === 'clip' ? { type: 'place', clipId: payload.clipId, layerId, start, index } : null;
+    plan.guide = placement.guide;
+    plan.command =
+      payload.kind === 'clip' ? { type: 'place', clipId: payload.clipId, layerId, start, index: plan.index } : null;
     plan.duration = durationAt(clips);
     const candidate = candidateDocument(project, payload, plan);
     const layout = calculateLayout(candidate);

@@ -72,6 +72,34 @@ describe('one authoritative timeline drop plan', () => {
     expect(plan.error).toContain('cannot overlap');
     expect(JSON.stringify(document)).toBe(before);
   });
+  it('snaps a free Ripple anchor to bookmarks and beats, but not to the clips that follow it', () => {
+    let document = applyCommand(project(), { type: 'layer-add', layer: createLayer('lane', 'Lane') });
+    document = { ...document, bookmarks: [150] };
+    const media = { kind: 'media' as const, clips: [createClip('new', 'a', 0, 30)] };
+    expect(planTimelineDrop(document, media, 'lane', 147, true, 5, 0)).toMatchObject({
+      start: 150,
+      guide: 150,
+      mode: 'ripple',
+      error: '',
+    });
+    expect(planTimelineDrop(document, media, 'lane', 147, false, 5, 0)).toMatchObject({ start: 147, guide: null });
+    expect(planTimelineDrop(document, media, 'lane', 372, () => [400], 5, 0)).toMatchObject({
+      start: 370,
+      guide: 400,
+    });
+
+    // Moving the first clip of a Ripple track moves its anchor; the clips after it follow.
+    document = { ...document, bookmarks: [33] };
+    const first = planTimelineDrop(document, { kind: 'clip', clipId: 'a', grabFrame: 0 }, 'video-1', 28, true, 8, 0);
+    expect(first).toMatchObject({ start: 33, guide: 33, mode: 'ripple', error: '' });
+    expect(calculateLayout(applyCommand(document, first.command!)).clips.map((clip) => clip.start)).toEqual([
+      33, 93, 153,
+    ]);
+    // A later slot keeps the derived start without snapping.
+    const later = planTimelineDrop(document, { kind: 'clip', clipId: 'c', grabFrame: 0 }, 'video-1', 58, true, 5, 0);
+    expect(later).toMatchObject({ start: 60, guide: null });
+  });
+
   it('copies a media batch as consecutive placements and reports the first exact start', () => {
     const document = project();
     const payload = {
