@@ -396,16 +396,16 @@
   margin-top: 4px;
 }
 
-/* A music transition's button sits on its lane, centred in the 90 px clip. */
+/* A music transition's button sits on its lane, centred in the 74 px clip. */
 .music-instance-lane .boundary-button.music-boundary {
-  top: 36px;
+  top: 28px;
   color: #ccd4f2;
   background: #2a3150;
   border-color: #5d6894;
 }
 
 .music-lane-wrapper.music-instance-lane {
-  height: 96px;
+  height: 80px;
   border-bottom: 1px solid #414963;
   background: #191d2d;
 }
@@ -416,7 +416,7 @@
 
 .music-lane-wrapper.music-instance-lane .music-timeline-clip {
   top: 3px;
-  height: 90px;
+  height: 74px;
 }
 
 .music-instance-lane .music-body {
@@ -452,7 +452,7 @@
 .music-instance-lane .music-transition-slot {
   position: absolute;
   top: 3px;
-  height: 90px;
+  height: 74px;
   border: 1px dashed #5d6894;
   border-radius: 4px;
   background: #0d1018;
