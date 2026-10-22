@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { signalChild } from './child-signal.js';
 import { ServiceError } from './errors.js';
 
 interface ProcessOptions {
@@ -32,8 +33,8 @@ export function runProcess(binary: string, args: string[], options: ProcessOptio
     let overflow = false;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
     const cancel = (): void => {
-      child.kill('SIGTERM');
-      killTimer = setTimeout(() => child.kill('SIGKILL'), 2_000);
+      signalChild(child, 'SIGTERM');
+      killTimer = setTimeout(() => signalChild(child, 'SIGKILL'), 2_000);
       killTimer.unref();
     };
     options.signal?.addEventListener('abort', cancel, { once: true });

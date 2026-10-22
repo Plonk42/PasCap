@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import type { Readable, Writable } from 'node:stream';
 import { EXPORT_RESOURCES } from '../shared/export.js';
+import { signalChild } from './child-signal.js';
 import { ServiceError } from './errors.js';
 
 interface RawProcessOptions {
@@ -196,12 +197,12 @@ export class RawVideoPass {
     if (this.#stopping) return;
     this.#stopping = true;
     for (const child of this.#active.keys()) {
-      child.kill('SIGTERM');
+      signalChild(child, 'SIGTERM');
       child.stdout?.destroy();
       child.stdin?.destroy();
     }
     this.#timer = setTimeout(() => {
-      for (const child of this.#active.keys()) child.kill('SIGKILL');
+      for (const child of this.#active.keys()) signalChild(child, 'SIGKILL');
     }, EXPORT_RESOURCES.terminateGraceMs);
     this.#timer.unref();
   }
