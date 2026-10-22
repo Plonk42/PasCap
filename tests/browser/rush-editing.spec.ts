@@ -93,6 +93,10 @@ test.beforeEach(async ({ page, request }) => {
       await route.continue();
       return;
     }
+    if (method === 'POST' && pathname === '/api/ops/music_waveform') {
+      await route.continue();
+      return;
+    }
     unexpectedApi.push(`${method} ${pathname}`);
     await route.abort('blockedbyclient');
   });
@@ -1955,7 +1959,10 @@ test('missing source snapshots degrade explicitly without changing the track or 
 }) => {
   const requests: string[] = [];
   page.on('request', (request) => {
-    if (request.method() !== 'GET') requests.push(`${request.method()} ${new URL(request.url()).pathname}`);
+    const pathname = new URL(request.url()).pathname;
+    // The editor reads the assistant session status by POST; it writes nothing.
+    if (request.method() !== 'GET' && pathname !== '/api/ops/session_status')
+      requests.push(`${request.method()} ${pathname}`);
   });
   await page.route(/\/api\/media\/[^/]+\/thumbnail\/\d+$/, (route) => route.fulfill({ status: 404, body: '' }));
   // Reload so no thumbnail can come from the document's already decoded image cache.

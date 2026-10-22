@@ -94,6 +94,10 @@ test.beforeEach(async ({ page, request }) => {
       await route.continue();
       return;
     }
+    if (method === 'POST' && pathname === '/api/ops/music_waveform') {
+      await route.continue();
+      return;
+    }
     unexpected.push(`${method} ${pathname}`);
     await route.abort('blockedbyclient');
   });
