@@ -27,6 +27,7 @@ import {
   closeOptions,
   expandedInspectorPreferences,
   inspectorTab,
+  isWrite,
   openOptions,
   sharedPoint,
 } from './editor-helpers.js';
@@ -1959,10 +1960,7 @@ test('missing source snapshots degrade explicitly without changing the track or 
 }) => {
   const requests: string[] = [];
   page.on('request', (request) => {
-    const pathname = new URL(request.url()).pathname;
-    // The editor reads the assistant session status by POST; it writes nothing.
-    if (request.method() !== 'GET' && pathname !== '/api/ops/session_status')
-      requests.push(`${request.method()} ${pathname}`);
+    if (isWrite(request)) requests.push(`${request.method()} ${new URL(request.url()).pathname}`);
   });
   await page.route(/\/api\/media\/[^/]+\/thumbnail\/\d+$/, (route) => route.fulfill({ status: 404, body: '' }));
   // Reload so no thumbnail can come from the document's already decoded image cache.

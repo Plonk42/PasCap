@@ -5,7 +5,7 @@ import type { AudioAsset } from '../../src/shared/audio.js';
 import type { FootageRoot } from '../../src/shared/footage.js';
 import type { MediaJob } from '../../src/shared/media.js';
 import { createProject } from '../../src/shared/model.js';
-import { expandPanel, inspectorTab } from './editor-helpers.js';
+import { expandPanel, inspectorTab, isWritePost } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let memory: MemoryProjects;
@@ -91,8 +91,7 @@ async function openBrowser(page: Page, enterFixture = true): Promise<Locator> {
 function posts(page: Page): { pathname: string; body: unknown }[] {
   const writes: { pathname: string; body: unknown }[] = [];
   page.on('request', (request) => {
-    if (request.method() === 'POST')
-      writes.push({ pathname: new URL(request.url()).pathname, body: request.postDataJSON() });
+    if (isWritePost(request)) writes.push({ pathname: new URL(request.url()).pathname, body: request.postDataJSON() });
   });
   return writes;
 }
