@@ -806,7 +806,9 @@ I/O marks or **Use** (steadiest range) creates the entry with its first range an
 **Add clip** copies it. The handles stop one frame from the neighbouring kept ranges (their range sliders end
 there, Home/End too); typed IN/OUT that overlap or touch another kept range are rejected with an inline
 error, never merged or clamped. **Reset source range** returns to the whole recording (IN = 0, OUT = frame
-count), removing every kept range in one step.
+count), removing every kept range in one step. The trash after it, **Delete selected kept range**, removes only
+the active range, the next one becoming active (the last one leaves the whole recording again); without a kept
+range it is unavailable, with its reason.
 
 The **Kept ranges** button beside the readout (**Whole recording**, or **N kept ranges**) opens their list:
 one row per range with its IN → OUT timecodes and length, which makes that range active (moving to its IN),

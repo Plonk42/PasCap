@@ -592,6 +592,33 @@ function SourceExcerpts({
   );
 }
 
+/** Why Reset and Delete selected kept range are unavailable (null when available), and their tooltips. */
+function rangeButtons({
+  disabled,
+  drafting,
+  whole,
+  kept,
+  active,
+}: Readonly<{ disabled: boolean; drafting: boolean; whole: boolean; kept: number; active: number }>) {
+  let reset: string | null = null;
+  if (disabled) reset = 'Finish the current edit before resetting the range.';
+  else if (whole) reset = 'The range already covers the whole recording.';
+  let remove: string | null = null;
+  if (disabled || drafting) remove = 'Finish the current edit before deleting the range.';
+  else if (!kept) remove = 'No range is kept: the whole recording is available.';
+  const several = kept > 1;
+  return {
+    reset,
+    resetTitle: several
+      ? 'Reset to the whole recording: removes every kept range'
+      : 'Reset IN and OUT to the whole recording',
+    remove,
+    removeTitle: several
+      ? `Delete kept range ${active + 1} of ${kept}; the others stay`
+      : 'Delete this kept range: the whole recording is available again',
+  };
+}
+
 function SourceRangeEditor({
   asset,
   range,
@@ -715,10 +742,14 @@ function SourceRangeEditor({
     }
     commit({ mediaId: asset.id, sourceIn: Number(numbers.sourceIn), sourceOut: Number(numbers.sourceOut) });
   };
-  let resetBlocked: string | null = null;
-  if (disabled) resetBlocked = 'Finish the current edit before resetting the range.';
-  else if (range.sourceIn === 0 && range.sourceOut === count && !numbersDirty && !error)
-    resetBlocked = 'The range already covers the whole recording.';
+  const buttons = rangeButtons({
+    disabled,
+    drafting: draft !== null,
+    whole: range.sourceIn === 0 && range.sourceOut === count && !numbersDirty && !error,
+    kept: kept.length,
+    active: activeKept,
+  });
+  const resetBlocked = buttons.reset;
   const resetRange = (): void => {
     if (resetBlocked !== null || drag.current) return;
     if (kept.length > 1) applyKept([], 0);
@@ -750,6 +781,7 @@ function SourceRangeEditor({
     const next = removeKeptRange(kept, index, activeKept);
     applyKept(next.ranges, next.active);
   };
+  const deleteBlocked = buttons.remove;
   const activate = (index: number): void => {
     if (disabled || draft !== null) return;
     onPause();
@@ -1116,16 +1148,25 @@ function SourceRangeEditor({
             aria-label="Reset source range"
             aria-disabled={resetBlocked !== null}
             tabIndex={resetBlocked === null ? 0 : -1}
-            title={
-              resetBlocked ??
-              (kept.length > 1
-                ? 'Reset to the whole recording: removes every kept range'
-                : 'Reset IN and OUT to the whole recording')
-            }
+            title={resetBlocked ?? buttons.resetTitle}
             onKeyDown={onKeyDown}
             onClick={resetRange}
           >
             <Icon name="reset" size={13} />
+          </button>
+          <button
+            type="button"
+            className="icon-button source-range-delete"
+            aria-label="Delete selected kept range"
+            aria-disabled={deleteBlocked !== null}
+            tabIndex={deleteBlocked === null ? 0 : -1}
+            title={deleteBlocked ?? buttons.removeTitle}
+            onKeyDown={onKeyDown}
+            onClick={() => {
+              if (deleteBlocked === null) removeRange(activeKept);
+            }}
+          >
+            <Icon name="trash" size={13} />
           </button>
         </form>
       </div>

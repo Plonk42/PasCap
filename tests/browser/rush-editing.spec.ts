@@ -2664,12 +2664,24 @@ test('applied ranges are the recording’s kept ranges: saved with the project, 
   expect((await current(page)).clips).toHaveLength(clips);
   await page.getByRole('tab', { name: 'Source preview', exact: true }).click();
 
+  // Delete selected kept range removes only the active one, in one Undo step.
+  const remove = page.getByRole('button', { name: 'Delete selected kept range', exact: true });
+  await remove.click();
+  expect(await kept()).toEqual([
+    { sourceIn: 10, sourceOut: 59 },
+    { sourceIn: 70, sourceOut: 120 },
+  ]);
+  await expect(strip).toHaveAttribute('data-source-in', '70');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.getByRole('tab', { name: 'Source preview', exact: true }).click();
+
   // Reset returns to the whole recording, removing every kept range in one step; Undo restores them.
   await page.getByRole('button', { name: 'Reset source range', exact: true }).click();
   expect(await kept()).toBeUndefined();
   await expect(strip).toHaveAttribute('data-source-in', '0');
   await expect(strip).toHaveAttribute('data-source-out', '120');
   await expect(trigger).toHaveText(/Whole recording/);
+  await expect(remove).toHaveAttribute('aria-disabled', 'true');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await kept()).toEqual([
     { sourceIn: 10, sourceOut: 59 },
