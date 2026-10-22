@@ -16,6 +16,7 @@ import {
   expectDecoders,
   freshExportLinks,
   inspectorTab,
+  isWrite,
   openOptions,
   submitExport,
 } from './editor-helpers.js';
@@ -793,7 +794,7 @@ test('dragging a Media multi-selection inserts every recording into Ripple-on an
 test('the selection header keeps Prepare and Clear keyboard reachable without starting work', async ({ page }) => {
   const posts: string[] = [];
   page.on('request', (request) => {
-    if (request.method() !== 'GET') posts.push(`${request.method()} ${new URL(request.url()).pathname}`);
+    if (isWrite(request)) posts.push(`${request.method()} ${new URL(request.url()).pathname}`);
   });
   const summary = page.locator('.library-summary');
   await expect(summary.getByRole('button', { name: 'Prepare selected' })).toHaveCount(0);
