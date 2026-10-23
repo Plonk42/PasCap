@@ -608,6 +608,16 @@ function keepCutTransition(document: ProjectDocument, value: Transition): Projec
   return result;
 }
 
+/** The same detail filters on every listed clip, or none of them. */
+function setClipsDetail(next: ProjectDocument, clipIds: readonly string[], value: VideoClip['detail']): void {
+  const detail = detailSchema.parse(value);
+  const ids = new Set(clipIds);
+  if (ids.size !== clipIds.length) throw new Error('List each clip once.');
+  const missing = clipIds.find((id) => !next.clips.some((clip) => clip.id === id));
+  if (missing !== undefined) throw new Error(`Clip ${missing} no longer exists.`);
+  next.clips = next.clips.map((clip) => (ids.has(clip.id) ? { ...clip, detail: { ...detail } } : clip));
+}
+
 export function applyCommand(document: ProjectDocument, command: EditCommand): ProjectDocument {
   if (command.type === 'transition' && command.keepCut) return keepCutTransition(document, command.transition);
   const next = projectSchema.parse(document);
@@ -665,6 +675,9 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
       return projectSchema.parse(next);
     case 'detail':
       next.clips[index] = { ...next.clips[index]!, detail: detailSchema.parse(command.detail) };
+      return projectSchema.parse(next);
+    case 'detail-clips':
+      setClipsDetail(next, command.clipIds, command.detail);
       return projectSchema.parse(next);
     case 'colour-setting':
     case 'hsl-band':

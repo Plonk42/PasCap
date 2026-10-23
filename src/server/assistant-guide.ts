@@ -84,6 +84,7 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
 - Change one setting with colour-setting, hsl-band, colour-curve or transform-setting, which
   keep every other value; a keyed setting follows its keyframes, so change those instead
   (layer-key-value). The colour and transform commands replace everything and suit a full grade.
+  detail-clips sets the same Detail on several clips in one command.
 - To animate, layer-key-set keys several settings at one frame in one command, with one Easing
   (hold keeps a grade until the next keyframe) or one per setting; settings left out keep what
   they have there, and null disables one.

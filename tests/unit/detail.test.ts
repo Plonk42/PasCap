@@ -10,7 +10,7 @@ import {
   isNeutralColour,
   type RGB,
 } from '../../src/shared/colour.js';
-import { applyCommand } from '../../src/shared/commands.js';
+import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import {
   compileDetail,
   createDetailSettings,
@@ -693,6 +693,30 @@ describe('clip detail editing and export routing', () => {
     expect(split.clips[0]!.detail).not.toBe(split.clips[1]!.detail);
     const duplicated = applyCommand(edited, { type: 'duplicate', clipId: 'clip', newClipId: 'copy' });
     expect(duplicated.clips[1]!.detail).toEqual(detail);
+  });
+
+  it('sets the same detail on several clips in one command, or on none of them', () => {
+    const document = applyCommand(project(NEUTRAL_DETAIL), {
+      type: 'duplicate',
+      clipId: 'clip',
+      newClipId: 'copy',
+    });
+    const detail = { sharpen: 0, clarity: 0.15, denoise: 0 };
+    const history = new EditHistory(document);
+    history.commit({ type: 'detail-clips', clipIds: ['copy', 'clip'], detail });
+    expect(history.current.clips.map((clip) => clip.detail)).toEqual([detail, detail]);
+    expect(history.current.clips[0]!.detail).not.toBe(history.current.clips[1]!.detail);
+    history.undo();
+    expect(history.current).toEqual(document);
+    for (const clipIds of [
+      ['clip', 'gone'],
+      ['clip', 'clip'],
+    ])
+      expect(() => history.commit({ type: 'detail-clips', clipIds, detail })).toThrow();
+    expect(() =>
+      history.commit({ type: 'detail-clips', clipIds: ['clip'], detail: { ...detail, clarity: 2 } }),
+    ).toThrow();
+    expect(history.current).toEqual(document);
   });
 
   it('routes only nonneutral detail through the composited exporter', () => {

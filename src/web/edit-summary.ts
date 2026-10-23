@@ -21,6 +21,7 @@ const PHRASES: Record<EditCommand['type'], Phrase> = {
   reverse: ['clip direction', 'changed', 'clip directions'],
   transform: ['track Transform', 'changed', 'track Transforms'],
   detail: ['clip detail', 'changed', 'clip details'],
+  'detail-clips': ['detail of several clips', 'changed', 'details of several clips'],
   music: ['music', 'changed', null],
   opacity: ['track Opacity', 'changed', 'track Opacities'],
   'layer-key-toggle': ['keyframe setting', 'toggled'],

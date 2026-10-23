@@ -183,6 +183,14 @@ export const editCommandSchema = z.discriminatedUnion('type', [
     clipId,
     detail: described(detailSchema, 'Sharpen 0–2, Clarity −1–1 and Denoise 0–1; 0 is neutral.'),
   }),
+  command(
+    'detail-clips',
+    'Set the same static detail filters on several clips at once, such as every clip of a track; an unknown clip rejects the whole command.',
+    {
+      clipIds: described(z.array(idSchema).min(1), 'The clips, each once.'),
+      detail: described(detailSchema, 'Sharpen 0–2, Clarity −1–1 and Denoise 0–1; 0 is neutral.'),
+    },
+  ),
   command('music', 'Replace every music track of the project.', {
     music: described(
       musicTracksSchema,
