@@ -804,7 +804,7 @@ them: ascending integer `{ sourceIn, sourceOut }` ranges (OUT exclusive, at leas
 separated by at least one frame since touching ranges are one) inside the registered recording. No entry
 means the whole recording is available; an empty list is invalid. A recording that leaves the project with
 **Remove from project** loses its entry. Clips, trims and the timeline may still use any frame: selects
-record what the user kept and never retime, render or export (assistant sessions will be bound by them,
+record what the user kept and never retime, render or export (assistant sessions are bound by them,
 [ASSISTANT_MCP](design/ASSISTANT_MCP.md#project-selects-schema-bump)). Edits are the commands `select-set`
 (replaces a recording's ranges; an empty list makes the whole recording available again) and
 `select-narrow` (a subset of the existing ranges only).
