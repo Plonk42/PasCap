@@ -3,7 +3,7 @@ import { referencedEditCommandSchema } from '../command-schema.js';
 import { described } from '../described.js';
 import { frameSchema, idSchema } from '../model.js';
 import { MAX_EDIT_COMMANDS } from './edit.js';
-import { defineOperation } from './spec.js';
+import { defineOperation, revisionReadSchema } from './spec.js';
 import { timecodeSchema } from './timecode.js';
 
 /** Hard limits; the service's image budget sets the actual ones, at most these. */
@@ -159,6 +159,7 @@ export const compareRecordings = defineOperation({
     .strict(),
   output: z
     .object({
+      revision: revisionReadSchema,
       image: imageSchema,
       candidates: described(
         z.array(

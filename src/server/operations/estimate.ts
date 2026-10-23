@@ -292,7 +292,14 @@ export const runEstimate: OperationRunner<typeof estimate> = async (context, inp
   const clips = separateClips(project, input);
   if (clips) {
     const { analysed, results, commands } = await estimateClips(context, clips, project, input);
-    return { kind: input.kind, analysed, unchanged: [], commands: input.commands ? commands : [], clips: results };
+    return {
+      revision: project.revision,
+      kind: input.kind,
+      analysed,
+      unchanged: [],
+      commands: input.commands ? commands : [],
+      clips: results,
+    };
   }
   const target = targetOf(project, input, context);
   if (input.applyAs === 'keyframe') {
@@ -302,6 +309,7 @@ export const runEstimate: OperationRunner<typeof estimate> = async (context, inp
   const { fields, commands, unchanged } = await estimators[input.kind](context, target, input);
   const frames = target.reads.reduce((sum, read) => sum + new Set(read.sourceFrames).size, 0);
   return {
+    revision: project.revision,
     kind: input.kind,
     analysed: { description: target.description, frames },
     unchanged,

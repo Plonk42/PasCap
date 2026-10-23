@@ -159,6 +159,7 @@ describe('estimate operation', () => {
     const expected = scaleCorrection(analyseAutoAdjust(sourceFrames.map((frame) => patches(frame / 30)))!, 0.8);
     expect(result.correction).toEqual(expected);
     expect(result.analysed).toEqual({ description: 'the whole clip a', frames: 16 });
+    expect(result.revision).toBe(project.revision);
     expect(result.unchanged).toEqual([]);
     const edited = applyCommand(project, result.commands[0]!);
     expect(edited.layers[0]!.colour).toMatchObject(expected);

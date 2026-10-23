@@ -182,7 +182,7 @@ export const runMusicAnalysis: OperationRunner<typeof musicAnalysis> = async (
       describeMusicClip(placed, audio.get(mediaId), analysis, audio.analysisJob(mediaId), window, detail === 'summary'),
     );
   });
-  return { clips };
+  return { revision: project.revision, clips };
 };
 
 function requireBeats({ beats, hits }: { beats: readonly PlacedBeat[]; hits: readonly number[] }): void {
@@ -217,6 +217,7 @@ export const runCheckAlignment: OperationRunner<typeof checkAlignment> = async (
   const within = (offset: { offset: number } | null): boolean => offset !== null && Math.abs(offset.offset) <= 1;
   const offsets = report.flatMap((item) => (item.beat ? [Math.abs(item.beat.offset)] : []));
   return {
+    revision: project.revision,
     beats: beats.length,
     hits: hits.length,
     boundaries: report,
@@ -292,5 +293,5 @@ export const runSnapCutsToBeats: OperationRunner<typeof snapOperation> = async (
     apply && result.commands.length
       ? await runEdit(context, { projectId, expectedRevision: expectedRevision!, commands: result.commands })
       : null;
-  return { boundaries: result.boundaries, commands: result.commands, applied };
+  return { revision: project.revision, boundaries: result.boundaries, commands: result.commands, applied };
 };

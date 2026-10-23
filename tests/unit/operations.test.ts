@@ -404,6 +404,7 @@ describe('operation routes', () => {
       images: { stillWidth: 480, sheetCellWidth: 240, sheetCells: 2 },
     } as unknown as Parameters<typeof runners.describe_recording>[0];
     const described = await runners.describe_recording(context, { projectId: 'shots', mediaId: 'rec-1', sheet: true });
+    expect(described.revision).toBe(project.revision);
     expect(described.allowedMovement).toBe(3);
     expect(described.recording).toMatchObject({ damaged: [{ sourceIn: 100, sourceOut: 130 }], flightData: false });
     expect(described.keptRanges).toEqual([{ sourceIn: 30, sourceOut: 570 }]);
@@ -484,6 +485,7 @@ describe('operation routes', () => {
       candidates: [{ mediaId: 'rec-1' }, { mediaId: 'rec-2' }, { mediaId: 'rec-2', sourceIn: 10, sourceOut: 40 }],
       frames: 2,
     });
+    expect(compared.revision).toBe(described.revision);
     expect(compared.candidates.map(({ cells, sourceIn, sourceOut }) => ({ cells, sourceIn, sourceOut }))).toEqual([
       // The best steady range; without motion analysis or kept ranges, the whole recording.
       { cells: [0, 1], sourceIn: best.sourceIn, sourceOut: best.sourceOut },
@@ -633,6 +635,8 @@ describe('operation routes', () => {
     ]);
     expect(report.summary).toEqual({ boundaries: 1, onBeat: 0, onDownbeat: 0, onHit: 0, meanOffset: 10 });
     expect(report.hits).toBe(1);
+    // Every read names the saved revision it used.
+    expect([music.revision, report.revision]).toEqual([project.revision, project.revision]);
 
     for (const [prefer, sourceOut, target] of [
       ['hit', 58, 'hit'],
@@ -662,6 +666,7 @@ describe('operation routes', () => {
         ...fields,
       });
     const proposal = await snap({});
+    expect(proposal.revision).toBe(project.revision);
     expect(proposal.commands).toEqual([{ type: 'trim', clipId: 'a', sourceIn: 0, sourceOut: 50 }]);
     expect(proposal.boundaries).toMatchObject([{ before: 60, beat: 50, target: 'downbeat', after: 50, skipped: null }]);
     expect(proposal.applied).toBeNull();
