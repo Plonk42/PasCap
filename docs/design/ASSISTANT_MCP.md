@@ -478,20 +478,21 @@ Read; for assistant. Show candidate shots from several video recordings in one c
 
 #### `estimate`
 
-Read; for editor and assistant. Measure footage the way the editor's automatic tools do, from proxy frames, and return the values with the edit commands that apply them (pass them to edit; nothing changes until then). kind auto-adjust is Track → Colour → Auto: eleven Colour settings balancing exposure, contrast, white balance and colour. white-balance is Auto white balance: Temperature and Tint. detail measures noise and softness and suggests the clip's Denoise and Sharpen (never Clarity, a look). Analyse a clip (clipId: the whole clip, or with frame the second around that project frame, as at the playhead), a whole track (layerId: all its clips by duration; not for detail) or a recording range (mediaId, sourceIn, sourceOut: values only, no commands). Judge the result with a still.
+Read; for editor and assistant. Measure footage the way the editor's automatic tools do, from proxy frames, and return the values with the edit commands that apply them (pass them to edit; nothing changes until then). kind auto-adjust is Track → Colour → Auto: eleven Colour settings balancing exposure, contrast, white balance and colour. white-balance is Auto white balance: Temperature and Tint. detail measures noise and softness and suggests the clip's Denoise and Sharpen (never Clarity, a look). Analyse a clip (clipId: the whole clip, or with frame the second around that project frame, as at the playhead), several clips each on its own (clipIds, up to 64), a whole track (layerId: all its clips by duration for one grade; each clip on its own for detail or applyAs shots) or a recording range (mediaId, sourceIn, sourceOut: values only, no commands). For a grade per shot use applyAs shots. Estimates and pictures render one at a time: a call waits its turn, up to a few minutes. Judge the result with a still.
 
-| Input       | Type                                         | Description                                                                                                                                                |
-| ----------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `projectId` | string                                       | ID of the saved project.                                                                                                                                   |
-| `kind`      | "auto-adjust" or "white-balance" or "detail" | What to estimate.                                                                                                                                          |
-| `clipId`    | string                                       | Analyse this clip.                                                                                                                                         |
-| `frame`     | integer                                      | With clipId: analyse the project frames within 1 s of this one, inside the clip, instead of the whole clip.                                                |
-| `layerId`   | string                                       | Analyse every clip of this video track instead.                                                                                                            |
-| `mediaId`   | string                                       | Analyse a range of this video recording instead, with sourceIn and sourceOut.                                                                              |
-| `sourceIn`  | integer                                      | First source frame of the recording range.                                                                                                                 |
-| `sourceOut` | integer                                      | Source frame after the recording range (exclusive).                                                                                                        |
-| `applyAs`   | "values" or "keyframe"                       | Colour kinds: values replaces the track's values (leaving animated settings unchanged); keyframe keys the settings at frame, which needs clipId and frame. |
-| `intensity` | number                                       | auto-adjust: strength of the correction in %; 80 is the correction as fitted, 100 exaggerates it by a quarter.                                             |
+| Input       | Type                                         | Description                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId` | string                                       | ID of the saved project.                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `kind`      | "auto-adjust" or "white-balance" or "detail" | What to estimate.                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `clipId`    | string                                       | Analyse this clip.                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `clipIds`   | array of string                              | Analyse each of these clips on its own, whole: detail, or a Colour kind with applyAs shots.                                                                                                                                                                                                                                                                                                                                                 |
+| `frame`     | integer                                      | With clipId: analyse the project frames within 1 s of this one, inside the clip, instead of the whole clip.                                                                                                                                                                                                                                                                                                                                 |
+| `layerId`   | string                                       | Analyse every clip of this video track instead.                                                                                                                                                                                                                                                                                                                                                                                             |
+| `mediaId`   | string                                       | Analyse a range of this video recording instead, with sourceIn and sourceOut.                                                                                                                                                                                                                                                                                                                                                               |
+| `sourceIn`  | integer                                      | First source frame of the recording range.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `sourceOut` | integer                                      | Source frame after the recording range (exclusive).                                                                                                                                                                                                                                                                                                                                                                                         |
+| `applyAs`   | "values" or "keyframe" or "shots"            | Colour kinds: values replaces the track's values (leaving animated settings unchanged); keyframe keys the settings at frame, which needs clipId and frame; shots gives each clip (clipId, clipIds or every clip of layerId) its own whole-clip correction, keyed at its first frame with Hold Easing so it holds until the next keyframe of those settings, and blended linearly across a cross-dissolve whose two clips are both analysed. |
+| `intensity` | number                                       | auto-adjust: strength of the correction in %; 80 is the correction as fitted, 100 exaggerates it by a quarter.                                                                                                                                                                                                                                                                                                                              |
 
 #### Edit commands
 
@@ -676,13 +677,21 @@ values plus the `edit` commands that apply them; it edits nothing itself:
   Playhead source and **Auto white balance** read them (white balance weighs each project frame,
   Auto adjust each source frame once, as in the editor);
 - **layerId**: every clip of the track by duration (`trackSamples`), as the Track source;
-- **mediaId** with `sourceIn`/`sourceOut`: a recording range, values only.
+- **mediaId** with `sourceIn`/`sourceOut`: a recording range, values only;
+- **clipIds** (up to 64), or **layerId** for `detail` or `applyAs: shots`: each clip on its own,
+  whole, one call returning a `clips` list of results in timeline order
+  ([#274](https://github.com/Plonk42/PasCap/issues/274)).
 
 `kind: auto-adjust` runs `analyseAutoAdjust` and scales the correction by `intensity` (80 %
 is the fitted correction); `white-balance` runs `frameIlluminant` and `poolWhiteBalance`. Their
 commands are the editor's: track values as one `colour` edit leaving animated settings unchanged
 (listed in `unchanged`), or with `applyAs: keyframe` the settings captured at `frame` like their
-diamonds ([shared helpers](../../src/shared/auto-colour.ts)). The frames are decoded on the
+diamonds ([shared helpers](../../src/shared/auto-colour.ts)). `applyAs: shots`
+([#272](https://github.com/Plonk42/PasCap/issues/272)) gives each analysed clip its own correction
+as one `layer-key-set` at its first frame with Hold Easing, so it holds until the next keyframe of
+those settings (into a following clip that was not analysed, too); across a cross-dissolve between
+two analysed clips, the left clip's values are keyed again at the overlap's start with Linear Easing
+and the right clip's at its end, so the grade blends over the dissolve. The frames are decoded on the
 still renderer's serial queue from the proxy with FFmpeg, at the editor's analysis size
 (`analysisSize`, 320 × 180 for a 720p proxy) in RGBA, area-scaled with full chroma
 interpolation. That is the exact BT.709 conversion (checked at patch centres within one code);
@@ -847,8 +856,9 @@ which command (for example static grades unless the brief wants animation).
   writes fail with "The user took the project back."
 - Selects and bin membership are enforced in the service's `edit`, not
   in the MCP layer.
-- Image responses are at most 1 MB each; stills and estimates are serialised and refused
-  during exports; the service applies the same 120 s request timeout as today.
+- Image responses are at most 1 MB each; stills and estimates render one at a time, with up to
+  16 calls rendering or waiting their turn, each waiting at most 5 minutes before it starts
+  (then refused with that reason), and are refused during exports; each render has a 120 s limit.
 - Every batch is validated like a save (`projectSchema`, layout, `assertProjectSources`).
 
 ## Hand-off in the editor

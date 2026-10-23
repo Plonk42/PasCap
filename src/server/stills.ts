@@ -19,7 +19,9 @@ import { runProcess } from './process.js';
 export const STILL_SIZE = Object.freeze({ width: 1280, height: 720 });
 const PIXELS = STILL_SIZE.width * STILL_SIZE.height;
 const MAX_IMAGE_BYTES = 1024 * 1024;
-const MAX_WAITING = 2;
+/** Calls rendering or waiting their turn. */
+const MAX_QUEUED = 16;
+const QUEUE_TIMEOUT_MS = 5 * 60_000;
 const RENDER_TIMEOUT_MS = 120_000;
 
 export interface Crop {
@@ -193,17 +195,41 @@ export class StillRenderer {
     private readonly jobs: Pick<JobQueue, 'list'>,
   ) {}
 
-  /** One render at a time and at most two waiting; refused while an export or reference job runs. */
+  /**
+   * One render at a time; up to MAX_QUEUED calls wait their turn, each at most QUEUE_TIMEOUT_MS before it starts.
+   * Refused while an export or reference job runs.
+   */
   #run<T>(task: (signal: AbortSignal) => Promise<T>): Promise<T> {
     const busy = this.jobs
       .list()
       .find((job) => job.state === 'running' && (job.kind === 'export' || job.kind === 'reference'));
     if (busy) throw new ServiceError(`Pictures wait while “${busy.label}” renders; try again when it finishes.`, 409);
-    if (this.#pending > MAX_WAITING) throw new ServiceError('Too many pictures are rendering; try again shortly.', 503);
+    if (this.#pending >= MAX_QUEUED)
+      throw new ServiceError(
+        `${MAX_QUEUED} pictures and estimates are already rendering or waiting, one at a time; try again when one finishes.`,
+        503,
+      );
     this.#pending++;
-    const result = this.#tail.then(() => task(AbortSignal.timeout(RENDER_TIMEOUT_MS)));
+    const late = () =>
+      new ServiceError(
+        `Waited ${QUEUE_TIMEOUT_MS / 60_000} minutes behind other pictures and estimates, which render one at a time; try again.`,
+        503,
+      );
+    let expired = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        expired = true;
+        reject(late());
+      }, QUEUE_TIMEOUT_MS);
+    });
+    const result = this.#tail.then(() => {
+      clearTimeout(timer);
+      if (expired) throw late();
+      return task(AbortSignal.timeout(RENDER_TIMEOUT_MS));
+    });
     this.#tail = result.catch(() => undefined);
-    return result.finally(() => {
+    return Promise.race([result, timedOut]).finally(() => {
       this.#pending--;
     });
   }
