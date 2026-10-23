@@ -3,7 +3,12 @@ import { colourCurveSchema, curvesSchema, hslBandSchema, hslSchema } from './adv
 import { COLOUR_CONTROLS, colourSchema, NEUTRAL_COLOUR, type ScalarColourSetting } from './colour.js';
 import { described } from './described.js';
 import { detailSchema } from './detail.js';
-import { interpolationSchema, keyframeSettingSchema } from './keyframes.js';
+import {
+  interpolationSchema,
+  keyEasingPatchSchema,
+  keyframeSettingSchema,
+  layerKeyValuesPatchSchema,
+} from './keyframes.js';
 import {
   clipSchema,
   frameSchema,
@@ -196,6 +201,26 @@ export const editCommandSchema = z.discriminatedUnion('type', [
       frame: described(frameSchema, 'Project frame of the keyframe.'),
       setting: keyframeSetting,
       value: described(z.number(), "Value to key, within the setting's bounds; checked even when disabling."),
+    },
+  ),
+  command(
+    'layer-key-set',
+    'Create or change the track keyframe at frame in one command: each listed setting is keyed at its value (or disabled with null), settings not listed keep what they have there, and a keyframe left without settings is removed. Rejected as a whole when a value is out of bounds, an Easing names a setting not keyed there, or a new keyframe would exceed 256 on the track.',
+    {
+      layerId,
+      frame: described(frameSchema, 'Project frame of the keyframe.'),
+      values: described(
+        layerKeyValuesPatchSchema,
+        `Settings to key at their value, or null to disable them here; at least one. ${colourBounds} Opacity 0–1, neutral 1.`,
+      ),
+      easing: described(
+        keyEasingPatchSchema.optional(),
+        'One Easing (hold, linear, ease-in, ease-out or smooth) for every setting keyed by this command, or an Easing per setting keyed here. Omitted: a newly keyed setting adopts the Easing the keyframe already agrees on, else linear; others keep theirs.',
+      ),
+      reset: described(
+        z.boolean().optional(),
+        "True makes it a default keyframe, whose values never reach back to earlier frames; omitted keeps the keyframe's current flag (false for a new one).",
+      ),
     },
   ),
   command('layer-key-value', 'Change the value of a setting already enabled at a track keyframe.', {

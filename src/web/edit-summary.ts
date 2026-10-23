@@ -24,6 +24,7 @@ const PHRASES: Record<EditCommand['type'], Phrase> = {
   music: ['music', 'changed', null],
   opacity: ['track Opacity', 'changed', 'track Opacities'],
   'layer-key-toggle': ['keyframe setting', 'toggled'],
+  'layer-key-set': ['keyframe', 'set'],
   'layer-key-value': ['keyframe value', 'changed'],
   'layer-key-move': ['keyframe', 'moved'],
   'layer-key-remove': ['keyframe', 'removed'],

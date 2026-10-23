@@ -40,6 +40,14 @@ const layerKeyValuesSchema = z
   })
   .strict();
 export type LayerKeyValues = z.infer<typeof layerKeyValuesSchema>;
+/** Some settings of a track keyframe: a value keys the setting, null disables it, absent keeps it. */
+export const layerKeyValuesPatchSchema = layerKeyValuesSchema
+  .partial()
+  .refine((values) => Object.values(values).some((value) => value !== undefined), {
+    message: 'List at least one setting.',
+  });
+/** One Easing for every setting a command keys, or an Easing per setting. */
+export const keyEasingPatchSchema = interpolationSchema.or(z.partialRecord(keyframeSettingSchema, interpolationSchema));
 export const EMPTY_KEY_VALUES: Readonly<LayerKeyValues> = Object.freeze({
   opacity: null,
   temperature: null,

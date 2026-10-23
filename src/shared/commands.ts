@@ -5,11 +5,15 @@ import {
   EMPTY_KEY_VALUES,
   KEYFRAME_SETTINGS,
   joiningEasing,
+  keyEasingPatchSchema,
   keySettings,
   layerKeyframe,
   layerKeyframeSchema,
+  layerKeyValuesPatchSchema,
   upsertKey,
   withEasing,
+  type Interpolation,
+  type KeyframeSetting,
   type LayerKeyframe,
 } from './keyframes.js';
 import {
@@ -20,6 +24,7 @@ import {
   layerSchema,
   MAX_BOOKMARKS,
   MAX_SELECTS,
+  MAX_TRACK_KEYFRAMES,
   orderedSelectRanges,
   projectSchema,
   selectRangeSchema,
@@ -276,6 +281,57 @@ function editLayerValue(layer: VideoLayer, point: LayerKeyframe | undefined, com
     values: { ...base.values, [command.setting]: participating ? null : command.value },
     easing: { ...base.easing, [command.setting]: participating ? null : curve },
     reset: base.reset,
+  };
+  layer.keyframes = keySettings(changed).length
+    ? upsertKey(layer.keyframes, changed)
+    : layer.keyframes.filter((key) => key.frame !== command.frame);
+}
+
+type LayerKeySet = Extract<EditCommand, { type: 'layer-key-set' }>;
+
+/** Each listed setting's new value and Easing; the others keep theirs. */
+function patchKeySettings(
+  base: LayerKeyframe,
+  patch: { [K in KeyframeSetting]?: number | null | undefined },
+  easing: Interpolation | Partial<Record<KeyframeSetting, Interpolation>> | undefined,
+  joining: Interpolation,
+): Pick<LayerKeyframe, 'values' | 'easing'> {
+  const values = { ...base.values };
+  const curves: Record<KeyframeSetting, Interpolation | null> = { ...base.easing };
+  for (const [setting, value] of Object.entries(patch) as [KeyframeSetting, number | null | undefined][]) {
+    if (value === undefined) continue;
+    const keyed = values[setting] !== null;
+    values[setting] = value;
+    if (value === null) curves[setting] = null;
+    else if (typeof easing === 'string') curves[setting] = easing;
+    else if (!keyed) curves[setting] = joining;
+  }
+  if (typeof easing !== 'object') return { values, easing: curves };
+  for (const [setting, curve] of Object.entries(easing) as [KeyframeSetting, Interpolation][]) {
+    if (values[setting] === null) throw new Error(`${setting} is not keyed at this keyframe, so it has no Easing.`);
+    curves[setting] = curve;
+  }
+  return { values, easing: curves };
+}
+
+/** Keys, changes or disables several settings of one track keyframe at once, like their toggles together. */
+function setLayerKey(next: ProjectDocument, command: LayerKeySet): void {
+  const layer = requiredLayer(next, command.layerId);
+  frameSchema.parse(command.frame);
+  const patch = layerKeyValuesPatchSchema.parse(command.values);
+  const easing = command.easing === undefined ? undefined : keyEasingPatchSchema.parse(command.easing);
+  if (command.reset !== undefined && typeof command.reset !== 'boolean')
+    throw new Error('Reset must be true or false.');
+  const point = layer.keyframes.find((key) => key.frame === command.frame);
+  if (!point && layer.keyframes.length >= MAX_TRACK_KEYFRAMES)
+    throw new Error(`This track already has ${MAX_TRACK_KEYFRAMES} keyframes. Change one of them, or remove one.`);
+  const order = KEYFRAME_SETTINGS.map((setting) => setting.key);
+  const base = point ?? layerKeyframe(command.frame, EMPTY_KEY_VALUES, 'linear');
+  const joining = point ? joiningEasing(layer.keyframes, point, order) : 'linear';
+  const changed = {
+    frame: command.frame,
+    ...patchKeySettings(base, patch, easing, joining),
+    reset: command.reset ?? base.reset,
   };
   layer.keyframes = keySettings(changed).length
     ? upsertKey(layer.keyframes, changed)
@@ -571,6 +627,9 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
       break;
     case 'opacity':
       requiredLayer(next, command.layerId).opacity = layerSchema.shape.opacity.parse(command.opacity);
+      break;
+    case 'layer-key-set':
+      setLayerKey(next, command);
       break;
     case 'layer-key-toggle':
     case 'layer-key-value':

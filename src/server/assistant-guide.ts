@@ -72,6 +72,9 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
 - Change one setting with colour-setting, hsl-band, colour-curve or transform-setting, which
   keep every other value; a keyed setting follows its keyframes, so change those instead
   (layer-key-value). The colour and transform commands replace everything and suit a full grade.
+- To animate, layer-key-set keys several settings at one frame in one command, with one Easing
+  (hold keeps a grade until the next keyframe) or one per setting; settings left out keep what
+  they have there, and null disables one.
 - Compare with still or timeline_sheet: both accept commands to preview a change without saving.
   Judge Detail on a 1:1 crop: no halos, no waxy smoothing.
 

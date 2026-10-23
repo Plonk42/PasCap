@@ -313,6 +313,80 @@ describe('strict current-schema row points and independently participating setti
     expect(project).toBe(before);
   });
 
+  it('sets a whole keyframe in one command exactly like its toggles and Easing', () => {
+    const values = {
+      temperature: 0.2,
+      tint: -0.1,
+      exposure: 0.3,
+      brightness: 0.02,
+      contrast: 1.1,
+      saturation: 1.2,
+      vibrance: 0.3,
+      highlights: -0.2,
+      shadows: 0.25,
+      blacks: -0.1,
+    } satisfies Partial<Record<KeyframeSetting, number>>;
+    let toggled = createProject('set', 'Set');
+    for (const [setting, value] of Object.entries(values))
+      toggled = applyCommand(toggled, {
+        type: 'layer-key-toggle',
+        layerId: BASE_LAYER_ID,
+        frame: 30,
+        setting: setting as KeyframeSetting,
+        value,
+      });
+    toggled = applyCommand(toggled, {
+      type: 'layer-key-easing',
+      layerId: BASE_LAYER_ID,
+      frame: 30,
+      setting: null,
+      interpolation: 'hold',
+    });
+    const set = (project: ProjectDocument, command: Omit<Extract<EditCommand, { type: 'layer-key-set' }>, 'type'>) =>
+      applyCommand(project, { type: 'layer-key-set', ...command });
+    let project = set(createProject('set', 'Set'), { layerId: BASE_LAYER_ID, frame: 30, values, easing: 'hold' });
+    expect(project).toEqual(toggled);
+
+    // Unlisted settings stay; null disables one; a new setting joins with the agreed Easing.
+    project = set(project, { layerId: BASE_LAYER_ID, frame: 30, values: { exposure: 0.5, contrast: null, hue: 10 } });
+    const key = project.layers[0]!.keyframes[0]!;
+    expect(key.values).toMatchObject({ exposure: 0.5, contrast: null, hue: 10, saturation: 1.2 });
+    expect(key.easing).toMatchObject({ exposure: 'hold', contrast: null, hue: 'hold', saturation: 'hold' });
+    project = set(project, { layerId: BASE_LAYER_ID, frame: 30, values: { hue: 20 }, easing: { exposure: 'smooth' } });
+    expect(project.layers[0]!.keyframes[0]!.easing).toMatchObject({ exposure: 'smooth', hue: 'hold' });
+
+    // reset makes it a default keyframe; disabling every setting removes the keyframe.
+    project = set(project, { layerId: BASE_LAYER_ID, frame: 30, values: { opacity: 1 }, reset: true });
+    expect(project.layers[0]!.keyframes[0]!.reset).toBe(true);
+    const all = Object.fromEntries(KEYFRAME_SETTINGS.map((setting) => [setting.key, null]));
+    expect(set(project, { layerId: BASE_LAYER_ID, frame: 30, values: all }).layers[0]!.keyframes).toEqual([]);
+  });
+
+  it('rejects a whole keyframe command without partial edits', () => {
+    const keys = Array.from({ length: 256 }, (_, frame) => point(frame, { opacity: 0.5 }));
+    const history = new EditHistory({ ...createProject('set', 'Set'), layers: [row(keys)] });
+    const before = history.current;
+    const attempt = (command: Record<string, unknown>) => () =>
+      history.commit({
+        type: 'layer-key-set',
+        layerId: BASE_LAYER_ID,
+        frame: 10,
+        values: {},
+        ...command,
+      } as EditCommand);
+    expect(attempt({ values: { exposure: 0.5, contrast: 9 } })).toThrow();
+    expect(attempt({ values: { exposure: 0.5, sharpness: 1 } })).toThrow();
+    expect(attempt({ values: {} })).toThrow('at least one');
+    expect(attempt({ values: { exposure: 0.5 }, easing: { hue: 'hold' } })).toThrow('hue is not keyed');
+    expect(attempt({ values: { exposure: 0.5 }, easing: 'cubic' })).toThrow();
+    expect(attempt({ frame: 300, values: { exposure: 0.5 } })).toThrow('already has 256 keyframes');
+    expect(attempt({ layerId: 'missing', values: { exposure: 0.5 } })).toThrow('Track no longer exists');
+    expect(history.current).toEqual(before);
+    // Changing a keyframe that exists is still allowed at the limit.
+    history.commit({ type: 'layer-key-set', layerId: BASE_LAYER_ID, frame: 10, values: { exposure: 0.5 } });
+    expect(history.current.layers[0]!.keyframes).toHaveLength(256);
+  });
+
   it('adds a default keyframe that holds defaults from its frame without reaching back', () => {
     let project = createProject('default', 'Default keyframe');
     const layer = project.layers[0]!;
