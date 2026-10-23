@@ -851,7 +851,11 @@ Implemented: one resource, `pascap://guide` (Markdown), holding the playbook bel
 `rough_cut { request? }`, which hands the playbook to the model with the user's request. The
 server instructions point to both. Clients differ: VS Code shows the prompt as
 `/mcp.pascap.rough_cut` and lets the user attach the resource, but its model cannot read a
-resource on its own, so the instructions also name the key tools.
+resource on its own, so the instructions carry the playbook's seven steps in short, naming the
+key tools ([#281](https://github.com/Plonk42/PasCap/issues/281)). The picture tools'
+descriptions (`still`, `timeline_sheet`, `recording_sheet`, `compare_recordings` and
+`describe_recording`'s sheet) end with this service's image budget, generated from its
+configuration, so a client learns the limits before a call is refused.
 
 The other resources first proposed are not built: each duplicated an operation the model calls
 anyway (`session_status`, `describe_project`, `describe_recording`, `music_analysis`), and

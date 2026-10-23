@@ -103,6 +103,16 @@ describe('MCP endpoint', () => {
       expect(JSON.stringify(edit.inputSchema)).toContain('Project frame without a bookmark.');
       expect(edit.annotations).toEqual({ readOnlyHint: false, openWorldHint: false });
       expect(tools.find((tool) => tool.name === 'still')!.annotations?.readOnlyHint).toBe(true);
+      // Picture tools state this service's image budget; the instructions carry the playbook's steps.
+      const describedAs = (name: string) => tools.find((tool) => tool.name === name)!.description;
+      expect(describedAs('still')).toMatch(/at most 480 pixels wide/);
+      expect(describedAs('timeline_sheet')).toMatch(/at most 16 frames, 240 pixels wide each\.$/);
+      expect(describedAs('recording_sheet')).toMatch(/at most 16 frames/);
+      expect(describedAs('compare_recordings')).toMatch(/at most 16 cells \(candidates × frames\)/);
+      expect(describedAs('describe_recording')).toMatch(/at most 16 steady ranges\.$/);
+      expect(describedAs('edit')).toBe(operations.find((operation) => operation.name === 'edit')!.description);
+      for (const step of ['1. Read', 'session_start', 'compare_recordings', 'keepCut', 'applyAs shots', 'session_end'])
+        expect(client.getInstructions()).toContain(step);
       // Only edit publishes the whole command schema; previews and pictures refer to it.
       for (const name of ['still', 'timeline_sheet', 'preview_edits'])
         expect(JSON.stringify(tools.find((tool) => tool.name === name)).length, name).toBeLessThan(5_000);
