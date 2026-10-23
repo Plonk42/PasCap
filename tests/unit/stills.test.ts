@@ -174,7 +174,7 @@ describe('still renderer bounds', () => {
     expect(() => renderer.recordingSheet('rec-a', [0], budget)).toThrow(/Flight · 4K/);
   });
 
-  it('runs one picture at a time with at most two waiting', async () => {
+  it('runs one picture at a time with up to sixteen calls queued', async () => {
     const releases: (() => void)[] = [];
     vi.mocked(runProcess).mockImplementation(
       () =>
@@ -183,16 +183,43 @@ describe('still renderer bounds', () => {
         }),
     );
     const renderer = new StillRenderer({ ffmpeg: 'ffmpeg' }, library, { list: () => [] });
-    const pending = [0, 1, 2].map((frame) => renderer.recordingSheet('rec-a', [frame], budget));
-    expect(() => renderer.recordingSheet('rec-a', [3], budget)).toThrow(/Too many pictures/);
+    const frames = Array.from({ length: 16 }, (_, frame) => frame);
+    const pending = frames.map((frame) => renderer.recordingSheet('rec-a', [frame], budget));
+    expect(() => renderer.recordingSheet('rec-a', [16], budget)).toThrow(/16 pictures and estimates/);
     await vi.waitFor(() => expect(releases).toHaveLength(1));
     // Each picture decodes its frame, then encodes the JPEG.
-    for (let step = 0; step < 6; step++) {
+    for (let step = 0; step < 32; step++) {
       await vi.waitFor(() => expect(releases.length).toBeGreaterThan(step));
       releases[step]!();
     }
     const images = await Promise.all(pending);
-    expect(images.map((image) => image.width)).toEqual([480, 480, 480]);
-    expect(vi.mocked(runProcess)).toHaveBeenCalledTimes(6);
+    expect(images.map((image) => image.width)).toEqual(frames.map(() => 480));
+    expect(vi.mocked(runProcess)).toHaveBeenCalledTimes(32);
+  });
+
+  it('gives up on a call that waited five minutes without starting, and skips it', async () => {
+    vi.useFakeTimers();
+    try {
+      const releases: (() => void)[] = [];
+      vi.mocked(runProcess).mockImplementation(
+        () =>
+          new Promise<Buffer>((resolve) => {
+            releases.push(() => resolve(Buffer.alloc(PIXELS * 3)));
+          }),
+      );
+      const renderer = new StillRenderer({ ffmpeg: 'ffmpeg' }, library, { list: () => [] });
+      const first = renderer.recordingSheet('rec-a', [0], budget);
+      const waiting = renderer.recordingSheet('rec-a', [1], budget);
+      const outcome = expect(waiting).rejects.toThrow(/Waited 5 minutes/);
+      await vi.advanceTimersByTimeAsync(5 * 60_000);
+      await outcome;
+      releases[0]!();
+      await vi.waitFor(() => expect(releases).toHaveLength(2));
+      releases[1]!();
+      await expect(first).resolves.toMatchObject({ width: 480 });
+      expect(vi.mocked(runProcess)).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

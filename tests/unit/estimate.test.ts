@@ -223,6 +223,64 @@ describe('estimate operation', () => {
     expect(result.commands).toEqual([{ type: 'detail', clipId: 'b', detail: result.detail!.suggested }]);
   });
 
+  it('keys each clip its own whole-clip grade at its start, blending across a cross-dissolve', async () => {
+    reads.length = 0;
+    const third = { ...createClip('c', 'rec-1', 400, 500), start: 0 };
+    const dissolved = projectSchema.parse({
+      ...project,
+      clips: [...project.clips, third],
+      layers: [
+        {
+          ...project.layers[0]!,
+          transitions: [
+            { leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 20 },
+            { leftId: 'b', rightId: 'c', type: 'cut', duration: 0 },
+          ],
+        },
+      ],
+    });
+    const shots = { ...context, projects: { load: async () => dissolved } } as unknown as Context;
+    const result = await runners.estimate(shots, { ...input, kind: 'auto-adjust', layerId, applyAs: 'shots' });
+    expect(reads.map((read) => read.frames)).toEqual([
+      autoAdjustFrames(0, 300),
+      autoAdjustFrames(100, 200),
+      autoAdjustFrames(400, 500),
+    ]);
+    expect(result.correction).toBeUndefined();
+    expect(result.clips!.map((clip) => clip.clipId)).toEqual(['a', 'b', 'c']);
+    const [a, b, c] = result.clips!.map((clip) => clip.correction!);
+    const layout = calculateLayout(dissolved).clips;
+    const bStart = layout.find((item) => item.clip.id === 'b')!.start;
+    const cStart = layout.find((item) => item.clip.id === 'c')!.start;
+    expect(result.commands).toEqual([
+      { type: 'layer-key-set', layerId, frame: 0, values: a, easing: 'hold' },
+      { type: 'layer-key-set', layerId, frame: bStart, values: a, easing: 'linear' },
+      { type: 'layer-key-set', layerId, frame: bStart + 20, values: b, easing: 'hold' },
+      { type: 'layer-key-set', layerId, frame: cStart, values: c, easing: 'hold' },
+    ]);
+    let graded = dissolved;
+    for (const command of result.commands) graded = applyCommand(graded, command);
+    expect(graded.layers[0]!.keyframes).toHaveLength(4);
+
+    // One clip of a list, on its own: Hold at its start, whatever its neighbours.
+    const one = await runners.estimate(shots, { ...input, kind: 'white-balance', clipIds: ['b'], applyAs: 'shots' });
+    expect(one.commands).toEqual([
+      { type: 'layer-key-set', layerId, frame: bStart, values: one.clips![0]!.whiteBalance, easing: 'hold' },
+    ]);
+  });
+
+  it('measures the detail of several clips, each on its own, in one call', async () => {
+    lumaReads.length = 0;
+    const listed = await runners.estimate(context, { ...input, kind: 'detail', clipIds: ['b', 'a'] });
+    expect(lumaReads).toEqual([detailFrames(0, 300), detailFrames(100, 200)]);
+    expect(listed.clips!.map((clip) => clip.clipId)).toEqual(['a', 'b']);
+    expect(listed.commands).toEqual(
+      listed.clips!.map((clip) => ({ type: 'detail', clipId: clip.clipId, detail: clip.detail!.suggested })),
+    );
+    const track = await runners.estimate(context, { ...input, kind: 'detail', layerId });
+    expect(track.commands).toEqual(listed.commands);
+  });
+
   it('rejects ambiguous, misplaced and unsupported targets', async () => {
     const rejects = (fields: Record<string, unknown>, statusCode: number) =>
       expect(
@@ -232,11 +290,16 @@ describe('estimate operation', () => {
       ).rejects.toMatchObject({ statusCode });
     await rejects({}, 422);
     await rejects({ clipId: 'a', layerId }, 422);
+    await rejects({ clipId: 'a', clipIds: ['b'] }, 422);
     await rejects({ clipId: 'a', frame: 400 }, 422);
     await rejects({ layerId, frame: 10 }, 422);
     await rejects({ clipId: 'a', applyAs: 'keyframe' }, 422);
     await rejects({ clipId: 'z' }, 404);
-    await rejects({ layerId, kind: 'detail' }, 422);
+    await rejects({ clipIds: ['a', 'z'], applyAs: 'shots' }, 404);
+    await rejects({ clipIds: ['a', 'a'], applyAs: 'shots' }, 422);
+    await rejects({ clipIds: ['a', 'b'] }, 422);
+    await rejects({ clipId: 'a', frame: 10, applyAs: 'shots' }, 422);
+    await rejects({ clipIds: ['a'], kind: 'detail', applyAs: 'shots' }, 422);
     await rejects({ mediaId: 'rec-9', sourceIn: 0, sourceOut: 10 }, 404);
     await rejects({ mediaId: 'rec-1', sourceIn: 10, sourceOut: 10 }, 422);
     await rejects({ mediaId: 'rec-1', sourceIn: 0, sourceOut: 601 }, 422);

@@ -10,12 +10,12 @@ import {
 } from '../../shared/auto-colour.js';
 import type { EditCommand } from '../../shared/commands.js';
 import { detailFrames, measureDetail, suggestDetail } from '../../shared/detail-estimate.js';
-import { hasLayerKeys } from '../../shared/keyframes.js';
+import { hasLayerKeys, type Interpolation, type KeyframeSetting } from '../../shared/keyframes.js';
 import type { ProjectDocument, VideoLayer } from '../../shared/model.js';
 import type { estimate } from '../../shared/operations/estimate.js';
 import { projectVideoIds } from '../../shared/projects.js';
 import { forEachSerial } from '../../shared/serial.js';
-import { calculateLayout, type PlacedClip } from '../../shared/timeline.js';
+import { calculateLayout, type PlacedClip, type PlacedTransition } from '../../shared/timeline.js';
 import {
   frameIlluminant,
   poolWhiteBalance,
@@ -106,15 +106,48 @@ function rangeTarget(project: ProjectDocument, input: Input, context: ServiceCon
   };
 }
 
-function targetOf(project: ProjectDocument, input: Input, context: ServiceContext): Target {
-  const chosen = [input.clipId, input.layerId, input.mediaId].filter((value) => value !== undefined).length;
-  if (chosen !== 1) throw invalid('Give exactly one of clipId, layerId or mediaId (with sourceIn and sourceOut).');
+function checkChoice(input: Input): void {
+  const chosen = [input.clipId, input.clipIds, input.layerId, input.mediaId].filter(
+    (value) => value !== undefined,
+  ).length;
+  if (chosen !== 1)
+    throw invalid('Give exactly one of clipId, clipIds, layerId or mediaId (with sourceIn and sourceOut).');
   if (input.frame !== undefined && input.clipId === undefined) throw invalid('frame needs the clipId it lies in.');
+}
+
+function targetOf(project: ProjectDocument, input: Input, context: ServiceContext): Target {
   if (input.applyAs === 'keyframe' && (input.kind === 'detail' || input.frame === undefined))
     throw invalid('A keyframe takes the light at one frame: give clipId and frame, for a Colour kind.');
   if (input.clipId !== undefined) return clipTarget(project, input);
   if (input.layerId !== undefined) return trackTarget(project, input);
   return rangeTarget(project, input, context);
+}
+
+/** The clips analysed each on its own, in timeline order, or null for one analysis. */
+function separateClips(project: ProjectDocument, input: Input): PlacedClip[] | null {
+  const shots = input.applyAs === 'shots';
+  if (shots && input.kind === 'detail') throw invalid('applyAs shots keys Colour: use it with a Colour kind.');
+  if (shots && (input.frame !== undefined || input.mediaId !== undefined))
+    throw invalid('applyAs shots analyses whole clips: give clipId, clipIds or layerId, without frame.');
+  const each = input.clipIds !== undefined || shots || (input.layerId !== undefined && input.kind === 'detail');
+  if (!each) return null;
+  if (input.kind !== 'detail' && !shots)
+    throw invalid(
+      'A track has one Colour: several clips get a grade each only as keyframes (applyAs shots); layerId alone fits one grade to the whole track.',
+    );
+  const layout = calculateLayout(project).clips;
+  if (input.layerId !== undefined) {
+    if (!project.layers.some((layer) => layer.id === input.layerId))
+      throw new ServiceError(`The project has no video track ${input.layerId}; read describe_project.`, 404);
+    const clips = layout.filter((item) => item.clip.layerId === input.layerId);
+    if (!clips.length) throw invalid('This track has no clips to analyse.');
+    return clips;
+  }
+  const ids = input.clipIds ?? [input.clipId!];
+  if (new Set(ids).size !== ids.length) throw invalid('List each clip once.');
+  const missing = ids.find((id) => !layout.some((item) => item.clip.id === id));
+  if (missing !== undefined) throw new ServiceError(`The project has no clip ${missing}; read describe_project.`, 404);
+  return layout.filter((item) => ids.includes(item.clip.id)).sort((left, right) => left.start - right.start);
 }
 
 /** The analysed frames in sample order, each distinct source frame decoded once. */
@@ -187,8 +220,80 @@ const estimators = {
   'auto-adjust': estimateAutoAdjust,
 } satisfies Record<Input['kind'], (context: ServiceContext, target: Target, input: Input) => Promise<Estimated>>;
 
+type ShotValues = Partial<Record<KeyframeSetting, number>>;
+
+/**
+ * Each shot's values keyed at its first frame with Hold; across a cross-dissolve between two shots, the left
+ * shot's values at the overlap's start and the right shot's at its end, so the grade blends over the dissolve.
+ */
+export function shotCommands(
+  transitions: readonly PlacedTransition[],
+  shots: readonly { clip: PlacedClip; values: ShotValues }[],
+): EditCommand[] {
+  const byId = new Map(shots.map((shot) => [shot.clip.clip.id, shot]));
+  const keys = new Map<string, Map<number, { values: ShotValues; easing: Interpolation }>>();
+  for (const shot of shots) {
+    const layerId = shot.clip.clip.layerId;
+    const layer = keys.get(layerId) ?? new Map<number, { values: ShotValues; easing: Interpolation }>();
+    keys.set(layerId, layer);
+    const dissolve = transitions.find(
+      (item) =>
+        item.layerId === layerId &&
+        item.transition.type === 'cross-dissolve' &&
+        item.transition.rightId === shot.clip.clip.id &&
+        byId.has(item.transition.leftId),
+    );
+    if (!dissolve) {
+      layer.set(shot.clip.start, { values: shot.values, easing: 'hold' });
+      continue;
+    }
+    layer.set(dissolve.start, { values: byId.get(dissolve.transition.leftId)!.values, easing: 'linear' });
+    layer.set(dissolve.end, { values: shot.values, easing: 'hold' });
+  }
+  return [...keys].flatMap(([layerId, layer]) =>
+    [...layer]
+      .sort(([left], [right]) => left - right)
+      .map(([frame, { values, easing }]): EditCommand => ({ type: 'layer-key-set', layerId, frame, values, easing })),
+  );
+}
+
+/** Each clip analysed whole on its own: its result, and the detail edits or shot keyframes applying them. */
+async function estimateClips(
+  context: ServiceContext,
+  clips: readonly PlacedClip[],
+  project: ProjectDocument,
+  input: Input,
+) {
+  const results: { clipId: string; frames: number }[] = [];
+  const commands: EditCommand[] = [];
+  const shots: { clip: PlacedClip; values: ShotValues }[] = [];
+  let frames = 0;
+  await forEachSerial(clips, async (clip) => {
+    const { mediaId, sourceIn, sourceOut } = clip.clip;
+    const sourceFrames =
+      input.kind === 'detail' ? detailFrames(sourceIn, sourceOut) : autoAdjustFrames(sourceIn, sourceOut);
+    const target = { description: '', reads: [{ mediaId, sourceFrames }], layer: null, clip };
+    const estimated = await estimators[input.kind](context, target, input);
+    const count = new Set(sourceFrames).size;
+    frames += count;
+    results.push({ clipId: clip.clip.id, frames: count, ...estimated.fields });
+    commands.push(...estimated.commands);
+    const values = estimated.fields as { correction?: ShotValues; whiteBalance?: ShotValues };
+    if (input.applyAs === 'shots') shots.push({ clip, values: (values.correction ?? values.whiteBalance)! });
+  });
+  if (shots.length) commands.push(...shotCommands(calculateLayout(project).transitions, shots));
+  const clipsWord = clips.length === 1 ? `clip ${clips[0]!.clip.id}` : `${clips.length} clips`;
+  return { analysed: { description: `each of the ${clipsWord} on its own, whole`, frames }, results, commands };
+}
+
 export const runEstimate: OperationRunner<typeof estimate> = async (context, input) => {
   const project = await context.projects.load(input.projectId);
+  checkChoice(input);
+  const clips = separateClips(project, input);
+  if (clips) {
+    const { analysed, results, commands } = await estimateClips(context, clips, project, input);
+    return { kind: input.kind, analysed, unchanged: [], commands, clips: results };
+  }
   const target = targetOf(project, input, context);
   if (input.applyAs === 'keyframe') {
     const full = keyframeLimitReason(target.layer!, input.frame!);

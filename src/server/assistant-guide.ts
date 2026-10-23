@@ -67,8 +67,11 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   the brief asks or the light changes within a shot.
 - Start from estimate: auto-adjust on a representative clip (or the whole track) gives the
   editor's Auto correction and the edit applying it; white-balance only Temperature and Tint;
-  detail suggests a clip's Denoise and Sharpen. Clips needing different grades go on their own
-  track, since Colour belongs to the track.
+  detail suggests a clip's Denoise and Sharpen (clipIds or layerId: every clip in one call).
+  Clips needing different grades go on their own track, since Colour belongs to the track, or
+  get a grade per shot: estimate with applyAs shots (layerId or clipIds) keys each clip's own
+  correction at its start with Hold, blended across dissolves, in one call. Do it once the cut
+  is final: keyframes stay at their project frames when clips move.
 - Change one setting with colour-setting, hsl-band, colour-curve or transform-setting, which
   keep every other value; a keyed setting follows its keyframes, so change those instead
   (layer-key-value). The colour and transform commands replace everything and suit a full grade.
