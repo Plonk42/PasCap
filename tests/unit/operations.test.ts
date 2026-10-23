@@ -8,6 +8,7 @@ import { createApp } from '../../src/server/app.js';
 import { createConfig } from '../../src/server/config.js';
 import { runners } from '../../src/server/operations/index.js';
 import { createColourSettings } from '../../src/shared/colour.js';
+import { applyCommand } from '../../src/shared/commands.js';
 import { createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import type { TrackDescription } from '../../src/shared/operations/describe-track.js';
 import { operations } from '../../src/shared/operations/index.js';
@@ -633,39 +634,60 @@ describe('operation routes', () => {
     expect(report.summary).toEqual({ boundaries: 1, onBeat: 0, onDownbeat: 0, onHit: 0, meanOffset: 10 });
     expect(report.hits).toBe(1);
 
-    for (const [prefer, sourceOut] of [
-      ['hit', 58],
-      ['beat-or-hit', 58],
-      ['downbeat', 50],
+    for (const [prefer, sourceOut, target] of [
+      ['hit', 58, 'hit'],
+      ['beat-or-hit', 58, 'hit'],
+      ['downbeat', 50, 'downbeat'],
     ] as const) {
       const snapped = await runners.snap_cuts_to_beats(context, {
         projectId: 'music',
         layerId: base.layers[0]!.id,
         prefer,
         minimumSeconds: 1,
+        keepOnHit: false,
         apply: false,
       });
       expect(snapped.commands, prefer).toEqual([{ type: 'trim', clipId: 'a', sourceIn: 0, sourceOut }]);
+      expect(snapped.boundaries[0]!.target, prefer).toBe(target);
     }
 
-    const proposal = await runners.snap_cuts_to_beats(context, {
-      projectId: 'music',
-      layerId: base.layers[0]!.id,
-      prefer: 'beat',
-      minimumSeconds: 1,
-      apply: false,
-    });
-    expect(proposal.commands).toEqual([{ type: 'trim', clipId: 'a', sourceIn: 0, sourceOut: 50 }]);
-    expect(proposal.boundaries).toMatchObject([{ before: 60, beat: 50, after: 50, skipped: null }]);
-    expect(proposal.applied).toBeNull();
-    await expect(
+    const snap = (fields: Partial<Parameters<typeof runners.snap_cuts_to_beats>[1]>) =>
       runners.snap_cuts_to_beats(context, {
         projectId: 'music',
         layerId: base.layers[0]!.id,
         prefer: 'beat',
         minimumSeconds: 1,
-        apply: true,
-      }),
-    ).rejects.toMatchObject({ statusCode: 422 });
+        keepOnHit: false,
+        apply: false,
+        ...fields,
+      });
+    const proposal = await snap({});
+    expect(proposal.commands).toEqual([{ type: 'trim', clipId: 'a', sourceIn: 0, sourceOut: 50 }]);
+    expect(proposal.boundaries).toMatchObject([{ before: 60, beat: 50, target: 'downbeat', after: 50, skipped: null }]);
+    expect(proposal.applied).toBeNull();
+    // The nearest beat is 10 frames away; kept and too-far boundaries stay, with the reason.
+    const far = await snap({ maxShift: 9 });
+    expect(far.commands).toEqual([]);
+    expect(far.boundaries[0]!.skipped).toMatch(/10 frames away, more than maxShift/);
+    expect((await snap({ maxShift: 10 })).commands).toHaveLength(1);
+    const kept = await snap({ keep: [{ leftId: 'a', rightId: 'b' }] });
+    expect(kept.commands).toEqual([]);
+    expect(kept.boundaries[0]).toMatchObject({ after: 60, skipped: 'Listed in keep.' });
+    // Within one frame of a light hit at 20 when the cut is there.
+    const cutAt21 = applyCommand(project, { type: 'trim', clipId: 'a', sourceIn: 0, sourceOut: 21 });
+    const onHit = await runners.snap_cuts_to_beats(
+      { ...context, projects: { load: async () => cutAt21 } } as unknown as typeof context,
+      {
+        projectId: 'music',
+        layerId: base.layers[0]!.id,
+        prefer: 'beat',
+        minimumSeconds: 0,
+        keepOnHit: true,
+        apply: false,
+      },
+    );
+    expect(onHit.commands).toEqual([]);
+    expect(onHit.boundaries[0]!.skipped).toBe('Already on a hit at frame 20.');
+    await expect(snap({ apply: true })).rejects.toMatchObject({ statusCode: 422 });
   });
 });

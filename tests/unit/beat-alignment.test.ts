@@ -141,6 +141,30 @@ describe('beat alignment', () => {
     expect(snapped.boundaries[0]!.after).toBe(65);
   });
 
+  it('keeps listed boundaries on their frame and limits how far the others move', () => {
+    // a grows to 65 for the beat there, pushing the b|c cut to 125: kept, b shortens to bring it back to 120.
+    const kept = snapCutsToBeats(project(), 'video-1', all, 30, sources(200), { keep: new Set(['b>c']) });
+    expect(kept.boundaries.map((item) => [item.before, item.after, item.skipped])).toEqual([
+      [60, 65, null],
+      [125, 120, 'Listed in keep.'],
+    ]);
+    expect(kept.commands).toEqual([
+      { type: 'trim', clipId: 'a', sourceIn: 0, sourceOut: 65 },
+      { type: 'trim', clipId: 'b', sourceIn: 0, sourceOut: 55 },
+    ]);
+    const onHit = snapCutsToBeats(project(), 'video-1', all, 30, sources(200), { keepOnHits: [61] });
+    expect(onHit.boundaries[0]).toMatchObject({ after: 60, skipped: 'Already on a hit at frame 61.' });
+    const near = snapCutsToBeats(project(), 'video-1', all, 30, sources(200), {
+      maxShift: 4,
+      kindOf: (frame) => (frame % 60 === 5 ? 'downbeat' : 'beat'),
+    });
+    expect(near.commands).toEqual([]);
+    expect(near.boundaries.map((item) => [item.beat, item.target, item.skipped])).toEqual([
+      [65, 'downbeat', 'The nearest downbeat is 5 frames away, more than maxShift.'],
+      [125, 'downbeat', 'The nearest downbeat is 5 frames away, more than maxShift.'],
+    ]);
+  });
+
   it('snaps to downbeats only, keeps clips at their minimum length and needs Ripple', () => {
     const downbeats = snapCutsToBeats(project(), 'video-1', downbeatFrames, 1, sources(200));
     // Downbeats at 5, 65, 125, 185: a grows to 65 frames and b, now 65–125, already ends on one.
