@@ -8,6 +8,7 @@ import { z, ZodError, type ZodType } from 'zod';
 import { operations } from '../shared/operations/index.js';
 import { ASSISTANT_GUIDE } from './assistant-guide.js';
 import { clientName } from './assistant-connection.js';
+import type { AssistantImageBudget } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { assertNoSymlinks } from './files.js';
 import type { ServiceContext, ServiceResources } from './operations/context.js';
@@ -25,13 +26,34 @@ export const GUIDE_URI = 'pascap://guide';
 
 const INSTRUCTIONS = [
   'PasCap edits drone-flight video projects. Frames are integers at 30000/1001 fps; outputs also give MM:SS:FF timecodes.',
-  `Before building or changing a cut, follow the playbook in the ${GUIDE_URI} resource (also the rough_cut prompt).`,
-  'Start with list_projects and describe_project; choose footage with describe_recording (without its sheet) and compare_recordings, and follow the music with music_analysis, check_alignment and snap_cuts_to_beats. Read a track with describe_track before grading it, and start a grade from estimate.',
-  'Every picture stays in the conversation and many clients limit how many it may hold: put many cells in one sheet rather than looking at shots one by one.',
-  "To change a project, first take it with session_start and the user's brief; the user then cannot save it until you call session_end with notes for them or the user takes it back.",
-  'Change a project only with edit: its commands apply together against the expectedRevision you last read, or not at all, and a rejected command returns its reason. Clips you add must stay inside the ranges the user kept.',
-  'Look at the result with timeline_sheet or still.',
+  `The playbook is the ${GUIDE_URI} resource and the rough_cut prompt; when your client cannot read them, follow these steps.`,
+  '1. Read: list_projects, describe_project, session_status (a Hand off carries the brief) and music_analysis (detail summary first).',
+  "2. Take the project with session_start and the user's brief, unless the user's Hand off already started a session for you: edit within it. The user then cannot save it until you call session_end with notes for them or they take it back.",
+  '3. Choose footage with describe_recording (without its sheet) and compare_recordings: whole camera movements inside the ranges the user kept; clips outside them are refused.',
+  '4. Structure: order the shots to tell the flight, longer clips on quiet music, cuts on downbeats or strong hits at peaks.',
+  '5. Build with edit: its commands apply together against the expectedRevision you last read, or not at all, and a rejected command returns its reason; preview_edits checks a batch first. Then snap_cuts_to_beats (keep deliberate cuts, maxShift), check_alignment, and dissolves with keepCut so cuts stay on the music.',
+  '6. Grade: describe_track first, then estimate (applyAs shots for a grade per shot, keyed once the cut is final); layer-key-set keys several settings at one frame, detail-clips sets Detail on several clips.',
+  '7. Finish: look with timeline_sheet or still, check the length, and call session_end with notes.',
+  'Every read reports the revision it used; read again when it is older than your last edit. Every picture stays in the conversation and many clients limit how many it may hold: put many cells in one sheet rather than looking at shots one by one.',
 ].join(' ');
+
+/** The service's image budget, stated in the descriptions of the tools it limits. */
+const PICTURE_LIMITS: Partial<Record<string, (budget: AssistantImageBudget) => string>> = {
+  still: (budget) => `Here a still is at most ${budget.stillWidth} pixels wide, and a crop at most that on each side.`,
+  timeline_sheet: (budget) =>
+    `Here a sheet holds at most ${budget.sheetCells} frames, ${budget.sheetCellWidth} pixels wide each.`,
+  recording_sheet: (budget) =>
+    `Here a sheet holds at most ${budget.sheetCells} frames, ${budget.sheetCellWidth} pixels wide each.`,
+  compare_recordings: (budget) =>
+    `Here a sheet holds at most ${budget.sheetCells} cells (candidates × frames), ${budget.sheetCellWidth} pixels wide each.`,
+  describe_recording: (budget) => `Here its sheet holds at most ${budget.sheetCells} steady ranges.`,
+};
+
+/** An operation's description, with the limits this service applies to it. */
+export function toolDescription(operation: { name: string; description: string }, budget: AssistantImageBudget) {
+  const limits = PICTURE_LIMITS[operation.name];
+  return limits ? `${operation.description} ${limits(budget)}` : operation.description;
+}
 
 const assistantOperations = operations.filter((operation) => operation.audience.includes('assistant'));
 
@@ -83,7 +105,7 @@ export function mcpServer(resources: ServiceResources): McpServer {
   const server = new McpServer({ name: 'pascap', title: 'PasCap', version: '0.1.0' }, { instructions: INSTRUCTIONS });
   for (const operation of assistantOperations) {
     const config = {
-      description: operation.description,
+      description: toolDescription(operation, resources.images),
       // One schema type for the loop; each tool still publishes and validates its own schema.
       inputSchema: operation.input as ZodType,
       annotations: { readOnlyHint: operation.access === 'read', openWorldHint: false },
