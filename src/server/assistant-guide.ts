@@ -63,6 +63,8 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   stops a cut from travelling far to reach a beat.
 - Transitions: cuts on beats; short cross-dissolves (8–15 frames) between related shots; fade
   through black between sections; opening and closing fades on the track to match the music.
+  After snapping, add dissolves with keepCut so the change stays on the beat and later cuts
+  do not move.
 - Use a second track only for an overlay or a clip that needs its own grade.
 
 ## 6. Grade

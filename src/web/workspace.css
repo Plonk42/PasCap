@@ -619,6 +619,7 @@ body {
 .product-workspace .speed-field,
 .product-workspace .music-loop,
 .product-workspace .boundary-inspector > p,
+.product-workspace .transition-keep-cut,
 .product-workspace .animate-colour {
   font-size: 12px;
 }

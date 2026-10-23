@@ -312,7 +312,9 @@ track in **Track**; clicking a boundary button opens that tab and scrolls to the
 boundary, expanded.
 Gapped pairs are Cut only: explicitly close the gap or enable Ripple before adding
 a fade/dissolve. A cross-dissolve explicitly adjusts the right clip to its overlap;
-with Ripple off, no other clip moves and conflicts reject it.
+with Ripple off, no other clip moves and conflicts reject it. With Ripple on, check
+**Keep the cut in place** first to lengthen both clips by half the overlap instead,
+so the change stays where you cut (on the music, say) and later clips do not move.
 **Fade through black with pause** fades out over **Fade** frames, holds black for
 **Pause** frames, then fades in over the same **Fade** frames. The pause adds time
 between the clips instead of hiding footage, so the right clip moves later by the

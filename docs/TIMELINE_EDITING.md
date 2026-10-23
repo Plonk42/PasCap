@@ -547,6 +547,15 @@ that overlap. Ripple on re-sequences the suffix; off changes only the paired rig
 clip and rejects conflicts with others. Arbitrary/triple overlap is forbidden.
 Fade-through-black keeps a touching boundary without overlap.
 
+On a Ripple track, **Keep the cut in place** (a checkbox under the boundary's Type, off
+initially, editor-only) instead makes a dissolve's overlap lengthen the left clip's end and
+the right clip's start by half of it each (the left clip takes the smaller half of an odd
+overlap), so the perceived change and every later clip stay on their frames
+([#277](https://github.com/Plonk42/PasCap/issues/277)). Shortening or removing a dissolve
+trims both back. It is one Undo step, the `transition` command's `keepCut`; when either
+recording lacks the footage the edit is refused with the reason, never shortened. Pauses
+still move later clips, and fades through black stay touching.
+
 **Fade through black with pause** (`fade-black-pause`, timeline label **Pause**) has
 two settings: **Fade** frames, the length of both the fade-out at the end of the left
 clip and the fade-in at the start of the right clip, and **Pause** frames of black

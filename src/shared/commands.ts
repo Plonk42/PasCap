@@ -39,7 +39,10 @@ import { colourCurveSchema, hslBandSchema } from './advanced-colour.js';
 import { colourSchema } from './colour.js';
 import { spatialPoseSchema, spatialSettingsSchema } from './spatial.js';
 import { clipDuration } from './speed.js';
+import { trimByOutputFrames } from './source-range.js';
 import { calculateLayout, layerClips, transitionOffset, type TimelineLayout } from './timeline.js';
+
+const MAX_FRAME = 2_147_483_647;
 
 export { editCommandSchema, type EditCommand } from './command-schema.js';
 
@@ -559,7 +562,54 @@ function editSelects(next: ProjectDocument, command: SelectCommand): void {
   next.selects = ranges.length ? { ...others, [mediaId]: ranges } : others;
 }
 
+/** Frames the two clips of a transition overlap. */
+function overlapOf(transition: Transition): number {
+  return Math.max(0, -transitionOffset(transition));
+}
+
+/**
+ * Sets a transition on a Ripple track keeping its perceived change and every later clip in place: a longer
+ * overlap lengthens the left clip's end and the right clip's start by half of it each, a shorter one trims
+ * them back. The recordings' lengths and kept ranges are checked when the edit is saved.
+ */
+function keepCutTransition(document: ProjectDocument, value: Transition): ProjectDocument {
+  const transition = transitionSchema.parse(value);
+  const left = document.clips.find((clip) => clip.id === transition.leftId);
+  const right = document.clips.find((clip) => clip.id === transition.rightId);
+  if (!left || !right) throw new Error('Transition clips no longer exist.');
+  const layer = requiredLayer(document, left.layerId);
+  if (!layer.ripple)
+    throw new Error(
+      'Keeping the cut in place needs Ripple: without it a dissolve already leaves later clips where they are.',
+    );
+  const previous = layer.transitions.find((t) => t.leftId === left.id && t.rightId === right.id);
+  if (!previous) throw new Error('Transition is not between adjacent clips.');
+  const change = overlapOf(transition) - overlapOf(previous);
+  const toLeft = Math.floor(change / 2);
+  const toRight = change - toLeft;
+  const trims = (project: ProjectDocument): ProjectDocument => {
+    const clip = (id: string) => project.clips.find((item) => item.id === id)!;
+    // The displayed end and start: a reversed clip shows its source OUT first.
+    const lengthenEnd = (item: VideoClip, frames: number) =>
+      trimByOutputFrames(item, item.reverse ? 'in' : 'out', item.reverse ? -frames : frames, MAX_FRAME);
+    const lengthenStart = (item: VideoClip, frames: number) =>
+      trimByOutputFrames(item, item.reverse ? 'out' : 'in', item.reverse ? frames : -frames, MAX_FRAME);
+    const widened = applyCommand(project, lengthenStart(clip(right.id), toRight));
+    return applyCommand(widened, lengthenEnd(clip(left.id), toLeft));
+  };
+  const command = { type: 'transition', transition } as const;
+  // Lengthen before a longer overlap and shorten after a shorter one, so every step is a valid project.
+  const result = change >= 0 ? applyCommand(trims(document), command) : trims(applyCommand(document, command));
+  const endOf = (project: ProjectDocument) =>
+    calculateLayout(project).clips.find((item) => item.clip.id === right.id)!.end;
+  // A trim stops at the recording's first or last frame; speed curves may round by one frame.
+  if (Math.abs(endOf(result) - endOf(document)) > 1)
+    throw new Error('The recordings have no footage to keep the cut in place with this overlap.');
+  return result;
+}
+
 export function applyCommand(document: ProjectDocument, command: EditCommand): ProjectDocument {
+  if (command.type === 'transition' && command.keepCut) return keepCutTransition(document, command.transition);
   const next = projectSchema.parse(document);
   // Keep the snapshot attached to the untouched committed document. In-place
   // moves of cloned clips must not change its original track/first-clip identity.
