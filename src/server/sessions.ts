@@ -23,6 +23,28 @@ const checkpointFileSchema = z.object({ summary: checkpointSummarySchema, docume
 
 export type SessionStarter = 'user' | 'assistant';
 
+/** The brief's fields that say something, in words. */
+function describeBrief(brief: Brief): string {
+  const parts = [
+    brief.notes && `notes “${brief.notes}”`,
+    brief.musicTrackId && `music track ${brief.musicTrackId}`,
+    brief.targetSeconds !== null && `target length ${brief.targetSeconds} s`,
+    brief.allowedMovement !== null && `allowed movement ${brief.allowedMovement}`,
+    brief.maxClips !== null && `at most ${brief.maxClips} clips`,
+  ].filter((part): part is string => typeof part === 'string' && part !== '');
+  return parts.length ? `Brief: ${parts.join('; ')}.` : 'The brief is empty.';
+}
+
+/** Why a session cannot start beside the active one, and what an assistant can do instead. */
+export function activeSessionReason(active: AssistantSession, caller: SessionStarter, revision: number): string {
+  if (caller === 'user') return `An assistant session has been active on this project since ${active.startedAt}.`;
+  const origin =
+    active.startedBy === 'user'
+      ? `The user handed this project off to an assistant at ${active.startedAt}: that session is open for you`
+      : `An assistant session has been active on this project since ${active.startedAt} (started by an assistant, perhaps you)`;
+  return `${origin}, so do not start another. Edit within it with edit (expectedRevision ${revision}) and finish with session_end and your notes. ${describeBrief(active.brief)}`;
+}
+
 /**
  * Assistant sessions and checkpoints, stored beside the projects in `<dataDir>/assistant/<id>/`,
  * outside the project document. An active session holds the project's write lease: the user's
@@ -131,15 +153,13 @@ export class AssistantSessions {
   ): Promise<AssistantSession> {
     return this.projects.exclusive(async () => {
       const document = await this.projects.load(projectId);
+      // An active session comes first: an assistant can edit within it whatever revision it read.
+      const previous = await this.current(projectId);
+      if (previous?.endedAt === null)
+        throw new ServiceError(activeSessionReason(previous, startedBy, document.revision), 409);
       if (document.revision !== expectedRevision)
         throw new ServiceError(
           `The project is at revision ${document.revision}, not ${expectedRevision}: read it again (in the editor, wait until it is saved) before starting a session.`,
-          409,
-        );
-      const previous = await this.current(projectId);
-      if (previous?.endedAt === null)
-        throw new ServiceError(
-          `An assistant session has been active on this project since ${previous.startedAt}.`,
           409,
         );
       const checkpoint = await this.#checkpoint(document, 'session-start', null, null);

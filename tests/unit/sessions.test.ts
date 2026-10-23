@@ -168,17 +168,31 @@ describe('assistant sessions', () => {
     expect(status.session).not.toHaveProperty('pictures');
   });
 
-  it('refuses to start on a stale revision or beside an active session', async () => {
+  it('refuses to start on a stale revision or beside an active session, saying whether it can be used', async () => {
     const stale = await setup();
     await expect(
       stale.call('assistant', 'session_start', { projectId: 'flight', expectedRevision: 0 }),
     ).rejects.toMatchObject({
       statusCode: 409,
     });
-    await stale.call('editor', 'session_start', { projectId: 'flight', expectedRevision: 1 });
+    await stale.call('editor', 'session_start', {
+      projectId: 'flight',
+      expectedRevision: 1,
+      brief: { notes: 'A calm flight', targetSeconds: 60 },
+    });
+    // The user's Hand off is open for the assistant, even from a revision it read earlier.
+    for (const expectedRevision of [1, 0])
+      await expect(stale.call('assistant', 'session_start', { projectId: 'flight', expectedRevision })).rejects.toThrow(
+        /^The user handed this project off to an assistant at .*: that session is open for you, so do not start another\. Edit within it with edit \(expectedRevision 1\) and finish with session_end and your notes\. Brief: notes “A calm flight”; target length 60 s\.$/,
+      );
+    await expect(stale.call('editor', 'session_start', { projectId: 'flight', expectedRevision: 1 })).rejects.toThrow(
+      /^An assistant session has been active on this project since /,
+    );
+    const other = await setup();
+    await other.call('assistant', 'session_start', { projectId: 'flight', expectedRevision: 1 });
     await expect(
-      stale.call('assistant', 'session_start', { projectId: 'flight', expectedRevision: 1 }),
-    ).rejects.toThrow(/already|been active/);
+      other.call('assistant', 'session_start', { projectId: 'flight', expectedRevision: 1 }),
+    ).rejects.toThrow(/started by an assistant, perhaps you\), so do not start another\..* The brief is empty\.$/);
   });
 
   it('keeps assistant clips inside the kept ranges and only narrows them, leaving the project unchanged otherwise', async () => {
