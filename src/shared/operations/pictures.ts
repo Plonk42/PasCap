@@ -34,6 +34,10 @@ const timelineLegend = described(
         frame: frameSchema,
         timecode: timecodeSchema,
         clipIds: described(z.array(idSchema), 'Clips visible at that frame, bottom track first.'),
+        shows: described(
+          z.enum(['saved', 'original', 'candidate']).optional(),
+          'In a comparison: the frame as saved, without any Colour and Detail (original), or with the commands (candidate).',
+        ),
       })
       .strict(),
   ),
@@ -50,7 +54,7 @@ const projectPicture = z
 export const still = defineOperation({
   name: 'still',
   description:
-    "Render one project frame as the export composes it (every enabled track with its Colour, Detail, Transform, Opacity and transitions), from the 720p editing proxies, as a JPEG. Use crop for a 1:1 detail of the 1280 × 720 composition, for example to judge Sharpen or Denoise. Width and crop size are limited by the service's image budget.",
+    "Render one project frame as the export composes it (every enabled track with its Colour, Detail, Transform, Opacity and transitions), from the 720p editing proxies, as a JPEG. Use crop for a 1:1 detail of the 1280 × 720 composition, for example to judge Sharpen or Denoise, and compare to judge a candidate grade beside the saved or original image in one picture. Width and crop size are limited by the service's image budget.",
   input: z
     .object({
       projectId,
@@ -72,6 +76,10 @@ export const still = defineOperation({
         'Render this region at 1:1 instead of the scaled whole frame.',
       ),
       commands,
+      compare: described(
+        z.enum(['saved', 'original']).optional(),
+        "Show the frame twice side by side in one picture: on the left as saved (saved, which needs commands) or without any Colour and Detail (original, the editor's Original preview), on the right with the commands, or as saved without them. Each half has the width asked for.",
+      ),
     })
     .strict(),
   output: projectPicture,

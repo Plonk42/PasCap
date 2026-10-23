@@ -105,6 +105,22 @@ describe('project stills', () => {
     expect(error / (checked.length * 3)).toBeLessThan(2);
   });
 
+  it('composes the Original image without Colour and Detail, keeping Opacity and dissolves', async () => {
+    const graded = dissolveProject();
+    const detailed = {
+      ...graded,
+      clips: graded.clips.map((item) => ({ ...item, detail: { sharpen: 1, clarity: 0.5, denoise: 0 } })),
+    };
+    const plain = projectSchema.parse({
+      ...graded,
+      layers: graded.layers.map((layer) => ({ ...layer, colour: createColourSettings() })),
+    });
+    const layout = calculateLayout(graded);
+    const original = await composeProjectFrame(detailed, layout, 50, { ...context(decode), ungraded: true });
+    expect(original.equals(await composeProjectFrame(plain, layout, 50, context(decode)))).toBe(true);
+    expect(original.equals(await composeProjectFrame(graded, layout, 50, context(decode)))).toBe(false);
+  });
+
   it('draws a transition timeslot as opaque black geometry without decoding it', async () => {
     const base = createProject('slots', 'Slots');
     const document = projectSchema.parse({

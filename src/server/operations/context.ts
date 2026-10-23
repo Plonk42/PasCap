@@ -34,7 +34,7 @@ export interface ServiceContext {
   jobs: Pick<JobQueue, 'list'>;
   stills: Pick<
     StillRenderer,
-    'still' | 'timelineSheet' | 'recordingSheet' | 'sourceSheet' | 'analysisFrames' | 'lumaFrames'
+    'still' | 'comparison' | 'timelineSheet' | 'recordingSheet' | 'sourceSheet' | 'analysisFrames' | 'lumaFrames'
   >;
   assistant: Pick<AssistantConnection, 'url' | 'tokenFile' | 'lastClient' | 'seen'>;
   images: AssistantImageBudget;
