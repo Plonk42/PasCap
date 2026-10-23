@@ -1420,6 +1420,36 @@ test('transition and fade edits keep the range at its project frames; Cut range 
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
+test('Keep the cut in place lengthens both clips so the dissolve leaves later clips where they are', async ({
+  page,
+}) => {
+  const before = await current(page);
+  await page.locator('.boundary-button').first().click();
+  await page.getByRole('checkbox', { name: 'Keep the cut in place', exact: true }).check();
+  await page.getByRole('combobox', { name: 'Transition type', exact: true }).selectOption('cross-dissolve');
+  const dissolved = await current(page);
+  expect(dissolved).toEqual(
+    applyCommand(before, {
+      type: 'transition',
+      transition: { leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 30 },
+      keepCut: true,
+    }),
+  );
+  // a gains 15 frames at its end and b 15 at its start: c still starts at 150.
+  expect(firstTrackGeometry(dissolved).map(([id, start]) => [id, start])).toEqual([
+    ['a', 0],
+    ['b', 75],
+    ['c', 150],
+  ]);
+  expect(dissolved.clips.map((clip) => [clip.id, clip.sourceIn, clip.sourceOut])).toEqual([
+    ['a', 15, 120],
+    ['b', 15, 90],
+    ['c', 60, 120],
+  ]);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(before);
+});
+
 test('native first-clip edge autoscroll restores a head longer than 32px without a start jump or draft save', async ({
   page,
 }) => {

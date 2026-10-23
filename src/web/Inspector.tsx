@@ -1,4 +1,4 @@
-import { Fragment, memo, useEffect, useId, type KeyboardEvent, type ReactNode } from 'react';
+import { Fragment, memo, useEffect, useId, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { colourAt } from '../shared/composition.js';
@@ -529,11 +529,14 @@ function SequenceControls({
   const transitionGap = transitionHasGap(boundary, layout);
   const clipName = (clipId: string): string =>
     shortName(assets.find((item) => item.id === project.clips.find((clip) => clip.id === clipId)?.mediaId)?.name ?? '');
-  const setTransition = (transition: Transition): void => onEdit({ type: 'transition', transition });
+  const [keepCutChosen, setKeepCutChosen] = useState(false);
+  // Only a Ripple track moves its later clips when an overlap changes.
+  const keepCut = layer.ripple && keepCutChosen;
+  const setTransition = (transition: Transition): void => onEdit({ type: 'transition', transition, keepCut });
   const transitionError = (transition: Transition): string | null =>
     commandNumberError(
       project,
-      { type: 'transition', transition },
+      { type: 'transition', transition, keepCut },
       'Shorten this transition or adjust conflicting fades/placements on this track.',
     );
   const resetKey = `${project.id}:${layer.id}:${boundary?.leftId}:${boundary?.rightId}:${boundary?.type}`;
@@ -601,6 +604,20 @@ function SequenceControls({
                         </option>
                       </select>
                     </label>
+                    {layer.ripple && (
+                      <label
+                        className="transition-keep-cut"
+                        title="A dissolve lengthens both clips by half its overlap, so the change and the later clips stay where they are."
+                      >
+                        <input
+                          type="checkbox"
+                          checked={keepCutChosen}
+                          disabled={drafting}
+                          onChange={(event) => setKeepCutChosen(event.target.checked)}
+                        />
+                        <span>Keep the cut in place</span>
+                      </label>
+                    )}
                     {boundary.type === 'fade-black-pause' && (
                       <div className="range-fields">
                         <label>

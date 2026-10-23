@@ -1005,6 +1005,15 @@ svg {
   margin-top: 10px;
 }
 
+.transition-keep-cut {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 8px;
+  font-size: 9px;
+  color: #9eb8a8;
+}
+
 .edge-fade-settings h3 {
   margin-bottom: 8px;
 }

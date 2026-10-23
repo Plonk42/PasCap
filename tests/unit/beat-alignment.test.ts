@@ -165,6 +165,42 @@ describe('beat alignment', () => {
     ]);
   });
 
+  it('keeps the perceived cut and every later boundary when a dissolve is added with keepCut', () => {
+    const base = project();
+    const roomy = projectSchema.parse({
+      ...base,
+      clips: base.clips.map((clip) => ({ ...clip, sourceIn: 30, sourceOut: 90 })),
+    });
+    const dissolve = (duration: number) =>
+      ({
+        type: 'transition',
+        transition: { leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration },
+        keepCut: true,
+      }) as const;
+    const frames = (document: ProjectDocument) => boundaries(document).map((item) => item.frame);
+    expect(frames(roomy)).toEqual([60, 120]);
+    const added = applyCommand(roomy, dissolve(20));
+    expect(frames(added)).toEqual([60, 120]);
+    expect(added.clips.map((clip) => [clip.id, clip.sourceIn, clip.sourceOut])).toEqual([
+      ['a', 30, 100],
+      ['b', 20, 90],
+      ['c', 30, 90],
+    ]);
+    // An odd overlap rounds within a frame; shortening it, or a cut again, trims both clips back.
+    expect(frames(applyCommand(roomy, dissolve(9)))).toEqual([60, 120]);
+    expect(frames(applyCommand(added, dissolve(10)))).toEqual([60, 120]);
+    const cut = applyCommand(added, {
+      type: 'transition',
+      transition: { leftId: 'a', rightId: 'b', type: 'cut', duration: 0 },
+      keepCut: true,
+    });
+    expect(cut.clips).toEqual(roomy.clips);
+    // Without it, b and c move earlier by the overlap; without footage, or Ripple, it is refused.
+    expect(frames(applyCommand(roomy, { ...dissolve(20), keepCut: false }))).toEqual([50, 100]);
+    expect(() => applyCommand(base, dissolve(20))).toThrow();
+    expect(() => applyCommand(project(false), dissolve(20))).toThrow(/needs Ripple/);
+  });
+
   it('snaps to downbeats only, keeps clips at their minimum length and needs Ripple', () => {
     const downbeats = snapCutsToBeats(project(), 'video-1', downbeatFrames, 1, sources(200));
     // Downbeats at 5, 65, 125, 185: a grows to 65 frames and b, now 65–125, already ends on one.

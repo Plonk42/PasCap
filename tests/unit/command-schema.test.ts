@@ -77,7 +77,7 @@ type FormerEditCommand =
   | { type: 'layer-order'; layerIds: string[] }
   | { type: 'place'; clipId: string; layerId: string; start: number; index: number }
   | { type: 'move-clips'; clipIds: string[]; delta: number; layerId: string | null }
-  | { type: 'transition'; transition: Transition }
+  | { type: 'transition'; transition: Transition; keepCut?: boolean | undefined }
   | { type: 'fades'; layerId: string; opening: number; closing: number }
   | { type: 'bookmark-add'; frame: number }
   | { type: 'bookmark-move'; frame: number; nextFrame: number }

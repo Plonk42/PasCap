@@ -309,6 +309,10 @@ export const editCommandSchema = z.discriminatedUnion('type', [
         transitionSchema,
         'cut (duration 0), fade-through-black (duration ≥ 2), cross-dissolve (overlap duration ≥ 1) or fade-black-pause (fade and pause frames), with leftId and rightId of the clips.',
       ),
+      keepCut: described(
+        z.boolean().optional(),
+        "On a Ripple track, keep the perceived change and every later clip in place: a dissolve's overlap lengthens the left clip's end and the right clip's start by half each (shortening it trims them back), refused when the recordings or kept ranges lack the footage. Without it the right clip and every later one move earlier by the overlap.",
+      ),
     },
   ),
   command('fades', "Set a video track's fade from black at its first clip and to black at its last clip.", {
