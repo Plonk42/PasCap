@@ -41,6 +41,7 @@ type FormerEditCommand =
   | { type: 'reverse'; clipId: string; reverse: boolean }
   | { type: 'transform'; layerId: string; transform: SpatialSettings }
   | { type: 'detail'; clipId: string; detail: DetailSettings }
+  | { type: 'detail-clips'; clipIds: string[]; detail: DetailSettings }
   | { type: 'music'; music: MusicLane[] }
   | { type: 'opacity'; layerId: string; opacity: number }
   | { type: 'layer-key-toggle'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
@@ -117,6 +118,7 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
   reverse: { type: 'reverse', clipId: 'clip-1', reverse: true },
   transform: { type: 'transform', layerId: 'video-1', transform: createSpatialSettings() },
   detail: { type: 'detail', clipId: 'clip-1', detail: createDetailSettings() },
+  'detail-clips': { type: 'detail-clips', clipIds: ['clip-1', 'clip-2'], detail: createDetailSettings() },
   music: { type: 'music', music: [] },
   opacity: { type: 'opacity', layerId: 'video-1', opacity: 0.5 },
   'layer-key-toggle': { type: 'layer-key-toggle', layerId: 'video-1', frame: 4, setting: 'exposure', value: 0.5 },
