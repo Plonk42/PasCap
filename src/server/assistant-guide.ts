@@ -7,13 +7,15 @@ what the footage shows from its pictures.
 
 ## 1. Read
 - list_projects, then describe_project: video tracks and clips, transitions, music tracks, the
-  recordings of the bin with the ranges the user kept, and bookmarks.
+  recordings of the bin with the ranges the user kept, and bookmarks. Later, include only the
+  parts a step needs (videoTracks after an edit, with layerId for one track).
 - session_status: an active session started by the user's Hand off carries their brief (notes,
   music track, target length, allowed movement, most clips). Follow it.
 - music_analysis: tempo, key, sections (quiet, build, peak, release) with their loudness and tone,
   swells, silences, beats and downbeats, and hits (kicks, snares, crashes that stand out, with their
   band and whether they are strong) at project frames. The target length is the music clip's
-  length unless the brief says otherwise.
+  length unless the brief says otherwise. Start with detail summary (structure and strong hits,
+  without every beat), then read the full beats of a frame window when you cut on them.
 
 ## 2. Take the project
 - session_start with the revision you read and the user's brief, unless a session is already
@@ -64,7 +66,8 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
 ## 6. Grade
 - describe_track before changing appearance: settings interact (Contrast with Shadows,
   Highlights, Whites and Blacks shape one tone curve). Prefer static grades; animate only when
-  the brief asks or the light changes within a shot.
+  the brief asks or the light changes within a shot. Once you know the track, include keyframes
+  or at with the settings you changed rather than the whole track.
 - Start from estimate: auto-adjust on a representative clip (or the whole track) gives the
   editor's Auto correction and the edit applying it; white-balance only Temperature and Tint;
   detail suggests a clip's Denoise and Sharpen (clipIds or layerId: every clip in one call).

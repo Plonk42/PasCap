@@ -1,7 +1,8 @@
-import type { describeProject } from '../../shared/operations/describe-project.js';
+import { projectParts, type describeProject } from '../../shared/operations/describe-project.js';
 import { durationOf } from '../../shared/operations/timecode.js';
 import { calculateLayout } from '../../shared/timeline.js';
 import { formatTimecode } from '../../shared/timing.js';
+import { ServiceError } from '../errors.js';
 import type { OperationRunner, ServiceContext } from './context.js';
 
 /** Unregistered media is described as unknown rather than failing the whole summary. */
@@ -20,42 +21,46 @@ function span(start: number, end: number) {
 
 export const runDescribeProject: OperationRunner<typeof describeProject> = async (
   { projects, library, audio }: ServiceContext,
-  { projectId },
+  { projectId, include = projectParts, layerId },
 ) => {
   const project = await projects.load(projectId);
+  if (layerId !== undefined && !project.layers.some((layer) => layer.id === layerId))
+    throw new ServiceError(`The project has no video track ${layerId}.`, 404);
   const layout = calculateLayout(project);
+  const parts = new Set(include);
   const videoName = (id: string) => known(() => library.get(id).name);
   const musicName = (id: string) => known(() => audio.get(id).name);
-  return {
-    id: project.id,
-    title: project.title,
-    revision: project.revision,
-    duration: durationOf(layout.duration),
-    videoTracks: project.layers.map((layer) => ({
-      id: layer.id,
-      name: layer.name,
-      enabled: layer.enabled,
-      ripple: layer.ripple,
-      opacity: layer.opacity,
-      colourKeyframes: layer.keyframes.length,
-      transformKeyframes: layer.transform.keyframes.length,
-      openingFade: layer.openingFade,
-      closingFade: layer.closingFade,
-      clips: layout.clips
-        .filter((placed) => placed.clip.layerId === layer.id)
-        .map(({ clip, start, end }) => ({
-          id: clip.id,
-          recording: { id: clip.mediaId, name: videoName(clip.mediaId) },
-          ...span(start, end),
-          sourceIn: clip.sourceIn,
-          sourceOut: clip.sourceOut,
-          speed:
-            clip.speed.mode === 'constant' ? `${clip.speed.rate}×` : `curve, ${clip.speed.keyframes.length} keyframes`,
-          reverse: clip.reverse,
-        })),
-      transitions: layer.transitions,
-    })),
-    musicTracks: project.music.map((track) => ({
+  const videoTracks = () =>
+    project.layers
+      .filter((layer) => layerId === undefined || layer.id === layerId)
+      .map((layer) => ({
+        id: layer.id,
+        name: layer.name,
+        enabled: layer.enabled,
+        ripple: layer.ripple,
+        opacity: layer.opacity,
+        colourKeyframes: layer.keyframes.length,
+        transformKeyframes: layer.transform.keyframes.length,
+        openingFade: layer.openingFade,
+        closingFade: layer.closingFade,
+        clips: layout.clips
+          .filter((placed) => placed.clip.layerId === layer.id)
+          .map(({ clip, start, end }) => ({
+            id: clip.id,
+            recording: { id: clip.mediaId, name: videoName(clip.mediaId) },
+            ...span(start, end),
+            sourceIn: clip.sourceIn,
+            sourceOut: clip.sourceOut,
+            speed:
+              clip.speed.mode === 'constant'
+                ? `${clip.speed.rate}×`
+                : `curve, ${clip.speed.keyframes.length} keyframes`,
+            reverse: clip.reverse,
+          })),
+        transitions: layer.transitions,
+      }));
+  const musicTracks = () =>
+    project.music.map((track) => ({
       id: track.id,
       gainDb: track.gainDb,
       ripple: track.ripple,
@@ -70,8 +75,9 @@ export const runDescribeProject: OperationRunner<typeof describeProject> = async
         loop: clip.loop,
       })),
       transitions: track.transitions,
-    })),
-    recordings: project.media.videoIds.map((id) => {
+    }));
+  const recordings = () =>
+    project.media.videoIds.map((id) => {
       const asset = known(() => library.get(id));
       return {
         id,
@@ -80,8 +86,18 @@ export const runDescribeProject: OperationRunner<typeof describeProject> = async
         ready: asset?.status === 'ready',
         kept: project.selects[id] ?? null,
       };
+    });
+  return {
+    id: project.id,
+    title: project.title,
+    revision: project.revision,
+    duration: durationOf(layout.duration),
+    ...(parts.has('videoTracks') && { videoTracks: videoTracks() }),
+    ...(parts.has('musicTracks') && { musicTracks: musicTracks() }),
+    ...(parts.has('recordings') && {
+      recordings: recordings(),
+      musicRecordings: project.media.audioIds.map((id) => ({ id, name: musicName(id) })),
     }),
-    musicRecordings: project.media.audioIds.map((id) => ({ id, name: musicName(id) })),
-    bookmarks: project.bookmarks,
+    ...(parts.has('bookmarks') && { bookmarks: project.bookmarks }),
   };
 };

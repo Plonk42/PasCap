@@ -212,7 +212,7 @@ describe('operation routes', () => {
       audio: { get: () => ({ name: 'song.wav' }) },
     } as unknown as Parameters<typeof runners.describe_project>[0];
     const description = await runners.describe_project(context, { projectId: project.id });
-    expect(description.videoTracks[0]!.clips).toEqual([
+    expect(description.videoTracks![0]!.clips).toEqual([
       {
         id: 'clip-1',
         recording: { id: 'rec-1', name: 'DJI_0001.MP4' },
@@ -259,21 +259,54 @@ describe('operation routes', () => {
     const description = response.json<TrackDescription>();
     const saved = (await call(app, 'describe_project', { projectId: project.id })).json<{ revision: number }>();
     expect(description.revision).toBe(saved.revision);
-    expect(description.track.colour).toMatchObject({ shadows: 0.3, contrast: 1.2, exposure: 0 });
-    expect(description.track.keyframes.map((key) => [key.frame, key.values.exposure])).toEqual([
+    expect(description.track!.colour).toMatchObject({ shadows: 0.3, contrast: 1.2, exposure: 0 });
+    expect(description.track!.keyframes.map((key) => [key.frame, key.values.exposure])).toEqual([
       [30, 1],
       [90, 0],
     ]);
     expect(description.keyed).toEqual({ colour: ['exposure'], transform: [] });
+    expect(description.keyframes).toBeUndefined();
     expect(
-      description.at.map(({ frame, timecode, values }) => [frame, timecode, values.exposure, values.shadows]),
+      description.at!.map(({ frame, timecode, values }) => [frame, timecode, values.exposure, values.shadows]),
     ).toEqual([
       [0, '00:00:00', 1, 0.3],
       [60, '00:02:00', 0.5, 0.3],
       [120, '00:04:00', 0, 0.3],
     ]);
-    expect(description.at[1]!.values.opacity).toBe(1);
-    expect(description.at[1]!.transform.scale).toBe(1.5);
+    expect(description.at![1]!.values.opacity).toBe(1);
+    expect(description.at![1]!.transform.scale).toBe(1.5);
+
+    // Compact: keyframes with only their keyed settings, and the values of the settings asked for.
+    const compact = await call(app, 'describe_track', {
+      projectId: project.id,
+      layerId: 'video-1',
+      frames: [60],
+      include: ['keyframes', 'at'],
+      settings: ['exposure', 'scale'],
+    });
+    expect(compact.json()).toEqual({
+      revision: saved.revision,
+      keyed: { colour: ['exposure'], transform: [] },
+      keyframes: {
+        colour: [
+          { frame: 30, timecode: '00:01:00', values: { exposure: 1 }, easing: { exposure: 'linear' }, reset: false },
+          { frame: 90, timecode: '00:03:00', values: { exposure: 0 }, easing: { exposure: 'linear' }, reset: false },
+        ],
+        transform: [],
+      },
+      at: [{ frame: 60, timecode: '00:02:00', values: { exposure: 0.5 }, transform: { scale: 1.5 } }],
+    });
+    const parts = await call(app, 'describe_project', {
+      projectId: project.id,
+      include: ['bookmarks'],
+    });
+    expect(Object.keys(parts.json())).toEqual(['id', 'title', 'revision', 'duration', 'bookmarks']);
+    const one = await call(app, 'describe_project', {
+      projectId: project.id,
+      include: ['videoTracks'],
+      layerId: 'video-9',
+    });
+    expect(one.statusCode).toBe(404);
 
     const unknown = await call(app, 'describe_track', { projectId: project.id, layerId: 'video-9' });
     expect(unknown.statusCode).toBe(404);
@@ -556,12 +589,19 @@ describe('operation routes', () => {
       },
     } as unknown as Parameters<typeof runners.music_analysis>[0];
 
-    const music = await runners.music_analysis(context, { projectId: 'music', fromFrame: 0, toFrame: 60 });
+    const music = await runners.music_analysis(context, {
+      projectId: 'music',
+      fromFrame: 0,
+      toFrame: 60,
+      detail: 'full',
+    });
     expect(music.clips[0]).toMatchObject({
       musicClipId: 'song-clip',
       trackId: 'track-1',
       analysis: 'analysed',
       tempo: { bpm: 89.9 },
+      beatCount: 3,
+      hitCount: 2,
       hits: [
         { frame: 20, timecode: '00:00:20', band: 'high', strong: false, strength: 0.3 },
         { frame: 58, timecode: '00:01:28', band: 'low', strong: true, strength: 0.9 },
@@ -577,6 +617,14 @@ describe('operation routes', () => {
       [30, false],
       [50, true],
     ]);
+    const summary = await runners.music_analysis(context, { projectId: 'music', detail: 'summary' });
+    expect(summary.clips[0]).toMatchObject({
+      beats: [],
+      beatCount: 6,
+      hitCount: 2,
+      sections: music.clips[0]!.sections,
+    });
+    expect(summary.clips[0]!.hits.map((hit) => hit.frame)).toEqual([58]);
 
     const report = await runners.check_alignment(context, { projectId: 'music' });
     expect(report.boundaries).toMatchObject([

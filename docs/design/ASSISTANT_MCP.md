@@ -283,19 +283,23 @@ Read; for editor and assistant. List the saved projects, most recently saved fir
 
 Read; for editor and assistant. Summarise a saved project: its revision, duration, video tracks with their clips in timeline order (project frames and timecodes, source ranges, speed, direction), transitions, music tracks, the recordings with the ranges the user kept, and bookmarks. Frames are integers at 30000/1001 fps. Read it before editing and after each edit batch.
 
-| Input       | Type   | Description              |
-| ----------- | ------ | ------------------------ |
-| `projectId` | string | ID of the saved project. |
+| Input       | Type                                                                   | Description                                                                                                                                                                                                                                          |
+| ----------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId` | string                                                                 | ID of the saved project.                                                                                                                                                                                                                             |
+| `include`   | array of "videoTracks" or "musicTracks" or "recordings" or "bookmarks" | Parts to return besides the id, title, revision and duration: videoTracks, musicTracks, recordings (video and music) and bookmarks; all when omitted. Ask only for what the step needs: videoTracks after an edit, recordings when choosing footage. |
+| `layerId`   | string                                                                 | Only this video track in videoTracks.                                                                                                                                                                                                                |
 
 #### `describe_track`
 
-Read; for editor and assistant. Read every appearance value of one video track: its saved Colour (scalar settings, HSL ranges, curves), Opacity, Transform and keyframes, which settings follow keyframes, and the values that apply at the requested project frames. Settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve), so read the whole track before grading it.
+Read; for editor and assistant. Read every appearance value of one video track: its saved Colour (scalar settings, HSL ranges, curves), Opacity, Transform and keyframes, which settings follow keyframes, and the values that apply at the requested project frames. Settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve), so read the whole track before grading it; afterwards, include keyframes or at with the settings you changed reads far less.
 
-| Input       | Type             | Description                                                                          |
-| ----------- | ---------------- | ------------------------------------------------------------------------------------ |
-| `projectId` | string           | ID of the saved project.                                                             |
-| `layerId`   | string           | ID of the video track.                                                               |
-| `frames`    | array of integer | Up to 32 project frames at which to report the values that apply; none when omitted. |
+| Input       | Type                                                                                                                                                                                                                                                                                                                                 | Description                                                                                                                                                                        |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId` | string                                                                                                                                                                                                                                                                                                                               | ID of the saved project.                                                                                                                                                           |
+| `layerId`   | string                                                                                                                                                                                                                                                                                                                               | ID of the video track.                                                                                                                                                             |
+| `frames`    | array of integer                                                                                                                                                                                                                                                                                                                     | Up to 32 project frames at which to report the values that apply; none when omitted.                                                                                               |
+| `include`   | array of "track" or "keyframes" or "at"                                                                                                                                                                                                                                                                                              | Parts to return besides revision and keyed: track (the whole saved track, the largest part), keyframes (each keyframe with only its keyed settings) and at (the values at frames). |
+| `settings`  | array of "opacity" or "temperature" or "tint" or "exposure" or "brightness" or "contrast" or "hue" or "saturation" or "vibrance" or "highlights" or "shadows" or "whites" or "blacks" or "hdr" or "localContrast" or "cropLeft" or "cropRight" or "cropTop" or "cropBottom" or "scale" or "translateX" or "translateY" or "rotation" | Report only these Opacity, Colour and Transform settings in at; all when omitted.                                                                                                  |
 
 #### `describe_recording`
 
@@ -312,12 +316,13 @@ Read; for editor and assistant. Map where a video recording is usable and how it
 
 Read; for editor and assistant. Read the music of the project's music clips at project frames (where each plays on the timeline, repeated across loops): tempo, meter, beats, downbeats, hits (rhythmic hits that stand out from their surroundings, such as a kick, a snare or a cymbal crash, each with the band that rose most and whether it is strong: the places worth cutting on), key and mode, sections (quiet, build, peak, release) with their loudness and tone (low, mid and high frequency levels), swells (crescendos and decrescendos, sudden or gradual) and silences. Use a frame window for long music. A clip whose music is not analysed yet says so; ask the user to analyse it in Audio → Music.
 
-| Input         | Type    | Description                                                                                |
-| ------------- | ------- | ------------------------------------------------------------------------------------------ |
-| `projectId`   | string  | ID of the saved project.                                                                   |
-| `musicClipId` | string  | ID of one music clip, from describe_project; every music clip of the project when omitted. |
-| `fromFrame`   | integer | First project frame of the window.                                                         |
-| `toFrame`     | integer | Project frame after the window (exclusive).                                                |
+| Input         | Type                | Description                                                                                                                                                         |
+| ------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId`   | string              | ID of the saved project.                                                                                                                                            |
+| `musicClipId` | string              | ID of one music clip, from describe_project; every music clip of the project when omitted.                                                                          |
+| `fromFrame`   | integer             | First project frame of the window.                                                                                                                                  |
+| `toFrame`     | integer             | Project frame after the window (exclusive).                                                                                                                         |
+| `detail`      | "summary" or "full" | summary leaves out the beats and the light hits (their counts remain) to read the structure of long music at a glance; full lists every beat and hit in the window. |
 
 #### `check_alignment`
 
@@ -493,6 +498,7 @@ Read; for editor and assistant. Measure footage the way the editor's automatic t
 | `sourceOut` | integer                                      | Source frame after the recording range (exclusive).                                                                                                                                                                                                                                                                                                                                                                                         |
 | `applyAs`   | "values" or "keyframe" or "shots"            | Colour kinds: values replaces the track's values (leaving animated settings unchanged); keyframe keys the settings at frame, which needs clipId and frame; shots gives each clip (clipId, clipIds or every clip of layerId) its own whole-clip correction, keyed at its first frame with Hold Easing so it holds until the next keyframe of those settings, and blended linearly across a cross-dissolve whose two clips are both analysed. |
 | `intensity` | number                                       | auto-adjust: strength of the correction in %; 80 is the correction as fitted, 100 exaggerates it by a quarter.                                                                                                                                                                                                                                                                                                                              |
+| `commands`  | boolean                                      | False returns the values only, without the edit commands (applying as values repeats the track's whole Colour, HSL ranges and curves included).                                                                                                                                                                                                                                                                                             |
 
 #### Edit commands
 
@@ -719,8 +725,15 @@ the project, tempo, meter, beats with downbeats and strength, hits with their ba
 strength, and sections mapped to
 project frames through the clip's placement, source range and loops (`musicBeatFrames`,
 `musicHitFrames`, `musicSampleRanges` in [beat alignment](../../src/shared/beat-alignment.ts)),
-in an optional frame window, at most 2,000 beats and 2,000 hits per clip. The method as built,
-with its constants and measured agreement, is in
+in an optional frame window, at most 2,000 beats and 2,000 hits per clip. `detail: summary`
+([#275](https://github.com/Plonk42/PasCap/issues/275)) leaves out the beats and the light hits,
+keeping their counts: on the owner's 3:37 song without a steady beat it reads 9 KB instead of
+17 KB. `describe_project` likewise takes `include` (videoTracks, musicTracks, recordings,
+bookmarks) and `layerId`, and `describe_track` takes `include` (the whole track, its keyframes
+with only their keyed settings, the values at frames) and `settings`: on the owner's graded
+rough cut (39 keyframes), the values of three settings at eight frames read 1 KB instead of the
+27 KB of the whole track. `estimate` with `commands: false` returns the values only. The method
+as built, with its constants and measured agreement, is in
 [speed and audio](../SPEED_AND_AUDIO.md#music-analysis) (it also covers key, swells, silences
 and per-second tone); in outline:
 

@@ -61,6 +61,10 @@ export const estimate = defineOperation({
         z.number().min(0).max(100).default(balanced),
         `auto-adjust: strength of the correction in %; ${balanced} is the correction as fitted, 100 exaggerates it by a quarter.`,
       ),
+      commands: described(
+        z.boolean().default(true),
+        "False returns the values only, without the edit commands (applying as values repeats the track's whole Colour, HSL ranges and curves included).",
+      ),
     })
     .strict(),
   output: z
@@ -101,7 +105,7 @@ export const estimate = defineOperation({
       ),
       commands: described(
         z.array(editCommandSchema),
-        'Edit commands applying the result in one step: pass them to edit. Empty for a recording range or when every setting is animated.',
+        'Edit commands applying the result in one step: pass them to edit. Empty for a recording range, without commands, or when every setting is animated.',
       ),
     })
     .strict(),

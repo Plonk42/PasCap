@@ -149,7 +149,7 @@ describe('estimate operation', () => {
       },
     },
   } as unknown as Context;
-  const input = { projectId: 'estimate', applyAs: 'values', intensity: 80 } as const;
+  const input = { projectId: 'estimate', applyAs: 'values', intensity: 80, commands: true } as const;
 
   it('fits Auto adjust to the frames the editor analyses and returns the edit that applies it', async () => {
     reads.length = 0;
@@ -165,6 +165,8 @@ describe('estimate operation', () => {
 
     const half = await runners.estimate(context, { ...input, kind: 'auto-adjust', clipId: 'a', intensity: 40 });
     expect(half.correction!['tint']).toBeCloseTo(expected.tint / 2, 2);
+    const valuesOnly = await runners.estimate(context, { ...input, kind: 'auto-adjust', clipId: 'a', commands: false });
+    expect(valuesOnly).toMatchObject({ correction: expected, commands: [] });
 
     // A keyframe at a frame analyses the second around it and keys the eleven settings there.
     const keyed = await runners.estimate(context, {
