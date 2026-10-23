@@ -1,4 +1,12 @@
 import type { z } from 'zod';
+import { described } from '../described.js';
+import { frameSchema } from '../model.js';
+
+/** The saved revision a read used, so a result read before or during an edit can be recognised. */
+export const revisionReadSchema = described(
+  frameSchema,
+  'Saved revision this result was read from; older than your last edit means it is stale, so read again.',
+);
 
 /** Who can call an operation: the editor through HTTP, the assistant through MCP. */
 export type OperationAudience = 'editor' | 'assistant';

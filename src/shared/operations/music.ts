@@ -3,7 +3,7 @@ import { editCommandSchema } from '../command-schema.js';
 import { described } from '../described.js';
 import { frameSchema, idSchema } from '../model.js';
 import { hitBands, pitchNames, sectionKinds, swellKinds } from '../music-analysis.js';
-import { defineOperation } from './spec.js';
+import { defineOperation, revisionReadSchema } from './spec.js';
 import { durationSchema, timecodeSchema } from './timecode.js';
 
 export const MAX_LISTED_BEATS = 2000;
@@ -52,6 +52,7 @@ export const musicAnalysis = defineOperation({
     .strict(),
   output: z
     .object({
+      revision: revisionReadSchema,
       clips: z.array(
         z
           .object({
@@ -134,6 +135,7 @@ export const checkAlignment = defineOperation({
     .strict(),
   output: z
     .object({
+      revision: revisionReadSchema,
       beats: described(z.number().int().nonnegative(), 'Beats of the analysed music clips considered.'),
       hits: described(z.number().int().nonnegative(), 'Strong hits of the analysed music clips considered.'),
       boundaries: z.array(
@@ -204,6 +206,7 @@ export const snapCutsToBeats = defineOperation({
     .strict(),
   output: z
     .object({
+      revision: described(revisionReadSchema, 'Saved revision the proposal was computed on, before any apply.'),
       boundaries: z.array(
         z
           .object({

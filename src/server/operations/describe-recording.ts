@@ -43,6 +43,7 @@ export const runDescribeRecording: OperationRunner<typeof describeRecording> = a
   const shown = sheet ? pictured(shots, images.sheetCells) : [];
   const middles = shown.map((shot) => Math.floor((shot.sourceIn + shot.sourceOut) / 2));
   return {
+    revision: project.revision,
     recording: {
       id: asset.id,
       name: asset.name,

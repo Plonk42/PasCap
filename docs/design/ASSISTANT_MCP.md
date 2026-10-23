@@ -881,6 +881,9 @@ which command (for example static grades unless the brief wants animation).
   16 calls rendering or waiting their turn, each waiting at most 5 minutes before it starts
   (then refused with that reason), and are refused during exports; each render has a 120 s limit.
 - Every batch is validated like a save (`projectSchema`, layout, `assertProjectSources`).
+- Every operation that reads a saved project returns the `revision` it read
+  ([#278](https://github.com/Plonk42/PasCap/issues/278)), so a result read before or during an
+  edit can be recognised; reads take no lock and keep their order.
 
 ## Hand-off in the editor
 

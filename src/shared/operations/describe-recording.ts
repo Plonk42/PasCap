@@ -4,7 +4,7 @@ import { SMOOTH_TOLERANCE } from '../motion-analysis.js';
 import { frameSchema, idSchema } from '../model.js';
 import { SHOT_KINDS, SHOT_SCORE_SECONDS, SHOT_WEIGHTS } from '../recording-shots.js';
 import { imageSchema } from './pictures.js';
-import { defineOperation } from './spec.js';
+import { defineOperation, revisionReadSchema } from './spec.js';
 import { durationSchema, timecodeSchema } from './timecode.js';
 
 const sourceRange = z.object({ sourceIn: frameSchema, sourceOut: frameSchema }).strict();
@@ -30,6 +30,7 @@ export const describeRecording = defineOperation({
     .strict(),
   output: z
     .object({
+      revision: revisionReadSchema,
       recording: z
         .object({
           id: idSchema,

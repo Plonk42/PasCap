@@ -4,7 +4,7 @@ import { editCommandSchema } from '../command-schema.js';
 import { described } from '../described.js';
 import { detailSchema } from '../detail.js';
 import { frameSchema, idSchema } from '../model.js';
-import { defineOperation } from './spec.js';
+import { defineOperation, revisionReadSchema } from './spec.js';
 
 export const estimateKinds = ['auto-adjust', 'white-balance', 'detail'] as const;
 /** Clips one estimate analyses each on its own. */
@@ -69,6 +69,7 @@ export const estimate = defineOperation({
     .strict(),
   output: z
     .object({
+      revision: revisionReadSchema,
       kind: z.enum(estimateKinds),
       analysed: described(
         z.object({ description: z.string(), frames: z.number().int().nonnegative() }).strict(),

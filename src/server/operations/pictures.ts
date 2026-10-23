@@ -136,5 +136,6 @@ export const runCompareRecordings: OperationRunner<typeof compareRecordings> = a
     });
   });
   const cells = candidates.flatMap(({ mediaId, frames }) => frames.map((frame) => ({ mediaId, frame })));
-  return { image: await stills.sourceSheet(cells, perCandidate > 1 ? perCandidate : null, images), candidates };
+  const image = await stills.sourceSheet(cells, perCandidate > 1 ? perCandidate : null, images);
+  return { revision: project.revision, image, candidates };
 };
