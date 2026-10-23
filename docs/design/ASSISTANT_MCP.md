@@ -138,7 +138,10 @@ when restored.
 `session_start` (the editor, or the assistant itself from what the user asked, decided on
 2026-10-21) checks the revision the starter read (unprepared recordings in the bin do not block
 it: describe_project marks them, and stills cannot show them),
-checkpoints the project and takes its write lease. While it is active every write of the user
+checkpoints the project and takes its write lease. Beside an active session it is refused, the
+assistant being told who started that session (the user's Hand off, open for it, or an
+assistant), that it can edit within it, the current revision and the brief
+([#280](https://github.com/Plonk42/PasCap/issues/280)). While it is active every write of the user
 (editor saves, renames, deletes, imports into the bin, `edit` from the editor) is refused with
 423, and the assistant's writes are allowed; without an active session the assistant cannot
 write and is told why (none started, the user took the project back, or the lease expired).

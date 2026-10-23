@@ -19,8 +19,9 @@ what the footage shows from its pictures.
 
 ## 2. Take the project
 - session_start with the revision you read and the user's brief, unless a session is already
-  active. While it lasts the user watches and cannot edit; every edit you save is a revision,
-  and they can restore the project as it was before the session.
+  active (the user's Hand off starts one for you: session_start then says so and gives the
+  brief, and you edit within it). While it lasts the user watches and cannot edit; every edit
+  you save is a revision, and they can restore the project as it was before the session.
 - Every read reports the revision it used: run reads after the edit they depend on has
   returned, and read again when a result's revision is older than your last edit.
 
