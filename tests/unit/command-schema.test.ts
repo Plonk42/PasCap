@@ -44,6 +44,14 @@ type FormerEditCommand =
   | { type: 'music'; music: MusicLane[] }
   | { type: 'opacity'; layerId: string; opacity: number }
   | { type: 'layer-key-toggle'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
+  | {
+      type: 'layer-key-set';
+      layerId: string;
+      frame: number;
+      values: { [K in KeyframeSetting]?: number | null | undefined };
+      easing?: Interpolation | { [K in KeyframeSetting]?: Interpolation } | undefined;
+      reset?: boolean | undefined;
+    }
   | { type: 'layer-key-value'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
   | { type: 'layer-key-move'; layerId: string; frame: number; nextFrame: number }
   | { type: 'layer-key-remove'; layerId: string; frame: number }
@@ -112,6 +120,14 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
   music: { type: 'music', music: [] },
   opacity: { type: 'opacity', layerId: 'video-1', opacity: 0.5 },
   'layer-key-toggle': { type: 'layer-key-toggle', layerId: 'video-1', frame: 4, setting: 'exposure', value: 0.5 },
+  'layer-key-set': {
+    type: 'layer-key-set',
+    layerId: 'video-1',
+    frame: 4,
+    values: { exposure: 0.5, contrast: null },
+    easing: { exposure: 'hold' },
+    reset: false,
+  },
   'layer-key-value': { type: 'layer-key-value', layerId: 'video-1', frame: 4, setting: 'opacity', value: 0.2 },
   'layer-key-move': { type: 'layer-key-move', layerId: 'video-1', frame: 4, nextFrame: 9 },
   'layer-key-remove': { type: 'layer-key-remove', layerId: 'video-1', frame: 4 },
@@ -147,7 +163,14 @@ function descriptionOf(schema: z.ZodType): string | undefined {
   return z.globalRegistry.get(schema)?.description;
 }
 
-/** Paths of object fields without a description on the field or on the value it makes nullable. */
+/** The value a field makes optional and/or nullable. */
+function unwrapped(field: z.ZodType): z.ZodType {
+  return field instanceof z.ZodNullable || field instanceof z.ZodOptional
+    ? unwrapped(field.unwrap() as z.ZodType)
+    : field;
+}
+
+/** Paths of object fields without a description on the field or on the value it makes optional or nullable. */
 function undescribedFields(schema: z.ZodType, path: string): string[] {
   if (schema instanceof z.ZodNullable || schema instanceof z.ZodOptional)
     return undescribedFields(schema.unwrap() as z.ZodType, path);
@@ -156,9 +179,10 @@ function undescribedFields(schema: z.ZodType, path: string): string[] {
     return (schema.options as z.ZodType[]).flatMap((option) => undescribedFields(option, path));
   if (!(schema instanceof z.ZodObject)) return [];
   return Object.entries(schema.shape as Record<string, z.ZodType>).flatMap(([name, field]) => {
-    const inner = field instanceof z.ZodNullable ? (field.unwrap() as z.ZodType) : field;
     const own =
-      field instanceof z.ZodLiteral || descriptionOf(field) || descriptionOf(inner) ? [] : [`${path}.${name}`];
+      field instanceof z.ZodLiteral || descriptionOf(field) || descriptionOf(unwrapped(field))
+        ? []
+        : [`${path}.${name}`];
     return [...own, ...undescribedFields(field, `${path}.${name}`)];
   });
 }
