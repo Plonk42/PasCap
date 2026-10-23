@@ -59,6 +59,8 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   Use preview_edits to check a batch before saving it.
 - snap_cuts_to_beats (first without apply, then with apply) moves each cut onto the beat, or with
   prefer hit or beat-or-hit onto a strong hit; check_alignment reports how the cut follows the music.
+  Cuts you placed deliberately go in keep (or keepOnHit for those already on a hit), and maxShift
+  stops a cut from travelling far to reach a beat.
 - Transitions: cuts on beats; short cross-dissolves (8–15 frames) between related shots; fade
   through black between sections; opening and closing fades on the track to match the music.
 - Use a second track only for an overlay or a clip that needs its own grade.

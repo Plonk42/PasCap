@@ -182,6 +182,18 @@ export const snapCutsToBeats = defineOperation({
         z.number().min(0).max(60).default(1),
         'Shortest a clip may become; a boundary that would need a shorter clip stays where it is.',
       ),
+      maxShift: described(
+        z.number().int().nonnegative().optional(),
+        'Farthest a boundary may move, in frames; one whose nearest target is farther stays where it is.',
+      ),
+      keep: described(
+        z.array(z.object({ leftId: idSchema, rightId: idSchema }).strict()).optional(),
+        'Boundaries (their left and right clip IDs) to keep on their frame: never snapped, and taken back to it when earlier trims move it.',
+      ),
+      keepOnHit: described(
+        z.boolean().default(false),
+        'Keep every boundary already within one frame of a hit, strong or light, like the listed ones.',
+      ),
       musicClipId,
       apply: described(z.boolean().default(false), 'True saves the trims as one edit; false only proposes them.'),
       expectedRevision: described(
@@ -199,8 +211,12 @@ export const snapCutsToBeats = defineOperation({
             rightId: idSchema,
             before: frameSchema,
             beat: described(frameSchema.nullable(), 'The beat or hit reached, else the nearest one.'),
+            target: described(
+              z.enum(['beat', 'downbeat', 'hit']).nullable(),
+              'What that frame is: a beat, a downbeat or a strong hit; null without one.',
+            ),
             after: frameSchema,
-            skipped: described(z.string().nullable(), 'Why the boundary stays where it is.'),
+            skipped: described(z.string().nullable(), 'Why the boundary was not snapped, such as kept or too far.'),
           })
           .strict(),
       ),

@@ -338,15 +338,18 @@ Read; for editor and assistant. Measure how the cut follows the music: for every
 
 Write; for editor and assistant. Move the boundaries of one Ripple video track onto the music: left to right, trim each boundary's left clip so the change lands on the nearest beat (or downbeat, or strong hit), shortening it, or lengthening it where its recording has footage inside the kept ranges, else taking the nearest one on the other side; each clip stays at least minimumSeconds long and transitions keep their durations; later clips follow. Returns the proposed trim commands and each boundary before and after; with apply, saves them as one edit (needs the session and expectedRevision). Do the arithmetic with this rather than by hand.
 
-| Input              | Type                                           | Description                                                                                |
-| ------------------ | ---------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `projectId`        | string                                         | ID of the saved project.                                                                   |
-| `layerId`          | string                                         | ID of a video track with Ripple on.                                                        |
-| `prefer`           | "beat" or "downbeat" or "hit" or "beat-or-hit" | Snap to every beat, to downbeats only, to strong hits only, or to beats and strong hits.   |
-| `minimumSeconds`   | number                                         | Shortest a clip may become; a boundary that would need a shorter clip stays where it is.   |
-| `musicClipId`      | string                                         | ID of one music clip, from describe_project; every music clip of the project when omitted. |
-| `apply`            | boolean                                        | True saves the trims as one edit; false only proposes them.                                |
-| `expectedRevision` | integer                                        | Revision you last read, from describe_project; required with apply.                        |
+| Input              | Type                                           | Description                                                                                                                        |
+| ------------------ | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId`        | string                                         | ID of the saved project.                                                                                                           |
+| `layerId`          | string                                         | ID of a video track with Ripple on.                                                                                                |
+| `prefer`           | "beat" or "downbeat" or "hit" or "beat-or-hit" | Snap to every beat, to downbeats only, to strong hits only, or to beats and strong hits.                                           |
+| `minimumSeconds`   | number                                         | Shortest a clip may become; a boundary that would need a shorter clip stays where it is.                                           |
+| `maxShift`         | integer                                        | Farthest a boundary may move, in frames; one whose nearest target is farther stays where it is.                                    |
+| `keep`             | array of object                                | Boundaries (their left and right clip IDs) to keep on their frame: never snapped, and taken back to it when earlier trims move it. |
+| `keepOnHit`        | boolean                                        | Keep every boundary already within one frame of a hit, strong or light, like the listed ones.                                      |
+| `musicClipId`      | string                                         | ID of one music clip, from describe_project; every music clip of the project when omitted.                                         |
+| `apply`            | boolean                                        | True saves the trims as one edit; false only proposes them.                                                                        |
+| `expectedRevision` | integer                                        | Revision you last read, from describe_project; required with apply.                                                                |
 
 #### `session_start`
 
@@ -792,7 +795,12 @@ clip on the timeline (or one), merged by frame, and hits its strong hits.
   earlier at every boundary. A boundary that reaches neither beat stays put with the reason.
   Returns the `trim` commands and each boundary before and after as a proposal, or with
   `apply` and `expectedRevision` saves them as one `edit` (the session rules apply). With slow
-  motion a boundary can land a frame from the beat; `after` says where.
+  motion a boundary can land a frame from the beat; `after` says where, and `target` whether the
+  frame reached is a beat, a downbeat or a hit
+  ([#276](https://github.com/Plonk42/PasCap/issues/276)). `maxShift` (frames) leaves a boundary
+  whose nearest target is farther where it is; boundaries listed in `keep`, or with `keepOnHit`
+  already within one frame of any hit, are not snapped and, when earlier trims move them, their
+  left clip takes them back to their first frame; each reports why.
 - No `beats_to_bookmarks` operation: bookmarks are `bookmark-add` commands at the frames
   `music_analysis` lists. Not done: the first/last video frame against the music's first and
   last beat.

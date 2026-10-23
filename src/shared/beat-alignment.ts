@@ -96,9 +96,25 @@ export interface SnappedBoundary {
   before: number;
   /** The beat reached, else the nearest one, or null without beats. */
   beat: number | null;
+  /** What `beat` is, or null without one. */
+  target: SnapTargetKind | null;
   after: number;
   /** Why the boundary was left where it is, or null. */
   skipped: string | null;
+}
+
+export type SnapTargetKind = 'beat' | 'downbeat' | 'hit';
+
+/** Limits on which boundaries move and how far. */
+export interface SnapOptions {
+  /** What a target frame is: a beat, a downbeat or a hit. */
+  kindOf?: (frame: number) => SnapTargetKind;
+  /** Farthest a boundary may move, in frames; farther targets are not used. */
+  maxShift?: number;
+  /** Boundaries to leave where they are, as `leftId>rightId`. */
+  keep?: ReadonlySet<string>;
+  /** Hits (strong or light): a boundary within one frame of one stays where it is. */
+  keepOnHits?: readonly number[];
 }
 
 /** The nearest target at or before `frame` and the nearest after it, nearest first. */
@@ -161,28 +177,56 @@ function reachBeat(
   }
 }
 
+/** Why a boundary first at `original` stays on that frame, or null. */
+function keptReason(pair: { leftId: string; rightId: string }, original: number, options: SnapOptions): string | null {
+  if (options.keep?.has(`${pair.leftId}>${pair.rightId}`)) return 'Listed in keep.';
+  const hit = options.keepOnHits?.find((frame) => Math.abs(frame - original) <= 1);
+  return hit === undefined ? null : `Already on a hit at frame ${hit}.`;
+}
+
 /** One boundary's trim on the project as edited so far, toward the nearest beat it can reach, or why none. */
 function snapBoundary(
   document: ProjectDocument,
   layerId: string,
-  pair: { leftId: string; rightId: string },
+  pair: { leftId: string; rightId: string; original: number },
   targets: readonly number[],
   minimumFrames: number,
   sources: SnapSources,
+  options: SnapOptions,
 ): { entry: SnappedBoundary; command: EditCommand | null; document: ProjectDocument } {
+  const { original, ...ids } = pair;
   const before = boundaries(document, layerId).find((item) => item.leftId === pair.leftId)!.frame;
-  const options = candidates(targets, before);
-  const entry: SnappedBoundary = { ...pair, before, beat: options[0] ?? null, after: before, skipped: null };
-  if (!options.length) return { entry: { ...entry, skipped: 'No beat near it.' }, command: null, document };
-  if (options[0] === before) return { entry, command: null, document };
+  const nearby = candidates(targets, before);
+  const kind = (frame: number | null) => (frame === null ? null : (options.kindOf?.(frame) ?? 'beat'));
+  const nearest = nearby[0] ?? null;
+  const entry: SnappedBoundary = { ...ids, before, beat: nearest, target: kind(nearest), after: before, skipped: null };
+  const unchanged = (skipped: string | null) => ({ entry: { ...entry, skipped }, command: null, document });
+  const kept = keptReason(pair, original, options);
+  if (kept) {
+    // Trims before it moved it along: its left clip takes it back to its frame.
+    if (before === original) return unchanged(kept);
+    const step = reachBeat(document, layerId, pair.leftId, before, original, minimumFrames, sources);
+    if (!('command' in step)) return unchanged(`${kept} Earlier trims moved it, and it cannot return: ${step.skipped}`);
+    return { entry: { ...entry, after: step.after, skipped: kept }, command: step.command, document: step.document };
+  }
+  if (nearest === null) return unchanged('No beat near it.');
+  if (nearest === before) return unchanged(null);
+  const { maxShift = Number.POSITIVE_INFINITY } = options;
+  const reachable = nearby.filter((frame) => Math.abs(frame - before) <= maxShift);
+  if (!reachable.length)
+    return unchanged(`The nearest ${entry.target} is ${Math.abs(nearest - before)} frames away, more than maxShift.`);
   let skipped = '';
-  for (const beat of options) {
+  for (const beat of reachable) {
     const step = reachBeat(document, layerId, pair.leftId, before, beat, minimumFrames, sources);
     if ('command' in step)
-      return { entry: { ...entry, beat, after: step.after }, command: step.command, document: step.document };
+      return {
+        entry: { ...entry, beat, target: kind(beat), after: step.after },
+        command: step.command,
+        document: step.document,
+      };
     skipped ||= step.skipped;
   }
-  return { entry: { ...entry, skipped }, command: null, document };
+  return unchanged(skipped);
 }
 
 /**
@@ -197,6 +241,7 @@ export function snapCutsToBeats(
   targets: readonly number[],
   minimumFrames: number,
   sources: SnapSources,
+  options: SnapOptions = {},
 ): SnapResult {
   const layer = project.layers.find((item) => item.id === layerId);
   if (!layer) throw new Error(`The project has no video track ${layerId}.`);
@@ -204,8 +249,10 @@ export function snapCutsToBeats(
   let document = project;
   const commands: EditCommand[] = [];
   const result: SnappedBoundary[] = [];
+  const originals = new Map(boundaries(project, layerId).map((item) => [item.leftId, item.frame]));
   for (const { leftId, rightId } of layer.transitions) {
-    const step = snapBoundary(document, layerId, { leftId, rightId }, targets, minimumFrames, sources);
+    const pair = { leftId, rightId, original: originals.get(leftId)! };
+    const step = snapBoundary(document, layerId, pair, targets, minimumFrames, sources, options);
     document = step.document;
     if (step.command) commands.push(step.command);
     result.push(step.entry);

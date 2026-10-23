@@ -4,6 +4,7 @@ import {
   musicSampleRanges,
   nearestBeat,
   snapCutsToBeats,
+  type SnapTargetKind,
 } from '../../shared/beat-alignment.js';
 import type { MusicTrack, ProjectDocument } from '../../shared/model.js';
 import {
@@ -48,21 +49,26 @@ async function readAnalysis(audio: ServiceContext['audio'], mediaId: string): Pr
   }
 }
 
-/** The beats and strong hits of the project's analysed music clips at project frames. */
+/** The beats, strong hits and every hit of the project's analysed music clips at project frames. */
 async function projectBeats(
   { audio }: ServiceContext,
   project: ProjectDocument,
   musicClipId: string | undefined,
-): Promise<{ beats: PlacedBeat[]; hits: number[] }> {
+): Promise<{ beats: PlacedBeat[]; hits: number[]; allHits: number[] }> {
   const lists: PlacedBeat[][] = [];
   const hits = new Set<number>();
+  const allHits = new Set<number>();
   await forEachSerial(musicClipsOf(project, musicClipId), async ({ track }) => {
     const analysis = await readAnalysis(audio, track.mediaId);
     if (!analysis) return;
     lists.push(musicBeatFrames(track, analysis.beats));
-    for (const hit of musicHitFrames(track, analysis.hits)) if (hit.strong) hits.add(hit.frame);
+    for (const hit of musicHitFrames(track, analysis.hits)) {
+      allHits.add(hit.frame);
+      if (hit.strong) hits.add(hit.frame);
+    }
   });
-  return { beats: mergeBeats(lists), hits: [...hits].sort((a, b) => a - b) };
+  const sorted = (frames: Set<number>) => [...frames].sort((a, b) => a - b);
+  return { beats: mergeBeats(lists), hits: sorted(hits), allHits: sorted(allHits) };
 }
 
 function rounded(value: number, digits: number): number {
@@ -234,6 +240,20 @@ function snapTargets(
   return [...new Set(frames)].sort((a, b) => a - b);
 }
 
+/** What a snap target is; a frame that is both a beat and a hit counts as the beat unless only hits are wanted. */
+function targetKinds(
+  { beats, hits }: { beats: readonly PlacedBeat[]; hits: readonly number[] },
+  prefer: 'beat' | 'downbeat' | 'hit' | 'beat-or-hit',
+): (frame: number) => SnapTargetKind {
+  const beatAt = new Map(beats.map((beat) => [beat.frame, beat]));
+  const hitFrames = new Set(hits);
+  return (frame) => {
+    const beat = beatAt.get(frame);
+    if (prefer === 'hit' || (hitFrames.has(frame) && !beat)) return 'hit';
+    return beat?.downbeat ? 'downbeat' : 'beat';
+  };
+}
+
 export const runSnapCutsToBeats: OperationRunner<typeof snapOperation> = async (context, input) => {
   const { projectId, layerId, prefer, minimumSeconds, musicClipId, apply, expectedRevision } = input;
   if (apply && expectedRevision === undefined)
@@ -249,10 +269,22 @@ export const runSnapCutsToBeats: OperationRunner<typeof snapOperation> = async (
   const fps = PROJECT_FPS.numerator / PROJECT_FPS.denominator;
   let result;
   try {
-    result = snapCutsToBeats(project, layerId, targets, Math.round(minimumSeconds * fps), {
-      frameCount: (mediaId) => context.library.get(mediaId).metadata.frameCount,
-      kept: (mediaId) => project.selects[mediaId],
-    });
+    result = snapCutsToBeats(
+      project,
+      layerId,
+      targets,
+      Math.round(minimumSeconds * fps),
+      {
+        frameCount: (mediaId) => context.library.get(mediaId).metadata.frameCount,
+        kept: (mediaId) => project.selects[mediaId],
+      },
+      {
+        kindOf: targetKinds(music, prefer),
+        ...(input.maxShift !== undefined && { maxShift: input.maxShift }),
+        keep: new Set((input.keep ?? []).map(({ leftId, rightId }) => `${leftId}>${rightId}`)),
+        ...(input.keepOnHit && { keepOnHits: music.allHits }),
+      },
+    );
   } catch (error) {
     throw new ServiceError(error instanceof Error ? error.message : 'Cannot snap the cuts of this track.', 422);
   }
