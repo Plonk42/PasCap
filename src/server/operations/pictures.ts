@@ -45,16 +45,33 @@ function legend(document: Parameters<typeof sampleTimeline>[0], frames: readonly
   }));
 }
 
-export const runStill: OperationRunner<typeof still> = async (context, { projectId, frame, width, crop, commands }) => {
+export const runStill: OperationRunner<typeof still> = async (
+  context,
+  { projectId, frame, width, crop, commands, compare },
+) => {
   const { images, stills } = context;
   const size = width ?? images.stillWidth;
   withinBudget(size, images.stillWidth, 'pixels of still width');
   if (crop) withinBudget(Math.max(crop.width, crop.height), images.stillWidth, 'pixels of crop width and height');
+  if (compare === 'saved' && !commands)
+    throw new ServiceError('Comparing with the saved frame needs the commands of the candidate.', 422);
   const { saved, document } = await renderedProject(context, projectId, commands);
+  if (!compare)
+    return {
+      revision: saved.revision,
+      image: await stills.still(document, frame, size, crop ?? null),
+      legend: legend(document, [frame]),
+    };
+  const left = { document: saved, ungraded: compare === 'original' };
+  const right = { document, ungraded: false };
+  const [before, after] = [...legend(saved, [frame]), ...legend(document, [frame])];
   return {
     revision: saved.revision,
-    image: await stills.still(document, frame, size, crop ?? null),
-    legend: legend(document, [frame]),
+    image: await stills.comparison([left, right], frame, size, crop ?? null),
+    legend: [
+      { ...before!, shows: compare },
+      { ...after!, cell: 1, shows: commands ? ('candidate' as const) : ('saved' as const) },
+    ],
   };
 };
 

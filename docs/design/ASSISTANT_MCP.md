@@ -448,15 +448,16 @@ Read; for editor. The level of a prepared music recording for drawing its wavefo
 
 #### `still`
 
-Read; for editor and assistant. Render one project frame as the export composes it (every enabled track with its Colour, Detail, Transform, Opacity and transitions), from the 720p editing proxies, as a JPEG. Use crop for a 1:1 detail of the 1280 × 720 composition, for example to judge Sharpen or Denoise. Width and crop size are limited by the service's image budget.
+Read; for editor and assistant. Render one project frame as the export composes it (every enabled track with its Colour, Detail, Transform, Opacity and transitions), from the 720p editing proxies, as a JPEG. Use crop for a 1:1 detail of the 1280 × 720 composition, for example to judge Sharpen or Denoise, and compare to judge a candidate grade beside the saved or original image in one picture. Width and crop size are limited by the service's image budget.
 
-| Input       | Type            | Description                                                                                                             |
-| ----------- | --------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `projectId` | string          | ID of the saved project.                                                                                                |
-| `frame`     | integer         | Project frame to render.                                                                                                |
-| `width`     | integer         | Picture width in pixels; defaults to, and may not exceed, the service's still width.                                    |
-| `crop`      | object          | Render this region at 1:1 instead of the scaled whole frame.                                                            |
-| `commands`  | array of object | Edit commands applied in memory to the saved project before rendering, to compare a candidate change without saving it. |
+| Input       | Type                  | Description                                                                                                                                                                                                                                                                   |
+| ----------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId` | string                | ID of the saved project.                                                                                                                                                                                                                                                      |
+| `frame`     | integer               | Project frame to render.                                                                                                                                                                                                                                                      |
+| `width`     | integer               | Picture width in pixels; defaults to, and may not exceed, the service's still width.                                                                                                                                                                                          |
+| `crop`      | object                | Render this region at 1:1 instead of the scaled whole frame.                                                                                                                                                                                                                  |
+| `commands`  | array of object       | Edit commands applied in memory to the saved project before rendering, to compare a candidate change without saving it.                                                                                                                                                       |
+| `compare`   | "saved" or "original" | Show the frame twice side by side in one picture: on the left as saved (saved, which needs commands) or without any Colour and Detail (original, the editor's Original preview), on the right with the commands, or as saved without them. Each half has the width asked for. |
 
 #### `timeline_sheet`
 
@@ -611,7 +612,12 @@ Operations return the JPEG base64-encoded in JSON with its size; the MCP endpoin
 it into image content. Optional `commands` apply to the saved revision in memory before
 composing, so the LLM can compare a grade or a transition without a revision; they are
 validated like an `edit` and against the recordings' frames, and never written. A `crop`
-renders a region of the 1280 × 720 composition at 1:1, to judge Sharpen and Denoise. Stills
+renders a region of the 1280 × 720 composition at 1:1, to judge Sharpen and Denoise. A `still`
+with `compare` ([#282](https://github.com/Plonk42/PasCap/issues/282)) renders the frame twice side
+by side in one picture, each half at the width asked (or the crop at 1:1), 4 pixels apart: on the
+left as saved (`saved`, with the candidate `commands` on the right) or without any Colour and
+Detail (`original`, composed like the editor's **Original** preview, keeping geometry, Opacity and
+fades), its legend naming what each half `shows`. Stills
 show the 720p proxy composition: the export at 4K differs in resolution only, as the preview
 does ([detail filters](DETAIL_FILTERS.md#kernel)).
 

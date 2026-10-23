@@ -90,7 +90,9 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   (hold keeps a grade until the next keyframe) or one per setting; settings left out keep what
   they have there, and null disables one.
 - Compare with still or timeline_sheet: both accept commands to preview a change without saving.
-  Judge Detail on a 1:1 crop: no halos, no waxy smoothing.
+  still with compare shows the candidate beside the saved frame (saved) or the ungraded one
+  (original) in one picture: judge a grade there, not in small sheet cells. Judge Detail on a
+  1:1 crop: no halos, no waxy smoothing.
 
 ## 7. Finish
 - Verify with a timeline_sheet across the cut, check_alignment and the duration against the

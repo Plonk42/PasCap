@@ -1,4 +1,6 @@
 import type { MediaAsset } from '../shared/media.js';
+import { createColourSettings } from '../shared/colour.js';
+import { NEUTRAL_DETAIL } from '../shared/detail.js';
 import type { LumaFrame } from '../shared/detail-estimate.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
@@ -101,6 +103,8 @@ export interface ComposeContext {
   cache: ColourLutCache;
   signal: AbortSignal;
   pool?: CompositorPool | null;
+  /** Without any Colour or clip Detail, as the editor's Original preview: geometry, Opacity and fades remain. */
+  ungraded?: boolean;
 }
 
 /**
@@ -112,7 +116,7 @@ export async function composeProjectFrame(
   document: ProjectDocument,
   layout: TimelineLayout,
   frame: number,
-  { assetOf, decode, cache, signal, pool = null }: ComposeContext,
+  { assetOf, decode, cache, signal, pool = null, ungraded = false }: ComposeContext,
 ): Promise<Buffer> {
   const allocate = (bytes: number): Buffer => (pool ? Buffer.from(new SharedArrayBuffer(bytes)) : Buffer.alloc(bytes));
   const shared = (frame: Buffer): Buffer => {
@@ -123,7 +127,9 @@ export async function composeProjectFrame(
   };
   const accumulator = allocate(PIXELS * 8);
   const group = allocate(PIXELS * 8);
-  const samples = sampleTimeline(document, frame, layout);
+  const samples = sampleTimeline(document, frame, layout).map((sample) =>
+    ungraded ? { ...sample, colour: createColourSettings(), detail: { ...NEUTRAL_DETAIL } } : sample,
+  );
   const slots = sampleSlots(document, frame, layout);
   // A timeslot draws geometry and coverage only: brightness 0 never reads its pixels.
   const blank = allocate(PIXELS * 3);
@@ -266,7 +272,12 @@ export class StillRenderer {
   }
 
   /** RGB8 compositions of project frames, decoded from the proxies of the clips they show. */
-  async #projectFrames(document: ProjectDocument, frames: readonly number[], signal: AbortSignal): Promise<Buffer[]> {
+  async #projectFrames(
+    document: ProjectDocument,
+    frames: readonly number[],
+    signal: AbortSignal,
+    ungraded = false,
+  ): Promise<Buffer[]> {
     const layout = calculateLayout(document);
     const outside = frames.find((frame) => frame >= layout.duration);
     if (outside !== undefined)
@@ -282,6 +293,7 @@ export class StillRenderer {
           cache: this.#cache,
           signal,
           pool,
+          ungraded,
         });
         pictures.push(rgba16ToRgb8(composed));
       });
@@ -349,6 +361,28 @@ export class StillRenderer {
       const [picture] = await this.#projectFrames(document, [frame], signal);
       if (!crop) return this.#encode([picture!], STILL_SIZE, width, signal);
       return this.#encode([cropRgb8(picture!, crop)], crop, crop.width, signal);
+    });
+  }
+
+  /** The same frame of two versions side by side in one picture, each at `width` or as a 1:1 crop. */
+  comparison(
+    sides: readonly [
+      { document: ProjectDocument; ungraded: boolean },
+      { document: ProjectDocument; ungraded: boolean },
+    ],
+    frame: number,
+    width: number,
+    crop: Crop | null,
+  ): Promise<JpegImage> {
+    return this.#run(async (signal) => {
+      const pictures: Buffer[] = [];
+      await forEachSerial(sides, async ({ document, ungraded }) => {
+        const [picture] = await this.#projectFrames(document, [frame], signal, ungraded);
+        pictures.push(crop ? cropRgb8(picture!, crop) : picture!);
+      });
+      return crop
+        ? this.#encode(pictures, crop, crop.width, signal, 2)
+        : this.#encode(pictures, STILL_SIZE, width, signal, 2);
     });
   }
 

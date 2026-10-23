@@ -231,6 +231,58 @@ describe('operation routes', () => {
     expect(description.recordings).toEqual([
       { id: 'rec-1', name: 'DJI_0001.MP4', frameCount: 300, ready: true, kept: [{ sourceIn: 0, sourceOut: 120 }] },
     ]);
+
+    // A comparison renders the saved (or original) frame beside the candidate in one picture.
+    const sides: unknown[] = [];
+    const picture = { mimeType: 'image/jpeg', data: '', width: 964, height: 270 } as const;
+    const pictures = {
+      ...context,
+      library: { get: (id: string) => ({ id, name: 'DJI_0001.MP4', metadata: { frameCount: 300 }, status: 'ready' }) },
+      images: { stillWidth: 480, sheetCellWidth: 240, sheetCells: 16 },
+      stills: {
+        comparison: async (...args: unknown[]) => {
+          sides.push(args);
+          return picture;
+        },
+      },
+    } as unknown as Parameters<typeof runners.still>[0];
+    const candidate = [{ type: 'colour-setting', layerId: 'video-1', setting: 'exposure', value: 0.5 }] as const;
+    const compared = await runners.still(pictures, {
+      projectId: project.id,
+      frame: 10,
+      commands: [...candidate],
+      compare: 'saved',
+    });
+    expect(compared.image).toBe(picture);
+    expect(compared.legend.map(({ cell, shows }) => [cell, shows])).toEqual([
+      [0, 'saved'],
+      [1, 'candidate'],
+    ]);
+    const [[[saved, edited], frame, width, crop]] = sides as [
+      [
+        [{ document: ProjectDocument; ungraded: boolean }, { document: ProjectDocument; ungraded: boolean }],
+        number,
+        number,
+        null,
+      ],
+    ];
+    expect([saved.document, saved.ungraded, edited.ungraded, frame, width, crop]).toEqual([
+      project,
+      false,
+      false,
+      10,
+      480,
+      null,
+    ]);
+    expect(edited.document.layers[0]!.colour.exposure).toBe(0.5);
+    const original = await runners.still(pictures, { projectId: project.id, frame: 10, compare: 'original' });
+    expect(original.legend.map(({ shows }) => shows)).toEqual(['original', 'saved']);
+    expect((sides[1] as [{ ungraded: boolean }[]])[0].map((side) => side.ungraded)).toEqual([true, false]);
+    await expect(runners.still(pictures, { projectId: project.id, frame: 10, compare: 'saved' })).rejects.toMatchObject(
+      {
+        statusCode: 422,
+      },
+    );
   });
 
   it('reads a whole track, its keyed settings and the values that apply at frames', async () => {
