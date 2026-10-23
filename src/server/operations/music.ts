@@ -80,10 +80,13 @@ function describeMusicClip(
   analysis: MusicAnalysis | null,
   job: unknown,
   window: { from: number; to: number },
+  summary: boolean,
 ) {
   const inWindow = (frame: number) => frame >= window.from && frame < window.to;
   const beats = analysis ? musicBeatFrames(track, analysis.beats).filter((beat) => inWindow(beat.frame)) : [];
   const hits = analysis ? musicHitFrames(track, analysis.hits).filter((hit) => inWindow(hit.frame)) : [];
+  const listedBeats = summary ? [] : beats;
+  const listedHits = summary ? hits.filter((hit) => hit.strong) : hits;
   return {
     musicClipId: track.id,
     trackId,
@@ -97,21 +100,23 @@ function describeMusicClip(
     meter: analysis?.meter
       ? { beatsPerBar: analysis.meter.beatsPerBar, confidence: rounded(analysis.meter.confidence, 2) }
       : null,
-    beats: beats.slice(0, MAX_LISTED_BEATS).map((beat) => ({
+    beats: listedBeats.slice(0, MAX_LISTED_BEATS).map((beat) => ({
       frame: beat.frame,
       timecode: formatTimecode(beat.frame),
       downbeat: beat.downbeat,
       strength: rounded(beat.strength, 2),
     })),
-    beatsTruncated: beats.length > MAX_LISTED_BEATS,
-    hits: hits.slice(0, MAX_LISTED_BEATS).map((hit: PlacedHit) => ({
+    beatCount: beats.length,
+    beatsTruncated: listedBeats.length > MAX_LISTED_BEATS,
+    hits: listedHits.slice(0, MAX_LISTED_BEATS).map((hit: PlacedHit) => ({
       frame: hit.frame,
       timecode: formatTimecode(hit.frame),
       band: hit.band,
       strong: hit.strong,
       strength: rounded(hit.strength, 2),
     })),
-    hitsTruncated: hits.length > MAX_LISTED_BEATS,
+    hitCount: hits.length,
+    hitsTruncated: listedHits.length > MAX_LISTED_BEATS,
     key: analysis?.key ?? null,
     sections: (analysis?.sections ?? [])
       .flatMap((section) =>
@@ -159,7 +164,7 @@ function sectionTone(
 
 export const runMusicAnalysis: OperationRunner<typeof musicAnalysis> = async (
   { projects, audio },
-  { projectId, musicClipId, fromFrame, toFrame },
+  { projectId, musicClipId, fromFrame, toFrame, detail },
 ) => {
   const project = await projects.load(projectId);
   const window = { from: fromFrame ?? 0, to: toFrame ?? Number.MAX_SAFE_INTEGER };
@@ -167,7 +172,9 @@ export const runMusicAnalysis: OperationRunner<typeof musicAnalysis> = async (
   await forEachSerial(musicClipsOf(project, musicClipId), async (placed) => {
     const { mediaId } = placed.track;
     const analysis = await readAnalysis(audio, mediaId);
-    clips.push(describeMusicClip(placed, audio.get(mediaId), analysis, audio.analysisJob(mediaId), window));
+    clips.push(
+      describeMusicClip(placed, audio.get(mediaId), analysis, audio.analysisJob(mediaId), window, detail === 'summary'),
+    );
   });
   return { clips };
 };

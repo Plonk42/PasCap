@@ -44,6 +44,10 @@ export const musicAnalysis = defineOperation({
       musicClipId,
       fromFrame: described(frameSchema.optional(), 'First project frame of the window.'),
       toFrame: described(frameSchema.optional(), 'Project frame after the window (exclusive).'),
+      detail: described(
+        z.enum(['summary', 'full']).default('full'),
+        'summary leaves out the beats and the light hits (their counts remain) to read the structure of long music at a glance; full lists every beat and hit in the window.',
+      ),
     })
     .strict(),
   output: z
@@ -62,12 +66,14 @@ export const musicAnalysis = defineOperation({
             ),
             tempo: z.object({ bpm: z.number(), confidence: z.number() }).strict().nullable(),
             meter: z.object({ beatsPerBar: z.number().int(), confidence: z.number() }).strict().nullable(),
-            beats: z.array(placedBeat),
+            beats: described(z.array(placedBeat), 'Beats in the window; none in summary.'),
+            beatCount: described(z.number().int().nonnegative(), 'Beats in the window, listed or not.'),
             beatsTruncated: described(
               z.boolean(),
               `True when more than ${MAX_LISTED_BEATS} beats fall in the window; ask for a narrower one.`,
             ),
-            hits: z.array(placedHit),
+            hits: described(z.array(placedHit), 'Hits in the window; only the strong ones in summary.'),
+            hitCount: described(z.number().int().nonnegative(), 'Hits in the window, strong or light, listed or not.'),
             hitsTruncated: described(
               z.boolean(),
               `True when more than ${MAX_LISTED_BEATS} hits fall in the window; ask for a narrower one.`,
