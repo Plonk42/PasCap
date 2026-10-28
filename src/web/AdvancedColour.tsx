@@ -1,4 +1,3 @@
-import { colourTarget } from './colour-owner.js';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import {
   colourCurveSchema,
@@ -19,6 +18,7 @@ import { colourSchema, type ColourSettings } from '../shared/colour.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { ProjectDocument, VideoLayer } from '../shared/model.js';
 import './advanced-colour.css';
+import { colourTarget } from './colour-owner.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { InspectorSection } from './InspectorSection.js';

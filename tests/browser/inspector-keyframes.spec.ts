@@ -71,13 +71,13 @@ async function selectClip(page: Page, id: string): Promise<void> {
   await page.locator(`[data-clip-id="${id}"] .timeline-clip-body`).click();
 }
 
-test('three accessible tabs preserve selection across clips, populated/empty tracks and projects without writes', async ({
+test('four accessible tabs preserve selection across clips, populated/empty tracks and projects without writes', async ({
   page,
 }) => {
   const tabs = page.getByRole('tablist', { name: 'Properties sections', exact: true });
-  await expect(tabs.getByRole('tab')).toHaveText(['Clip', 'Track', 'Audio']);
+  await expect(tabs.getByRole('tab')).toHaveText(['Clip', 'Colour', 'Track', 'Audio']);
   await tabs.getByRole('tab', { name: 'Clip', exact: true }).focus();
-  for (const label of ['Track', 'Audio']) {
+  for (const label of ['Colour', 'Track', 'Audio']) {
     await page.keyboard.press('ArrowRight');
     const tab = tabs.getByRole('tab', { name: label, exact: true });
     await expect(tab).toBeFocused();
@@ -111,7 +111,7 @@ test('three accessible tabs preserve selection across clips, populated/empty tra
   await expect(layerKeyframes(page, 'Track 2')).toBeVisible();
   await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
   await expect(layerKeyframes(page, 'Empty row')).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('button', { name: 'Next Colour keyframe', exact: true })).toBeEnabled();
   const other = createProject('other-inspector', 'Other context');
   other.layers[0]!.name = 'Other row';
@@ -119,7 +119,7 @@ test('three accessible tabs preserve selection across clips, populated/empty tra
   await page.getByRole('button', { name: 'Open projects', exact: true }).click();
   await page.getByRole('button', { name: 'Open Other context', exact: true }).click();
   await expect(layerKeyframes(page, 'Other row')).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(layerKeyframes(page, 'Empty row')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   expect(memory.saves).toBe(0);

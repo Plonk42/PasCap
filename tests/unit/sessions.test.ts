@@ -1,4 +1,3 @@
-import { createClipGrade } from '../../src/shared/grade.js';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -9,6 +8,7 @@ import { AssistantSessions } from '../../src/server/sessions.js';
 import { ProjectStore } from '../../src/server/storage.js';
 import { sessionViolation } from '../../src/shared/assistant-session.js';
 import type { EditCommand } from '../../src/shared/commands.js';
+import { createClipGrade } from '../../src/shared/grade.js';
 import { createProject, projectSchema, type ProjectDocument, type VideoClip } from '../../src/shared/model.js';
 import { operationNamed, type OperationName } from '../../src/shared/operations/index.js';
 

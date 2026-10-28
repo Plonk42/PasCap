@@ -383,20 +383,20 @@ test('Escape closes a hover preview before cancelling an underlying invalid nume
 
 test('changing Inspector context without clicking dismisses help whose owner becomes hidden', async ({ page }) => {
   const clipTab = page.getByRole('tab', { name: 'Clip', exact: true });
+  const colourTab = page.getByRole('tab', { name: 'Colour', exact: true });
   const trackTab = page.getByRole('tab', { name: 'Track', exact: true });
-  const audioTab = page.getByRole('tab', { name: 'Audio', exact: true });
   await clipTab.focus();
   await clipTab.press('ArrowRight');
-  await expect(trackTab).toHaveAttribute('aria-selected', 'true');
-  await expect(trackTab).toBeFocused();
+  await expect(colourTab).toHaveAttribute('aria-selected', 'true');
+  await expect(colourTab).toBeFocused();
   const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
   const panel = await panelFor(page, trigger);
   await trigger.click();
   await expect(panel).toBeVisible();
-  await trackTab.focus();
-  await trackTab.press('ArrowRight');
-  await expect(audioTab).toHaveAttribute('aria-selected', 'true');
-  await expect(audioTab).toBeFocused();
+  await colourTab.focus();
+  await colourTab.press('ArrowRight');
+  await expect(trackTab).toHaveAttribute('aria-selected', 'true');
+  await expect(trackTab).toBeFocused();
   await expect(panel).toHaveJSProperty('popover', 'manual');
   await expect.poll(() => panel.evaluate((element) => element.matches(':popover-open'))).toBe(false);
   expect(memory.saves).toBe(0);
@@ -445,8 +445,8 @@ const HELP_CONTEXTS = [
     tab: 'Clip',
     text: 'The bar shows the whole recording; drag IN and OUT to keep only the part you want.',
   },
-  { label: 'Placement timing', tab: 'Clip', text: 'Tip: Opacity is in Track → Colour.' },
-  { label: 'Colour animation', tab: 'Track', text: 'These settings grade every clip on this track.' },
+  { label: 'Placement timing', tab: 'Clip', text: 'Tip: Opacity is in the Colour tab, with Track chosen.' },
+  { label: 'Colour animation', tab: 'Track colour', text: 'These settings grade every clip on this track' },
   { label: 'Speed timing', tab: 'Clip', text: 'A keyframe ○ changes the speed over the length of this clip.' },
   {
     label: 'Animation',
@@ -466,7 +466,7 @@ const INSPECTOR_HELP_HEADINGS = [
   { title: 'Range', help: 'Source timing', tab: 'Clip' },
   { title: 'Placement', help: 'Placement timing', tab: 'Clip' },
   { title: 'Speed', help: 'Speed timing', tab: 'Clip' },
-  { title: 'Colour', help: 'Colour animation', tab: 'Track' },
+  { title: 'Colour', help: 'Colour animation', tab: 'Track colour' },
   { title: 'Transitions', help: 'Transition timing', tab: 'Track' },
   { title: 'Fades', help: 'Fade timing', tab: 'Track' },
 ] as const;

@@ -1,4 +1,3 @@
-import { ownerTarget, colourTarget } from './colour-owner.js';
 import {
   COLOUR_CONTROLS,
   createColourSettings,
@@ -9,6 +8,7 @@ import {
 import type { EditCommand } from '../shared/commands.js';
 import { hasLayerKeys, isKeyframeFrame, type KeyframeSetting } from '../shared/keyframes.js';
 import type { VideoLayer } from '../shared/model.js';
+import { colourTarget, ownerTarget } from './colour-owner.js';
 
 /** Visible grouping of the Colour section; storage and keyframe channel order stay unchanged. */
 export const COLOUR_GROUPS: readonly { name: string; settings: readonly KeyframeSetting[] }[] = [

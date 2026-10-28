@@ -379,7 +379,7 @@ and incompatible fades/transitions/overlaps reject the edit rather than being sh
 The **Colour** Properties tab edits the selected clip's **grade** by default: its pinned header
 names the clip and says **This clip only**. The **Clip / Track** switch beside it (or the arrow
 keys on it) moves to the track's Colour, which then applies to every clip on the track after their
-own grades; selecting another clip returns to Clip. Without a selected clip the tab edits the
+own grades; the choice stays while you select other clips. Without a selected clip the tab edits the
 track. With several clips selected, it asks you to select one, or offers the track.
 
 A clip grade has the same Colour, HSL ranges and Colour curves sections as the track, without
@@ -389,7 +389,8 @@ duplicated pieces each get a copy. Its keyframes are frames of the recording: a 
 image shown at the playhead (move the playhead onto the clip first), slow motion eases between
 keyframes, and they appear as amber ◆ markers inside the clip on the timeline, which you can
 click, drag or move with the arrow keys and delete with Delete. The **Clip keyframes** list
-counts in source frames.
+counts in source frames. The sliders show the grade of the source frame at the playhead: in slow
+motion the image keeps easing between two source frames, so it can differ slightly from them.
 
 To give several clips the same look, right-click a clip whose grade has no keyframes and choose
 **Copy grade**, then right-click another and choose **Paste grade**: it replaces that clip's grade
