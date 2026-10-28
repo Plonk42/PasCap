@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyseAutoAdjust, autoAdjustFrames, scaleCorrection } from '../../src/shared/auto-adjust.js';
+import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import {
   DETAIL_ESTIMATE,
@@ -226,22 +227,25 @@ describe('estimate operation', () => {
     expect(result.commands).toEqual([{ type: 'detail', clipId: 'b', detail: result.detail!.suggested }]);
   });
 
-  it('keys each clip its own whole-clip grade at its start, blending across a cross-dissolve', async () => {
+  it('writes each clip its own whole-clip correction into its clip grade, keeping its keyframes', async () => {
     reads.length = 0;
     const third = { ...createClip('c', 'rec-1', 400, 500), start: 0 };
-    const dissolved = projectSchema.parse({
-      ...project,
-      clips: [...project.clips, third],
-      layers: [
-        {
-          ...project.layers[0]!,
-          transitions: [
-            { leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 20 },
-            { leftId: 'b', rightId: 'c', type: 'cut', duration: 0 },
-          ],
-        },
-      ],
-    });
+    const dissolved = applyCommand(
+      projectSchema.parse({
+        ...project,
+        clips: [...project.clips, third],
+        layers: [
+          {
+            ...project.layers[0]!,
+            transitions: [
+              { leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 20 },
+              { leftId: 'b', rightId: 'c', type: 'cut', duration: 0 },
+            ],
+          },
+        ],
+      }),
+      { type: 'layer-key-set', clipId: 'b', frame: 150, values: { hue: 10 } },
+    );
     const shots = { ...context, projects: { load: async () => dissolved } } as unknown as Context;
     const result = await runners.estimate(shots, { ...input, kind: 'auto-adjust', layerId, applyAs: 'shots' });
     expect(reads.map((read) => read.frames)).toEqual([
@@ -251,24 +255,26 @@ describe('estimate operation', () => {
     ]);
     expect(result.correction).toBeUndefined();
     expect(result.clips!.map((clip) => clip.clipId)).toEqual(['a', 'b', 'c']);
-    const [a, b, c] = result.clips!.map((clip) => clip.correction!);
-    const layout = calculateLayout(dissolved).clips;
-    const bStart = layout.find((item) => item.clip.id === 'b')!.start;
-    const cStart = layout.find((item) => item.clip.id === 'c')!.start;
-    expect(result.commands).toEqual([
-      { type: 'layer-key-set', layerId, frame: 0, values: a, easing: 'hold' },
-      { type: 'layer-key-set', layerId, frame: bStart, values: a, easing: 'linear' },
-      { type: 'layer-key-set', layerId, frame: bStart + 20, values: b, easing: 'hold' },
-      { type: 'layer-key-set', layerId, frame: cStart, values: c, easing: 'hold' },
-    ]);
+    expect(result.commands).toEqual(
+      result.clips!.map((clip) => ({
+        type: 'colour',
+        clipIds: [clip.clipId],
+        colour: { ...NEUTRAL_COLOUR, ...clip.correction },
+      })),
+    );
     let graded = dissolved;
     for (const command of result.commands) graded = applyCommand(graded, command);
-    expect(graded.layers[0]!.keyframes).toHaveLength(4);
+    expect(graded.layers[0]!.keyframes).toEqual([]);
+    expect(graded.layers[0]!.colour).toEqual(NEUTRAL_COLOUR);
+    expect(graded.clips.map((clip) => clip.grade.colour.exposure)).toEqual(
+      result.clips!.map((clip) => clip.correction!.exposure),
+    );
+    expect(graded.clips.find((clip) => clip.id === 'b')!.grade.keyframes).toHaveLength(1);
 
-    // One clip of a list, on its own: Hold at its start, whatever its neighbours.
+    // One clip of a list, on its own: only its Temperature and Tint change.
     const one = await runners.estimate(shots, { ...input, kind: 'white-balance', clipIds: ['b'], applyAs: 'shots' });
     expect(one.commands).toEqual([
-      { type: 'layer-key-set', layerId, frame: bStart, values: one.clips![0]!.whiteBalance, easing: 'hold' },
+      { type: 'colour', clipIds: ['b'], colour: { ...NEUTRAL_COLOUR, ...one.clips![0]!.whiteBalance } },
     ]);
   });
 

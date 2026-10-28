@@ -134,7 +134,7 @@ test.beforeEach(async ({ page, request }) => {
   await expandedInspectorPreferences(page);
   await page.goto(`/?project=${document.id}`);
   await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
 });
 
 test.afterEach(() => {

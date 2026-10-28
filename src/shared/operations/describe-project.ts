@@ -47,6 +47,10 @@ export const projectDescriptionSchema = z
                     sourceOut: frameSchema,
                     speed: described(z.string(), 'Constant rate such as "1×", or "curve, N keyframes".'),
                     reverse: z.boolean(),
+                    grade: described(
+                      z.string(),
+                      'Its own grade, applied before the track Colour: "none", "static" or "N keyframes" (describe_track reads it).',
+                    ),
                   })
                   .strict(),
               ),

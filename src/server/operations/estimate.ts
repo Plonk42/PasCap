@@ -10,12 +10,13 @@ import {
 } from '../../shared/auto-colour.js';
 import type { EditCommand } from '../../shared/commands.js';
 import { detailFrames, measureDetail, suggestDetail } from '../../shared/detail-estimate.js';
-import { hasLayerKeys, type Interpolation, type KeyframeSetting } from '../../shared/keyframes.js';
+import type { ScalarColourSetting } from '../../shared/colour.js';
+import { hasLayerKeys } from '../../shared/keyframes.js';
 import type { ProjectDocument, VideoLayer } from '../../shared/model.js';
 import type { estimate } from '../../shared/operations/estimate.js';
 import { projectVideoIds } from '../../shared/projects.js';
 import { forEachSerial } from '../../shared/serial.js';
-import { calculateLayout, type PlacedClip, type PlacedTransition } from '../../shared/timeline.js';
+import { calculateLayout, type PlacedClip } from '../../shared/timeline.js';
 import {
   frameIlluminant,
   poolWhiteBalance,
@@ -133,7 +134,7 @@ function separateClips(project: ProjectDocument, input: Input): PlacedClip[] | n
   if (!each) return null;
   if (input.kind !== 'detail' && !shots)
     throw invalid(
-      'A track has one Colour: several clips get a grade each only as keyframes (applyAs shots); layerId alone fits one grade to the whole track.',
+      'A track has one Colour: give several clips a grade each with applyAs shots (their clip grades); layerId alone fits one grade to the whole track.',
     );
   const layout = calculateLayout(project).clips;
   if (input.layerId !== undefined) {
@@ -220,50 +221,22 @@ const estimators = {
   'auto-adjust': estimateAutoAdjust,
 } satisfies Record<Input['kind'], (context: ServiceContext, target: Target, input: Input) => Promise<Estimated>>;
 
-type ShotValues = Partial<Record<KeyframeSetting, number>>;
+type ShotValues = Partial<Record<ScalarColourSetting, number>>;
 
 /**
- * Each shot's values keyed at its first frame with Hold; across a cross-dissolve between two shots, the left
- * shot's values at the overlap's start and the right shot's at its end, so the grade blends over the dissolve.
+ * Each shot's values written into its clip's grade, which applies before its track's Colour and stays with the
+ * clip; settings the grade animates follow their keyframes. A cross-dissolve then blends the two clips' grades.
  */
-export function shotCommands(
-  transitions: readonly PlacedTransition[],
-  shots: readonly { clip: PlacedClip; values: ShotValues }[],
-): EditCommand[] {
-  const byId = new Map(shots.map((shot) => [shot.clip.clip.id, shot]));
-  const keys = new Map<string, Map<number, { values: ShotValues; easing: Interpolation }>>();
-  for (const shot of shots) {
-    const layerId = shot.clip.clip.layerId;
-    const layer = keys.get(layerId) ?? new Map<number, { values: ShotValues; easing: Interpolation }>();
-    keys.set(layerId, layer);
-    const dissolve = transitions.find(
-      (item) =>
-        item.layerId === layerId &&
-        item.transition.type === 'cross-dissolve' &&
-        item.transition.rightId === shot.clip.clip.id &&
-        byId.has(item.transition.leftId),
-    );
-    if (!dissolve) {
-      layer.set(shot.clip.start, { values: shot.values, easing: 'hold' });
-      continue;
-    }
-    layer.set(dissolve.start, { values: byId.get(dissolve.transition.leftId)!.values, easing: 'linear' });
-    layer.set(dissolve.end, { values: shot.values, easing: 'hold' });
-  }
-  return [...keys].flatMap(([layerId, layer]) =>
-    [...layer]
-      .sort(([left], [right]) => left - right)
-      .map(([frame, { values, easing }]): EditCommand => ({ type: 'layer-key-set', layerId, frame, values, easing })),
-  );
+export function shotCommands(shots: readonly { clip: PlacedClip; values: ShotValues }[]): EditCommand[] {
+  return shots.map(({ clip, values }) => ({
+    type: 'colour',
+    clipIds: [clip.clip.id],
+    colour: { ...structuredClone(clip.clip.grade.colour), ...values },
+  }));
 }
 
-/** Each clip analysed whole on its own: its result, and the detail edits or shot keyframes applying them. */
-async function estimateClips(
-  context: ServiceContext,
-  clips: readonly PlacedClip[],
-  project: ProjectDocument,
-  input: Input,
-) {
+/** Each clip analysed whole on its own: its result, and the detail edits or clip grades applying them. */
+async function estimateClips(context: ServiceContext, clips: readonly PlacedClip[], input: Input) {
   const results: { clipId: string; frames: number }[] = [];
   const commands: EditCommand[] = [];
   const shots: { clip: PlacedClip; values: ShotValues }[] = [];
@@ -281,7 +254,7 @@ async function estimateClips(
     const values = estimated.fields as { correction?: ShotValues; whiteBalance?: ShotValues };
     if (input.applyAs === 'shots') shots.push({ clip, values: (values.correction ?? values.whiteBalance)! });
   });
-  if (shots.length) commands.push(...shotCommands(calculateLayout(project).transitions, shots));
+  commands.push(...shotCommands(shots));
   const clipsWord = clips.length === 1 ? `clip ${clips[0]!.clip.id}` : `${clips.length} clips`;
   return { analysed: { description: `each of the ${clipsWord} on its own, whole`, frames }, results, commands };
 }
@@ -291,7 +264,7 @@ export const runEstimate: OperationRunner<typeof estimate> = async (context, inp
   checkChoice(input);
   const clips = separateClips(project, input);
   if (clips) {
-    const { analysed, results, commands } = await estimateClips(context, clips, project, input);
+    const { analysed, results, commands } = await estimateClips(context, clips, input);
     return {
       revision: project.revision,
       kind: input.kind,

@@ -228,6 +228,7 @@ describe('operation routes', () => {
         sourceOut: 90,
         speed: '2×',
         reverse: true,
+        grade: 'none',
       },
     ]);
     expect(description.recordings).toEqual([

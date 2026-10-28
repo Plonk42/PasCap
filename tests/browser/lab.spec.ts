@@ -208,7 +208,7 @@ test('paused grading changes pixels immediately and saves/reloads the selected c
   await expect(page.getByRole('status', { name: 'Saved on this device' })).toContainText('Saved locally');
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('0.7');
   await page.getByRole('button', { name: 'Reset colour' }).click();
   await page.evaluate(() => window.pascapLab!.flush());
@@ -897,7 +897,7 @@ test('changing a later boundary preserves independent excerpts while Colour appl
 }) => {
   await page.getByRole('button', { name: 'Add pattern-a.mp4 to timeline', exact: true }).click();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.8');
   await page.getByRole('button', { name: 'Transition after pattern-b.mp4, clip 2 on Track 1', exact: true }).click();
   await page.getByRole('combobox', { name: 'Transition type' }).selectOption('cross-dissolve');

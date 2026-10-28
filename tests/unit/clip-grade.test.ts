@@ -12,6 +12,7 @@ import {
 import { compositePixel } from '../../src/shared/composition.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { needsLayeredExport } from '../../src/shared/export.js';
+import { runners } from '../../src/server/operations/index.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { copyGradeBlocked, pasteGradeCommands, pasteTargets } from '../../src/web/grade-clipboard.js';
 import {
@@ -159,6 +160,19 @@ describe('source grades', () => {
     expect(first!.sourceFrame).toBe(59);
     expect(first!.grade.exposure).toBe(1);
     expect(first!.colour).toEqual(NEUTRAL_COLOUR);
+    const [last] = sampleTimeline(document, 59);
+    expect(last!.sourceFrame).toBe(0);
+    expect(last!.grade.exposure).toBe(0);
+  });
+
+  it('eases a clip grade between keys while slow motion holds an image', () => {
+    const document = project();
+    document.clips[0]!.speed = { mode: 'constant', rate: 0.5 };
+    document.clips[0]!.grade.keyframes = [gradeKey(0, { exposure: 0 }), gradeKey(10, { exposure: 1 })];
+    const [held] = sampleTimeline(document, 1);
+    expect(held!.sourceFrame).toBe(0);
+    expect(held!.grade.exposure).toBeCloseTo(0.05, 12);
+    expect(sampleTimeline(document, 20)[0]!.grade.exposure).toBe(1);
   });
 });
 
@@ -258,6 +272,42 @@ describe('clip grade commands', () => {
     expect(next.clips.find((clip) => clip.id === 'a3')!.grade).toEqual(grade);
     next = applyCommand(next, { type: 'place', clipId: 'a', layerId: 'video-2', start: 500, index: 0 });
     expect(next.clips.find((clip) => clip.id === 'a')!.grade).toEqual(grade);
+  });
+});
+
+describe('clip grades for the assistant', () => {
+  it('reads each clip grade on its track and the grade shown at a frame', async () => {
+    let document = applyCommand(project(), { type: 'colour-setting', clipId: 'a', setting: 'saturation', value: 1.3 });
+    document = applyCommand(document, { type: 'layer-key-set', clipId: 'a', frame: 10, values: { tint: 0.2 } });
+    const context = { projects: { load: async () => document } } as unknown as Parameters<
+      typeof runners.describe_track
+    >[0];
+    const described = await runners.describe_track(context, {
+      projectId: document.id,
+      layerId: 'video-1',
+      frames: [10, 70],
+      include: ['grades', 'at'],
+      settings: ['tint', 'saturation'],
+    });
+    expect(described.grades).toEqual([
+      {
+        clipId: 'a',
+        colour: { ...NEUTRAL_COLOUR, saturation: 1.3 },
+        keyframes: [
+          { frame: 10, timecode: '00:00:10', values: { tint: 0.2 }, easing: { tint: 'linear' }, reset: false },
+        ],
+      },
+    ]);
+    expect(described.at).toEqual([
+      {
+        frame: 10,
+        timecode: '00:00:10',
+        values: { tint: 0, saturation: 1 },
+        transform: {},
+        clipGrades: [{ clipId: 'a', sourceFrame: 10, values: { tint: 0.2, saturation: 1.3 } }],
+      },
+      { frame: 70, timecode: '00:02:10', values: { tint: 0, saturation: 1 }, transform: {} },
+    ]);
   });
 });
 

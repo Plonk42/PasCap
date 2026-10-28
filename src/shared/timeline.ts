@@ -264,6 +264,15 @@ function clipWeights(
   return { blendWeight, brightness };
 }
 
+/**
+ * The source position a clip grade is evaluated at, `offset` output frames into the clip: continuous, so slow
+ * motion eases between keys; one frame lower when reversed, so a key's values apply fully as its image appears.
+ */
+export function gradePosition(placed: PlacedClip, offset: number): number {
+  const position = placed.retiming.sourcePositionAt(offset);
+  return placed.clip.reverse ? position - 1 : position;
+}
+
 export function sampleTimeline(
   project: ProjectDocument,
   frame: number,
@@ -287,7 +296,7 @@ export function sampleTimeline(
         sourcePosition,
         spatial: evaluateSpatial(layer.transform, frame),
         detail: placed.clip.detail,
-        grade: gradeColourAt(placed.clip.grade, sourceFrame),
+        grade: gradeColourAt(placed.clip.grade, gradePosition(placed, frame - placed.start)),
         colour: colourAt(layer, frame),
         weight: blendWeight * brightness,
         blendWeight,
