@@ -92,11 +92,19 @@ items `{ id, start, duration, colour, keyframes }`, sorted by `start`, **never o
   they never follow clips. They do not extend the project duration.
 - Splitting an item gives both pieces the whole grade and every key, rebased.
 
-### Tracks after #286
+### Tracks after #286 (owner)
 
-A video track keeps `opacity`, `transform`, Ripple, transitions and fades. Its shared
-keyframes keep **only the `opacity` channel** (proposed), with Easing and default keyframes as
-today; the other fourteen channels move to clip grades and items.
+A video track keeps `transform`, Ripple, transitions and fades. **Opacity becomes a Transform
+setting**: the Transform base and each Transform keyframe gain `opacity` (0–1, neutral 1), with
+its own nullable value and Easing like the other eight. Opacity and Transform both describe how
+the track's layer sits over the ones below; neither grades the image. `layer.opacity` and the
+shared track keyframes (`layer.keyframes`) are removed, so a track has one keyframe list.
+
+- A default Transform keyframe and **Reset transform** also return Opacity to 1.
+- "Exact neutral pose", which keeps today's opaque black letterboxing, stays about geometry
+  only: a track at 50% Opacity with untouched geometry keeps the letterbox path. Opacity stays
+  coverage, $o_i$ in the equations below.
+- Opacity alone is not per-pixel heavy work: it does not send a group to the GPU export worker.
 
 ## Rendering
 
@@ -155,8 +163,8 @@ already attaches, and Firefox's llvmpipe). No texture, decoder or lane is added.
 - **Static fast path:** each clip already gets its own LUT. Before #286, it is the clip grade
   followed by the track Colour, composed into one LUT. After #286, it requires **no adjustment
   items** and every clip grade unkeyed, scalar-only and with zero local tone, besides the
-  existing single-track conditions (Opacity 1 without keyframes, neutral Transform and Detail,
-  contiguous from frame 0). Anything else uses composited export.
+  existing single-track conditions (Opacity 1 and neutral Transform without Transform
+  keyframes, neutral Detail, contiguous from frame 0). Anything else uses composited export.
 
 ## Editor
 
@@ -172,13 +180,14 @@ Follows the requirements of #289: one settings panel, an unmistakable target.
   shows nothing to edit and a hint to select one. Clips and items can be selected together
   (Ctrl/Cmd-click), so they can be dragged together; with several clips, or a clip and an item,
   editing is disabled with the reason.
-- **Track tab (owner).** It keeps an **Opacity** section (slider, diamond, its keyframe list and
-  line), Transform, Transitions and Fades.
+- **Track tab (owner).** It keeps **Transform**, which now includes an **Opacity** setting (UI
+  0–100%) with its triangle and per-setting Previous/Next like the other eight, then Transitions
+  and Fades. The section keeps its name for now.
 - **Timeline (owner).** The adjustment track is a lane **above the video tracks, under the
   ruler**. Items have no name: they are shown and announced by their timecode range. A clip
   grade's keyframes are amber markers inside the clip rectangle, moving with it; an item's are
-  amber markers inside the item. Both slide through `useKeyframeSlide`. **Proposed:** track
-  Opacity markers become grey, so the three kinds stay distinct at a glance.
+  amber markers inside the item. Both slide through `useKeyframeSlide`. Track keyframes are the
+  blue Transform ▼ markers only.
 - **A clip's whole grade (owner).** When a clip is selected, the item also grading it at the
   playhead is highlighted on the timeline, in a style distinct from the selection; clicking it
   selects it. The panel adds no line for it.
@@ -230,9 +239,10 @@ own, and the track-level compromise grade is removed with track Colour.
 
 ## Guides changed at delivery
 
-#70's track-only Colour ownership is superseded: Colour belongs to clips and items, Opacity and
-Transform stay on the track (#67, #131). At delivery, update
+#70's track-only Colour ownership is superseded: Colour belongs to clips and items, while
+Transform, now including Opacity, stays on the track (#67, #131). At delivery, update
 [track appearance](ROW_APPEARANCE.md) (replaced by this contract),
+[spatial transforms](SPATIAL_TRANSFORMS.md) (Opacity setting),
 [tracks and keyframes](../LAYERS_AND_KEYFRAMES.md), [HSL and curves](HSL_AND_CURVES.md),
 [Temperature and Tint](TEMPERATURE_AND_TINT.md), [detail filters](DETAIL_FILTERS.md),
 [Auto adjust](AUTO_ADJUST.md), [editor controls](EDITOR_CONTROLS.md),
