@@ -199,7 +199,7 @@ test('paused grading changes pixels immediately and saves/reloads the selected c
   const before = await page.evaluate(() =>
     Array.from(window.pascapLab!.engine.capturePixels().slice(100_000, 100_004)),
   );
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().colourLatencyMs !== null);
   const after = await page.evaluate(() => Array.from(window.pascapLab!.engine.capturePixels().slice(100_000, 100_004)));
@@ -250,7 +250,7 @@ test('playback and colour updates run outside React, shortcuts ignore text input
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().playing)).toBe(false);
   await page.getByRole('button', { name: 'Play preview' }).click();
   await page.waitForFunction(() => (window.pascapLab?.engine.diagnostics().frame ?? 0) > 20);
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('0.2');
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().colourLatencyMs !== null);
   await page.getByRole('button', { name: 'Pause preview' }).click();
@@ -478,7 +478,7 @@ test('each Ramp up preset easing saves and restores along with shared row Colour
     expect(state.status, state.message).toBe('paused');
     expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.speed.mode)).toBe('curve');
   }
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.6');
   await page.evaluate(() => window.pascapLab!.flush());
   await page.reload();
@@ -626,7 +626,7 @@ test('plays both ramp directions across dissolves and music source wraps on repe
 });
 
 test('speed changes while playing pause and reload the mapped frame without losing the grade', async ({ page }) => {
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.4');
   await inspectorTab(page, 'Clip');
   await page.getByRole('button', { name: 'Play preview' }).click();

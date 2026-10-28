@@ -25,10 +25,13 @@ let assets: MediaAsset[];
 let memory: MemoryProjects;
 let unexpectedApi: string[];
 
-// These cases navigate Colour/Opacity, which share the Track tab with the keyframe list;
+// These cases navigate the track's Colour/Opacity, which share the Colour tab with the keyframe list;
 // "Clip" here means the playhead setting controls. Real Clip-tab checks use openTab.
-async function inspectorTab(page: Page, name: 'Clip' | 'Track keyframes' | 'Sequence' | 'Track'): Promise<void> {
-  await openTab(page, name === 'Clip' ? 'Track' : name);
+async function inspectorTab(
+  page: Page,
+  name: 'Clip' | 'Track keyframes' | 'Sequence' | 'Track' | 'Track colour',
+): Promise<void> {
+  await openTab(page, name === 'Clip' ? 'Track colour' : name);
 }
 
 test.beforeEach(async ({ page, request }) => {
@@ -258,7 +261,7 @@ test('unkeyed settings keep diamonds with visible guarded per-setting arrows and
       await expect(button.locator('svg[aria-hidden="true"]')).toHaveCount(1);
     }
   }
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   for (const { label } of KEYFRAME_SETTINGS)
     await expect(inspector(page).getByRole('slider', { name: label, exact: true })).toBeEnabled();
   await openTab(page, 'Clip');
@@ -730,7 +733,7 @@ test('no opened project keeps main diamonds and Colour section navigation disabl
   const dialog = page.getByRole('dialog', { name: 'Projects', exact: true });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   // Speed is clip-owned, so without a project only the ten Track settings exist.
   for (const { label } of KEYFRAME_SETTINGS) {
     await expect(diamond(page, label)).toBeDisabled();

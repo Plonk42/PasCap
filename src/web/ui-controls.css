@@ -14,7 +14,7 @@
 
 .product-workspace .inspector-panel.editor-inspector .inspector-tab-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(min-content, 1fr));
+  grid-template-columns: repeat(4, minmax(min-content, 1fr));
 }
 
 .product-workspace .viewer-tabs > [role='tab'],
@@ -31,6 +31,11 @@
   color: var(--muted);
   font-size: 12px;
   white-space: nowrap;
+}
+
+/* Four Properties tabs fit beside their two icons at the 270 px minimum panel width. */
+.product-workspace .inspector-tab-list > [role='tab'] {
+  padding-inline: 3px;
 }
 
 .product-workspace .viewer-tabs > [role='tab'][aria-selected='true'],

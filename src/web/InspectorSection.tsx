@@ -5,11 +5,15 @@ import { Icon, type IconName } from './icons.js';
 import './input-controls.css';
 import { readPreference, writePreference } from './preferences.js';
 
-export type InspectorMode = 'clip' | 'track' | 'audio';
+export type InspectorMode = 'clip' | 'colour' | 'track' | 'audio';
 /** A timeline marker or boundary asks the Inspector to show the section that edits it. */
 export type InspectorSectionTarget = 'colour' | 'speed' | 'transform' | 'transition';
+/** Which grade the Colour tab edits: the selected clip's own or its track's. */
+export type ColourTarget = 'clip' | 'track';
 export interface InspectorSectionRequest {
   section: InspectorSectionTarget;
+  /** For Colour: the grade whose marker was clicked. */
+  colourTarget?: ColourTarget;
   nonce: number;
 }
 
@@ -30,10 +34,11 @@ const SECTION_DEFAULTS = {
 type SectionId = keyof typeof SECTION_DEFAULTS;
 const TAB_SECTIONS: Record<InspectorMode, readonly SectionId[]> = {
   clip: ['speed', 'detail', 'source', 'layer-opacity'],
-  track: ['colour', 'hsl', 'curves', 'transform', 'transition', 'fades'],
+  colour: ['colour', 'hsl', 'curves'],
+  track: ['transform', 'transition', 'fades'],
   audio: ['music'],
 };
-const TAB_TITLES: Record<InspectorMode, string> = { clip: 'Clip', track: 'Track', audio: 'Audio' };
+const TAB_TITLES: Record<InspectorMode, string> = { clip: 'Clip', colour: 'Colour', track: 'Track', audio: 'Audio' };
 type Expansion = Record<SectionId, boolean>;
 interface InspectorExpansion {
   sections: Expansion;

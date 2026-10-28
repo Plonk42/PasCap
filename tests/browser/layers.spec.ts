@@ -102,7 +102,7 @@ test('adds layered clips, adjusts row opacity, hides/shows and releases unused d
   await openOptions(page, 'Track options Track 2');
   await expect(page.getByRole('slider', { name: 'Opacity of track Track 2', exact: true })).toHaveCount(0);
   await closeOptions(page);
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('50');
   await seek(page, 30);
   const half = await page.evaluate(() => Array.from(window.pascapLab!.engine.capturePixels().slice(100_000, 100_012)));
@@ -204,7 +204,7 @@ test('shares row opacity and individual colour channels at project points and ke
   const id = await addOverlay(page);
   await seek(page, 0);
   const inspector = page.getByRole('complementary', { name: 'Properties' });
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('0');
   await inspector.getByRole('button', { name: 'Keyframe Opacity', exact: true }).click();
   await seek(page, 60);
@@ -256,7 +256,7 @@ test('clip speed keys support easing, removal and their own duration while share
   const duration = async () =>
     calculateLayout(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()))).duration;
   await seek(page, 0);
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await inspector.getByRole('button', { name: 'Keyframe Exposure', exact: true }).click();
   await inspectorTab(page, 'Clip');
   await diamond.click();
@@ -294,7 +294,7 @@ test('clip speed keys support easing, removal and their own duration while share
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await speedOf()).toEqual(smooth);
   await seek(page, 20);
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await inspector.getByRole('button', { name: 'Keyframe Opacity', exact: true }).click();
   const state = await page.evaluate(() => {
     window.pascapLab!.engine.capturePixels();
@@ -317,13 +317,13 @@ test('clip speed keys support easing, removal and their own duration while share
 });
 
 test('collapses/expands Inspector sections and remembers the choice across reloads', async ({ page }) => {
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   const summary = page.getByLabel('Colour section', { exact: true });
   await summary.click();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeHidden();
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeHidden();
   await page.getByLabel('Colour section', { exact: true }).click();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeVisible();
@@ -451,7 +451,7 @@ test('layered native UI export includes keyed opacity and colour in an immutable
   expect(receipt.verification.audio).toBeNull();
   expect(receipt.verification.frameCount).toBe(calculateLayout(document).duration);
   await seek(page, 0);
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   const again = (await (await request.get(receiptUrl)).json()) as { snapshot: unknown };
   expect(projectSchema.parse(again.snapshot)).toEqual(snapshot);

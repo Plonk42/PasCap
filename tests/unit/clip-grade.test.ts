@@ -13,6 +13,7 @@ import { compositePixel } from '../../src/shared/composition.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { needsLayeredExport } from '../../src/shared/export.js';
 import { applyCommand } from '../../src/shared/commands.js';
+import { copyGradeBlocked, pasteGradeCommands, pasteTargets } from '../../src/web/grade-clipboard.js';
 import {
   clipGradeSchema,
   compileGradeChain,
@@ -257,6 +258,22 @@ describe('clip grade commands', () => {
     expect(next.clips.find((clip) => clip.id === 'a3')!.grade).toEqual(grade);
     next = applyCommand(next, { type: 'place', clipId: 'a', layerId: 'video-2', start: 500, index: 0 });
     expect(next.clips.find((clip) => clip.id === 'a')!.grade).toEqual(grade);
+  });
+});
+
+describe('copy and paste grade', () => {
+  it('copies only grades without keyframes and pastes on the selection, removing its keyframes, in one step', () => {
+    const document = applyCommand(project(), { type: 'layer-key-set', clipId: 'b', frame: 120, values: { tint: 0.2 } });
+    expect(copyGradeBlocked(document.clips[0]!)).toBeNull();
+    expect(copyGradeBlocked(document.clips[1]!)).toContain('has keyframes');
+    expect(pasteTargets('a', ['a', 'b'])).toEqual(['a', 'b']);
+    expect(pasteTargets('a', ['b'])).toEqual(['a']);
+    const colour = { ...createColourSettings(), exposure: 0.4, hue: 12 };
+    const pasted = pasteGradeCommands(document, ['a', 'b'], colour).reduce(applyCommand, document);
+    expect(pasted.clips.map((clip) => clip.grade)).toEqual([
+      { colour, keyframes: [] },
+      { colour, keyframes: [] },
+    ]);
   });
 });
 

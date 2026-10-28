@@ -743,7 +743,7 @@ test('a colour edit while original saves once, returns the new grade and has a s
   const bypass = await capture(page, 'bypass-before-edit');
   const identity = await pausedIdentity(page);
   comparison.guard.permittedSaves = 1;
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('1.2');
   await page.evaluate(() => window.pascapLab!.flush());
   await expect(page.getByRole('status', { name: 'Saved on this device', exact: true })).toContainText('Saved locally');

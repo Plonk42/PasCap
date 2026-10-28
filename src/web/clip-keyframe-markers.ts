@@ -1,7 +1,7 @@
 import type { PlacedClip } from '../shared/timeline.js';
 
 export interface ClipKeyframeMarker {
-  type: 'speed';
+  type: 'speed' | 'grade';
   sourceFrame: number;
   outputFrame: number;
   timelineFrame: number;
@@ -59,4 +59,25 @@ export function clipKeyframeMarkers(placed: PlacedClip): ClipKeyframeMarker[] {
         seekFrame,
       };
     });
+}
+
+/** Clip grade keys on the footage the clip shows; keys on trimmed-off footage stay in the Colour tab only. */
+export function gradeKeyframeMarkers(placed: PlacedClip): ClipKeyframeMarker[] {
+  const { sourceIn, sourceOut } = placed.clip;
+  return placed.clip.grade.keyframes
+    .filter((point) => point.frame >= sourceIn && point.frame < sourceOut)
+    .map((point) => {
+      const outputFrame = nearestOutput(placed, point.frame);
+      return {
+        type: 'grade',
+        sourceFrame: point.frame,
+        outputFrame,
+        timelineFrame: placed.start + outputFrame,
+        seekFrame: placed.start + outputFrame,
+      };
+    });
+}
+
+export function clipMarkersOf(placed: PlacedClip, type: ClipKeyframeMarker['type']): ClipKeyframeMarker[] {
+  return type === 'grade' ? gradeKeyframeMarkers(placed) : clipKeyframeMarkers(placed);
 }

@@ -9,7 +9,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from 'react';
 import type { GpuComparison, GpuCompositionComparison } from '../preview/compositor.js';
-import type { PreviewDiagnostics, PreviewEngine } from '../preview/engine.js';
+import type { OriginalMode, PreviewDiagnostics, PreviewEngine } from '../preview/engine.js';
 import type { AudioAsset } from '../shared/audio.js';
 import type { Brief } from '../shared/assistant-session.js';
 import type { ColourSettings } from '../shared/colour.js';
@@ -59,7 +59,12 @@ import { PanelRail, toggleSidePanel, type SidePanel } from './PanelToggle.js';
 import { trackPointerFocus, type PointerFocus } from './pointer-focus.js';
 import { useRestingValue } from './use-delayed-flag.js';
 import { chooseProjectFile, readProjectFile } from './project-file.js';
-import type { InspectorMode, InspectorSectionRequest, InspectorSectionTarget } from './InspectorSection.js';
+import type {
+  ColourTarget,
+  InspectorMode,
+  InspectorSectionRequest,
+  InspectorSectionTarget,
+} from './InspectorSection.js';
 import { Jobs } from './Jobs.js';
 import {
   inspectKeyframe,
@@ -124,6 +129,13 @@ const ShortcutHelp = lazy(() => import('./ShortcutHelp.js').then((module) => ({ 
 const SourceReview = lazy(() => import('./SourceReview.js').then((module) => ({ default: module.SourceReview })));
 const ImportDialog = lazy(() => import('./ImportDialog.js').then((module) => ({ default: module.ImportDialog })));
 const HandOffDialog = lazy(() => import('./HandOff.js').then((module) => ({ default: module.HandOffDialog })));
+/** The Properties tab holding each section a timeline marker or boundary opens. */
+const INSPECTOR_TABS: Record<InspectorSectionTarget, InspectorMode> = {
+  speed: 'clip',
+  colour: 'colour',
+  transform: 'track',
+  transition: 'track',
+};
 const loadInspector = () => import('./Inspector.js').then((module) => ({ default: module.Inspector }));
 const loadDiagnostics = () => import('./Diagnostics.js').then((module) => ({ default: module.Diagnostics }));
 const EMPTY_PROJECT = createProject('preview-lab', 'Untitled');
@@ -283,7 +295,7 @@ export function App() {
   const playAfterSeek = useRef(false);
   const [inspectorMode, setInspectorMode] = useState<InspectorMode>(() => {
     const saved = readPreference('pascap-inspector-tab');
-    return saved === 'track' || saved === 'audio' ? saved : 'clip';
+    return saved === 'colour' || saved === 'track' || saved === 'audio' ? saved : 'clip';
   });
   useEffect(() => {
     writePreference('pascap-inspector-tab', inspectorMode);
@@ -667,9 +679,9 @@ export function App() {
     else if (state.status === 'seeking') playAfterSeek.current = !playAfterSeek.current;
     else void preview.play(playRange.current ?? undefined);
   }, []);
-  const holdOriginal = useCallback((active: boolean) => {
-    if (active && drafting.current) return;
-    engine.current?.setUngraded(active);
+  const holdOriginal = useCallback((mode: OriginalMode | false) => {
+    if (mode && drafting.current) return;
+    engine.current?.setUngraded(mode);
   }, []);
   const revealClip = (id: string): void => {
     if (drafting.current || !current.current) return;
@@ -1336,12 +1348,16 @@ export function App() {
     [selectLayer],
   );
   const followPlayhead = useCallback((): void => setKeyframeInspection(null), []);
-  const openInspectorSection = useCallback((section: InspectorSectionTarget): void => {
-    setInspectorMode(section === 'speed' ? 'clip' : 'track');
+  const openInspectorSection = useCallback((section: InspectorSectionTarget, colourTarget?: ColourTarget): void => {
+    setInspectorMode(INSPECTOR_TABS[section]);
     const workspace = latestWorkspace.current;
     if (!workspace.layout.inspectorOpen)
       workspace.update({ inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) }, false);
-    setSectionRequest((previous) => ({ section, nonce: (previous?.nonce ?? 0) + 1 }));
+    setSectionRequest((previous) => ({
+      section,
+      ...(section === 'colour' ? { colourTarget: colourTarget ?? 'track' } : {}),
+      nonce: (previous?.nonce ?? 0) + 1,
+    }));
   }, []);
   const seekSourceKeyframe = useCallback((frame: number): void => seek(frame, true), [seek]);
   const navigationDisabled = !project || draft !== null || !previewReady;

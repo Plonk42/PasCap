@@ -27,7 +27,7 @@ test.beforeEach(async ({ page, request }) => {
   memory = await memoryProjects(page, document);
   await expandedInspectorPreferences(page);
   await page.goto(`/?project=${document.id}`);
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeEnabled();
 });
 test.afterEach(() => expect(unexpected).toEqual([]));

@@ -23,6 +23,16 @@ describe('setting scope wording', () => {
     });
   });
 
+  it('words a clip grade setting in source frames and clip keyframes', () => {
+    const context = { keyed: true, baseAvailable: true, baseLabel: 'Track' as const, clipGrade: true, frame: 12 };
+    expect(settingPresentation({ ...context, label: 'Exposure', active: true }).hint).toBe(
+      'Editable keyframe at source frame 12. Edits change only Exposure at this clip keyframe.',
+    );
+    expect(settingPresentation({ ...context, keyed: false, label: 'Tint', active: false }).hint).toBe(
+      'Editing Tint. Add keyframes to animate this setting on the clip.',
+    );
+  });
+
   it.each(['Exposure', 'Speed'])('explains %s on an empty layer without inventing a static layer base', (label) => {
     expect(
       settingPresentation({

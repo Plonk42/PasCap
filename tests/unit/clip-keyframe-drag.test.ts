@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { GRADE_SETTINGS, type GradeKeyframe } from '../../src/shared/grade.js';
 import { uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { clipKeyframeTarget, planClipKeyframeMove } from '../../src/web/clip-keyframe-drag.js';
-import { clipKeyframeMarkers } from '../../src/web/clip-keyframe-markers.js';
+import { clipKeyframeMarkers, gradeKeyframeMarkers } from '../../src/web/clip-keyframe-markers.js';
 import { planTransformKeyframeMove } from '../../src/web/timeline-keyframes.js';
 
 function fixture(frames: readonly number[], rate = 1): ProjectDocument {
@@ -77,7 +78,7 @@ describe('clip speed keyframe sliding', () => {
         ],
       },
     });
-    expect(plan.document.clips[0]!.speed).toEqual(plan.command?.speed);
+    expect(plan.command).toEqual({ type: 'speed', clipId: 'clip', speed: plan.document.clips[0]!.speed });
     expect(project.clips[0]!.speed).toMatchObject({ keyframes: [{ frame: 10 }, { frame: 70 }] });
     expect(planClipKeyframeMove(project, 'clip', 70, 70, 300).command).toBeNull();
     const collision = planClipKeyframeMove(project, 'clip', 70, 10, 300);
@@ -99,5 +100,46 @@ describe('clip speed keyframe sliding', () => {
     expect(clipKeyframeTarget(placed, marker!, 5)).toBeGreaterThan(55);
     expect(clipKeyframeTarget(placed, marker!, -10_000)).toBe(placed.clip.sourceIn);
     expect(clipKeyframeTarget(placed, marker!, 10_000)).toBe(placed.retiming.sourceAt(placed.duration - 1));
+  });
+});
+
+describe('clip grade keyframe sliding', () => {
+  const unkeyed = <T>(): Record<(typeof GRADE_SETTINGS)[number], T | null> =>
+    Object.fromEntries(GRADE_SETTINGS.map((setting) => [setting, null])) as Record<
+      (typeof GRADE_SETTINGS)[number],
+      T | null
+    >;
+  function graded(): ProjectDocument {
+    const project = fixture([]);
+    project.clips[0]!.speed = { mode: 'constant', rate: 2 };
+    project.clips[0]!.grade.keyframes = [5, 40, 80].map((frame) => ({
+      frame,
+      values: { ...unkeyed<number>(), exposure: frame / 100 } as GradeKeyframe['values'],
+      easing: { ...unkeyed<string>(), exposure: 'linear' } as GradeKeyframe['easing'],
+      reset: false,
+    }));
+    return project;
+  }
+
+  it('marks only keys on the footage the clip shows, at the output frame showing them', () => {
+    const placed = calculateLayout(graded()).clips[0]!;
+    expect(gradeKeyframeMarkers(placed).map((marker) => [marker.sourceFrame, marker.outputFrame])).toEqual([
+      [40, 15],
+      [80, 35],
+    ]);
+  });
+
+  it('moves a key as one layer-key-move command and rejects collisions and frames outside the recording', () => {
+    const project = graded();
+    const plan = planClipKeyframeMove(project, 'clip', 40, 50, 300, 'grade');
+    expect(plan.error).toBe('');
+    expect(plan.command).toEqual({ type: 'layer-key-move', clipId: 'clip', frame: 40, nextFrame: 50 });
+    expect(plan.document.clips[0]!.grade.keyframes.map((key) => key.frame)).toEqual([5, 50, 80]);
+    expect(planClipKeyframeMove(project, 'clip', 40, 80, 300, 'grade').error).toBe(
+      'A clip grade keyframe already exists at this source frame. Choose another frame.',
+    );
+    expect(planClipKeyframeMove(project, 'clip', 40, 300, 300, 'grade').error).toBe(
+      'A clip grade keyframe must stay within source frames 0–299.',
+    );
   });
 });

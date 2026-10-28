@@ -422,7 +422,7 @@ test('leaves animated settings and keyframes unchanged and says so', async ({ pa
   memory.seed(seeded);
   await page.reload();
   await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await seek(page, 45);
   const correction = await expectedCorrection(page);
   await auto(page).click();

@@ -24,6 +24,8 @@ export interface StoredKeyframeKind<S extends string, K extends StoredKeyframe<S
   noun: string;
   /** Group name, followed by the track name. */
   title: string;
+  /** What `frame` counts: timeline frames, or source frames of a clip's recording. */
+  frameNoun?: 'timeline' | 'source';
   tone?: string;
   /** Every setting, in control order. */
   settings: readonly { key: S; label: string }[];
@@ -195,7 +197,7 @@ function StoredKeyframeRow<S extends string, K extends StoredKeyframe<S>>({
         <summary aria-label={`Edit ${kind.noun} keyframe ${point.frame}`}>Edit</summary>
         <div className="layer-keyframe-point-fields">
           <label htmlFor={frameId}>
-            Timeline frame
+            {kind.frameNoun === 'source' ? 'Source frame' : 'Timeline frame'}
             <NumberField
               id={frameId}
               aria-label={`${capitalised(kind.noun)} keyframe frame ${point.frame}`}
@@ -269,8 +271,11 @@ export function StoredKeyframeList<S extends string, K extends StoredKeyframe<S>
   const atHead = previewAvailable ? keys.find((key) => key.frame === frame) : undefined;
   // Only a keyframe the preview cannot show needs explaining; one in range is simply at the playhead.
   const unshown = inspected && (!previewAvailable || inspected.frame >= duration) ? inspected : undefined;
+  const source = kind.frameNoun === 'source';
   let position = 'Empty timeline · no preview frame';
-  if (previewAvailable) position = `Timeline frame ${frame} · ${atHead ? 'keyframe at playhead' : 'no keyframe here'}`;
+  if (previewAvailable)
+    position = `${source ? 'Source' : 'Timeline'} frame ${frame} · ${atHead ? 'keyframe at playhead' : 'no keyframe here'}`;
+  else if (source) position = 'The playhead is outside this clip';
   else if (duration > 0) position = `Frame ${frame} is outside the current timeline`;
   const labels = (key: K): string =>
     enabledSettings(kind, key)

@@ -478,7 +478,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('50');
   await input.press('Enter');
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.2');
   const edited = await current(page);
   expect(edited.clips.slice(0, 2)).toEqual(added.clips.slice(0, 2));
