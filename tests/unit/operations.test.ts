@@ -1,3 +1,4 @@
+import { createClipGrade } from '../../src/shared/grade.js';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -201,6 +202,7 @@ describe('operation routes', () => {
           speed: { mode: 'constant', rate: 2 },
           reverse: true,
           detail: { sharpen: 0, clarity: 0, denoise: 0 },
+          grade: createClipGrade(),
         },
       ],
       selects: { 'rec-1': [{ sourceIn: 0, sourceOut: 120 }] },
@@ -588,6 +590,7 @@ describe('operation routes', () => {
         speed: { mode: 'constant', rate: 1 },
         reverse: false,
         detail: { sharpen: 0, clarity: 0, denoise: 0 },
+        grade: createClipGrade(),
       })),
       layers: [{ ...base.layers[0]!, transitions: [{ leftId: 'a', rightId: 'b', type: 'cut', duration: 0 }] }],
       music: [

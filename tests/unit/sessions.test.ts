@@ -1,3 +1,4 @@
+import { createClipGrade } from '../../src/shared/grade.js';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -33,6 +34,7 @@ function clip(id: string, sourceIn: number, sourceOut: number): VideoClip {
     speed: { mode: 'constant', rate: 1 },
     reverse: false,
     detail: { sharpen: 0, clarity: 0, denoise: 0 },
+    grade: createClipGrade(),
   };
 }
 
@@ -199,11 +201,10 @@ describe('assistant sessions', () => {
     const { call, file } = await setup();
     await call('assistant', 'session_start', { projectId: 'flight', expectedRevision: 1 });
     const saved = await readFile(file, 'utf8');
-    const insert = (id: string, sourceIn: number, sourceOut: number): EditCommand => ({
-      type: 'insert',
-      clip: clip(id, sourceIn, sourceOut),
-      index: 1,
-    });
+    const insert = (id: string, sourceIn: number, sourceOut: number): EditCommand => {
+      const { grade: _grade, ...inserted } = clip(id, sourceIn, sourceOut);
+      return { type: 'insert', clip: inserted, index: 1 };
+    };
     await expect(
       call('assistant', 'edit', { projectId: 'flight', expectedRevision: 1, commands: [insert('outside', 250, 350)] }),
     ).rejects.toThrow(/outside the ranges the user kept/);

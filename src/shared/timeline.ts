@@ -1,6 +1,7 @@
 import { NEUTRAL_COLOUR, type ColourSettings } from './colour.js';
 import { colourAt, opacityAt } from './composition.js';
 import { NEUTRAL_DETAIL, type DetailSettings } from './detail.js';
+import { gradeColourAt } from './grade.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from './model.js';
 import { musicClips, validateMusicLane } from './music-lanes.js';
 import { evaluateSpatial, type SpatialPose } from './spatial.js';
@@ -35,6 +36,9 @@ export interface PreviewLayer {
   sourcePosition: number;
   spatial: SpatialPose;
   detail: DetailSettings;
+  /** The clip's own Colour at the source frame shown, applied before the track's. */
+  grade: ColourSettings;
+  /** The track's Colour at the project frame. */
   colour: ColourSettings;
   weight: number;
   blendWeight: number;
@@ -283,6 +287,7 @@ export function sampleTimeline(
         sourcePosition,
         spatial: evaluateSpatial(layer.transform, frame),
         detail: placed.clip.detail,
+        grade: gradeColourAt(placed.clip.grade, sourceFrame),
         colour: colourAt(layer, frame),
         weight: blendWeight * brightness,
         blendWeight,
@@ -318,6 +323,7 @@ export function sampleSlots(
         sourcePosition: left.retiming.sourcePositionAt(last),
         spatial: evaluateSpatial(layer.transform, frame),
         detail: { ...NEUTRAL_DETAIL },
+        grade: structuredClone(NEUTRAL_COLOUR),
         colour: structuredClone(NEUTRAL_COLOUR),
         weight: 0,
         blendWeight: 1,

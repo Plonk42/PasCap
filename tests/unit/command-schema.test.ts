@@ -24,11 +24,29 @@ import type { SpeedSettings } from '../../src/shared/speed.js';
  * the inferred type must stay identical.
  */
 type FormerEditCommand =
-  | { type: 'colour-setting'; layerId: string; setting: ScalarColourSetting; value: number }
-  | { type: 'hsl-band'; layerId: string; band: HslBand; values: { hue: number; saturation: number; lightness: number } }
-  | { type: 'colour-curve'; layerId: string; channel: CurveChannel; points: ColourCurvePoint[] }
+  | {
+      type: 'colour-setting';
+      layerId?: string | undefined;
+      clipId?: string | undefined;
+      setting: ScalarColourSetting;
+      value: number;
+    }
+  | {
+      type: 'hsl-band';
+      layerId?: string | undefined;
+      clipId?: string | undefined;
+      band: HslBand;
+      values: { hue: number; saturation: number; lightness: number };
+    }
+  | {
+      type: 'colour-curve';
+      layerId?: string | undefined;
+      clipId?: string | undefined;
+      channel: CurveChannel;
+      points: ColourCurvePoint[];
+    }
   | { type: 'transform-setting'; layerId: string; setting: SpatialChannel; value: number }
-  | { type: 'insert'; clip: VideoClip; index: number }
+  | { type: 'insert'; clip: Omit<VideoClip, 'grade'>; index: number }
   | { type: 'delete'; clipId: string }
   | { type: 'reorder'; clipIds: string[] }
   | { type: 'trim'; clipId: string; sourceIn: number; sourceOut: number }
@@ -36,7 +54,12 @@ type FormerEditCommand =
   | { type: 'split'; clipId: string; sourceFrame: number; newClipId: string }
   | { type: 'remove-source-range'; clipId: string; sourceIn: number; sourceOut: number; newClipId: string }
   | { type: 'duplicate'; clipId: string; newClipId: string }
-  | { type: 'colour'; layerId: string; colour: ColourSettings }
+  | {
+      type: 'colour';
+      layerId?: string | undefined;
+      clipIds?: string[] | undefined;
+      colour: ColourSettings;
+    }
   | { type: 'speed'; clipId: string; speed: SpeedSettings }
   | { type: 'reverse'; clipId: string; reverse: boolean }
   | { type: 'transform'; layerId: string; transform: SpatialSettings }
@@ -44,22 +67,44 @@ type FormerEditCommand =
   | { type: 'detail-clips'; clipIds: string[]; detail: DetailSettings }
   | { type: 'music'; music: MusicLane[] }
   | { type: 'opacity'; layerId: string; opacity: number }
-  | { type: 'layer-key-toggle'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
+  | {
+      type: 'layer-key-toggle';
+      layerId?: string | undefined;
+      clipId?: string | undefined;
+      frame: number;
+      setting: KeyframeSetting;
+      value: number;
+    }
   | {
       type: 'layer-key-set';
-      layerId: string;
+      layerId?: string | undefined;
+      clipId?: string | undefined;
       frame: number;
       values: { [K in KeyframeSetting]?: number | null | undefined };
       easing?: Interpolation | { [K in KeyframeSetting]?: Interpolation } | undefined;
       reset?: boolean | undefined;
     }
-  | { type: 'layer-key-value'; layerId: string; frame: number; setting: KeyframeSetting; value: number }
-  | { type: 'layer-key-move'; layerId: string; frame: number; nextFrame: number }
-  | { type: 'layer-key-remove'; layerId: string; frame: number }
-  | { type: 'layer-key-default'; layerId: string; frame: number }
+  | {
+      type: 'layer-key-value';
+      layerId?: string | undefined;
+      clipId?: string | undefined;
+      frame: number;
+      setting: KeyframeSetting;
+      value: number;
+    }
+  | {
+      type: 'layer-key-move';
+      layerId?: string | undefined;
+      clipId?: string | undefined;
+      frame: number;
+      nextFrame: number;
+    }
+  | { type: 'layer-key-remove'; layerId?: string | undefined; clipId?: string | undefined; frame: number }
+  | { type: 'layer-key-default'; layerId?: string | undefined; clipId?: string | undefined; frame: number }
   | {
       type: 'layer-key-easing';
-      layerId: string;
+      layerId?: string | undefined;
+      clipId?: string | undefined;
       frame: number;
       setting: KeyframeSetting | null;
       interpolation: Interpolation;
@@ -87,7 +132,7 @@ type FormerEditCommand =
   | { type: 'select-narrow'; mediaId: string; ranges: SelectRange[] };
 
 const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> } = {
-  insert: { type: 'insert', clip: createClip('clip-2', 'rec-1', 0, 30), index: 1 },
+  insert: { type: 'insert', clip: newClip('clip-2', 'rec-1', 0, 30), index: 1 },
   delete: { type: 'delete', clipId: 'clip-1' },
   reorder: { type: 'reorder', clipIds: ['clip-2', 'clip-1'] },
   trim: { type: 'trim', clipId: 'clip-1', sourceIn: 5, sourceOut: 20 },
@@ -187,6 +232,11 @@ function undescribedFields(schema: z.ZodType, path: string): string[] {
         : [`${path}.${name}`];
     return [...own, ...undescribedFields(field, `${path}.${name}`)];
   });
+}
+
+function newClip(id: string, mediaId: string, sourceIn: number, sourceOut: number): Omit<VideoClip, 'grade'> {
+  const { grade: _grade, ...clip } = createClip(id, mediaId, sourceIn, sourceOut);
+  return clip;
 }
 
 describe('editCommandSchema', () => {

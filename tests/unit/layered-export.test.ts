@@ -1,3 +1,4 @@
+import { createColourSettings } from '../../src/shared/colour.js';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -733,6 +734,7 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       sourcePosition: 11,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
       detail: { ...NEUTRAL_DETAIL },
+      grade: createColourSettings(),
       colour,
       weight: blendWeight,
       blendWeight,
@@ -790,6 +792,7 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       sourcePosition: 0,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
       detail: { ...NEUTRAL_DETAIL },
+      grade: createColourSettings(),
       colour: { ...strong },
       weight: 0,
       blendWeight: 1,
@@ -824,6 +827,7 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       sourcePosition: 0,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
       detail: { ...NEUTRAL_DETAIL },
+      grade: createColourSettings(),
       colour: { ...NEUTRAL_COLOUR, brightness: 0.2, shadows: 0.4 },
       weight: 1,
       blendWeight: 1,
@@ -861,6 +865,7 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       sourcePosition: 0,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
       detail: { ...NEUTRAL_DETAIL },
+      grade: createColourSettings(),
       colour: { ...NEUTRAL_COLOUR },
       weight: 0.5,
       blendWeight: 0.5,
