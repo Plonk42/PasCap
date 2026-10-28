@@ -1,22 +1,21 @@
-# Local deployment and planned containers
+# Local deployment
 
-## Status and target
+## Target
 
-The approved eventual package is **one local OCI application usable with Docker
-and Podman**. It is not GitHub Pages/static-only hosting and not a remote SaaS:
-PasCap needs a local Node service, native FFmpeg/ffprobe and access to registered
-source paths. Its local HTTP guards are not multi-user authentication.
+PasCap runs **natively on Linux**: one local Node service, native FFmpeg/ffprobe and
+the user's own browser, started with `npm run dev` or `npm run build && npm start`
+([run locally](../README.md#run-locally)). It is not GitHub Pages/static hosting, a
+LAN service or a remote SaaS, and its local HTTP guards are not multi-user
+authentication. Validation is described in [DEVELOPMENT.md](DEVELOPMENT.md#validation)
+and runs in [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
 
-**Container packaging is not implemented yet.** No supplied image or supported
-container build/run recipe exists. The layout and configuration examples below
-record the intended design and future acceptance requirements, not a working
-container deployment. The current native Linux workflow is in
-[../README.md](../README.md#run-locally); current validation is tracked in
-[DEVELOPMENT.md](DEVELOPMENT.md#validation) and
-[GitHub Actions](https://github.com/Plonk42/PasCap/actions). Container acceptance
-is tracked in [#9 — networking](https://github.com/Plonk42/PasCap/issues/9),
-[#10 — OCI package](https://github.com/Plonk42/PasCap/issues/10) and
-[#11 — both-runtime acceptance](https://github.com/Plonk42/PasCap/issues/11).
+There is no container package. A Docker/Podman image was planned, then dropped
+(owner, 2026-10-28; [#10](https://github.com/Plonk42/PasCap/issues/10)): with no
+published image every user would build it, PasCap needs direct access to the user's
+footage, and its GPU export compositor and NVDEC proxy decoding would need GPU
+passthrough into the container. The pinned toolchain a container would have provided
+is covered by the [toolchain section](#native-toolchain) and
+[#290](https://github.com/Plonk42/PasCap/issues/290).
 
 ## No-copy source access today
 
@@ -107,148 +106,93 @@ start + duration; music can extend it. Video closing fades end at their clip OUT
 then the picture is black while music continues/fades at its own end. Music-only
 preview is black; native export still requires a video clip and uses composited
 export for music tails. [MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md) specifies
-the current contract and pending validation, not container/release acceptance.
+the current contract and pending validation, not release acceptance.
 
-## Planned architecture and storage layout
+## Storage layout
 
-The eventual container contains **one Node service, FFmpeg, ffprobe and the built
-browser UI**. Node serves the UI/API and runs the existing native job queue. The
-browser remains on the host, where video decoding, WebGL2 and GPU selection occur.
-No source footage belongs in the image or build context, and startup must not
-automatically register or prepare mounted footage.
+| Data                                                                                      | Location                                         | Access                                           |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------ |
+| Original footage and music                                                                | Where the user keeps it, inside approved roots   | Read only by the service; never written          |
+| Registries, project documents, generated proxies/thumbnails, exports/receipts and scratch | `PASCAP_DATA_DIR`, default `.pascap/` in the app | Read/write for the service user, outside footage |
 
-| Data                                                                                      | Stable container path            | Mount/access                                            |
-| ----------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------- |
-| Original footage from a user-chosen host folder                                           | `/media/footage`                 | Read-only source bind mount                             |
-| Registries, project documents, generated proxies/thumbnails, exports/receipts and scratch | `/var/lib/pascap`                | Separate read/write persistent host directory or volume |
-| Built UI, Node application and native toolchain                                           | Image-owned application location | No bundled originals or user data                       |
+Keep the data directory **outside footage**, never under an approved root, on a disk
+with room for proxies and export scratch. Scratch grows with export duration; there
+is no fixed-GB promise. Native audio retains at most selected stereo s16 PCM plus
+old/new full-project Float64 stereo accumulators: **three audio scratch files**,
+**two intermediate audio inputs**, **one audio child per serial pass**, and one
+original decoded at a time. Audio disk planning is maximum selected PCM + two
+full-project Float64 stereo timelines, additional to unchanged video
+buffers/children/LUTs/scratch.
 
-For this proposed layout, the **existing** configuration values would be
-`PASCAP_MEDIA_ROOTS=["/media/footage"]` (the environment value is that JSON array)
-and `PASCAP_DATA_DIR=/var/lib/pascap`. These are configuration examples, not container
-launch commands. Additional source mounts require explicit stable container paths
-and corresponding approved-root entries. Do not rely on the container user's
-default Videos folder to discover host drives.
-
-Keep writable cache/scratch **outside footage**, never under a source mount. Persist
-the entire data directory rather than an ephemeral container layer: project JSON,
-registries, verified proxies and successful export receipts must survive recreation.
-Exports must remain accessible through the existing output/download routes and,
-when using a host bind directory, directly on the host. A volume-based package
-will need a documented way to retrieve outputs; it must not hide finished videos
-in disposable storage. Scratch disk remains duration-dependent, not a fixed-GB promise.
-Native audio retains at most selected stereo s16 PCM plus old/new full-project
-Float64 stereo accumulators: **three audio scratch files**, **two intermediate
-audio inputs**, **one audio child per serial pass**, and one original decoded at a
-time. Audio disk planning is maximum selected PCM + two full-project Float64
-stereo timelines, additional to unchanged video buffers/children/LUTs/scratch.
-Do not provision for eight simultaneous original decoders or all selected files.
-
-Saved `sourcePath` values refer to the service/container path, so keep the mapping
-stable across restarts and upgrades. Originals must remain accessible there; moving
-a recording, changing mounts or disconnecting a drive fails explicitly, even if a
-proxy exists. Filesystem fingerprints still apply: a stable pathname does not bypass
-identity checks. There is no implicit path guessing, native-to-container path/
-fingerprint rewrite or migration; an explicit [verified relink](design/SOURCE_RELINK.md)
-accepts a moved copy only when every byte matches the registered original.
+Saved `sourcePath` values are the service's absolute paths, so originals must stay
+at those paths: moving a recording, unmounting a drive or changing a mount point
+fails explicitly, even if a proxy exists. Filesystem fingerprints still apply: a
+stable pathname does not bypass identity checks. There is no implicit path guessing
+or migration; an explicit [verified relink](design/SOURCE_RELINK.md) accepts a moved
+copy only when every byte matches the registered original.
 
 Previously copied source files from the removed implementation are **not deleted
 or migrated automatically**. Preserve registered paths and bytes for any still-used
 source. This is a data-safety rule, not compatibility code or a reason to reintroduce
-copy imports. Back up persistent project/export data and originals separately;
-proxies are not a backup of the originals.
+copy imports. Back up the data directory and the originals separately; proxies are
+not a backup of the originals.
 
-## Non-root, rootless and host permissions
+## Permissions
 
-- Run the eventual application as a non-root user; support rootless Podman and
-  compatible non-root Docker operation without privileged mode.
-- The mapped UID/GID needs read access to originals and traversal permission on
-  every parent directory. A read-only bind mount does not grant missing host access.
-- The dedicated persistent data location must be writable by that mapped user;
-  rootless user namespaces and existing host ownership need explicit validation.
-  Permission failures should be reported, not repaired by taking ownership of drives.
-- Do not automatically `chmod`, `chown` or relabel user-owned footage/drives.
-  Operators must deliberately provision an appropriate data directory and source
-  access without changing private originals behind their backs.
+- Run the service as an ordinary user, never as root.
+- That user needs read access to originals and traversal permission on every parent
+  directory, and write access to the data directory. Permission failures are
+  reported, not repaired: PasCap never `chmod`s, `chown`s or relabels footage or
+  drives.
 
-With Podman on SELinux hosts, `:z`/`:Z` relabel options change host labels, even for
-a read-only source mount. Shared versus private labels can affect other applications
-and access to private originals. Do not apply them automatically to users' drives;
-any necessary label change must be explicitly understood/approved and scoped to
-an appropriate dedicated location. Do not solve permissions by disabling SELinux
-or broadening the application's privileges.
+## Network
 
-## Networking still to implement
-
-The current entry point in [../src/server/main.ts](../src/server/main.ts) binds
-**`127.0.0.1` only**. That is correct for native local use but is not a completed
-container networking configuration. Eventual packaging needs an explicit way to
-bind **`0.0.0.0` inside the container** so port publishing can reach Node; no current
-environment switch for that bind address is claimed here.
-
-Publish the application port on **host `127.0.0.1` only**. Do not use host networking
-or expose the unauthenticated service to the LAN/Internet. Keep exact trusted
-`allowedHosts` / `allowedOrigins`, cross-site rejection and the existing client
-header requirement; do not replace them with `*`. If the published host port differs
-from the internal port, the eventual configuration must explicitly allow the exact
-loopback browser Host/Origin rather than weakening those guards. The MCP endpoint
+The entry point in [../src/server/main.ts](../src/server/main.ts) binds
+**`127.0.0.1` only**, with exact trusted Host/Origin checks, cross-site rejection and
+a required client header. Do not expose the unauthenticated service to the
+LAN/Internet, for example through a reverse proxy or port forwarding. The MCP endpoint
 (`/mcp`) keeps the same Host/Origin checks and replaces the client header with the
 bearer token in `<data directory>/mcp-token`; keep that file private with the rest of
 the data directory.
 
-## Shutdown, native processing and toolchain
+## Shutdown and native processing
 
-The current service handles SIGINT/SIGTERM and closes its job queue. The eventual
-container entry point must deliver **SIGTERM to Node**, allow graceful cancellation/
-cleanup, wait for native children and reap them without orphaned FFmpeg processes.
-An exec-style entry point or suitable init/signal forwarding must be validated in
-both runtimes. Stop/recreate must preserve persistent data and successful outputs;
-interrupted jobs are not resumed, and forced termination is not a crash-proof
-unsaved-draft guarantee. See [WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md).
+The service handles SIGINT/SIGTERM: it closes its job queue, cancels native work and
+cleans owned scratch. Interrupted jobs are not resumed, and a forced termination is
+not a crash-proof unsaved-draft guarantee
+([WORKSPACE_AND_RECOVERY.md](WORKSPACE_AND_RECOVERY.md)). Never run two service
+processes against the same data directory.
 
-Native export currently uses CPU composition/LUT work and **software `libx264`
-encoding**. Packaging does not promise NVENC, NVIDIA device mounts or faster renders.
-The host browser's GPU is separate; containers do not establish target-GPU preview
-performance. The actual browser renderer and long-flight acceptance still need
-independent validation.
+Export encodes with **software `libx264`**; there is no NVENC. Heavy grading frames
+are composited on a hardware GPU through headless Chrome when one starts
+(`PASCAP_CHROME`, `PASCAP_GPU_COMPOSITING`), and proxy preparation decodes with NVDEC
+when CUDA is available (`PASCAP_HW_DECODE`); both fall back to the CPU. The editor's
+preview decodes and composites in the user's browser, whose own GPU and renderer
+still need the intended-GPU validation tracked in v0.2.
 
-Historical native evidence used **FFmpeg 8.0.1**; see
-[FEASIBILITY_REPORT.md](FEASIBILITY_REPORT.md). The future image must pin/document
-its Node and FFmpeg/ffprobe toolchain, including the required `libx264`, FFV1,
-`lut3d`/`xfade`, raw/lossless pixel formats and colour/timing behaviour. A distribution
-package or a different FFmpeg build cannot be declared equivalent merely because
-it starts: container parity tests are required for proxy correspondence, retiming,
-track composition, BT.709 tags, exact frame counts and music/export verification.
+## Native toolchain
 
-## Future container acceptance — not completed
+Native processing is qualified on **FFmpeg/ffprobe 8.0.1** with `libx264`, FFV1,
+AAC, `lut3d`/`xfade`, `setparams`, raw/lossless pixel formats and the `setts`
+bitstream filter; [FEASIBILITY_REPORT.md](FEASIBILITY_REPORT.md) holds the historical
+evidence. Distribution packages are usually older or configured differently, and a
+build cannot be declared equivalent merely because it starts: proxy correspondence,
+retiming, track composition, BT.709 tags, exact frame counts and music/export
+verification depend on it.
 
-Follow [licensing and distribution](LICENSING.md) for the approved project MIT
-terms, exact npm notices and the separate GPL-enabled FFmpeg/libx264 source,
-native dependency and artifact-review requirements. No built image/source bundle
-or codec/patent clearance is implied by the project license or CI cache.
+To build the qualified version locally, run the
+[CI setup script](../scripts/ci/setup-ffmpeg.sh) with a dedicated absolute prefix
+(it needs `build-essential`, `pkg-config`, `nasm` and `libx264-dev`), then point the
+service at it:
 
-Sequential implementation of milestone issues is not release approval or milestone
-closure; those operations and real-media qualification require explicit approval.
+```sh
+bash scripts/ci/setup-ffmpeg.sh "$HOME/.local/opt/ffmpeg-8.0.1"
+PASCAP_FFMPEG="$HOME/.local/opt/ffmpeg-8.0.1/bin/ffmpeg" \
+PASCAP_FFPROBE="$HOME/.local/opt/ffmpeg-8.0.1/bin/ffprobe" npm start
+```
 
-Before publishing packaging, validate **both Docker and Podman** with disposable
-synthetic media and explicit read-only source bind mounts:
-
-1. Build the application/image reproducibly and serve the built UI/API locally;
-   verify the pinned native toolchain and existing correctness tests in each runtime.
-2. Browse without media reads/probes/writes/jobs, exercise unavailable roots,
-   permissions, symlinks, cache exclusion and truncation, then selectively register
-   originals and prepare/export without changing source bytes or identity metadata.
-   Preserve deliberate folder import and external-drop/no-POST behaviour.
-3. Exercise non-root/rootless UID access, read-only mount enforcement and SELinux
-   failure/reporting without automatic drive permission or label changes.
-4. Verify host-loopback-only publishing and exact Host/Origin/client guards; no
-   host-network or unauthenticated LAN exposure.
-5. Stop during native work with SIGTERM, verify child reaping/owned-scratch cleanup,
-   recreate with the same paths/data and retain projects, registry/proxy reuse,
-   existing registered source bytes and accessible successful exports/receipts.
-6. Run native proxy and short 720p/4K timing/colour/track/music parity tests in both
-   runtimes. Report actual results separately from historical native evidence;
-   make no GPU or long-render performance claim from a container build or short test.
-
-These future container gates are separate from the completed native no-copy tests
-and the pending intended-GPU browser check/5–10 minute real-flight qualification.
+The script checks the source archive's SHA-256 and verifies the required encoders,
+filters and bitstream filter. A startup toolchain check and a documented install
+command are tracked in [#290](https://github.com/Plonk42/PasCap/issues/290).
+Redistributing FFmpeg or other binaries follows [licensing](LICENSING.md); none is
+shipped today.

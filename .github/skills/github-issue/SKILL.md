@@ -60,15 +60,15 @@ need no issue or Project card.
   or a milestone/release gate; `priority:p2` normal planned/design work (default);
   `priority:p3` optional non-gating improvement. Never infer urgency from wording alone.
 - Apply only relevant live `area:*` labels. The current areas are editor, media,
-  export, preview, audio, ci, container, licensing and workflow. Documentation and
+  export, preview, audio, ci, licensing and workflow. Documentation and
   accessibility are modifiers, not primary categories. Do not create labels ad hoc.
 - Optionally set one `status:*` label: `status:backlog` for a new proposal,
   `status:ready` for selected actionable work or `status:blocked` naming the real
   prerequisite/decision/consent. Status labels are planning aids; they are not
   updated per commit. Preserve a reused issue's existing labels.
 - Assign one existing **outcome milestone** using its live scope, not a made-up
-  deadline. Current outcomes: v0.1 local editor hardening; v0.2 real-workload
-  qualification; v0.3 Docker/Podman delivery. A milestone assignment is a planning
+  deadline. Current outcomes are the open milestones; read their live descriptions
+  (`gh api repos/Plonk42/PasCap/milestones`). A milestone assignment is a planning
   proposal, not scope approval. If none fits, ask rather than create one silently.
 - Record actual prerequisites as native blocked-by relationships when supported.
   Preserve existing parents; add a native sub-issue only when that decomposition is

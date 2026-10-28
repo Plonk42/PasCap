@@ -3,7 +3,7 @@
 PasCap is a local Linux video editor: the browser edits a project, and the local
 service prepares previews and exports from original files. There is no account,
 upload or cloud workflow. For setup, see [DEVELOPMENT.md](DEVELOPMENT.md#run-locally);
-for source paths and future containers, see [DEPLOYMENT.md](DEPLOYMENT.md).
+for source paths, storage and the native toolchain, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Start a project
 

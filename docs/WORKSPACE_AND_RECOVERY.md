@@ -876,12 +876,9 @@ or migrated automatically**. Preserve registered source paths and bytes still in
 use. This is data safety, not compatibility/migration code or an optional copy mode.
 
 Keep writable cache/scratch outside footage and preserve project/registry data and
-successful outputs. The approved eventual local Docker/Podman OCI package uses
-read-only source mounts and separate read/write persistent data, with stable
-service-side path mapping; packaging is **not implemented yet**. No source belongs
-in an image, no implicit path migration is promised, and ephemeral container storage
-is not suitable for saved work. See [DEPLOYMENT.md](DEPLOYMENT.md) for the future
-layout, permissions, loopback publishing and SIGTERM/child-reaping acceptance.
+successful outputs. No implicit path migration is promised. See
+[DEPLOYMENT.md](DEPLOYMENT.md) for the storage layout, permissions, loopback network
+and shutdown behaviour.
 
 ## Save recovery
 

@@ -122,7 +122,7 @@ head-branch deletion are enabled.
 | `priority:p3` | Optional improvement                                   |
 
 Areas: `area:editor`, `area:media`, `area:export`, `area:preview`, `area:audio`,
-`area:ci`, `area:container`, `area:licensing` and `area:workflow`.
+`area:ci`, `area:licensing` and `area:workflow`.
 `documentation` and `accessibility` are modifiers.
 
 The private [planning Project](https://github.com/users/Plonk42/projects/1) shows

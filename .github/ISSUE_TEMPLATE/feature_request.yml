@@ -16,7 +16,6 @@ body:
         - Preview/hardware (area:preview)
         - Music/A/V (area:audio)
         - Tests/CI (area:ci)
-        - Docker/Podman (area:container)
         - License/distribution obligations (area:licensing)
         - Planning/contributor workflow (area:workflow)
     validations:
