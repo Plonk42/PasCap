@@ -30,6 +30,7 @@ import {
 /** Keyframes of one clip grade; see docs/design/CLIP_GRADES_AND_ADJUSTMENTS.md. */
 export const MAX_GRADE_KEYFRAMES = 64;
 export const GRADE_SETTINGS: readonly ScalarColourSetting[] = COLOUR_CONTROLS.map(({ key }) => key);
+export const gradeSettingSchema = z.enum(GRADE_SETTINGS as [ScalarColourSetting, ...ScalarColourSetting[]]);
 
 const gradeKeyValuesSchema = layerKeyValuesSchema.omit({ opacity: true });
 export type GradeKeyValues = z.infer<typeof gradeKeyValuesSchema>;

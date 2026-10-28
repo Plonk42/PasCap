@@ -604,7 +604,7 @@ test('whole-row curves continue across different clips and their dissolve, while
     .locator('[data-clip-id="second"] .timeline-clip-body')
     .evaluate((button) => (button as HTMLButtonElement).click());
   await seek(page, overlap);
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue(
     String(Number(exposureAtOverlap.toFixed(2))),
   );
