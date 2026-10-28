@@ -70,7 +70,11 @@ export async function inspectorTab(page: Page, name: keyof typeof TAB_FOR): Prom
 
 /** The Colour tab edits the selected clip's grade or its track's Colour; without a clip there is no switch. */
 export async function colourTarget(page: Page, target: 'Clip' | 'Track'): Promise<void> {
-  const radio = page.getByRole('radiogroup', { name: 'Colour target' }).getByRole('radio', { name: target });
+  // The pinned header appears once the project has loaded, with the switch when a clip is selected.
+  await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .colour-target')).toBeVisible();
+  const radio = page
+    .getByRole('radiogroup', { name: 'Colour target' })
+    .getByRole('radio', { name: target === 'Clip' ? 'Clip grade' : 'Track Colour', exact: true });
   if ((await radio.count()) && (await radio.getAttribute('aria-checked')) !== 'true')
     await radio.dispatchEvent('click');
 }

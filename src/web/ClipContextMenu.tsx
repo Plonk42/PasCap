@@ -41,6 +41,7 @@ export function ClipContextMenu({
   const copyBlocked = clip ? copyGradeBlocked(clip) : 'This clip no longer exists.';
   const targets = pasteTargets(anchor.clipId, selectedClipIds);
   const pasteBlocked = copiedGrade ? null : 'Copy a clip’s grade first.';
+  const pasted = targets.length > 1 ? `these ${targets.length} clips` : 'this clip';
   const panel = useRef<HTMLFieldSetElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 
@@ -126,10 +127,7 @@ export function ClipContextMenu({
       <button
         className="secondary-button small"
         aria-label={targets.length > 1 ? `Paste grade on ${targets.length} selected clips` : 'Paste grade on this clip'}
-        title={
-          pasteBlocked ??
-          `Replace the grade of ${targets.length > 1 ? `these ${targets.length} clips` : 'this clip'} with the copied one, removing its keyframes`
-        }
+        title={pasteBlocked ?? `Replace the grade of ${pasted} with the copied one, removing its keyframes`}
         aria-disabled={pasteBlocked !== null}
         onClick={() => {
           if (!copiedGrade) return;

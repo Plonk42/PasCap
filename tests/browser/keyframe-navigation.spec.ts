@@ -231,8 +231,11 @@ test('unkeyed settings keep diamonds with visible guarded per-setting arrows and
 }) => {
   const document = await current(page);
   expect(KEYFRAME_SETTINGS).toHaveLength(15);
-  // Fifteen Colour/Opacity diamonds plus the eight track Transform capture buttons.
-  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(15 + 8);
+  // Fifteen Colour/Opacity diamonds in Colour, the eight track Transform capture buttons in Track.
+  await inspectorTab(page, 'Track colour');
+  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(15);
+  await inspectorTab(page, 'Track');
+  await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(8);
   for (const { label } of KEYFRAME_SETTINGS) {
     await settingTab(page, label);
     const toggle = diamond(page, label);
@@ -771,7 +774,7 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
     },
   });
   await fixture(page, document);
-  await inspectorTab(page, 'Sequence');
+  await inspectorTab(page, 'Track colour');
   await collapsePanel(page, 'Properties').click();
   await expect(inspector(page)).toBeHidden();
   await openOptions(page, 'Track options Track 2');
@@ -781,7 +784,7 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
   await closeOptions(page);
   await expandPanel(page, 'Properties').click();
   await page.getByRole('button', { name: 'Select track Track 2', exact: true }).click();
-  await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
   await goToPoint(page, 20, 'Track 2');
   await previewAt(page, 20);
   const next = await step(page, 'Opacity', 'Next', 20);
@@ -791,7 +794,7 @@ test('single opacity navigation on a selected empty row preserves Inspector cont
   await previewAt(page, 119);
   await expect(next).toBeFocused();
   await expect(inspector(page)).toBeVisible();
-  await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
   await closeOptions(page);
   await openTab(page, 'Clip');
   await expect(inspector(page).locator('[role="tabpanel"]:not([hidden])')).toContainText(

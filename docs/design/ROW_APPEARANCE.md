@@ -112,12 +112,14 @@ and identity curves and Shadows/Highlights/HDR/Local contrast 0, without indepen
 The Colour sections live in the **Colour** Properties tab (**Clip / Colour / Track / Audio**). Its
 pinned header names what it edits: with a clip selected, its grade (**This clip only**) or, with
 the **Clip / Track** switch (arrow keys move between them), its track's Colour; without a selected
-clip, the track. Selecting another clip returns to Clip; a timeline marker chooses its own target.
+clip, the track. The choice stays while other clips are selected; a timeline marker chooses its own target.
 With several clips selected, the clip's grade is not editable: the tab says why and offers the
 track. A clip grade shows the same sections without the Opacity group, **Auto** and **Auto white
 balance**; its diamonds key the source frame shown at the playhead (unavailable, with the reason,
 when the playhead is off the clip), its keyframe list is **Clip keyframes** with source frames, and
-its keyframes are amber ◆ markers inside the clip on the timeline. **Copy grade** and **Paste grade**
+its keyframes are amber ◆ markers inside the clip on the timeline. Its sliders show the grade at
+that source frame; in slow motion the image eases between source frames, so it can differ slightly
+from the values shown until the next one. **Copy grade** and **Paste grade**
 in a clip's context menu copy a grade without keyframes and replace the right-clicked clip's grade
 (or every selected clip's, when it is selected), removing its keyframes, in one Undo step. Holding
 **Original** bypasses every grade and Detail; with **Shift** only clip grades and Detail, with

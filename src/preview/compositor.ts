@@ -407,6 +407,28 @@ export class Compositor {
       CURVE_CHANNELS.map((channel) => Number(isIdentityCurve(settings.curves[channel]))),
     );
   }
+  /** Detail settings and the source's summed local tone, for the detail program variants. */
+  #uploadDetail(index: number, source: CompositeClip, tone: LocalTone): void {
+    const gl = this.gl;
+    const { sharpen, clarity, denoise } = source.detail;
+    gl.uniform4f(this.#location(`detail${index}`), sharpen, clarity, denoise, denoiseRangeFactor(denoise));
+    // Texture UV spans the image: one step is 1/720 of its height, in the original aspect.
+    const stepV = 1 / DETAIL_REFERENCE_LINES;
+    const aspect = source.originalWidth / source.originalHeight;
+    const stepU = stepV / aspect;
+    const lines = this.#sizes[source.slot]![1];
+    const shiftV = (isNeutralDetail(source.detail) ? 0 : detailShift(lines)) / lines;
+    // Texture rows run bottom-up: a shift down the image is negative in texture V.
+    gl.uniform4f(this.#location(`detailStep${index}`), stepU, stepV, shiftV / aspect, -shiftV);
+    gl.uniform4f(this.#location(`localTone${index}`), tone.shadows, tone.highlights, tone.hdr, tone.exposure);
+  }
+  #uploadNeutralHsl(prefix: '' | 'first_', grades: readonly ColourSettings[]): void {
+    this.gl.uniform2f(
+      this.#location(`${prefix}neutralHsl`),
+      Number(isNeutralHsl(grades[0]!.hsl)),
+      Number(isNeutralHsl(grades[1]!.hsl)),
+    );
+  }
   #drawGroup(group: CompositeGroup): void {
     if (group.clips.length < 1 || group.clips.length > 2)
       throw new Error('A composite group needs one or two sources.');
@@ -464,20 +486,7 @@ export class Compositor {
       );
       gl.activeTexture(gl.TEXTURE0 + index);
       gl.bindTexture(gl.TEXTURE_2D, this.#texture(source.slot));
-      if (detailed) {
-        const { sharpen, clarity, denoise } = source.detail;
-        gl.uniform4f(this.#location(`detail${index}`), sharpen, clarity, denoise, denoiseRangeFactor(denoise));
-        // Texture UV spans the image: one step is 1/720 of its height, in the original aspect.
-        const stepV = 1 / DETAIL_REFERENCE_LINES;
-        const aspect = source.originalWidth / source.originalHeight;
-        const stepU = stepV / aspect;
-        const lines = this.#sizes[source.slot]![1];
-        const shiftV = (isNeutralDetail(source.detail) ? 0 : detailShift(lines)) / lines;
-        // Texture rows run bottom-up: a shift down the image is negative in texture V.
-        gl.uniform4f(this.#location(`detailStep${index}`), stepU, stepV, shiftV / aspect, -shiftV);
-        const tone = graded[index]!.tone;
-        gl.uniform4f(this.#location(`localTone${index}`), tone.shadows, tone.highlights, tone.hdr, tone.exposure);
-      }
+      if (detailed) this.#uploadDetail(index, source, graded[index]!.tone);
     }
     if (detailed)
       gl.uniform2f(this.#location('localContrast'), graded[0]!.tone.localContrast, graded[1]!.tone.localContrast);
@@ -490,17 +499,8 @@ export class Compositor {
     gl.uniform2f(this.#location('vibrance'), last[0]!.vibrance, last[1]!.vibrance);
     if (staged) gl.uniform2f(this.#location('first_vibrance'), first[0]!.vibrance, first[1]!.vibrance);
     if (this.#advanced) {
-      gl.uniform2f(
-        this.#location('neutralHsl'),
-        Number(isNeutralHsl(last[0]!.hsl)),
-        Number(isNeutralHsl(last[1]!.hsl)),
-      );
-      if (staged)
-        gl.uniform2f(
-          this.#location('first_neutralHsl'),
-          Number(isNeutralHsl(first[0]!.hsl)),
-          Number(isNeutralHsl(first[1]!.hsl)),
-        );
+      this.#uploadNeutralHsl('', last);
+      if (staged) this.#uploadNeutralHsl('first_', first);
     }
     gl.uniform2f(this.#location('neutralSpatial'), Number(mappings[0]!.neutral), Number(mappings[1]!.neutral));
     gl.uniform2f(this.#location('imageAspect'), sources[0]!.aspect, sources[1]!.aspect);

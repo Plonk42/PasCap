@@ -828,13 +828,13 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
     await page.setViewportSize({ width, height });
     await expect(inspector).toBeVisible();
     expect((await inspector.boundingBox())!.width).toBe(270);
-    for (const tab of ['Clip', 'Track', 'Audio'] as const) {
+    for (const tab of ['Clip', 'Clip grade', 'Track colour', 'Track', 'Audio'] as const) {
       await inspectorTab(page, tab);
-      if (tab === 'Track') {
+      if (tab === 'Clip grade' || tab === 'Track colour') {
         const hsl = inspector.getByRole('button', { name: 'HSL ranges section', exact: true });
         if ((await hsl.getAttribute('aria-expanded')) !== 'true') await hsl.click();
-        await editLayerPoint(page, 'Track 1', 0);
       }
+      if (tab === 'Track colour') await editLayerPoint(page, 'Track 1', 0);
       const widgets = await inspector.locator('.value-control').evaluateAll((elements) =>
         elements
           .filter((element) => element.getBoundingClientRect().height > 0)
@@ -863,8 +863,10 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
             };
           }),
       );
-      // Clip: speed rate and three Detail values; Track: fifteen Colour/Opacity, three HSL, eight Transform and three stored values.
-      expect(widgets.length, `${width}px ${tab}`).toBe(tab === 'Clip' ? 4 : tab === 'Track' ? 29 : 1);
+      // Clip: speed rate and three Detail values; clip grade: fourteen Colour and three HSL; track Colour: fifteen
+      // Colour/Opacity, three HSL and three stored values; Track: eight Transform; Audio: gain.
+      const expected = { Clip: 4, 'Clip grade': 17, 'Track colour': 21, Track: 8, Audio: 1 }[tab];
+      expect(widgets.length, `${width}px ${tab}`).toBe(expected);
       for (const widget of widgets) {
         expect(widget.inputs, `${width}px ${widget.name}`).toBe(2);
         expect(widget.outputs).toBe(0);
@@ -879,7 +881,13 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
         expect(widget.contained).toBe(true);
         expect(widget.overflow).toBe(false);
       }
-      const name = tab === 'Clip' ? 'Clip speed rate' : tab === 'Track' ? 'Contrast keyframe value 0' : 'Music gain';
+      const name = {
+        Clip: 'Clip speed rate',
+        'Clip grade': 'Local contrast',
+        'Track colour': 'Contrast keyframe value 0',
+        Track: 'Transform Rotation',
+        Audio: 'Music gain',
+      }[tab];
       const { exact } = controls(inspector, name);
       await exact.scrollIntoViewIfNeeded();
       await expect(exact).toBeInViewport();

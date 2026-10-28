@@ -5,7 +5,7 @@ import { colourAt } from '../shared/composition.js';
 import { activeLayerSetting, evaluateLayerSetting, hasLayerKeys, type KeyframeSetting } from '../shared/keyframes.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
-import { calculateLayout, transitionOffset, type TimelineLayout } from '../shared/timeline.js';
+import { calculateLayout, transitionOffset, type PlacedClip, type TimelineLayout } from '../shared/timeline.js';
 import { ColourCurvesSection, HslRangesSection } from './AdvancedColour.js';
 import { TrackAnimationControls } from './AnimationControls.js';
 import { AutoAdjust } from './AutoAdjust.js';
@@ -850,6 +850,152 @@ function SourceRangeSection({
   );
 }
 
+/** The Colour tab's target: the selected clip's own grade, or its track's Colour (arrow keys switch). */
+function ColourTargetSwitch({
+  target,
+  trackName,
+  disabled,
+  onTarget,
+}: Readonly<{ target: ColourTarget; trackName: string; disabled: boolean; onTarget: (target: ColourTarget) => void }>) {
+  const choose = (event: KeyboardEvent<HTMLButtonElement>): void => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const next = target === 'clip' ? 'track' : 'clip';
+    onTarget(next);
+    event.currentTarget.parentElement?.querySelector<HTMLElement>(`[data-colour-target="${next}"]`)?.focus();
+  };
+  return (
+    <div className="colour-target-switch" role="radiogroup" aria-label="Colour target">
+      {(['clip', 'track'] as const).map((option) => (
+        <button
+          key={option}
+          type="button"
+          role="radio"
+          data-colour-target={option}
+          tabIndex={target === option ? 0 : -1}
+          aria-checked={target === option}
+          aria-label={option === 'clip' ? 'Clip grade' : 'Track Colour'}
+          disabled={disabled}
+          title={option === 'clip' ? 'Grade only this clip' : `Grade every clip on ${trackName}`}
+          onClick={() => onTarget(option)}
+          onKeyDown={choose}
+        >
+          {option === 'clip' ? 'Clip' : 'Track'}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+interface ColourTabProps {
+  project: ProjectDocument;
+  assets: MediaAsset[];
+  layer: VideoLayer | undefined;
+  /** The selected clip, when it is placed. */
+  clip: VideoClip | undefined;
+  placed: PlacedClip | undefined;
+  asset: MediaAsset | undefined;
+  clipLabel: string;
+  trackClipCount: number;
+  selectedClipId: string | null;
+  selectedClipCount: number;
+  frame: number;
+  /** The source frame the selected clip shows at the playhead, or null off the clip. */
+  sourceFrame: number | null;
+  layout: TimelineLayout;
+  drafting: boolean;
+  resetKey: string;
+  id: string;
+  target: ColourTarget;
+  onTarget: (target: ColourTarget) => void;
+  onEdit: (command: EditCommand | readonly EditCommand[]) => void;
+  onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
+  onPause: () => void;
+  onSeek: (frame: number) => void;
+}
+
+/** Colour, HSL ranges and Colour curves for the selected clip's grade or its track's Colour. */
+function ColourTab(props: Readonly<ColourTabProps>) {
+  const { project, layer, clip, placed, asset, target, drafting, onEdit, onPreview, onPause, onSeek } = props;
+  const navigation = useKeyframeNavigation();
+  const clipNavigation = useMemo<KeyframeNavigation | null>(
+    () =>
+      placed
+        ? {
+            ...navigation,
+            inspection: null,
+            duration: (asset?.metadata.frameCount ?? placed.clip.sourceOut) + 1,
+            onSeekKeyframe: (_owner, source) => onSeek(gradeSeekFrame(placed, source)),
+          }
+        : null,
+    [navigation, placed, asset, onSeek],
+  );
+  if (!layer) return <div className="inspector-empty">Select a clip or a video track in the timeline to grade it.</div>;
+  const gradeClip = target === 'clip' && clip && clipNavigation ? clip : null;
+  if (gradeClip && props.selectedClipCount > 1)
+    return (
+      <div className="inspector-empty">
+        {props.selectedClipCount} clips are selected: select one to edit its grade, or choose Track to edit {layer.name}
+        . Paste grade sets the same grade on all of them.
+        <button type="button" className="text-button" onClick={() => props.onTarget('track')}>
+          Edit {layer.name}
+        </button>
+      </div>
+    );
+  const clipName = asset ? shortName(asset.name) : 'Unavailable recording';
+  const owner: ColourOwner = gradeClip ? clipColourOwner(layer, gradeClip, `${props.clipLabel} (${clipName})`) : layer;
+  const frame = gradeClip ? (props.sourceFrame ?? -1) : props.frame;
+  const resetKey = `${props.resetKey}:${owner.id}:${frame}`;
+  return (
+    <>
+      <div className="selected-clip-name inspector-selection colour-target">
+        <Icon name={gradeClip ? 'video' : 'layers'} size={17} />
+        <strong title={gradeClip ? asset?.name : layer.name}>{gradeClip ? clipName : layer.name}</strong>
+        <span>{gradeClip ? 'This clip only' : trackScope(props.trackClipCount)}</span>
+        {clip && (
+          <ColourTargetSwitch target={target} trackName={layer.name} disabled={drafting} onTarget={props.onTarget} />
+        )}
+      </div>
+      <KeyframeNavigationContext.Provider value={gradeClip ? clipNavigation! : navigation}>
+        <ColourSection
+          project={project}
+          layer={owner}
+          frame={frame}
+          duration={gradeClip ? clipNavigation!.duration : props.layout.duration}
+          layout={props.layout}
+          assets={props.assets}
+          selectedClipId={props.selectedClipId}
+          resetKey={resetKey}
+          disabled={drafting}
+          onEdit={onEdit}
+          id={props.id}
+        />
+      </KeyframeNavigationContext.Provider>
+      <HslRangesSection
+        key={`hsl:${project.id}:${owner.id}`}
+        project={project}
+        layer={owner}
+        frame={frame}
+        disabled={drafting}
+        onEdit={onEdit}
+        onPause={onPause}
+        onPreview={onPreview}
+      />
+      <ColourCurvesSection
+        key={`curves:${project.id}:${owner.id}`}
+        project={project}
+        layer={owner}
+        frame={frame}
+        disabled={drafting}
+        onEdit={onEdit}
+        onPause={onPause}
+        onPreview={onPreview}
+      />
+    </>
+  );
+}
+
 export const Inspector = memo(InspectorPanel);
 
 function InspectorPanel({
@@ -903,30 +1049,12 @@ function InspectorPanel({
   }, [sectionRequest]);
   const sourceFrame =
     placed && frame >= placed.start && frame < placed.end ? placed.retiming.sourceAt(frame - placed.start) : null;
-  // A lazily mounted panel honours the marker that opened it.
+  // The choice stays while other clips are selected, so a track being graded stays the target; a lazily mounted
+  // panel honours the marker that opened it.
   const [colourTargetChoice, setColourTargetChoice] = useState<ColourTarget>(sectionRequest?.colourTarget ?? 'clip');
-  useEffect(() => setColourTargetChoice('clip'), [clip?.id]);
   useEffect(() => {
     if (sectionRequest?.colourTarget) setColourTargetChoice(sectionRequest.colourTarget);
   }, [sectionRequest]);
-  const gradeClip = colourTargetChoice === 'clip' && layer && clip && placed ? clip : null;
-  const clipName = asset ? shortName(asset.name) : 'Unavailable recording';
-  const colourOwner: ColourOwner | undefined =
-    layer && (gradeClip ? clipColourOwner(layer, gradeClip, `clip ${trackPosition + 1} (${clipName})`) : layer);
-  const colourFrame = gradeClip ? (sourceFrame ?? -1) : frame;
-  const navigation = useKeyframeNavigation();
-  const clipNavigation = useMemo<KeyframeNavigation | null>(
-    () =>
-      placed
-        ? {
-            ...navigation,
-            inspection: null,
-            duration: (asset?.metadata.frameCount ?? placed.clip.sourceOut) + 1,
-            onSeekKeyframe: (_owner, source) => onSeek(gradeSeekFrame(placed, source)),
-          }
-        : null,
-    [navigation, placed, asset, onSeek],
-  );
   const inputContext = `${project.id}:${layer?.id}:${clip?.id ?? 'row'}`;
   const startRestriction = clip ? clipStartRestriction(project, clip) : null;
   const startHint = startRestriction ?? undefined;
@@ -1083,91 +1211,30 @@ function InspectorPanel({
           aria-labelledby={`${inspectorId}-colour-tab`}
           hidden={section !== 'colour'}
         >
-          {gradeClip && selectedClipCount > 1 ? (
-            <div className="inspector-empty">
-              {selectedClipCount} clips are selected: select one to edit its grade, or choose Track to edit{' '}
-              {layer!.name}. Paste grade sets the same grade on all of them.
-              <button type="button" className="text-button" onClick={() => setColourTargetChoice('track')}>
-                Edit {layer!.name}
-              </button>
-            </div>
-          ) : layer && colourOwner ? (
-            <>
-              <div className="selected-clip-name inspector-selection colour-target">
-                <Icon name={gradeClip ? 'video' : 'layers'} size={17} />
-                <strong title={gradeClip ? asset?.name : layer.name}>{gradeClip ? clipName : layer.name}</strong>
-                <span>{gradeClip ? 'This clip only' : trackScope(trackClips.length)}</span>
-                {clip && placed && (
-                  <div
-                    className="colour-target-switch"
-                    role="radiogroup"
-                    aria-label="Colour target"
-                    onKeyDown={(event) => {
-                      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
-                      event.preventDefault();
-                      event.stopPropagation();
-                      const next = colourTargetChoice === 'clip' ? 'track' : 'clip';
-                      setColourTargetChoice(next);
-                      event.currentTarget.querySelector<HTMLElement>(`[data-colour-target="${next}"]`)?.focus();
-                    }}
-                  >
-                    {(['clip', 'track'] as const).map((target) => (
-                      <button
-                        key={target}
-                        type="button"
-                        role="radio"
-                        data-colour-target={target}
-                        tabIndex={colourTargetChoice === target ? 0 : -1}
-                        aria-checked={colourTargetChoice === target}
-                        disabled={drafting}
-                        title={target === 'clip' ? 'Grade only this clip' : `Grade every clip on ${layer.name}`}
-                        onClick={() => setColourTargetChoice(target)}
-                      >
-                        {target === 'clip' ? 'Clip' : 'Track'}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <KeyframeNavigationContext.Provider value={gradeClip && clipNavigation ? clipNavigation : navigation}>
-                <ColourSection
-                  project={project}
-                  layer={colourOwner}
-                  frame={colourFrame}
-                  duration={gradeClip ? clipNavigation!.duration : layout.duration}
-                  layout={layout}
-                  assets={assets}
-                  selectedClipId={selectedClipId}
-                  resetKey={`${inputContext}:${colourOwner.id}:${colourFrame}`}
-                  disabled={drafting}
-                  onEdit={onEdit}
-                  id={colourControlId}
-                />
-              </KeyframeNavigationContext.Provider>
-              <HslRangesSection
-                key={`hsl:${project.id}:${colourOwner.id}`}
-                project={project}
-                layer={colourOwner}
-                frame={colourFrame}
-                disabled={drafting}
-                onEdit={onEdit}
-                onPause={onPause}
-                onPreview={onPreview}
-              />
-              <ColourCurvesSection
-                key={`curves:${project.id}:${colourOwner.id}`}
-                project={project}
-                layer={colourOwner}
-                frame={colourFrame}
-                disabled={drafting}
-                onEdit={onEdit}
-                onPause={onPause}
-                onPreview={onPreview}
-              />
-            </>
-          ) : (
-            <div className="inspector-empty">Select a clip or a video track in the timeline to grade it.</div>
-          )}
+          <ColourTab
+            project={project}
+            assets={assets}
+            layer={layer}
+            clip={clip && placed ? clip : undefined}
+            placed={placed}
+            asset={asset}
+            clipLabel={`clip ${trackPosition + 1}`}
+            trackClipCount={trackClips.length}
+            selectedClipId={selectedClipId}
+            selectedClipCount={selectedClipCount}
+            frame={frame}
+            sourceFrame={sourceFrame}
+            layout={layout}
+            drafting={drafting}
+            resetKey={inputContext}
+            id={colourControlId}
+            target={colourTargetChoice}
+            onTarget={setColourTargetChoice}
+            onEdit={onEdit}
+            onPreview={onPreview}
+            onPause={onPause}
+            onSeek={onSeek}
+          />
         </div>
         <div
           role="tabpanel"

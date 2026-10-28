@@ -1,4 +1,3 @@
-import { createColourSettings } from '../../src/shared/colour.js';
 import { Readable, Writable } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as files from '../../src/server/files.js';
@@ -7,7 +6,13 @@ import { renderLayeredExport } from '../../src/server/layered-export.js';
 import { composeLayerFrame, fittedContent, type LayerFrameSource } from '../../src/server/layered-frame.js';
 import { RawFrameReader, RawVideoPass } from '../../src/server/raw-process.js';
 import * as retime from '../../src/server/retime-process.js';
-import { gradePixel, NEUTRAL_COLOUR, type ColourSettings, type RGB } from '../../src/shared/colour.js';
+import {
+  createColourSettings,
+  gradePixel,
+  NEUTRAL_COLOUR,
+  type ColourSettings,
+  type RGB,
+} from '../../src/shared/colour.js';
 import { LAYERED_EXPORT_RESOURCES, planLayeredExport } from '../../src/shared/export.js';
 import { mediaAssetSchema } from '../../src/shared/media.js';
 import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';

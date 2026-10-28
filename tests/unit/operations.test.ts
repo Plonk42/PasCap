@@ -1,4 +1,3 @@
-import { createClipGrade } from '../../src/shared/grade.js';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,6 +9,7 @@ import { createConfig } from '../../src/server/config.js';
 import { runners } from '../../src/server/operations/index.js';
 import { createColourSettings } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
+import { createClipGrade } from '../../src/shared/grade.js';
 import { createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import type { TrackDescription } from '../../src/shared/operations/describe-track.js';
 import { operations } from '../../src/shared/operations/index.js';

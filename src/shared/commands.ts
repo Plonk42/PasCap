@@ -81,10 +81,10 @@ interface ColourOwner {
   keyframes: LayerKeyframe[];
 }
 
-function colourOwner(
-  next: ProjectDocument,
-  command: { layerId?: string | undefined; clipId?: string | undefined },
-): { owner: ColourOwner; save: () => void } {
+/** A command's target: a track (layerId) or a clip's grade (clipId); exactly one is given. */
+type ColourTargetFields = Partial<Record<'layerId' | 'clipId', string | undefined>>;
+
+function colourOwner(next: ProjectDocument, command: ColourTargetFields): { owner: ColourOwner; save: () => void } {
   if ((command.layerId === undefined) === (command.clipId === undefined))
     throw new Error("Give either layerId, for a track's Colour, or clipId, for a clip's own grade.");
   if (command.layerId !== undefined) {
@@ -414,6 +414,35 @@ function setLayerKey(layer: ColourOwner, command: LayerKeySet): void {
     : layer.keyframes.filter((key) => key.frame !== command.frame);
 }
 
+/** Adds a default keyframe at `frame`, or removes the one there; a clip grade's has no Opacity. */
+function toggleDefaultKey(layer: ColourOwner, point: LayerKeyframe | undefined, frame: number): void {
+  if (point && !point.reset)
+    throw new Error('A keyframe already exists at this frame. Choose another frame for a default keyframe.');
+  if (point) {
+    layer.keyframes = layer.keyframes.filter((key) => key !== point);
+    return;
+  }
+  if (layer.keyframes.length >= maxKeyframes(layer)) throw keyframeLimit(layer);
+  const added = { ...defaultKeyframe(frame) };
+  if (layer.kind === 'clip') {
+    added.values = { ...added.values, opacity: null };
+    added.easing = { ...added.easing, opacity: null };
+  }
+  layer.keyframes = upsertKey(layer.keyframes, added);
+}
+
+function moveLayerKey(layer: ColourOwner, point: LayerKeyframe, nextFrame: number): void {
+  frameSchema.parse(nextFrame);
+  if (layer.keyframes.some((key) => key !== point && key.frame === nextFrame))
+    throw new Error(
+      `A ${layer.kind === 'track' ? 'shared track' : 'clip grade'} keyframe already exists at the destination frame.`,
+    );
+  layer.keyframes = upsertKey(
+    layer.keyframes.filter((key) => key !== point),
+    { ...point, frame: nextFrame },
+  );
+}
+
 function editLayerKey(layer: ColourOwner, command: LayerKeyCommand): void {
   frameSchema.parse(command.frame);
   const point = layer.keyframes.find((key) => key.frame === command.frame);
@@ -422,29 +451,13 @@ function editLayerKey(layer: ColourOwner, command: LayerKeyCommand): void {
     return;
   }
   if (command.type === 'layer-key-default') {
-    if (point && !point.reset)
-      throw new Error('A keyframe already exists at this frame. Choose another frame for a default keyframe.');
-    if (!point && layer.keyframes.length >= maxKeyframes(layer)) throw keyframeLimit(layer);
-    const added = { ...defaultKeyframe(command.frame) };
-    if (layer.kind === 'clip') {
-      added.values = { ...added.values, opacity: null };
-      added.easing = { ...added.easing, opacity: null };
-    }
-    layer.keyframes = point ? layer.keyframes.filter((key) => key !== point) : upsertKey(layer.keyframes, added);
+    toggleDefaultKey(layer, point, command.frame);
     return;
   }
   if (!point) throw new Error(`${layer.kind === 'track' ? 'Track' : 'Clip grade'} keyframe no longer exists.`);
   switch (command.type) {
     case 'layer-key-move':
-      frameSchema.parse(command.nextFrame);
-      if (layer.keyframes.some((key) => key !== point && key.frame === command.nextFrame))
-        throw new Error(
-          `A ${layer.kind === 'track' ? 'shared track' : 'clip grade'} keyframe already exists at the destination frame.`,
-        );
-      layer.keyframes = upsertKey(
-        layer.keyframes.filter((key) => key !== point),
-        { ...point, frame: command.nextFrame },
-      );
+      moveLayerKey(layer, point, command.nextFrame);
       break;
     case 'layer-key-remove':
       layer.keyframes = layer.keyframes.filter((key) => key !== point);

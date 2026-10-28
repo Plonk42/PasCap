@@ -603,7 +603,7 @@ test('channel navigation skips unrelated keys and shares an off-duration cursor 
     await next.press('Enter');
     await previewAt(page, 119);
     await expect(next).toBeFocused();
-    await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
     await expect(diamond(page, 'Temperature')).toHaveAttribute('aria-pressed', 'false');
     await expect(diamond(page, 'Temperature')).toHaveAttribute('title', /timeline frame 119\./);
     await expect(controls(page, 'Temperature').exact).toBeDisabled();

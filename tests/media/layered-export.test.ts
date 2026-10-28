@@ -33,6 +33,7 @@ import {
   planExport,
   planLayeredExport,
 } from '../../src/shared/export.js';
+import { layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import {
   EMPTY_KEY_VALUES,
   KEYFRAME_SETTINGS,
@@ -1066,6 +1067,44 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     console.log(
       `Layered compound RGB parity: ${result.receipt.verification.frameCount} frames, maximum MAE ${maximumMae.toFixed(4)} / 255; ${JSON.stringify(result.receipt.settings.layered)}`,
     );
+  }, 120_000);
+
+  it('grades each dissolve source by its own keyed clip grade, then the keyed track Colour, over slow motion and reverse', async () => {
+    const project = createProject('native-clip-grades', 'Clip grades · synthetic');
+    const left = createClip('graded-left', assets[0]!.id, 2, 12);
+    const right = createClip('graded-right', assets[1]!.id, 4, 14);
+    left.speed = { mode: 'constant', rate: 0.5 };
+    right.reverse = true;
+    left.grade = {
+      colour: { ...NEUTRAL_COLOUR, temperature: 0.7, saturation: 1.25 },
+      keyframes: [3, 9].map((frame, index) =>
+        layerKeyAsGradeKey(
+          layerKeyframe(frame, { ...EMPTY_KEY_VALUES, exposure: index ? 0.4 : -0.3, hue: index ? -20 : 15 }, 'smooth'),
+        ),
+      ),
+    };
+    right.grade = {
+      colour: { ...NEUTRAL_COLOUR, contrast: 1.2, blacks: 0.06 },
+      keyframes: [layerKeyAsGradeKey(layerKeyframe(8, { ...EMPTY_KEY_VALUES, tint: 0.5 }, 'linear'))],
+    };
+    // HSL in one clip grade takes its source through the exact grade, in sequence with the track's.
+    right.grade.colour.hsl.blue = { hue: 12, saturation: 0.3, lightness: -0.1 };
+    project.clips = [left, right];
+    const row = project.layers[0]!;
+    row.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 4 }];
+    row.colour = { ...NEUTRAL_COLOUR, exposure: 0.1, whites: -0.15 };
+    row.keyframes = [point(0, { saturation: 0.9 }), point(20, { saturation: 1.1, temperature: -0.4 }, 'ease-in')];
+    const captured = projectSchema.parse(project);
+    expect(needsLayeredExport(captured)).toBe(true);
+    const layout = calculateLayout(captured);
+    // The grade follows the footage: the left clip's held slow-motion images take eased values.
+    const held = sampleTimeline(captured, 1, layout).find((sample) => sample.clipId === left.id)!;
+    expect(held.sourceFrame).toBe(2);
+    expect(held.grade.exposure).toBe(-0.3);
+    const result = await complete(captured);
+    const maximumMae = await parity(captured, result.filename);
+    await unchanged();
+    console.log(`Clip grade layered parity: maximum MAE ${maximumMae.toFixed(4)} / 255`);
   }, 120_000);
 
   it.each(['draft720', 'final4k'] as const)(
