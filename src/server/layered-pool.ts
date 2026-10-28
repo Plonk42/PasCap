@@ -8,7 +8,7 @@ export const MAX_COMPOSITOR_THREADS = 8;
 
 export type CompositorTask =
   | { kind: 'rows'; output: Uint16Array; width: number; sources: FrameSource[]; start: number; end: number }
-  | { kind: 'lut'; lut: Float32Array; colour: ColourSettings; start: number; end: number };
+  | { kind: 'lut'; lut: Float32Array; stages: ColourSettings[]; start: number; end: number };
 export interface CompositorReply {
   error: string | null;
 }
@@ -75,9 +75,9 @@ export class CompositorPool {
       })),
     );
   }
-  fillLut(lut: Float32Array, colour: ColourSettings, size: number): Promise<void> {
+  fillLut(lut: Float32Array, stages: ColourSettings[], size: number): Promise<void> {
     requireShared(lut);
-    return this.#run(bands(size, this.threads).map(([start, end]) => ({ kind: 'lut', lut, colour, start, end })));
+    return this.#run(bands(size, this.threads).map(([start, end]) => ({ kind: 'lut', lut, stages, start, end })));
   }
   async close(): Promise<void> {
     await Promise.all(this.#workers.map((worker) => worker.terminate()));

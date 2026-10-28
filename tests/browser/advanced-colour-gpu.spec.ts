@@ -88,6 +88,41 @@ test('advanced SDR GPU parity: all eight ranges, four curves, joint grading and 
   await testInfo.attach('advanced-colour-gpu', { body: JSON.stringify(result), contentType: 'application/json' });
 });
 
+test('a clip grade before its track grade keeps GPU parity, scalar and advanced, at full uniform arrays', async ({
+  page,
+}, testInfo) => {
+  const scalar = { ...createColourSettings(), temperature: 0.5, exposure: 0.3, contrast: 1.2, vibrance: 0.4 };
+  const track = { ...createColourSettings(), tint: -0.2, saturation: 1.3, whites: 0.2, blacks: -0.1 };
+  const ranged = createColourSettings();
+  HSL_BANDS.forEach((band, i) => {
+    ranged.hsl[band] = { hue: i % 2 ? 10 : -12, saturation: 0.2, lightness: -0.02 };
+  });
+  const curved = { ...createColourSettings(), hue: 15 };
+  CURVE_CHANNELS.forEach((channel, c) => {
+    curved.curves[channel] = Array.from({ length: 16 }, (_, i) => ({ x: i / 15, y: (i / 15) ** (1.1 - c * 0.05) }));
+  });
+  const pairs: [ColourSettings, ColourSettings][] = [
+    [scalar, track],
+    [ranged, track],
+    [scalar, curved],
+    [ranged, curved],
+  ];
+  await page.route('**/*', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Clip grade GPU</title>' }),
+  );
+  await page.goto('/');
+  await page.addScriptTag({ content: script });
+  const result = await page.evaluate((pairs) => {
+    const gpu = (globalThis as unknown as { ColourGpu: typeof import('../../src/preview/compositor.js') }).ColourGpu;
+    return pairs.map(([grade, settings]) => gpu.verifyGpuColour(settings, grade));
+  }, pairs);
+  for (const comparison of result) {
+    expect(comparison.maxError8Bit).toBeLessThan(2);
+    expect(comparison.meanAbsoluteError8Bit).toBeLessThan(0.6);
+  }
+  await testInfo.attach('clip-grade-gpu', { body: JSON.stringify(result), contentType: 'application/json' });
+});
+
 test('real GPU exact greys, near-grey chroma and circular hue boundaries retain strict pixel bounds', async ({
   page,
 }, testInfo) => {

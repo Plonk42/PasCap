@@ -5,7 +5,10 @@ import {
   compileGradeInto,
   createColourSettings,
   isNeutralAdvancedColour,
+  isNeutralColour,
+  isNeutralLocalTone,
   isNeutralScalarColour,
+  LOCAL_TONE_SETTINGS,
   type ColourSettings,
   type PixelGrade,
   type RGB,
@@ -102,6 +105,23 @@ export function layerKeyAsGradeKey(key: LayerKeyframe): GradeKeyframe {
     easing: easing as Record<ScalarColourSetting, Interpolation | null>,
     reset: key.reset,
   };
+}
+
+/** A grade with no effect at any frame. */
+export function isNeutralClipGrade(grade: ClipGrade): boolean {
+  return grade.keyframes.length === 0 && isNeutralColour(grade.colour);
+}
+
+/** Whether any frame of the clip can evaluate a nonzero Shadows, Highlights, HDR or Local contrast. */
+export function gradeUsesLocalTone(grade: ClipGrade): boolean {
+  return LOCAL_TONE_SETTINGS.some(
+    (setting) => grade.colour[setting] !== 0 || grade.keyframes.some((key) => (key.values[setting] ?? 0) !== 0),
+  );
+}
+
+/** A grade the static export can bake into each clip's LUT: unkeyed, scalar-only and without local tone. */
+export function isStaticClipGrade(grade: ClipGrade): boolean {
+  return grade.keyframes.length === 0 && isNeutralLocalTone(grade.colour) && isNeutralAdvancedColour(grade.colour);
 }
 
 /** A grade stage that changes encoded pixels; local tone runs in the detail kernel instead. */

@@ -26,7 +26,7 @@ if (mode === 'silent') await forever();
 const anonymous = await fetch(url.origin + '/config');
 const config = await (await call('/config')).json();
 const renderer = mode === 'software' ? 'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero)))' : 'Fake GPU';
-const hello = { protocol: 2, renderer, norm16: true, error: anonymous.status === 403 ? null : 'token not enforced' };
+const hello = { protocol: 3, renderer, norm16: true, error: anonymous.status === 403 ? null : 'token not enforced' };
 const reply = await (await call('/hello', { method: 'POST', body: JSON.stringify(hello) })).json();
 if (!reply.accept) await forever();
 for (;;) {
@@ -110,6 +110,7 @@ function source(): GpuGroupSource {
     rgb,
     bounds: { x: 2, y: 1, width: 4, height: 4 },
     parameters: {
+      grade: { ...NEUTRAL_COLOUR },
       colour: { ...NEUTRAL_COLOUR, hdr: 0.3 },
       spatial: { ...NEUTRAL_SPATIAL_POSE },
       detail: { sharpen: 0.3, clarity: 0, denoise: 0 },

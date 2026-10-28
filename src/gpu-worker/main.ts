@@ -110,6 +110,7 @@ function drawFrame(
     offset += length;
     return {
       slot,
+      grade: source.grade,
       settings: source.colour,
       aspect: source.width / source.height,
       spatial: source.spatial,
