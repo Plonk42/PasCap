@@ -1,3 +1,4 @@
+import { ownerTarget, colourTarget } from './colour-owner.js';
 import {
   COLOUR_CONTROLS,
   createColourSettings,
@@ -9,7 +10,7 @@ import type { EditCommand } from '../shared/commands.js';
 import { hasLayerKeys, isKeyframeFrame, type KeyframeSetting } from '../shared/keyframes.js';
 import type { VideoLayer } from '../shared/model.js';
 
-/** Visible grouping of Track → Colour; storage and keyframe channel order stay unchanged. */
+/** Visible grouping of the Colour section; storage and keyframe channel order stay unchanged. */
 export const COLOUR_GROUPS: readonly { name: string; settings: readonly KeyframeSetting[] }[] = [
   { name: 'Opacity', settings: ['opacity'] },
   { name: 'Colour', settings: ['temperature', 'tint', 'hue', 'saturation', 'vibrance'] },
@@ -37,13 +38,13 @@ export function colourGroupResetCommands(
     if (hasLayerKeys(layer, setting)) {
       const value = point?.values[setting];
       if (value !== undefined && value !== null && value !== neutral)
-        commands.push({ type: 'layer-key-value', layerId: layer.id, frame, setting, value: neutral });
+        commands.push({ type: 'layer-key-value', ...ownerTarget(layer), frame, setting, value: neutral });
     } else if (setting === 'opacity') {
       if (layer.opacity !== neutral) commands.push({ type: 'opacity', layerId: layer.id, opacity: neutral });
     } else if (layer.colour[setting] !== neutral) colour[setting] = neutral;
   }
   if (Object.keys(colour).length > 0)
-    commands.unshift({ type: 'colour', layerId: layer.id, colour: { ...layer.colour, ...colour } });
+    commands.unshift({ type: 'colour', ...colourTarget(layer), colour: { ...layer.colour, ...colour } });
   return commands;
 }
 
@@ -61,11 +62,10 @@ function resetPointCommands(layer: VideoLayer, frame: number): EditCommand[] {
     return [];
   return [
     {
-      type: 'layer-update',
-      layer: {
-        ...layer,
-        keyframes: layer.keyframes.map((key) => (key.frame === point.frame ? { ...key, values } : key)),
-      },
+      type: 'layer-key-set',
+      ...ownerTarget(layer),
+      frame: point.frame,
+      values: Object.fromEntries(Object.entries(values).filter(([, value]) => value !== null)),
     },
   ];
 }
@@ -77,7 +77,7 @@ export function colourResetCommands(layer: VideoLayer, frame: number): EditComma
   if (animated) return resetPointCommands(layer, frame);
   const commands: EditCommand[] = [];
   if (!isNeutralColour(layer.colour))
-    commands.push({ type: 'colour', layerId: layer.id, colour: createColourSettings() });
+    commands.push({ type: 'colour', ...colourTarget(layer), colour: createColourSettings() });
   if (layer.opacity !== 1) commands.push({ type: 'opacity', layerId: layer.id, opacity: 1 });
   return commands;
 }

@@ -55,6 +55,32 @@
   border-color: #f2a996;
 }
 
+.timeline-clip-key.grade {
+  top: 38px;
+  height: 18px;
+  background: #3d3214ee;
+  border-color: #b8913a;
+  color: #ffd27a;
+}
+
+.timeline-clip-key.grade > span {
+  line-height: 16px;
+}
+
+.timeline-clip-key.grade.reset {
+  background: #8a6a1f;
+  color: #fff3d6;
+}
+
+.timeline-clip-key.grade:is(:hover, :focus-visible):not(:disabled) {
+  background: #5a4718;
+  border-color: #f0c35c;
+}
+
+.snap-guide.grade-keyframe-guide {
+  background: #ffd27a;
+}
+
 .snap-guide.transform-keyframe-guide {
   background: #c4e9ff;
 }

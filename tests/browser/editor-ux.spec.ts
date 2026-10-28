@@ -221,7 +221,7 @@ test('selected context precedes compact animation controls and adjusted sections
   const selection = page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .inspector-selection');
   await expect(selection).toContainText('pattern-a');
   await expect(selection).toContainText('Clip 1 of 1');
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await expect(selection).toContainText('Applies to the clip on this track');
   expect(
     await selection.evaluate((element) =>
@@ -270,7 +270,7 @@ test('animated visual feedback retains explicit capture, native navigation order
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await seek(page, 30);
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   const diamond = page.getByRole('button', { name: 'Keyframe Exposure', exact: true });
   await expect(diamond).toHaveAttribute('aria-pressed', 'false');
   await expect(diamond).toHaveCSS('border-style', 'dashed');
@@ -546,7 +546,7 @@ test('a failed deferred preview keeps the editor usable and saves pending edits 
   await page.reload();
   await expect(page.getByRole('button', { name: 'Reload editor', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Play preview', exact: true })).toBeDisabled();
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await expect(page.getByRole('button', { name: 'Keyframe Exposure', exact: true })).toBeDisabled();
   const main = page.locator('.keyframe-setting-navigation').filter({
     has: page.getByRole('button', { name: 'Keyframe Exposure', exact: true }),

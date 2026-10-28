@@ -130,7 +130,7 @@ test('all participants reuse their main control bounds and resets with one exact
   page,
 }) => {
   const main = new Map<string, { min: string | null; max: string | null; step: string | null }>();
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   for (const setting of KEYFRAME_SETTINGS) {
     const slider = page.getByRole('slider', { name: setting.label, exact: true });
     main.set(

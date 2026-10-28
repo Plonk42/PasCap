@@ -119,7 +119,7 @@ test('dragging a marker moves all participants/easing with preview-only drafts, 
 }) => {
   const before = await current(page);
   await seek(page, 5);
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   const start = await begin(page);
   await move(page, start, 30, true);
   await page.keyboard.up('Alt');

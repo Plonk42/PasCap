@@ -73,7 +73,7 @@ test('a Colour slider drag previews the value without a document, history or sav
   page,
 }) => {
   await page.evaluate(() => window.pascapLab!.engine.seek(10));
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   const before = await current(page);
   const graded = await checksum(page);
   await dragSlider(page, 'Exposure', 0.9);
@@ -91,7 +91,7 @@ test('a Colour slider drag previews the value without a document, history or sav
 
 test('releasing the drag commits one Undo step and the preview stays on the committed value', async ({ page }) => {
   await page.evaluate(() => window.pascapLab!.engine.seek(10));
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   const before = await current(page);
   const graded = await checksum(page);
   await dragSlider(page, 'Exposure', 0.9);
@@ -114,7 +114,7 @@ test('a locked animated slider neither previews nor creates a keyframe', async (
   await page.reload();
   await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
   await page.evaluate(() => window.pascapLab!.engine.seek(10));
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   const graded = await checksum(page);
   const slider = page.getByRole('slider', { name: 'Exposure', exact: true });
   await expect(slider).toBeDisabled();

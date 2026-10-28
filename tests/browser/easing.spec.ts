@@ -88,7 +88,7 @@ test('a default keyframe returns settings to their defaults from its frame, in o
     document.layers[0]!.colour.contrast = 1.4;
     document.layers[0]!.keyframes = [sharedPoint(10, { exposure: 0.6 })];
   });
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   const contrast = page.getByRole('spinbutton', { name: 'Contrast', exact: true });
   await seek(page, 60);
   const before = await current(page);

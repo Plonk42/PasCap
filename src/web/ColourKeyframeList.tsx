@@ -1,3 +1,4 @@
+import { isClipOwner, ownerNoun, ownerTarget } from './colour-owner.js';
 import { useId } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import {
@@ -27,12 +28,12 @@ interface Props {
   onEdit: (command: EditCommand) => void;
 }
 
-function AnimationHelp({ id }: Readonly<{ id: string }>) {
+function AnimationHelp({ id, clip }: Readonly<{ id: string; clip: boolean }>) {
   return (
     <HelpPopover label="Animation" className="animation-help" guide="opt-in-to-shared-video-track-animation">
       <p id={id}>
-        Each diamond adds a keyframe for that setting on the whole track, at the playhead. Settings keyed together share
-        one keyframe; each can have its own easing.
+        Each diamond adds a keyframe for that setting on the whole {clip ? 'clip, on the footage shown' : 'track'}, at
+        the playhead. Settings keyed together share one keyframe; each can have its own easing.
       </p>
       <div className="animation-legend">
         <span>
@@ -57,7 +58,7 @@ function AnimationHelp({ id }: Readonly<{ id: string }>) {
   );
 }
 
-/** Track → Colour's stored keyframes, through the shared central inspection cursor. */
+/** Colour's stored keyframes (track or clip grade), through the shared central inspection cursor. */
 export function ColourKeyframeList({ project, layer, frame, duration, disabled, onEdit }: Readonly<Props>) {
   const navigation = useKeyframeNavigation();
   const unavailable = disabled || navigation.disabled;
@@ -76,8 +77,9 @@ export function ColourKeyframeList({ project, layer, frame, duration, disabled, 
   const current = inspection !== null || previewAvailable ? navigationFrame : null;
   const context = `${project.id}:${layer.id}`;
   const kind: StoredKeyframeKind<KeyframeSetting, LayerKeyframe> = {
-    noun: 'track',
-    title: 'Track keyframes',
+    noun: ownerNoun(layer),
+    title: isClipOwner(layer) ? 'Clip keyframes' : 'Track keyframes',
+    frameNoun: isClipOwner(layer) ? 'source' : 'timeline',
     settings: KEYFRAME_SETTINGS,
     enabled: keySettings,
     continuing: (key) => continuingSettings(keys, key, SETTING_KEYS),
@@ -96,10 +98,11 @@ export function ColourKeyframeList({ project, layer, frame, duration, disabled, 
       keys.some((other) => other.frame !== key.frame && other.frame === value)
         ? `Frame ${value} already has a shared keyframe. Choose a different frame.`
         : null,
-    moveFrame: (key, nextFrame) => onEdit({ type: 'layer-key-move', layerId: layer.id, frame: key.frame, nextFrame }),
+    moveFrame: (key, nextFrame) =>
+      onEdit({ type: 'layer-key-move', ...ownerTarget(layer), frame: key.frame, nextFrame }),
     setEasing: (key, setting, interpolation) =>
-      onEdit({ type: 'layer-key-easing', layerId: layer.id, frame: key.frame, setting, interpolation }),
-    remove: (key) => onEdit({ type: 'layer-key-remove', layerId: layer.id, frame: key.frame }),
+      onEdit({ type: 'layer-key-easing', ...ownerTarget(layer), frame: key.frame, setting, interpolation }),
+    remove: (key) => onEdit({ type: 'layer-key-remove', ...ownerTarget(layer), frame: key.frame }),
     removeTitle: 'Remove this whole shared keyframe and all its animated settings',
     renderValues: (key, row) =>
       KEYFRAME_SETTINGS.map((setting) => {
@@ -107,7 +110,7 @@ export function ColourKeyframeList({ project, layer, frame, duration, disabled, 
         if (value === null) return null;
         const command = (nextValue: number): EditCommand => ({
           type: 'layer-key-value',
-          layerId: layer.id,
+          ...ownerTarget(layer),
           frame: key.frame,
           setting: setting.key,
           value: nextValue,
@@ -128,7 +131,7 @@ export function ColourKeyframeList({ project, layer, frame, duration, disabled, 
               label={`${setting.label} keyframe value ${key.frame}`}
               value={value}
               disabled={unavailable}
-              hint={`${setting.label} at stored timeline frame ${key.frame} on ${layer.name}. Edits change only this setting's keyframe value, not the playhead, Easing or unanimated settings.`}
+              hint={`${setting.label} at stored ${isClipOwner(layer) ? 'source' : 'timeline'} frame ${key.frame} on ${layer.name}. Edits change only this setting's keyframe value, not the playhead, Easing or unanimated settings.`}
               exact={{ resetKey: `${context}:${row}:${setting.key}`, validate }}
               onCommit={(nextValue) => {
                 if (!unavailable) onEdit(command(nextValue));
@@ -150,7 +153,7 @@ export function ColourKeyframeList({ project, layer, frame, duration, disabled, 
       inspected={inspected}
       current={current}
       disabled={unavailable}
-      help={<AnimationHelp id={helpId} />}
+      help={<AnimationHelp id={helpId} clip={isClipOwner(layer)} />}
       describedBy={helpId}
       {...(inspection ? { onFollowPlayhead: navigation.onFollowPlayhead } : {})}
     />

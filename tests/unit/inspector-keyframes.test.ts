@@ -17,7 +17,7 @@ const navigation = {
 };
 
 describe('dedicated Inspector keyframe controls', () => {
-  it('labels Clip, Track and Audio panels; an empty track keeps Colour, Opacity and keyframes in Track', () => {
+  it('labels Clip, Colour, Track and Audio panels; an empty track keeps Colour, Opacity and keyframes in Colour', () => {
     const project = createProject('tabs', 'Tabs');
     const markup = renderToStaticMarkup(
       createElement(
@@ -44,42 +44,47 @@ describe('dedicated Inspector keyframe controls', () => {
       ),
     );
     const tabs = [...markup.matchAll(/<button[^>]*role="tab"[^>]*>(.*?)<\/button>/g)].map((match) => match[1]);
-    expect(tabs).toEqual(['Clip', 'Track', 'Audio']);
+    expect(tabs).toEqual(['Clip', 'Colour', 'Track', 'Audio']);
     expect(markup).not.toContain('Whole video row');
     expect(markup).not.toContain('Row colour');
     const panels = [...markup.matchAll(/<div role="tabpanel"[^>]*>/g)].map((match) => match[0]);
-    expect(panels).toHaveLength(3);
-    expect(panels[1]).not.toContain('hidden');
-    expect(panels.filter((panel) => panel.includes('hidden'))).toHaveLength(2);
+    expect(panels).toHaveLength(4);
+    expect(panels[2]).not.toContain('hidden');
+    expect(panels.filter((panel) => panel.includes('hidden'))).toHaveLength(3);
     const clipPanel = markup.slice(markup.indexOf(panels[0]!), markup.indexOf(panels[1]!));
-    const trackPanel = markup.slice(markup.indexOf(panels[1]!), markup.indexOf(panels[2]!));
+    // Without a selected clip, the Colour tab edits the track: no Clip/Track switch.
+    const colourPanel = markup.slice(markup.indexOf(panels[1]!), markup.indexOf(panels[2]!));
+    const trackPanel = markup.slice(markup.indexOf(panels[2]!), markup.indexOf(panels[3]!));
+    expect(colourPanel).not.toContain('aria-label="Colour target"');
+    expect(trackPanel).not.toContain('aria-label="Colour section"');
+    expect(trackPanel).toContain('aria-label="Transform section"');
     expect(clipPanel).toContain('Select a clip on Track 1 to edit it.');
     expect(clipPanel).not.toContain('aria-label="Placement section"');
     expect(clipPanel).not.toContain('aria-label="Opacity"');
-    expect(trackPanel).toContain('aria-label="Track keyframes Track 1"');
-    expect(trackPanel).not.toContain('aria-label="Keyframes section"');
+    expect(colourPanel).toContain('aria-label="Track keyframes Track 1"');
+    expect(colourPanel).not.toContain('aria-label="Keyframes section"');
     // Colour's stored keyframe list sits inside the Colour section, before HSL ranges.
-    const colourSection = trackPanel.slice(
-      trackPanel.indexOf('aria-label="Colour section"'),
-      trackPanel.indexOf('aria-label="HSL ranges section"'),
+    const colourSection = colourPanel.slice(
+      colourPanel.indexOf('aria-label="Colour section"'),
+      colourPanel.indexOf('aria-label="HSL ranges section"'),
     );
     expect(colourSection).toContain('aria-label="Track keyframes Track 1"');
     expect(trackPanel).toContain('aria-label="Fades section"');
-    const opacity = [...trackPanel.matchAll(/<input[^>]*aria-label="Opacity"[^>]*>/g)].map((match) => match[0]);
+    const opacity = [...colourPanel.matchAll(/<input[^>]*aria-label="Opacity"[^>]*>/g)].map((match) => match[0]);
     expect(opacity).toHaveLength(2);
     expect(opacity[0]).toContain('type="range"');
     expect(opacity[0]).toContain('value="100"');
     expect(opacity[1]).toContain('type="number"');
     expect(opacity[1]).toContain('value="100"');
     expect(opacity[0]).not.toContain('disabled');
-    expect(trackPanel).toContain('100%');
-    expect(trackPanel).toContain('Not animated');
-    const colour = trackPanel.slice(trackPanel.indexOf('aria-label="Colour section"'));
+    expect(colourPanel).toContain('100%');
+    expect(colourPanel).toContain('Not animated');
+    const colour = colourPanel.slice(colourPanel.indexOf('aria-label="Colour section"'));
     expect(colour).toContain('aria-label="Opacity"');
-    expect(trackPanel).not.toContain('Animate Colour');
-    expect(trackPanel).toContain('aria-label="Keyframe Opacity"');
-    expect(trackPanel).not.toContain('Keyframe Layer opacity');
-    expect(trackPanel).not.toContain('Keyframe Clip opacity');
+    expect(colourPanel).not.toContain('Animate Colour');
+    expect(colourPanel).toContain('aria-label="Keyframe Opacity"');
+    expect(colourPanel).not.toContain('Keyframe Layer opacity');
+    expect(colourPanel).not.toContain('Keyframe Clip opacity');
   });
 
   it.each(KEYFRAME_SETTINGS)('$label shares its setting-specific bounds and accessible controls', (setting) => {

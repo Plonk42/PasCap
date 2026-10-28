@@ -226,7 +226,7 @@ test('retryable autosave failures keep the draft and require an explicit retry w
   page,
 }) => {
   failure = 503;
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.6');
   await page.evaluate(() => window.pascapLab!.flush());
   await expect(page.getByRole('button', { name: 'Retry save' })).toBeVisible();
@@ -249,7 +249,7 @@ test('conflicts never overwrite or auto-rebase: download and confirmed reload pr
 }) => {
   saved = { ...saved, title: 'Other tab save', revision: 1 };
   failure = 409;
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.4');
   await page.evaluate(() => window.pascapLab!.flush());
   await expect(page.getByRole('button', { name: 'Retry save' })).toHaveCount(0);
@@ -264,7 +264,7 @@ test('conflicts never overwrite or auto-rebase: download and confirmed reload pr
   await page.getByRole('button', { name: 'Review latest save' }).click();
   await page.getByRole('button', { name: 'Discard local changes and reload' }).click();
   await expect(page.getByRole('textbox', { name: 'Project title', exact: true })).toHaveValue('Other tab save');
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('0');
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
   expect(writes).toBe(1);
@@ -352,7 +352,7 @@ test('denied browser preference storage does not prevent opening/editing a proje
   await page.getByRole('button', { name: 'Grid view' }).click();
   await expect(page.locator('.media-items')).toHaveClass('media-items grid');
   await closeOptions(page);
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.3');
   expect(await page.evaluate(() => window.pascapLab!.project()!.layers[0]!.colour.exposure)).toBe(0.3);
   await collapsePanel(page, 'Properties').click();

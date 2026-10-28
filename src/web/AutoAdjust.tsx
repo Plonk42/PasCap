@@ -51,7 +51,7 @@ const APPLIES: readonly { apply: AutoAdjustApply; label: string; name: string; h
   { apply: 'keyframe', label: 'Keyframe', name: 'Keyframe at playhead', hint: 'at playhead' },
 ];
 
-/** Track → Colour → Auto: analyses the clip at the playhead and applies its correction to the track. */
+/** Colour → Auto (track target): analyses the clip at the playhead and applies its correction to the track. */
 export function AutoAdjust({
   projectId,
   layer,
