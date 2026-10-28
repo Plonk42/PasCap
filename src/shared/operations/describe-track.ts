@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { described } from '../described.js';
 import { interpolationSchema, keyframeSettingSchema } from '../keyframes.js';
+import { colourSchema } from '../colour.js';
+import { gradeSettingSchema } from '../grade.js';
 import { frameSchema, idSchema, layerSchema } from '../model.js';
 import { SPATIAL_CHANNELS, spatialPoseSchema, type SpatialChannel } from '../spatial.js';
 import { defineOperation } from './spec.js';
@@ -10,7 +12,7 @@ export const MAX_DESCRIBED_FRAMES = 32;
 
 const spatialChannelSchema = z.enum(SPATIAL_CHANNELS as [SpatialChannel, ...SpatialChannel[]]);
 
-export const trackParts = ['track', 'keyframes', 'at'] as const;
+export const trackParts = ['track', 'keyframes', 'grades', 'at'] as const;
 
 /** A keyframe with only its enabled settings. */
 function compactKeyframe<K extends string>(settings: z.ZodEnum<Record<K, K>>) {
@@ -45,6 +47,23 @@ export const trackDescriptionSchema = z
         .optional(),
       'The Colour and Opacity keyframes and the Transform keyframes, each with only its keyed settings.',
     ),
+    grades: described(
+      z
+        .array(
+          z
+            .object({
+              clipId: idSchema,
+              colour: described(colourSchema, "The clip's own Colour, applied before the track's."),
+              keyframes: described(
+                z.array(compactKeyframe(gradeSettingSchema)),
+                'Its keyframes, at source frames of its recording (timecode too).',
+              ),
+            })
+            .strict(),
+        )
+        .optional(),
+      'The clip grades of the clips on this track that grade or have keyframes, in timeline order; the others are neutral.',
+    ),
     keyed: described(
       z
         .object({
@@ -75,6 +94,20 @@ export const trackDescriptionSchema = z
                 spatialPoseSchema.partial(),
                 'The Transform pose (or the settings asked for) at this frame.',
               ),
+              clipGrades: described(
+                z
+                  .array(
+                    z
+                      .object({
+                        clipId: idSchema,
+                        sourceFrame: frameSchema,
+                        values: z.partialRecord(gradeSettingSchema, z.number()),
+                      })
+                      .strict(),
+                  )
+                  .optional(),
+                'The grade of each clip shown at this frame that has one, at the source frame it shows; values apply before the track values.',
+              ),
             })
             .strict(),
         )
@@ -88,7 +121,7 @@ export type TrackDescription = z.infer<typeof trackDescriptionSchema>;
 export const describeTrack = defineOperation({
   name: 'describe_track',
   description:
-    'Read every appearance value of one video track: its saved Colour (scalar settings, HSL ranges, curves), Opacity, Transform and keyframes, which settings follow keyframes, and the values that apply at the requested project frames. Settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve), so read the whole track before grading it; afterwards, include keyframes or at with the settings you changed reads far less.',
+    'Read every appearance value of one video track: its saved Colour (scalar settings, HSL ranges, curves), Opacity, Transform and keyframes, which settings follow keyframes, the grades of its clips (each applied before the track Colour) and the values that apply at the requested project frames. Settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve), so read the whole track before grading it; afterwards, include keyframes or at with the settings you changed reads far less.',
   input: z
     .object({
       projectId: described(idSchema, 'ID of the saved project.'),
@@ -98,8 +131,8 @@ export const describeTrack = defineOperation({
         `Up to ${MAX_DESCRIBED_FRAMES} project frames at which to report the values that apply; none when omitted.`,
       ),
       include: described(
-        z.array(z.enum(trackParts)).min(1).default(['track', 'at']),
-        'Parts to return besides revision and keyed: track (the whole saved track, the largest part), keyframes (each keyframe with only its keyed settings) and at (the values at frames).',
+        z.array(z.enum(trackParts)).min(1).default(['track', 'grades', 'at']),
+        'Parts to return besides revision and keyed: track (the whole saved track, the largest part), keyframes (each keyframe with only its keyed settings), grades (its clips’ own grades) and at (the values at frames).',
       ),
       settings: described(
         z

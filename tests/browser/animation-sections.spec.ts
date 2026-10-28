@@ -334,7 +334,7 @@ for (const viewport of [
       expect(graded).toHaveLength(1280 * 720 * 4);
       expect(graded.rgbSum).toBeGreaterThan(0);
       expect(await pixels(page, true)).not.toEqual(graded);
-      await inspectorTab(page, 'Track');
+      await inspectorTab(page, 'Track colour');
       await expect(line(page, 'Colour')).toContainText('2 keyframes');
       await expect(diamond(page, 'Exposure')).toHaveAttribute('aria-pressed', 'false');
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toHaveValue('0.6');
@@ -342,6 +342,7 @@ for (const viewport of [
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toBeDisabled();
       await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeDisabled();
       await expect(layerKeyframes(page, TRACK).locator('.keyframe-row')).toHaveCount(2);
+      await inspectorTab(page, 'Track');
       // Every stored Transform keyframe (5) is counted, including those after the duration.
       await expect(line(page, 'Transform')).toContainText('5 keyframes');
       await expect(transformDiamonds(page)).toHaveCount(8);
@@ -366,6 +367,7 @@ for (const viewport of [
       await inspectorTab(page, 'Track');
       await seek(page, document, 10);
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toBeEnabled();
+      await inspectorTab(page, 'Track colour');
       await seek(page, document, 40);
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toBeEnabled();
       await seek(page, document, 0);
@@ -378,7 +380,7 @@ for (const viewport of [
       await colour.click();
       await expect(line(page, 'Colour')).toBeVisible();
       for (const section of ['Transform', 'Speed'] as const) {
-        if (section === 'Speed') await inspectorTab(page, 'Clip');
+        await inspectorTab(page, section === 'Speed' ? 'Clip' : 'Track');
         const toggle = page.getByRole('button', { name: `${section} section`, exact: true });
         await toggle.click();
         await expect(line(page, section)).toBeHidden();

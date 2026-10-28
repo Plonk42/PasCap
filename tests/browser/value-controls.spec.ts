@@ -125,7 +125,7 @@ function controls(scope: Page | Locator, name: string) {
   return { slider, exact: scope.getByRole('spinbutton', { name, exact: true }), widget: slider.locator('..') };
 }
 
-/** Track owns Colour, Opacity and stored keyframe values; Audio owns gain; Clip owns clip speed. */
+/** The track's Colour tab owns Colour, Opacity and stored keyframe values; Audio owns gain; Clip owns clip speed. */
 async function showControl(page: Page, name: string): Promise<void> {
   if (name === 'Music gain') await inspectorTab(page, 'Audio');
   else if (
@@ -133,7 +133,7 @@ async function showControl(page: Page, name: string): Promise<void> {
       name,
     )
   )
-    await inspectorTab(page, 'Track');
+    await inspectorTab(page, 'Track colour');
   else if (/speed rate|rate$/i.test(name)) await inspectorTab(page, 'Clip');
 }
 

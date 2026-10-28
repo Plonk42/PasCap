@@ -68,20 +68,21 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   through black between sections; opening and closing fades on the track to match the music.
   After snapping, add dissolves with keepCut so the change stays on the beat and later cuts
   do not move.
-- Use a second track only for an overlay or a clip that needs its own grade.
+- Use a second track only for an overlay; a clip that needs its own grade gets a clip grade.
 
 ## 6. Grade
-- describe_track before changing appearance: settings interact (Contrast with Shadows,
+- Each clip has its own grade (a clipId on the colour commands), applied first and kept with
+  the clip when it moves; its track's Colour then applies to all its clips, for a shared look.
+  describe_track reads both before you change them: settings interact (Contrast with Shadows,
   Highlights, Whites and Blacks shape one tone curve). Prefer static grades; animate only when
-  the brief asks or the light changes within a shot. Once you know the track, include keyframes
-  or at with the settings you changed rather than the whole track.
+  the brief asks or the light changes within a shot (clip keyframes are source frames). Once you
+  know the track, include keyframes or at with the settings you changed rather than all of it.
 - Start from estimate: auto-adjust on a representative clip (or the whole track) gives the
   editor's Auto correction and the edit applying it; white-balance only Temperature and Tint;
   detail suggests a clip's Denoise and Sharpen (clipIds or layerId: every clip in one call).
-  Clips needing different grades go on their own track, since Colour belongs to the track, or
-  get a grade per shot: estimate with applyAs shots (layerId or clipIds) keys each clip's own
-  correction at its start with Hold, blended across dissolves, in one call. Do it once the cut
-  is final: keyframes stay at their project frames when clips move.
+  For a correction per shot, estimate with applyAs shots (layerId or clipIds) writes each clip's
+  own correction into its clip grade in one call; dissolves blend the two grades. Keep the track
+  Colour for the look shared by every shot.
 - Change one setting with colour-setting, hsl-band, colour-curve or transform-setting, which
   keep every other value; a keyed setting follows its keyframes, so change those instead
   (layer-key-value). The colour and transform commands replace everything and suit a full grade.

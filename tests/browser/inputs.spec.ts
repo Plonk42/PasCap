@@ -71,7 +71,7 @@ async function commitNumber(page: Page, name: string, value: string): Promise<vo
       name,
     )
   )
-    await inspectorTab(page, 'Track');
+    await inspectorTab(page, 'Track colour');
   else await inspectorTab(page, 'Clip');
   const field = page.getByRole('spinbutton', { name, exact: true });
   await field.fill(value);

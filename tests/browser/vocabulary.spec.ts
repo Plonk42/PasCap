@@ -62,7 +62,7 @@ for (const viewport of [
     await openOptions(page, 'Track options Track 1');
     await expect(page.getByRole('textbox', { name: 'Rename track Track 1', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
-    await inspectorTab(page, 'Track');
+    await inspectorTab(page, 'Track colour');
     await expect(page.getByRole('group', { name: 'Track keyframes Track 1', exact: true })).toBeAttached();
     await expect(page.getByRole('button', { name: 'Delete track keyframe 30', exact: true })).toBeAttached();
     await page.getByRole('button', { name: 'Colour animation help', exact: true }).focus();
@@ -72,6 +72,7 @@ for (const viewport of [
     await page.getByRole('button', { name: 'Colour curves section', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Colour curve control node 1', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Delete colour curve control node', exact: true })).toBeDisabled();
+    await inspectorTab(page, 'Track');
     await page.getByRole('button', { name: 'Keyframe Scale', exact: true }).click();
     const transformKeys = page.getByRole('group', { name: 'Transform keyframes Track 1', exact: true });
     await expect(transformKeys.getByRole('list', { name: 'Edit Transform keyframes', exact: true })).toBeVisible();
