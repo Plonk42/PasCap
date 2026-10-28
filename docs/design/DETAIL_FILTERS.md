@@ -178,7 +178,7 @@ is the look HDR 1 alone used to give.
 Any nonzero HDR base or HDR keyframe requires composited export (keyframes already do).
 In preview, HDR uses the detail program variants below; no texture, buffer, decoder,
 LUT or native process is added. The diagnostic two-clip reference and measurement
-helper reject HDR. **Track → Colour** lists HDR in its Effects group, above Local contrast, with the common slider/exact
+helper reject HDR. **Colour → Track** lists HDR in its Effects group, above Local contrast, with the common slider/exact
 field, capture diamond and Previous/Next arrows, live slider preview and one Undo
 per release. The Original preview bypasses it with the rest of Colour.
 
@@ -201,7 +201,7 @@ this boost can be judged and set separately.
   export; the diagnostic two-clip reference and measurement helper reject it. Preview adds
   one `vec2 localContrast` uniform (one value per source) to the detail variants.
 
-**Track → Colour** lists Local contrast last, below HDR in its Effects group, with the common
+**Colour → Track** lists Local contrast last, below HDR in its Effects group, with the common
 slider/exact field, capture diamond, Previous/Next arrows, Reset icon, live slider preview and
 one Undo per release. The Original preview bypasses it with the rest of Colour.
 

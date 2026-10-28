@@ -71,7 +71,7 @@ quantisation remain measured approximations under the unchanged error gates.
 
 ## Editing, resets and resource ownership
 
-Track → Colour contains twelve scalar sliders, HDR, Local contrast and the sole Opacity control, grouped
+Colour → Track contains twelve scalar sliders, HDR, Local contrast and the sole Opacity control, grouped
 as in [track appearance](ROW_APPEARANCE.md#properties-and-history).
 The separate, initially collapsed Track sections
 **HSL ranges** and **Colour curves** (after Colour) choose their band/channel with a row of coloured

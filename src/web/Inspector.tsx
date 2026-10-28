@@ -55,6 +55,8 @@ interface Props {
   project: ProjectDocument;
   assets: MediaAsset[];
   selectedClipId: string | null;
+  /** Clips selected together (Ctrl/Cmd-click); one clip's grade is edited only on its own. */
+  selectedClipCount?: number;
   selectedLayerId: string;
   boundaryId: string | null;
   frame: number;
@@ -854,6 +856,7 @@ function InspectorPanel({
   project,
   assets,
   selectedClipId,
+  selectedClipCount = 0,
   selectedLayerId,
   boundaryId,
   frame,
@@ -1080,7 +1083,15 @@ function InspectorPanel({
           aria-labelledby={`${inspectorId}-colour-tab`}
           hidden={section !== 'colour'}
         >
-          {layer && colourOwner ? (
+          {gradeClip && selectedClipCount > 1 ? (
+            <div className="inspector-empty">
+              {selectedClipCount} clips are selected: select one to edit its grade, or choose Track to edit{' '}
+              {layer!.name}. Paste grade sets the same grade on all of them.
+              <button type="button" className="text-button" onClick={() => setColourTargetChoice('track')}>
+                Edit {layer!.name}
+              </button>
+            </div>
+          ) : layer && colourOwner ? (
             <>
               <div className="selected-clip-name inspector-selection colour-target">
                 <Icon name={gradeClip ? 'video' : 'layers'} size={17} />

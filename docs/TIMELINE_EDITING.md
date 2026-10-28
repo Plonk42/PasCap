@@ -419,7 +419,7 @@ uses its unkeyed value only when it has no keyed settings on the track: the save
 value for Opacity and track colour for colour.
 
 The selected video track, including an empty one, has its directly visible shared keyframe list
-(accessible name **Track keyframes**) at the end of **Track → Colour**, under a small
+(accessible name **Track keyframes**) at the end of **Colour → Track**, under a small
 **Keyframes** heading. Clip keeps
 the playhead Speed controls; Track keeps Colour, Opacity and Transform. Track Transform
 keyframes are a separate project-frame list at the end of **Track → Transform**, with their own markers
@@ -440,7 +440,7 @@ Each video track draws **one marker per stored keyframe**, with enabled settings
 diamond-and-return-arrow icon instead of ◆),
 never per-clip duplicates; keyframes after the last clip keep their markers there
 without extending playback. **Click or Enter** selects the marker's track
-and seeks, opening Track → Colour, without editing. **Drag horizontally** to move the shared keyframe:
+and seeks, opening Colour → Track, without editing. **Drag horizontally** to move the shared keyframe:
 
 - Capture the committed project, track/keyframe, zoom, grabbed pointer position,
   horizontal scroll and stationary playhead. Compute from that captured base plus
@@ -502,7 +502,7 @@ Enabled setting chips in stored Colour keyframe rows retain their arrows too.
 All these per-channel arrows are disabled without the relevant neighbour, an opened
 project, or during any document-preview draft. They seek
 strictly earlier/later keyframes where that channel is not `null` (zero included),
-skipping unrelated enabled settings. **Track → Colour** contains the single **Opacity**
+skipping unrelated enabled settings. **Colour → Track** contains the single **Opacity**
 slider/exact `NumberField` alongside the colour controls, its diamond and adjacent per-setting arrows.
 Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
 Required track `opacity` and keyframe values remain **0–1**; UI conversion changes no schema.
@@ -947,8 +947,8 @@ precision, commit on Enter/blur, keep invalid drafts editable and restore on Esc
 Other integer source/placement frames, durations and fades retain exact native
 numeric steppers and existing timecode feedback, without arbitrary timing sliders.
 Source-review IN/OUT fields apply as a pair on Enter or when focus leaves both; Escape restores.
-**Clip / Track / Audio** separates clip-owned source/placement/speed/Detail,
-track-owned Colour/Transform/keyframes/transitions/fades, and music. The header directly exposes
+**Clip / Colour / Track / Audio** separates clip-owned source/placement/speed/Detail, the
+selected clip's grade or its track's Colour, track-owned Transform/transitions/fades, and music. The header directly exposes
 help; **Workspace options**
 holds layout reset and Diagnostics, while Media and the Properties panel collapse from their
 own headings. **Track options**
