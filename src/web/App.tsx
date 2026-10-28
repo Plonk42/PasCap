@@ -2292,6 +2292,7 @@ export function App() {
                     project={visible}
                     assets={assets}
                     selectedClipId={selectedId}
+                    selectedClipCount={clipGroup.group.length}
                     selectedLayerId={selectedLayerId}
                     boundaryId={boundaryId}
                     frame={inspectorFrame}

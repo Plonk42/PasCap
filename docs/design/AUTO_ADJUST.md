@@ -1,4 +1,4 @@
-# Track → Colour → Auto (Auto adjust)
+# Colour → Auto (Auto adjust)
 
 Current contract for Phase 1 of [#167](https://github.com/Plonk42/PasCap/issues/167):
 an **Auto** action that analyses the clip at the playhead and writes a balanced

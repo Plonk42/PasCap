@@ -8,7 +8,7 @@ or opacity contract. [#67](https://github.com/Plonk42/PasCap/issues/67) supersed
 two-opacity descriptions with the current sole video track contract: required numeric `VideoLayer.opacity`
 (1 on new tracks), no saved `clip.opacity`, and the sole track keyframe channel `opacity`
 overriding the track value on every source, without an additional group multiplier.
-The single **Opacity** control is in **Track → Colour**; **Placement** contains
+The single **Opacity** control is in **Colour → Track**; **Placement** contains
 placement only. The accepted schema-6 body below remains historical. Track visibility,
 Ripple, transitions/fades, grouped dissolves and resource bounds retain their
 semantics. [#35's current contract](MULTIPLE_MUSIC.md) supersedes the

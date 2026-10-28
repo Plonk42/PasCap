@@ -117,7 +117,7 @@ original's exclusive OUT. Transform poses evaluate at absolute project time, lik
 Colour, and apply to every source on the track; see
 [track Transform](design/SPATIAL_TRANSFORMS.md).
 
-The single **Opacity** slider is in **Track → Colour**, beside the colour sliders,
+The single **Opacity** slider is in **Colour → Track**, beside the colour sliders,
 and starts at **100%**. It edits track `opacity` without keyframes and works on an empty
 track. With keyframes, only an enabled setting at the real playhead is editable; the hollow
 diamond explicitly captures a setting that is not enabled there. Sliders never create keyframes.

@@ -1,4 +1,4 @@
-# Owner-approved video track-only Colour and Opacity
+# Video track Colour, Opacity and clip grades
 
 Required Colour includes twelve graded scalar settings, including Temperature, Tint, Vibrance, Whites and Blacks,
 the HDR look and Local contrast (applied before grading with the clip detail filters; see
@@ -13,11 +13,10 @@ order: [Temperature/Tint](TEMPERATURE_AND_TINT.md) and
 
 Each video track requires complete `VideoLayer.colour`, neutral on creation,
 alongside its sole required `opacity`, initially 1. Colour contains the twelve
-graded scalar channels, `hdr`, `localContrast`, plus required HSL and curves. Clips have no colour or correction
-field: both `clip.colour` and `clip.correction` are invalid.
-The owner-approved scope is identical with or without animation: every clip on
-the same video track shares all colour treatment. Different treatments require different
-tracks, not a per-clip scope toggle or a separate shot feature. Temperature and Tint
+graded scalar channels, `hdr`, `localContrast`, plus required HSL and curves. Saved
+`clip.colour` and `clip.correction` are invalid; a clip's own Colour is its
+[grade](#clip-grades). Track Colour, with or without animation, applies to every clip on
+the track, after each clip's grade. Temperature and Tint
 are required normalized −1…1 track fields, neutral 0, with independent animation.
 Positive Temperature warms; positive Tint adds magenta. Nonzero settings
 intentionally colour greys; normalized linear gains precede Exposure, preserving
@@ -49,24 +48,53 @@ bases, Opacity, Transform and absolute keyframes remain untouched. Moving or ins
 a clip immediately adopts destination video track Colour, Transform, keyframes and
 Opacity without changing either track's settings or keyframes.
 
+## Clip grades
+
+Every clip requires `grade: { colour, keyframes }`
+([#273](https://github.com/Plonk42/PasCap/issues/273), schema decisions in
+[clip grades and adjustments](CLIP_GRADES_AND_ADJUSTMENTS.md#clip-grade-owner)):
+
+- `colour` has the track Colour's fields, bounds and neutral values (twelve scalar settings,
+  `hdr`, `localContrast`, HSL and curves), without Opacity or Transform. New clips are neutral;
+  projects saved before clip grades open with a neutral grade on every clip, rendering as before.
+- `keyframes` are at most **64** `{ frame, values, easing, reset }` at **original-source frames**
+  of the recording (0 to its frame count), with the fourteen nullable Colour channels
+  (`temperature` … `localContrast`, no `opacity`), one Easing per enabled setting and the default
+  keyframe flag. Keys outside the trim are kept, like off-trim speed keys.
+- The grade is evaluated at the clip's continuous source position (one frame lower when
+  reversed, so a key applies fully as its image appears): slow motion eases between keys and a
+  reversed clip plays its keys backwards. HSL and curves are static.
+- Trims, moves (to another track too), Ripple, splits, cuts, duplicates, Reverse and Move to new
+  track keep the grade with its footage; split, cut and duplicate copy it.
+- Commands: `colour` (with `clipIds`, several clips at once), `colour-setting`, `hsl-band`,
+  `colour-curve` and the `layer-key-*` keyframe commands take a `clipId` instead of `layerId`;
+  their frames are then source frames. Opacity is refused on a clip.
+
 ## Rendering
 
 Let `grade` be the encoded BT.709 SDR transform, including scalar, HSL and
-master/RGB curve stages. Each source is graded as
+master/RGB curve stages. Each source is graded by its clip's grade $c$, then its track's
+Colour $r$, both evaluated at the source's frame:
 
-$$G_i=\mathrm{grade}(RGB_i, rowColour(t)).$$
+$$G_i=\mathrm{grade}(\mathrm{grade}(RGB_i, c(s)), r(t)).$$
 
-There is one ordered SDR grade, not a composed or double-grade transform. An exactly
-neutral track grade returns its input unchanged. Grading precedes black fades,
-dissolve group sums and track Opacity/coverage. The Original preview neutralizes all video track Colour and clip Detail,
-preserving observed frames, retiming, geometry, Opacity, fades, stacking and music.
+Each grade ends with its own clipping and encoding; settings are never summed into one grade.
+The local tone settings (HDR, Local contrast, Shadows, Highlights) of both grades are summed,
+within their ranges, for the one detail-kernel pass before grading, and Shadows/Highlights choose
+tones after the summed Exposure. An exactly neutral grade is skipped: a clip with a neutral grade
+on a neutral track returns its input unchanged. Grading precedes black fades,
+dissolve group sums and track Opacity/coverage. The Original preview neutralizes clip grades, video track Colour and clip Detail (or, with a
+modifier, only one of the two kinds of grade), preserving observed frames, retiming, geometry, Opacity, fades, stacking and music.
 Appearance edits do not restart unchanged media or alter timing.
 Texture, decoder and full-frame buffer counts stay unchanged. Exact neutral spatial
 poses retain their existing opaque black letterbox path.
 
-With neutral HSL and identity curves, static export generates a 65³ scalar LUT
-from the video track's Colour alone; nonneutral scalar colour with Shadows/Highlights/HDR/Local contrast 0 retains this cheap path.
-Track keyframes, nonzero HDR or Local contrast, Transform edits/keyframes or nonneutral HSL/curves require composited export. Scalar-only
+With neutral HSL and identity curves, static export generates one 65³ scalar LUT per clip,
+composed from its grade followed by the track's Colour; nonneutral scalar colour with
+Shadows/Highlights/HDR/Local contrast 0 retains this cheap path. Track or clip grade keyframes,
+nonzero HDR or Local contrast, Transform edits/keyframes or nonneutral HSL/curves in either grade
+require composited export, which composes each source's two scalar grades into one LUT (its cache
+identity is the pair) or grades exactly in sequence. Scalar-only
 composited grades use evaluated track parameters and at most two reused LUT arrays.
 Advanced grades evaluate the complete scalar/HSL/curve transform exactly on the
 fractional sampled RGB. Source/frame compilation determines neutral stages once,
@@ -81,9 +109,23 @@ and identity curves and Shadows/Highlights/HDR/Local contrast 0, without indepen
 
 ## Properties and history
 
+The Colour sections live in the **Colour** Properties tab (**Clip / Colour / Track / Audio**). Its
+pinned header names what it edits: with a clip selected, its grade (**This clip only**) or, with
+the **Clip / Track** switch (arrow keys move between them), its track's Colour; without a selected
+clip, the track. Selecting another clip returns to Clip; a timeline marker chooses its own target.
+With several clips selected, the clip's grade is not editable: the tab says why and offers the
+track. A clip grade shows the same sections without the Opacity group, **Auto** and **Auto white
+balance**; its diamonds key the source frame shown at the playhead (unavailable, with the reason,
+when the playhead is off the clip), its keyframe list is **Clip keyframes** with source frames, and
+its keyframes are amber ◆ markers inside the clip on the timeline. **Copy grade** and **Paste grade**
+in a clip's context menu copy a grade without keyframes and replace the right-clicked clip's grade
+(or every selected clip's, when it is selected), removing its keyframes, in one Undo step. Holding
+**Original** bypasses every grade and Detail; with **Shift** only clip grades and Detail, with
+**Alt** only track Colour; its badge names the mode.
+
 Control vocabulary follows the [editor control catalogue](EDITOR_CONTROLS.md#vocabulary).
 
-**Track → Colour** has fifteen main widgets: twelve graded scalar video track colour controls,
+**Colour → Track** has fifteen main widgets: twelve graded scalar video track colour controls,
 HDR, Local contrast and sole Opacity. All use existing slider/exact-field/reset controls and work on an empty
 track. They sit in four static groups, each a labelled fieldset with a small heading:
 **Opacity**; **Colour** (Temperature, Tint, Hue, Saturation, Vibrance); **Light** (Exposure,

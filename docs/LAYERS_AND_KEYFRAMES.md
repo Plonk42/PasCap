@@ -220,7 +220,7 @@ For example, with saved Contrast 1.4 (unanimated), Exposure keyed to 1 at frame 
 default keyframe at 50: Contrast is 1.4 before frame 50 and 1 from it; Exposure is 1 at
 frame 10, 0.5 at 30 with Linear Easing, and 0 from 50.
 
-**Track → Colour**'s keyframe line has a toggle **Add default keyframe** (pressed:
+**Colour → Track**'s keyframe line has a toggle **Add default keyframe** (pressed:
 **Remove default keyframe**) with its own amber icon, a diamond around a return arrow. It
 adds a default keyframe at the real playhead, or removes the one there, in one Undo step;
 it is unavailable where an ordinary keyframe already exists (never merged or overwritten).
@@ -230,14 +230,14 @@ settings stay editable like any keyframe's; it remains a default keyframe throug
 
 Control names follow the [editor control vocabulary](design/EDITOR_CONTROLS.md#vocabulary).
 
-**Track → Colour** ends, below its grouped sliders, with **one directly visible whole-track
+**Colour → Track** ends, below its grouped sliders, with **one directly visible whole-track
 keyframe list** for the selected video track, including an empty track without a selected
 clip. It sits under a small **Keyframes** heading with the **Animation help** question-mark
 button beside it (fieldset accessible name **Track keyframes** plus the track name, list
 **Edit track keyframes**) and shows enabled-setting chips for the current or inspected stored
 keyframe. Colour's keyframe line provides its count and the only section Previous/Next pair.
 Animation help includes keyframe-timing guidance, with no separate Keyframe timing help button.
-**Clip** keeps source/clip settings and Speed controls; **Track → Colour**
+**Clip** keeps source/clip settings and Speed controls; **Colour → Track**
 keeps track Colour/Opacity controls and **Track → Transform** the pose, evaluated at the real playhead.
 
 Colour, Speed and Transform always show their capture diamonds while the section is expanded, Colour and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. Track diamond states remain:
@@ -275,7 +275,7 @@ or any document-preview draft is active. Navigation preserves the
 chosen Properties tab and activated button's focus instead of forcing Clip, and
 changes no document, history or autosave state.
 
-**Track → Colour** contains the single **Opacity** native slider/exact
+**Colour → Track** contains the single **Opacity** native slider/exact
 `NumberField` alongside the colour controls, with its diamond and adjacent
 per-setting Previous/Next buttons. The main sliders sit under four static headings,
 each with a one-Undo group Reset: **Opacity**; **Colour** (Temperature, Tint, Hue,
@@ -387,7 +387,7 @@ targets its existing stored keyed setting, even when that keyframe is outside du
 There is **one marker per stored track keyframe**, even across multiple clips or a
 dissolve, not one marker per channel/clip. Its title names the video track, project time
 and enabled settings; the panel exposes chips/dependencies. **Click or Enter** selects
-the track, seeks and opens Track → Colour, without editing. Whole-track keyframe
+the track, seeks and opens Colour → Track, without editing. Whole-track keyframe
 navigation retains the chosen Properties tab. Keyframes after the last clip keep their marker at
 their own project time, like keyframes before the first clip. The scrollable timeline
 widens to reach the last stored keyframe, but duration, playback and seeking still end
@@ -543,20 +543,21 @@ offscreen/unmount/project-switch releases the review decoder.
 
 ## Properties panel and resource limits
 
-The Properties panel uses **Clip / Track / Audio** tabs, split by ownership. **Clip**
+The Properties panel uses **Clip / Colour / Track / Audio** tabs, split by ownership. **Clip**
 holds the selected clip's **Speed**, **Detail**, **Range** and **Placement** (placement only) under a "Clip N of M · track" header; on an empty video track it shows only
-"Select a clip on … to edit it." **Track** holds everything the whole video track owns
-under an "Applies to all N clips on this track" header: Colour (including the sole
-track Opacity control and, at its end, the shared keyframe list with Animation help and
-enabled-setting chips), HSL ranges, Colour curves, Transform (ending with its own keyframe
-list), Transitions (every
+"Select a clip on … to edit it." **Colour** holds Colour, HSL ranges and Colour curves for the
+selected clip's [grade](design/ROW_APPEARANCE.md#clip-grades) or, through its **Clip / Track**
+switch (or without a selected clip), the track's Colour (including the sole track Opacity control
+and, at its end, the shared keyframe list with Animation help and enabled-setting chips).
+**Track** holds the rest of what the whole video track owns under an "Applies to all N clips on
+this track" header: Transform (ending with its own keyframe list), Transitions (every
 boundary of the track, left to right, with the selected one expanded) and Fades.
 Music belongs to Audio, with detailed **Placement & fades**.
 Sections retain their expansion in local browser storage.
 New defaults collapse **Speed**, **Detail**, **Range**, **Placement**, **HSL ranges**,
 **Colour curves** and **Transform**, while the other Track sections stay open. Existing section preferences are not reset. **Expand all / Collapse all**
 affects only the visible tab's sections: Clip's **Speed**, **Detail**, **Range** and
-**Placement**; Track's **Colour**, **HSL ranges**, **Colour curves**, **Transform**, **Transitions** and **Fades**; Audio's
+**Placement**; Colour's **Colour**, **HSL ranges** and **Colour curves**; Track's **Transform**, **Transitions** and **Fades**; Audio's
 **Music**. Other tabs, nested keyframe disclosures and
 help remain unchanged; the shared list has no expansion preference.
 Hidden tab/section content stays mounted, retaining valid/invalid drafts within

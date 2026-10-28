@@ -130,7 +130,7 @@ keyframe (even neutral keyframes) does too, as does nonzero track HDR, Local con
 after grading; nonneutral uncovered pixels reveal lower footage. The static chunk
 plan cannot silently omit these edits.
 Opacity is composition coverage, not part of the SDR RGB grade.
-Its single native slider/exact `NumberField` is in **Track → Colour** alongside
+Its single native slider/exact `NumberField` is in **Colour → Track** alongside
 the colour controls. Its capture diamond is always visible;
 adjacent per-setting Previous/Next buttons appear with it, and stored
 enabled-setting chips retain their per-channel arrows.
