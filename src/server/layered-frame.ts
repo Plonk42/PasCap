@@ -257,6 +257,11 @@ export function fittedContent(
  * Rows [rowStart, rowEnd) of one group, identical in process and in a worker band.
  * Each pixel reads only its own accumulator entry, so disjoint bands never interact.
  */
+/** One grade or several, applied in sequence. */
+function gradeStages(colour: ColourSettings | readonly ColourSettings[]): readonly ColourSettings[] {
+  return Array.isArray(colour) ? colour : [colour as ColourSettings];
+}
+
 export function composeRows(
   output: Uint16Array,
   width: number,
@@ -268,9 +273,7 @@ export function composeRows(
     const sampled = new Float64Array(3);
     return {
       ...source,
-      exactColour: source.exactColour
-        ? compileGradeChain(Array.isArray(source.exactColour) ? source.exactColour : [source.exactColour])
-        : null,
+      exactColour: source.exactColour ? compileGradeChain(gradeStages(source.exactColour)) : null,
       detail: source.detail
         ? compileDetail(
             source.detail,

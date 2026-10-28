@@ -1,4 +1,3 @@
-import { createColourSettings } from '../../src/shared/colour.js';
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,6 +14,7 @@ import { retimeRawVideo } from '../../src/server/retime-process.js';
 import { ProjectStore } from '../../src/server/storage.js';
 import {
   COLOUR_CONTROLS,
+  createColourSettings,
   gradePixel,
   NEUTRAL_COLOUR,
   scalarColourValues,

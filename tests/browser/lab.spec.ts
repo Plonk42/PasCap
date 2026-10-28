@@ -291,7 +291,7 @@ test('Space plays after a pointer press on a control, but keeps keyboard activat
   await expect(snap).toHaveAttribute('aria-pressed', initial!);
   expect(await playing()).toBe(false);
 
-  await page.getByRole('tab', { name: 'Track', exact: true }).click();
+  await page.getByRole('tab', { name: 'Colour', exact: true }).click();
   await toggle(true);
   await toggle(false);
   // Pressing the slider's centre keeps neutral Saturation 1, so this is a focus change, not an edit.
@@ -483,6 +483,7 @@ test('each Ramp up preset easing saves and restores along with shared row Colour
   await page.evaluate(() => window.pascapLab!.flush());
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+  await inspectorTab(page, 'Track colour');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('0.6');
   await inspectorTab(page, 'Clip');
   await expect(page.getByRole('combobox', { name: 'Clip speed keyframe easing' })).toHaveValue('smooth');

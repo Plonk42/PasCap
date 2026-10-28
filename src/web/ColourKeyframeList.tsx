@@ -1,4 +1,3 @@
-import { isClipOwner, ownerNoun, ownerTarget } from './colour-owner.js';
 import { useId } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import {
@@ -10,6 +9,7 @@ import {
   type LayerKeyframe,
 } from '../shared/keyframes.js';
 import type { ProjectDocument, VideoLayer } from '../shared/model.js';
+import { isClipOwner, ownerNoun, ownerTarget } from './colour-owner.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, useKeyframeNavigation } from './keyframe-navigation.js';

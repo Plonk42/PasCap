@@ -207,6 +207,7 @@ test('scalar keys do not disable static HSL or curves and Reset keys preserves t
   document.layers[0]!.colour.curves.master[0]!.y = 0.05;
   memory.seed(document);
   await page.reload();
+  await inspectorTab(page, 'Track colour');
   await openSection(page, 'HSL ranges');
   await expect(page.getByRole('slider', { name: 'HSL hue', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Reset colour', exact: true }).click();
@@ -259,6 +260,7 @@ test('advanced row settings survive same-row clip selection; empty-row selection
   document.layers.push(createLayer('empty', 'Empty advanced row'));
   memory.seed(document);
   await page.reload();
+  await inspectorTab(page, 'Track colour');
   await openSection(page, 'HSL ranges');
   const field = page.getByRole('spinbutton', { name: 'HSL hue', exact: true });
   await field.fill('7.123456789');

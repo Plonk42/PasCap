@@ -710,7 +710,7 @@ test('a row marker opens the selected empty row independently of clips, and keyb
 
   await marker.click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
-  await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
   await inspectorTab(page, 'Track keyframes');
   await expect(layerKeyframes(page, 'Track 2')).toBeVisible();
   await expect(layerKeyframes(page, 'Track 1')).toHaveCount(0);

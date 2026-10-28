@@ -308,6 +308,7 @@ for (const viewport of [
         }
       }
       await testInfo.attach('unanimated-colour', { body: await page.screenshot(), contentType: 'image/png' });
+      await inspectorTab(page, 'Track');
       await expect(line(page, 'Transform')).toContainText('0 keyframes');
       for (const direction of ['Previous', 'Next'] as const)
         await expect(navigation(page, 'Transform', direction)).toBeDisabled();

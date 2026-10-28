@@ -23,6 +23,12 @@ function moveCommand(clip: VideoClip, origin: number, frame: number, type: ClipK
 }
 
 /** Moves one clip speed key to another original source frame, keeping its rate and easing. */
+/** The source frames of a clip's keyframes of one type. */
+function keyFrames(clip: VideoClip, type: ClipKeyframeType): number[] {
+  if (type === 'grade') return clip.grade.keyframes.map((key) => key.frame);
+  return clip.speed.mode === 'curve' ? clip.speed.keyframes.map((key) => key.frame) : [];
+}
+
 export function planClipKeyframeMove(
   project: ProjectDocument,
   clipId: string,
@@ -38,8 +44,7 @@ export function planClipKeyframeMove(
   const last = type === 'grade' ? frameCount - 1 : frameCount;
   if (nextFrame < 0 || nextFrame > last)
     return fail(`A ${LABELS[type]} keyframe must stay within source frames 0–${last}.`);
-  const keys = type === 'grade' ? clip.grade.keyframes : clip.speed.mode === 'curve' ? clip.speed.keyframes : [];
-  if (nextFrame !== origin && keys.some((key) => key.frame === nextFrame))
+  if (nextFrame !== origin && keyFrames(clip, type).includes(nextFrame))
     return fail(`A clip ${type} keyframe already exists at this source frame. Choose another frame.`);
   try {
     const command = moveCommand(clip, origin, nextFrame, type);

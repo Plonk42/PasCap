@@ -603,7 +603,7 @@ test('bulk expansion includes Transform in Track while heading help and tab navi
   await expect(exact(page, 'Scale')).toBeVisible();
   await page.getByRole('tab', { name: 'Track', exact: true }).focus();
   await page.keyboard.press('ArrowLeft');
-  await expect(page.getByRole('tab', { name: 'Clip', exact: true })).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(exact(page, 'Scale')).toBeVisible();
   expect(await current(page)).toEqual(before);

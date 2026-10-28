@@ -263,8 +263,9 @@ test('click/Enter navigate without editing and marker arrows move one or ten fra
   await inspectorTab(page, 'Clip');
   await marker(page, 20).click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
-  // A Colour marker opens Track → Colour from any other tab.
-  await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
+  // A Colour marker opens Colour → Track from any other tab.
+  await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('radio', { name: 'Track Colour', exact: true })).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByRole('button', { name: 'Colour section', exact: true })).toHaveAttribute(
     'aria-expanded',
     'true',
@@ -459,7 +460,7 @@ test('stored points after the last clip keep their own markers without extending
   await marker(page, 160).click();
   await expect(marker(page, 160)).toHaveAttribute('aria-pressed', 'true');
   await expect(marker(page, 200)).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByRole('tab', { name: 'Track', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(119);
   await marker(page, 200).focus();
   await marker(page, 200).press('Enter');

@@ -13,7 +13,7 @@ import { probeVideo } from '../../src/server/probe.js';
 import * as nativeProcesses from '../../src/server/process.js';
 import { runProcess } from '../../src/server/process.js';
 import { audioAssetSchema, musicGainAt, type AudioAsset } from '../../src/shared/audio.js';
-import { gradePixel, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { estimateExportSpace } from '../../src/shared/export-space.js';
 import {
@@ -24,6 +24,7 @@ import {
   planExportMusic,
   type ExportMusicPlan,
 } from '../../src/shared/export.js';
+import { gradeChainPixel, sourceGrades } from '../../src/shared/grade.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import {
   createClip,
@@ -100,7 +101,10 @@ function assertPixels(
     const source = originals.get(layer.mediaId)!;
     const pixels = source.subarray(layer.sourceFrame * FRAME_BYTES, (layer.sourceFrame + 1) * FRAME_BYTES);
     for (let index = 0; index < FRAME_BYTES; index += 3) {
-      const rgb = gradePixel([pixels[index]! / 255, pixels[index + 1]! / 255, pixels[index + 2]! / 255], layer.colour);
+      const rgb = gradeChainPixel(
+        [pixels[index]! / 255, pixels[index + 1]! / 255, pixels[index + 2]! / 255],
+        sourceGrades(layer.grade, layer.colour).stages,
+      );
       for (let channel = 0; channel < 3; channel++) expected[index + channel]! += rgb[channel]! * 255 * layer.weight;
     }
   }
@@ -524,6 +528,25 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       }
     },
   );
+
+  it('exports static clip grades before the track Colour through one native LUT per clip', async () => {
+    const project = document(6);
+    const second = { ...createClip('two', assets[1]!.id, 2, 8), start: 6 };
+    project.clips[0]!.grade.colour = { ...NEUTRAL_COLOUR, temperature: 0.8, exposure: 0.3, saturation: 1.2 };
+    second.grade.colour = { ...NEUTRAL_COLOUR, tint: -0.6, contrast: 1.15, blacks: 0.05, hue: -12 };
+    project.clips.push(second);
+    project.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cut', duration: 0 }];
+    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: -0.2, whites: -0.1 };
+    const captured = structuredClone(projectSchema.parse(project));
+    expect(needsLayeredExport(captured)).toBe(false);
+    const result = await completed(captured);
+    expect(result.receipt.settings.pipeline).toBe('static-single-layer');
+    expect(result.receipt.settings.layered).toBeNull();
+    const pixels = await rawVideo(config, { ...assets[0]!, sourcePath: result.filename });
+    expect(pixels).toHaveLength(12 * FRAME_BYTES);
+    for (let frame = 0; frame < 12; frame++)
+      assertPixels(captured, frame, pixels.subarray(frame * FRAME_BYTES, (frame + 1) * FRAME_BYTES), originals);
+  });
 
   it('exports >2 clips, repeated graded originals, slow/fast and both directions of every ramp-shaped curve with exact numeric pixels', async () => {
     const project = createProject('native-many', 'Many clips and every speed curve');
