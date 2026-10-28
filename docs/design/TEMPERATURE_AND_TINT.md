@@ -28,7 +28,7 @@ skipped. No keyframes for a setting means the saved track base; removing its fin
 that unchanged base. HSL bands and master/RGB curves remain **static**, not new
 animation channels. Speed is clip-only, never a track channel.
 
-**Track → Colour** shows Temperature and Tint first in its Colour group (the grade still
+**Colour → Track** shows Temperature and Tint first in its Colour group (the grade still
 applies them before Exposure). Main and stored
 keyed settings use native sliders (step 0.01) with coloured tracks (Temperature
 blue → yellow, Tint green → magenta), adjacent exact numeric fields,
@@ -85,7 +85,7 @@ native process; existing frame/pixel/resource and A/V gates remain unchanged.
 
 ## Automatic white balance
 
-**Auto white balance**, a button under Tint in **Track → Colour**, estimates the light at
+**Auto white balance**, a button under Tint in **Colour → Track**, estimates the light at
 the playhead and keyframes Temperature and Tint there. It only chooses values: no
 schema, grade stage, render, export or decoder changes. Its constants live in one
 module, [white-balance.ts](../../src/shared/white-balance.ts), as starting values to tune on real flights.

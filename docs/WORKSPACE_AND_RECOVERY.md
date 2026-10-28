@@ -14,7 +14,7 @@ The intended discrete-GPU and long real-flight checks remain deferred.
 
 ## Layout and navigation
 
-Main **Track → Colour** edits twelve scalar video track colour values, HDR, Local contrast and sole Opacity, including
+Main **Colour → Track** edits twelve scalar video track colour values, HDR, Local contrast and sole Opacity, including
 on empty tracks. Static and keyed Colour share this track ownership on every clip.
 Different treatments require different tracks; there is no per-clip grade or scope
 toggle. Sources are graded once; the Original preview neutralizes track Colour and clip Detail only.
@@ -57,13 +57,14 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
   button in place of its add/prepare actions.
 - Centre: docked **Timeline preview** / **Source preview** tabs, never an overlay
   covering other editor controls. Tab arrows and Home/End switch viewer contexts.
-- Right: scrollable **Clip / Track / Audio** Properties tabs
+- Right: scrollable **Clip / Colour / Track / Audio** Properties tabs
   with readable inputs and independent collapsible sections, split by ownership.
   Clip ("Clip N of M · track") contains the selected clip's **Speed**,
   **Detail**, **Range** and **Placement**; an empty video track shows one line instead.
-  Track ("Applies to all N clips on this track") contains Colour with the single
-  track-owned Opacity control and, at its end, the whole-keyframe list (enabled-setting chips
-  and Animation help), **HSL ranges**, **Colour curves**, **Transform** (ending with its own
+  Colour contains Colour, **HSL ranges** and **Colour curves** for the selected clip's grade or,
+  with its **Clip / Track** switch, its track's Colour with the single track-owned Opacity control
+  and, at its end, the whole-keyframe list (enabled-setting chips and Animation help).
+  Track ("Applies to all N clips on this track") contains **Transform** (ending with its own
   keyframe list), Transitions and Fades;
   Audio owns selected-track music controls (**Music track / Add music track / Delete
   selected music track**, then the track's gain, Ripple and fades and its **Clip**,
@@ -150,7 +151,7 @@ Ctrl/Cmd-click on clips also builds; Delete and Alt+arrows then act on every sel
 ([multi-clip moves](TIMELINE_EDITING.md#insertion-reordering-and-history)).
 Track options contains only rename, Ripple,
 raise/lower and delete; visibility remains a separate sidebar control.
-**Track → Colour** contains the single **Opacity** native slider/exact
+**Colour → Track** contains the single **Opacity** native slider/exact
 `NumberField` alongside the colour controls, with its diamond.
 The Colour keyframe line's Previous/Next pair visits the union of Opacity,
 twelve scalar, HDR and Local contrast keyframes. Per-channel Opacity
@@ -197,7 +198,7 @@ On a focused track keyframe marker, Left/Right moves that keyframe one project f
 moves ten; Delete/Backspace removes it (one Undo step). Marker keyboard events remain in that context, retaining keyframe/Timeline
 focus while navigating to the moved keyframe, without also firing ordinary playhead-step,
 clip-nudge or other editor shortcuts.
-Click or Enter on a marker selects its track, seeks and opens Track → Colour, without editing; whole-track keyframe navigation preserves the chosen Properties tab.
+Click or Enter on a marker selects its track, seeks and opens Colour → Track, without editing; whole-track keyframe navigation preserves the chosen Properties tab.
 A focused bookmark moves the same way and Delete/Backspace removes it; click, Enter
 or Space only seeks to it.
 
@@ -404,13 +405,13 @@ Full schema, geometry and animation details: [spatial transforms](design/SPATIAL
 
 ### Shared video track animation
 
-The stored **Keyframes** list at the end of **Track → Colour** (fieldset accessible name
+The stored **Keyframes** list at the end of **Colour → Track** (fieldset accessible name
 **Track keyframes** plus the track name) belongs to the selected **entire video track**, not
 the selected clip. It remains available on an empty track and shows the enabled-setting chips
 of the current or inspected keyframe; Colour's keyframe line counts and visits the same keyframes.
 The question-mark **Animation help** beside its heading uses the common hover/pin/dismiss
 contract above; explanatory text does not replace the shared keyframe editor.
-**Clip** keeps source/clip settings and Speed controls; **Track → Colour**
+**Clip** keeps source/clip settings and Speed controls; **Colour → Track**
 keeps track Colour/Opacity playhead value/diamond controls and **Track → Transform** the pose.
 All fifteen settings (Opacity, twelve scalar colour parameters, HDR and Local contrast)
 expose a main diamond with adjacent per-setting **Previous/Next** buttons: **◇ hollow/inactive**

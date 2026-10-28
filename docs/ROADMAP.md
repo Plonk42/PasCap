@@ -22,7 +22,7 @@ The final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract h
 one video track-owned **Opacity** setting: required numeric `VideoLayer.opacity` in 0–1,
 initially 1 (100%) on new tracks. Its sole track channel, `opacity`, overrides that
 value on every clip, including both dissolve sources, without an additional track
-multiplier. The single slider/diamond/navigation lives in **Track → Colour** and
+multiplier. The single slider/diamond/navigation lives in **Colour → Track** and
 works on empty tracks; **Placement** contains placement only. Without Opacity keyframes,
 the slider edits the track value; with keyframes, a setting not enabled at the real
 playhead is read-only until explicitly captured. Sliders never create keyframes, and
@@ -53,9 +53,9 @@ Enabling Ripple packs from the current first start; while on, clips continuously
 sequence there, and turning it off retains actual placements. Video tracks display stored
 bottom-to-top composition order without primary/overlay roles. The UI provides a
 pinned ruler, synchronized native track access, accessible action bounds and contextual
-heading help. Properties tabs are **Clip / Track / Audio**, split by ownership: the
+heading help. Properties tabs are **Clip / Colour / Track / Audio**, split by ownership: the
 [whole-track keyframe list](https://github.com/Plonk42/PasCap/issues/26) sits at the
-end of **Track → Colour**, under a small **Keyframes** heading with animation/timing help
+end of **Colour → Track**, under a small **Keyframes** heading with animation/timing help
 beside it. Nested keyframe details retain drafts and input
 identity; there is no outer list disclosure or per-track list expansion preference.
 Track also holds HSL ranges, Colour curves, Transform (ending with its own keyframe list),

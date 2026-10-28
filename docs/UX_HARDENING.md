@@ -35,7 +35,7 @@ This guide is not a delivery ledger or a fresh validation result.
   Main capture uses the real displayed frame; navigation never edits or saves.
   Timeline speed markers still
   omit off-trim keyframes, with exclusive OUT represented by a boundary marker.
-- **Track → Colour** contains the single **Opacity** slider/diamond/navigation
+- **Colour → Track** contains the single **Opacity** slider/diamond/navigation
   alongside the colour sliders, initially **100%**. Without Opacity keyframes it edits
   track `opacity`, including on an empty track; keyed `opacity` overrides that value
   on every clip and both dissolve sources. Sliders never create keyframes; animated

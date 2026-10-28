@@ -34,7 +34,7 @@ fields, filenames and URLs retain their technical spelling.
 | [design/MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md)                           | Strict identified music arrays, corrected project duration/black tails, final-only summed clipping, one bounded clock and serial native mixing                                                       |
 | [design/ROW_APPEARANCE.md](design/ROW_APPEARANCE.md)                           | Required video track-only static/keyed Colour and Opacity, shared ownership, resets and destination-track adoption                                                                                   |
 | [design/TEMPERATURE_AND_TINT.md](design/TEMPERATURE_AND_TINT.md)               | Required normalized track Temperature/Tint, exact pre-exposure linear gains, independent capture and strict current-schema preservation                                                              |
-| [design/AUTO_ADJUST.md](design/AUTO_ADJUST.md)                                 | Track → Colour → Auto: the estimator fitted through the real grade, as track values or a keyframe, its popover, intensity and limits                                                                 |
+| [design/AUTO_ADJUST.md](design/AUTO_ADJUST.md)                                 | Colour → Auto: the estimator fitted through the real grade, as track values or a keyframe, its popover, intensity and limits                                                                         |
 | [design/HSL_AND_CURVES.md](design/HSL_AND_CURVES.md)                           | Required static track HSL bands and master/RGB curves, SDR order, bounded GPU/native evaluation and exact editor gestures                                                                            |
 | [design/CLIP_GRADES_AND_ADJUSTMENTS.md](design/CLIP_GRADES_AND_ADJUSTMENTS.md) | **Decided, not implemented** (v1.3): clip grades and range-scoped adjustment items replacing track Colour, their combination, rendering, editor and assistant                                        |
 | [design/SPATIAL_TRANSFORMS.md](design/SPATIAL_TRANSFORMS.md)                   | Required video track Transform base/per-setting project-frame keyframes, crop/affine geometry, neutral letterboxing, per-pixel coverage and Transform controls                                       |
@@ -46,7 +46,7 @@ fields, filenames and URLs retain their technical spelling.
 Use the final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract:
 one required numeric video track `opacity`, initially 1 (100%) on new tracks, with the sole
 track keyframe channel `opacity` overriding that value on every clip. Its single slider
-is in **Track → Colour**, works on empty tracks and never creates implicit keyframes;
+is in **Colour → Track**, works on empty tracks and never creates implicit keyframes;
 **Placement** contains placement only. Opacity is composition coverage, not SDR
 RGB grading; unkeyed colour settings are track-owned. Fifteen nullable keyframe fields
 are required, in control order: `opacity`, `temperature`, `tint`,

@@ -149,8 +149,9 @@ edits real projects with it, so saved data must keep working. Details are in
   colours; #184 `whites`, −1…1, a white-point tone stage after Highlights, and `blacks`,
   −1…1, a black-point tone stage after Whites; raised it adds a matte lift),
   `hdr`, `localContrast`, `colour.hsl` (eight complete named bands) and `colour.curves` (master/red/green/blue
-  2–16-point arrays). HSL/curves remain static, not animation channels. All Colour
-  is row-owned, keyed or not; clips have no colour/correction. Neutral creators
+  2–16-point arrays). HSL/curves remain static, not animation channels. Row Colour
+  applies to every clip of its track, after each clip's grade (#273, below); saved
+  `clip.colour`/`clip.correction` are invalid. Neutral creators
   deep-clone nested structures; never repair missing saved fields. Advanced resets
   never overwrite scalar bases/keys or Opacity; Reset on an animated section never erases advanced
   settings. Keep existing LUT/buffer/decoder/native budgets and strict gates. See
@@ -192,6 +193,17 @@ edits real projects with it, so saved data must keep working. Details are in
   row bases and absolute points, without per-clip colour copies. HSL and curves
   retain that ownership, as do Temperature and Tint.
   See [row appearance](../docs/design/ROW_APPEARANCE.md).
+- v1.3 #273 (dev branch `grading-284`): every clip requires `grade: { colour, keyframes }`
+  (track Colour's fields without Opacity; 0–64 keys at original-source frames, fourteen
+  nullable channels), evaluated at the continuous source position (one frame lower when
+  reversed) and kept with the footage through every clip edit. Each source is graded by its clip
+  grade, then its track Colour, in sequence (local tone summed once in the detail kernel); static
+  export composes both into one LUT per clip. The **Colour** tab (Clip / Colour / Track / Audio)
+  edits the selected clip's grade or, by its Clip/Track switch, the track's Colour; clip keys are
+  amber markers inside clips; Copy/Paste grade in the clip menu; Original with Shift/Alt bypasses
+  only clip grades / track Colour. Commands take `clipId` (or `colour` `clipIds`) instead of
+  `layerId`. Further v1.3 steps (#285–#289) follow
+  [clip grades and adjustments](../docs/design/CLIP_GRADES_AND_ADJUSTMENTS.md).
 - Owner-approved #131: Transform is **track-owned, exactly like Colour**.
   Every video track requires strict `transform: { base, keyframes }`; clips have no
   `spatial` field. Eight complete pose values and 0–256 ascending absolute project-frame
@@ -247,7 +259,7 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   `localContrast`. Reject missing row opacity,
   saved `clip.opacity` and old `clipOpacity`/`layerOpacity` channels; do not supply
   compatibility defaults. `layer.opacity` is the valid sole stored row value.
-  Put the single **Opacity** slider/diamond/navigation in **Track → Colour** beside
+  Put the single **Opacity** slider/diamond/navigation in **Colour → Track** beside
   the colour sliders, usable on empty rows too. Main and stored sliders/exact
   fields use 0–100%, neutral 100%; convert only at the UI boundary, keeping
   `VideoLayer.opacity` and `opacity` key values in 0–1 with no schema change.

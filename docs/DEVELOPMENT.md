@@ -551,7 +551,7 @@ Video closing fades remain inside their last clips. The static export path must
 cover the full project; music tails use composited export. Export still requires a video clip.
 See [the multiple-music contract](design/MULTIPLE_MUSIC.md).
 
-The single **Opacity** slider/exact field belongs in **Track → Colour** alongside
+The single **Opacity** slider/exact field belongs in **Colour → Track** alongside
 the colour sliders and works on an empty track. Its diamond is always visible, with adjacent per-setting Previous/Next buttons; stored enabled-setting
 chip arrows remain available too. Main and stored sliders/
 exact fields use **0–100%**, neutral **100%**; convert only at the UI boundary,

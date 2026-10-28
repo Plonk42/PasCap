@@ -1,11 +1,13 @@
 # Clip grades and adjustment items
 
 Decision record for [#215](https://github.com/Plonk42/PasCap/issues/215), part of milestone
-v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)). **Status: decided, not
-implemented.** Until each implementation issue is delivered, the current contracts remain
+v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)). **Status: decided; the clip grade
+([#273](https://github.com/Plonk42/PasCap/issues/273)) is implemented on the v1.3 branch, the
+rest is not.** Until each implementation issue is delivered, the current contracts remain
 [track appearance](ROW_APPEARANCE.md), [HSL and curves](HSL_AND_CURVES.md),
 [Temperature and Tint](TEMPERATURE_AND_TINT.md), [detail filters](DETAIL_FILTERS.md) and
-[Auto adjust](AUTO_ADJUST.md).
+[Auto adjust](AUTO_ADJUST.md), with the clip grade as described in
+[track appearance](ROW_APPEARANCE.md#clip-grades).
 
 Decisions marked **(owner)** were made on 2026-10-23 or 2026-10-28; every question of #215 is
 answered.
@@ -69,8 +71,9 @@ Every clip requires `grade: { colour, keyframes }`.
   ascending integers in `[0, frameCount]` of the recording; keys outside the trim are kept,
   like off-trim speed keyframes. At most **64** keys per clip, the items' limit (owner).
 - A clip's grade is evaluated at its continuous source position
-  `PlacedClip.retiming.sourcePositionAt(frame − start)`, so slow motion interpolates between
-  keys and a reversed clip plays its keys backwards. HSL and curves stay static.
+  `PlacedClip.retiming.sourcePositionAt(frame − start)` (one frame lower on a reversed clip, so a
+  key applies fully as its image appears), so slow motion interpolates between keys and a
+  reversed clip plays its keys backwards. HSL and curves stay static.
 - Trims, moves (including to another track), Ripple, splits, cuts, duplicates, Reverse and
   Move to new track keep the grade with its footage; split, cut and duplicate copy it.
 

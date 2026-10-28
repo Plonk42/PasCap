@@ -221,7 +221,7 @@ visible while scrolling; its ticks follow horizontal scroll. Clicking it seeks,
 dragging it selects a range to cut and dragging the playhead handle scrubs, without
 editing a track. Track options explains unavailable actions at
 stack endpoints or on the last remaining track. It contains only rename, Ripple,
-Raise/Lower and Delete; visibility stays in the sidebar and Opacity in **Track → Colour**.
+Raise/Lower and Delete; visibility stays in the sidebar and Opacity in **Colour → Track**.
 
 Select a clip and drag a timeline edge inward to shorten it or outward to restore
 omitted footage up to the original bounds. The dashed extent shows available source.
@@ -329,9 +329,11 @@ frozen last image. Details: [TIMELINE_EDITING.md](TIMELINE_EDITING.md).
 
 Each clip has independent constant or custom-curve speed; speed
 is clip-only, never a track setting.
-All static and keyed Colour and Transform belong to the video track, not the clip.
+Colour is graded twice: by the clip's own **grade**, then by its video track's Colour, which
+every clip on the track shares (see [Grade one clip](#grade-one-clip)). Transform belongs to the
+video track, not the clip.
 **Opacity** is one setting for the selected **whole video track**, not a clip.
-Find its single native slider/exact numeric field in **Track → Colour**, with its
+Find its single native slider/exact numeric field in **Colour → Track**, with its
 capture diamond and adjacent per-setting Previous/Next buttons. Colour groups its sliders
 under small headings, each with a **Reset** icon that resets the group's editable settings in
 one Undo step: **Opacity**; **Colour** (Temperature, Tint, Hue, Saturation, Vibrance); **Light**
@@ -356,8 +358,9 @@ on an empty track. With keyframes, the track's `opacity` curve overrides that va
 clip, including both sources in a dissolve. Removing its final keyed setting reveals
 the unchanged saved track value. There is no saved clip opacity, additional track
 multiplier or duplicate sidebar control/navigation.
-Static and keyed colour controls edit the same video track, including on empty tracks.
-All clips on that track share the treatment; different looks require different tracks. The clip's right-click menu offers **Move to new track** (one Undo step, keeping the clip's start). Opacity shares their
+With the Colour tab's **Track** target, static and keyed colour controls edit the video track,
+including empty tracks; all clips on that track share that treatment, after their own grades. The
+clip's right-click menu offers **Move to new track** (one Undo step, keeping the clip's start). Opacity shares their
 UI treatment, but controls composition coverage, not the SDR RGB grade.
 **Clip → Placement** contains placement only. Sliders never create implicit keyframes;
 an animated setting that is not enabled at the real playhead is read-only until
@@ -370,6 +373,28 @@ there is no optical-flow synthesis.
 Speed changes only that clip's output duration, never because of its track or start:
 Ripple-on tracks re-sequence, off keeps independent starts,
 and incompatible fades/transitions/overlaps reject the edit rather than being shrunk.
+
+### Grade one clip
+
+The **Colour** Properties tab edits the selected clip's **grade** by default: its pinned header
+names the clip and says **This clip only**. The **Clip / Track** switch beside it (or the arrow
+keys on it) moves to the track's Colour, which then applies to every clip on the track after their
+own grades; selecting another clip returns to Clip. Without a selected clip the tab edits the
+track. With several clips selected, it asks you to select one, or offers the track.
+
+A clip grade has the same Colour, HSL ranges and Colour curves sections as the track, without
+Opacity, **Auto** and **Auto white balance**. It stays with the clip's footage: trimming, moving
+it (to another track too), Ripple, splitting, duplicating and Reverse keep it, and split or
+duplicated pieces each get a copy. Its keyframes are frames of the recording: a diamond keys the
+image shown at the playhead (move the playhead onto the clip first), slow motion eases between
+keyframes, and they appear as amber ◆ markers inside the clip on the timeline, which you can
+click, drag or move with the arrow keys and delete with Delete. The **Clip keyframes** list
+counts in source frames.
+
+To give several clips the same look, right-click a clip whose grade has no keyframes and choose
+**Copy grade**, then right-click another and choose **Paste grade**: it replaces that clip's grade
+and removes its keyframes, in one Undo step. Paste on a selected clip applies to every selected
+clip.
 
 ### Animation controls
 
@@ -396,7 +421,7 @@ and interpolation remain unchanged.
 
 ### Temperature and Tint
 
-In **Track → Colour**, **Temperature** and **Tint** open the Colour group. They use
+In **Colour → Track**, **Temperature** and **Tint** open the Colour group. They use
 normalized **−2…2** and **−1…1**, neutral **0**, not Kelvin.
 Positive Temperature warms, negative cools; positive Tint adds magenta, negative
 adds green. Nonzero settings intentionally colour greys. The common gain formula
@@ -457,14 +482,14 @@ correction: lower it for a lighter touch, or raise it towards 100% for a stronge
 exaggerated look. Then **Apply** makes the change in one Undo step. **Cancel**, Escape or a
 click elsewhere leaves the track as it was. Reopening Auto on the same frames skips the
 analysis and starts at the intensity you last applied, so you can change it later. Track
-values are one look for the whole track: put shots that need different corrections on different tracks,
-or key them. Keyframes stay at their timeline frames when you trim or move clips, and with
+values are one look for the whole track: shots that need different corrections need their own
+clip grades, different tracks or keyframes. Keyframes stay at their timeline frames when you trim or move clips, and with
 Linear Easing a correction eases across a cut into the next shot: set **Hold** on a shot's
 last keyframe to keep shots apart. See [Auto adjust](design/AUTO_ADJUST.md).
 
 ### HDR
 
-**HDR**, in the Effects group of **Track → Colour**, opens shadows and recovers highlights
+**HDR**, in the Effects group of **Colour → Track**, opens shadows and recovers highlights
 over large areas, like a tone-mapped look, while keeping local detail as it is; **0** is off
 and **1** is the strongest.
 It is an SDR effect, not HDR output, and can be keyframed like the other Colour
@@ -484,14 +509,16 @@ path, and the Original preview bypasses it. Details:
 The **Timeline preview** heading has a native **Original** button, accessible as
 **Show original preview**. The preview shows the image without Colour and Detail
 (with an **Original** badge) only while you hold it: press and hold the pointer, or
-hold Enter/Space on the focused button, while paused or playing. Releasing the
+hold Enter/Space on the focused button, while paused or playing. Hold **Shift** as you
+press it to bypass only clip grades (and Detail), or **Alt** for only the tracks' Colour;
+the badge names what is bypassed. Releasing the
 pointer (anywhere), the key, moving focus away or leaving the window restores the
 graded preview. There is no global shortcut. **Source preview** is unchanged.
 
 Original means the **composed timeline preview without grading**, not the untouched
 recording, an original-resolution view or an isolated selected clip. It neutralizes all evaluated
-colour settings across enabled video tracks, including track colour bases/keyframes and both
-dissolve sources, and every clip's Sharpen, Clarity and Denoise. Exact observed source frames, retiming, track Opacity,
+colour settings across enabled video tracks, including clip grades, track colour bases/keyframes
+and both dissolve sources, and every clip's Sharpen, Clarity and Denoise. Exact observed source frames, retiming, track Opacity,
 spatial geometry/coverage (Transform), visibility, black fades, stacking and music remain unchanged.
 
 This is editor-only: holding never seeks, saves, enters Undo history, changes
@@ -654,12 +681,12 @@ drag or ←/→ (Shift for ten) moves them one project frame, one Undo step per 
 
 ### Opt in to shared video track animation
 
-The stored **Keyframes** list at the end of **Track → Colour**
+The stored **Keyframes** list at the end of **Colour → Track**
 belongs to the selected **whole video track**, even an empty one, not to a clip.
 It shows enabled-setting chips and one row per shared keyframe; Colour's keyframe line
 counts and visits the same keyframes. **Animation help** beside its heading combines
 animation and keyframe-timing guidance. **Clip** keeps source/clip settings and playhead
-Speed controls; **Track → Colour** keeps Opacity and Colour controls and **Track → Transform** the pose.
+Speed controls; **Colour → Track** keeps Opacity and Colour controls and **Track → Transform** the pose.
 All shared track keyframes use absolute project frames and affect every clip on that track.
 Fifteen settings can be keyed independently:
 Opacity (`opacity`), the twelve scalar colour controls, including
@@ -697,7 +724,7 @@ shared keyframes are allowed per video track.
 ### Move and inspect shared keyframes
 
 The timeline shows **one marker per stored shared keyframe**, not per clip/channel.
-Click or Enter selects its video track, seeks and opens Track → Colour, without editing.
+Click or Enter selects its video track, seeks and opens Colour → Track, without editing.
 Whole-track keyframe navigation keeps the chosen Properties tab. Drag horizontally to
 move **all enabled settings, values and easing together**; valid release is one Undo
 step. With Snap on, pointer movement snaps within eight pixels at the captured zoom
