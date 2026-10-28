@@ -35,8 +35,15 @@ import {
   type VideoLayer,
 } from './model.js';
 import { detailSchema } from './detail.js';
+import {
+  clipGradeSchema,
+  createClipGrade,
+  gradeKeyAsLayerKey,
+  layerKeyAsGradeKey,
+  MAX_GRADE_KEYFRAMES,
+} from './grade.js';
 import { colourCurveSchema, hslBandSchema } from './advanced-colour.js';
-import { colourSchema } from './colour.js';
+import { colourSchema, type ColourSettings } from './colour.js';
 import { spatialPoseSchema, spatialSettingsSchema } from './spatial.js';
 import { clipDuration } from './speed.js';
 import { trimByOutputFrames } from './source-range.js';
@@ -66,42 +73,104 @@ function requiredLayer(next: ProjectDocument, layerId: string): VideoLayer {
   return layer;
 }
 
-type TrackSettingCommand = Extract<
-  EditCommand,
-  { type: 'colour-setting' | 'hsl-band' | 'colour-curve' | 'transform-setting' }
->;
+/** The Colour and keyframes a command changes: a track's, or a clip's own grade in the track keyframe shape. */
+interface ColourOwner {
+  kind: 'track' | 'clip';
+  name: string;
+  colour: ColourSettings;
+  keyframes: LayerKeyframe[];
+}
 
-function followsKeyframes(layer: VideoLayer, setting: string, keys: number, list: string): void {
+function colourOwner(
+  next: ProjectDocument,
+  command: { layerId?: string | undefined; clipId?: string | undefined },
+): { owner: ColourOwner; save: () => void } {
+  if ((command.layerId === undefined) === (command.clipId === undefined))
+    throw new Error("Give either layerId, for a track's Colour, or clipId, for a clip's own grade.");
+  if (command.layerId !== undefined) {
+    const layer = requiredLayer(next, command.layerId);
+    const owner: ColourOwner = { kind: 'track', name: layer.name, colour: layer.colour, keyframes: layer.keyframes };
+    return {
+      owner,
+      save: () => {
+        layer.colour = owner.colour;
+        layer.keyframes = owner.keyframes;
+      },
+    };
+  }
+  const clip = next.clips.find((item) => item.id === command.clipId);
+  if (!clip) throw new Error('Clip no longer exists.');
+  const owner: ColourOwner = {
+    kind: 'clip',
+    name: `clip ${clip.id}`,
+    colour: clip.grade.colour,
+    keyframes: clip.grade.keyframes.map(gradeKeyAsLayerKey),
+  };
+  return {
+    owner,
+    save: () => {
+      if (owner.keyframes.some((key) => key.values.opacity !== null))
+        throw new Error("Opacity belongs to the track, not to a clip's grade.");
+      clip.grade = clipGradeSchema.parse({ colour: owner.colour, keyframes: owner.keyframes.map(layerKeyAsGradeKey) });
+    },
+  };
+}
+
+function maxKeyframes(owner: ColourOwner): number {
+  return owner.kind === 'track' ? MAX_TRACK_KEYFRAMES : MAX_GRADE_KEYFRAMES;
+}
+
+function followsKeyframes(name: string, setting: string, keys: number, list: string): void {
   if (keys)
     throw new Error(
-      `${setting} follows ${keys} ${list} keyframe${keys === 1 ? '' : 's'} on ${layer.name}, so its base value is not used; change ${keys === 1 ? 'that keyframe' : 'those keyframes'} instead.`,
+      `${setting} follows ${keys} ${list} keyframe${keys === 1 ? '' : 's'} on ${name}, so its base value is not used; change ${keys === 1 ? 'that keyframe' : 'those keyframes'} instead.`,
     );
 }
 
-/** Changes one appearance setting of a track, keeping every other one as saved. */
-function editTrackSetting(layer: VideoLayer, command: TrackSettingCommand): void {
-  const { colour, transform } = layer;
+type ColourSettingCommand = Extract<EditCommand, { type: 'colour-setting' | 'hsl-band' | 'colour-curve' }>;
+
+/** Changes one Colour setting of a track or a clip's grade, keeping every other one as saved. */
+function editColourSetting(owner: ColourOwner, command: ColourSettingCommand): void {
+  const { colour } = owner;
   switch (command.type) {
     case 'colour-setting':
-      followsKeyframes(layer, command.setting, keyCount(layer.keyframes, command.setting), 'track');
-      layer.colour = { ...colour, [command.setting]: colourSchema.shape[command.setting].parse(command.value) };
+      followsKeyframes(owner.name, command.setting, keyCount(owner.keyframes, command.setting), owner.kind);
+      owner.colour = { ...colour, [command.setting]: colourSchema.shape[command.setting].parse(command.value) };
       break;
     case 'hsl-band':
-      layer.colour = { ...colour, hsl: { ...colour.hsl, [command.band]: hslBandSchema.parse(command.values) } };
+      owner.colour = { ...colour, hsl: { ...colour.hsl, [command.band]: hslBandSchema.parse(command.values) } };
       break;
     case 'colour-curve': {
       const points = colourCurveSchema.parse(command.points).map((point) => ({ ...point }));
-      layer.colour = { ...colour, curves: { ...colour.curves, [command.channel]: points } };
+      owner.colour = { ...colour, curves: { ...colour.curves, [command.channel]: points } };
       break;
     }
-    case 'transform-setting':
-      followsKeyframes(layer, command.setting, keyCount(transform.keyframes, command.setting), 'Transform');
-      layer.transform = {
-        ...transform,
-        base: { ...transform.base, [command.setting]: spatialPoseSchema.shape[command.setting].parse(command.value) },
-      };
-      break;
   }
+}
+
+function editTransformSetting(layer: VideoLayer, command: Extract<EditCommand, { type: 'transform-setting' }>): void {
+  const { transform } = layer;
+  followsKeyframes(layer.name, command.setting, keyCount(transform.keyframes, command.setting), 'Transform');
+  layer.transform = {
+    ...transform,
+    base: { ...transform.base, [command.setting]: spatialPoseSchema.shape[command.setting].parse(command.value) },
+  };
+}
+
+/** The same Colour on a track, or on each listed clip's grade, keeping their keyframes. */
+function setColour(next: ProjectDocument, command: Extract<EditCommand, { type: 'colour' }>): void {
+  const colour = colourSchema.parse(command.colour);
+  if ((command.layerId === undefined) === (command.clipIds === undefined))
+    throw new Error("Give either layerId, for a track's Colour, or clipIds, for clips' own grades.");
+  if (command.layerId !== undefined) {
+    requiredLayer(next, command.layerId).colour = structuredClone(colour);
+    return;
+  }
+  const ids = new Set(command.clipIds);
+  if (ids.size !== command.clipIds!.length) throw new Error('List each clip once.');
+  const missing = command.clipIds!.find((id) => !next.clips.some((clip) => clip.id === id));
+  if (missing !== undefined) throw new Error(`Clip ${missing} no longer exists.`);
+  for (const clip of next.clips) if (ids.has(clip.id)) clip.grade = { ...clip.grade, colour: structuredClone(colour) };
 }
 
 function keyCount<K extends string>(keyframes: readonly { values: Record<K, number | null> }[], setting: K): number {
@@ -259,18 +328,19 @@ type LayerKeyCommand = Extract<
   }
 >;
 type LayerValueCommand = Extract<LayerKeyCommand, { type: 'layer-key-toggle' | 'layer-key-value' }>;
-function editLayerValue(layer: VideoLayer, point: LayerKeyframe | undefined, command: LayerValueCommand): void {
+function editLayerValue(layer: ColourOwner, point: LayerKeyframe | undefined, command: LayerValueCommand): void {
   if (!KEYFRAME_SETTINGS.some((setting) => setting.key === command.setting))
     throw new Error('Unknown keyframe setting.');
   layerKeyframeSchema.shape.values.shape[command.setting].unwrap().parse(command.value);
   const current = point?.values[command.setting];
   if (command.type === 'layer-key-value') {
     if (current === undefined || current === null)
-      throw new Error('The setting is not enabled at this track keyframe.');
+      throw new Error(`The setting is not enabled at this ${layer.kind} keyframe.`);
     point!.values[command.setting] = command.value;
     return;
   }
   const participating = current !== undefined && current !== null;
+  if (!point && layer.keyframes.length >= maxKeyframes(layer)) throw keyframeLimit(layer);
   const base = point ?? layerKeyframe(command.frame, EMPTY_KEY_VALUES, 'linear');
   const curve = point
     ? joiningEasing(
@@ -317,17 +387,20 @@ function patchKeySettings(
   return { values, easing: curves };
 }
 
-/** Keys, changes or disables several settings of one track keyframe at once, like their toggles together. */
-function setLayerKey(next: ProjectDocument, command: LayerKeySet): void {
-  const layer = requiredLayer(next, command.layerId);
+function keyframeLimit(owner: ColourOwner): Error {
+  const what = owner.kind === 'track' ? 'This track' : 'This clip';
+  return new Error(`${what} already has ${maxKeyframes(owner)} keyframes. Change one of them, or remove one.`);
+}
+
+/** Keys, changes or disables several settings of one keyframe at once, like their toggles together. */
+function setLayerKey(layer: ColourOwner, command: LayerKeySet): void {
   frameSchema.parse(command.frame);
   const patch = layerKeyValuesPatchSchema.parse(command.values);
   const easing = command.easing === undefined ? undefined : keyEasingPatchSchema.parse(command.easing);
   if (command.reset !== undefined && typeof command.reset !== 'boolean')
     throw new Error('Reset must be true or false.');
   const point = layer.keyframes.find((key) => key.frame === command.frame);
-  if (!point && layer.keyframes.length >= MAX_TRACK_KEYFRAMES)
-    throw new Error(`This track already has ${MAX_TRACK_KEYFRAMES} keyframes. Change one of them, or remove one.`);
+  if (!point && layer.keyframes.length >= maxKeyframes(layer)) throw keyframeLimit(layer);
   const order = KEYFRAME_SETTINGS.map((setting) => setting.key);
   const base = point ?? layerKeyframe(command.frame, EMPTY_KEY_VALUES, 'linear');
   const joining = point ? joiningEasing(layer.keyframes, point, order) : 'linear';
@@ -341,9 +414,7 @@ function setLayerKey(next: ProjectDocument, command: LayerKeySet): void {
     : layer.keyframes.filter((key) => key.frame !== command.frame);
 }
 
-function editLayerKey(next: ProjectDocument, command: LayerKeyCommand): void {
-  const layer = next.layers.find((item) => item.id === command.layerId);
-  if (!layer) throw new Error('Track no longer exists.');
+function editLayerKey(layer: ColourOwner, command: LayerKeyCommand): void {
   frameSchema.parse(command.frame);
   const point = layer.keyframes.find((key) => key.frame === command.frame);
   if (command.type === 'layer-key-toggle' || command.type === 'layer-key-value') {
@@ -353,17 +424,23 @@ function editLayerKey(next: ProjectDocument, command: LayerKeyCommand): void {
   if (command.type === 'layer-key-default') {
     if (point && !point.reset)
       throw new Error('A keyframe already exists at this frame. Choose another frame for a default keyframe.');
-    layer.keyframes = point
-      ? layer.keyframes.filter((key) => key !== point)
-      : upsertKey(layer.keyframes, defaultKeyframe(command.frame));
+    if (!point && layer.keyframes.length >= maxKeyframes(layer)) throw keyframeLimit(layer);
+    const added = { ...defaultKeyframe(command.frame) };
+    if (layer.kind === 'clip') {
+      added.values = { ...added.values, opacity: null };
+      added.easing = { ...added.easing, opacity: null };
+    }
+    layer.keyframes = point ? layer.keyframes.filter((key) => key !== point) : upsertKey(layer.keyframes, added);
     return;
   }
-  if (!point) throw new Error('Track keyframe no longer exists.');
+  if (!point) throw new Error(`${layer.kind === 'track' ? 'Track' : 'Clip grade'} keyframe no longer exists.`);
   switch (command.type) {
     case 'layer-key-move':
       frameSchema.parse(command.nextFrame);
       if (layer.keyframes.some((key) => key !== point && key.frame === command.nextFrame))
-        throw new Error('A shared track keyframe already exists at the destination frame.');
+        throw new Error(
+          `A ${layer.kind === 'track' ? 'shared track' : 'clip grade'} keyframe already exists at the destination frame.`,
+        );
       layer.keyframes = upsertKey(
         layer.keyframes.filter((key) => key !== point),
         { ...point, frame: command.nextFrame },
@@ -631,7 +708,7 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'insert':
       if (!Number.isInteger(command.index) || command.index < 0 || command.index > next.clips.length)
         throw new Error('Invalid insertion index.');
-      next.clips.splice(command.index, 0, clipSchema.parse(command.clip));
+      next.clips.splice(command.index, 0, clipSchema.parse({ grade: createClipGrade(), ...command.clip }));
       repairLayerBoundaries(next, [command.clip.layerId]);
       break;
     case 'delete': {
@@ -659,7 +736,7 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
       duplicateClip(next, index, command.newClipId);
       break;
     case 'colour':
-      requiredLayer(next, command.layerId).colour = { ...command.colour };
+      setColour(next, command);
       return projectSchema.parse(next);
     case 'speed':
       next.clips[index] = { ...next.clips[index]!, speed: { ...command.speed } };
@@ -681,9 +758,14 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
       return projectSchema.parse(next);
     case 'colour-setting':
     case 'hsl-band':
-    case 'colour-curve':
+    case 'colour-curve': {
+      const { owner, save } = colourOwner(next, command);
+      editColourSetting(owner, command);
+      save();
+      return projectSchema.parse(next);
+    }
     case 'transform-setting':
-      editTrackSetting(requiredLayer(next, command.layerId), command);
+      editTransformSetting(requiredLayer(next, command.layerId), command);
       return projectSchema.parse(next);
     case 'music':
       next.music = command.music;
@@ -691,17 +773,23 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'opacity':
       requiredLayer(next, command.layerId).opacity = layerSchema.shape.opacity.parse(command.opacity);
       break;
-    case 'layer-key-set':
-      setLayerKey(next, command);
+    case 'layer-key-set': {
+      const { owner, save } = colourOwner(next, command);
+      setLayerKey(owner, command);
+      save();
       break;
+    }
     case 'layer-key-toggle':
     case 'layer-key-value':
     case 'layer-key-move':
     case 'layer-key-remove':
     case 'layer-key-easing':
-    case 'layer-key-default':
-      editLayerKey(next, command);
+    case 'layer-key-default': {
+      const { owner, save } = colourOwner(next, command);
+      editLayerKey(owner, command);
+      save();
       break;
+    }
     case 'layer-add':
     case 'layer-create':
     case 'layer-update':

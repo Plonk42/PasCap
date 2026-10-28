@@ -1,3 +1,4 @@
+import { createColourSettings } from '../../src/shared/colour.js';
 import { Readable, Writable } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as files from '../../src/server/files.js';
@@ -37,6 +38,7 @@ function sample(pose: Partial<SpatialPose> = {}, overrides: Partial<PreviewLayer
     sourcePosition: 7.5,
     spatial: { ...NEUTRAL_SPATIAL_POSE, ...pose },
     detail: { ...NEUTRAL_DETAIL },
+    grade: createColourSettings(),
     colour: { ...NEUTRAL_COLOUR },
     weight: 1,
     blendWeight: 1,

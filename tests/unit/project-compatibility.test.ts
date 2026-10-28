@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ProjectStore } from '../../src/server/storage.js';
+import { createClipGrade } from '../../src/shared/grade.js';
 import {
   musicTracksSchema,
   PROJECT_SCHEMA_VERSION,
@@ -110,9 +111,23 @@ describe('project compatibility', () => {
     const upgraded = projectSchema.parse(upgradeProject(saved));
     expect(saved).toEqual(before);
     expect(upgraded.selects).toEqual({});
-    const { selects: _selects, schemaVersion: _version, ...rest } = upgraded;
-    const { schemaVersion: _saved, ...expected } = saved;
+    const { selects: _selects, schemaVersion: _version, clips, ...rest } = upgraded;
+    const { schemaVersion: _saved, clips: savedClips, ...expected } = saved;
     expect(rest).toEqual(expected);
+    expect(clips.map(({ grade: _grade, ...clip }) => clip)).toEqual(savedClips);
+  });
+
+  it('upgrades schema-25 projects with a neutral grade on every clip, so they render as before', async () => {
+    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-25.json'), 'utf8')) as Record<string, unknown>;
+    const before = structuredClone(saved);
+    const upgraded = projectSchema.parse(upgradeProject(saved));
+    expect(saved).toEqual(before);
+    expect(upgraded.clips.length).toBeGreaterThan(0);
+    for (const clip of upgraded.clips) expect(clip.grade).toEqual(createClipGrade());
+    const { schemaVersion: _version, clips, ...rest } = upgraded;
+    const { schemaVersion: _saved, clips: savedClips, ...expected } = saved;
+    expect(rest).toEqual(expected);
+    expect(clips.map(({ grade: _grade, ...clip }) => clip)).toEqual(savedClips);
   });
 
   it('keeps the kept ranges of a schema-25 project through the load', async () => {
