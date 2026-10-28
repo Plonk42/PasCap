@@ -4,6 +4,7 @@ import { generateCube, isNeutralLocalTone } from '../shared/colour.js';
 import type { MediaJob } from '../shared/media.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
 import { isNeutralDetail } from '../shared/detail.js';
+import { isNeutralClipGrade } from '../shared/grade.js';
 import { hasSpatialEdits } from '../shared/spatial.js';
 import { blackFadeParts, calculateLayout, layerClips } from '../shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS, sameRate } from '../shared/timing.js';
@@ -47,9 +48,12 @@ export function validateReference(project: ProjectDocument, library: MediaLibrar
     );
   if (hasSpatialEdits(snapshot.layers[0]!.transform))
     throw new ServiceError('The diagnostic reference does not support Transform edits or keyframes. Use Export.');
-  if (snapshot.clips.some((clip) => !isNeutralDetail(clip.detail)) || !isNeutralLocalTone(snapshot.layers[0]!.colour))
+  if (
+    snapshot.clips.some((clip) => !isNeutralDetail(clip.detail) || !isNeutralClipGrade(clip.grade)) ||
+    !isNeutralLocalTone(snapshot.layers[0]!.colour)
+  )
     throw new ServiceError(
-      'The diagnostic reference does not support Shadows, Highlights, HDR, Sharpen, Clarity or Denoise. Use Export.',
+      'The diagnostic reference does not support clip grades, Shadows, Highlights, HDR, Sharpen, Clarity or Denoise. Use Export.',
     );
   const layout = calculateLayout(snapshot);
   const [left, right] = layout.clips;

@@ -128,7 +128,9 @@ export async function composeProjectFrame(
   const accumulator = allocate(PIXELS * 8);
   const group = allocate(PIXELS * 8);
   const samples = sampleTimeline(document, frame, layout).map((sample) =>
-    ungraded ? { ...sample, colour: createColourSettings(), detail: { ...NEUTRAL_DETAIL } } : sample,
+    ungraded
+      ? { ...sample, grade: createColourSettings(), colour: createColourSettings(), detail: { ...NEUTRAL_DETAIL } }
+      : sample,
   );
   const slots = sampleSlots(document, frame, layout);
   // A timeslot draws geometry and coverage only: brightness 0 never reads its pixels.

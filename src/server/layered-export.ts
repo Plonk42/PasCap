@@ -179,6 +179,8 @@ function usesGpuKernel(sources: readonly LayerFrameSource[]): boolean {
       !isNeutralDetail(sample.detail) ||
       !isNeutralLocalTone(sample.colour) ||
       !isNeutralAdvancedColour(sample.colour) ||
+      !isNeutralLocalTone(sample.grade) ||
+      !isNeutralAdvancedColour(sample.grade) ||
       !isNeutralSpatial(sample.spatial),
   );
 }
@@ -188,6 +190,7 @@ function gpuSources(sources: readonly LayerFrameSource[]): GpuGroupSource[] {
     rgb,
     bounds,
     parameters: {
+      grade: sample.grade,
       colour: sample.colour,
       spatial: sample.spatial,
       detail: sample.detail,

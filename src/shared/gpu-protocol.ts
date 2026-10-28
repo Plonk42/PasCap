@@ -9,7 +9,7 @@ import type { SpatialPose } from './spatial.js';
  * premultiplied RGBA16 group as little-endian rows in WebGL readback order (bottom row first),
  * each with its byte offset in that order.
  */
-export const GPU_PROTOCOL_VERSION = 2;
+export const GPU_PROTOCOL_VERSION = 3;
 export const GPU_TOKEN_HEADER = 'x-pascap-gpu-token';
 export const GPU_SEQUENCE_HEADER = 'x-pascap-gpu-sequence';
 export const GPU_OFFSET_HEADER = 'x-pascap-gpu-offset';
@@ -35,6 +35,8 @@ export interface GpuFrameSource {
   /** Fitted content rectangle, the uploaded texture. */
   width: number;
   height: number;
+  /** The clip's own grade, applied before the track's Colour. */
+  grade: ColourSettings;
   colour: ColourSettings;
   spatial: SpatialPose;
   detail: DetailSettings;

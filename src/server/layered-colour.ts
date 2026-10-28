@@ -1,5 +1,6 @@
 import { setImmediate as yieldToEvents } from 'node:timers/promises';
-import { colourSchema, compileGradeInto, type ColourSettings, type PixelGrade } from '../shared/colour.js';
+import { colourSchema, type ColourSettings, type PixelGrade } from '../shared/colour.js';
+import { compileGradeChain, gradesPixels } from '../shared/grade.js';
 import { LAYERED_EXPORT_RESOURCES } from '../shared/export.js';
 import { forEachSerial } from '../shared/serial.js';
 import { ServiceError } from './errors.js';
@@ -64,11 +65,19 @@ export class ColourLutCache {
       generationMs: this.#generationMs,
     };
   }
-  async get(settings: ColourSettings, signal: AbortSignal, pool: CompositorPool | null = null): Promise<Float32Array> {
+  /** One grade, or grades applied one after another (a clip's, then its track's). */
+  async get(
+    settings: ColourSettings | readonly ColourSettings[],
+    signal: AbortSignal,
+    pool: CompositorPool | null = null,
+  ): Promise<Float32Array> {
     checkLayeredCancellation(signal);
     if (this.#building)
       throw new Error('LUT generation is sequential; concurrent requests would invalidate borrowed LUTs.');
-    const value = colourSchema.parse(settings);
+    // Stages that change no pixel share the identity LUT, however they were listed.
+    const value = (Array.isArray(settings) ? settings : [settings])
+      .map((stage) => colourSchema.parse(stage))
+      .filter(gradesPixels);
     const key = JSON.stringify(value);
     const cached = this.#entries.get(key);
     if (cached) {
@@ -92,7 +101,7 @@ export class ColourLutCache {
     try {
       if (pool) await pool.fillLut(buffer, value, SIZE);
       else {
-        const grade = compileGradeInto(value);
+        const grade = compileGradeChain(value);
         // Cancellation remains responsive while building a changing grade.
         await forEachSerial(blueSlices(SIZE), async (blue) => {
           fillColourLut(buffer, grade, blue, blue + 1);
