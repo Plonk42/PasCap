@@ -7,9 +7,8 @@ implemented.** Until each implementation issue is delivered, the current contrac
 [Temperature and Tint](TEMPERATURE_AND_TINT.md), [detail filters](DETAIL_FILTERS.md) and
 [Auto adjust](AUTO_ADJUST.md).
 
-Decisions marked **(owner)** were made on 2026-10-23 or 2026-10-28. Items marked
-**proposed** are this note's answers to details the owner did not settle; they hold unless
-he changes them.
+Decisions marked **(owner)** were made on 2026-10-23 or 2026-10-28; every question of #215 is
+answered.
 
 ## Why
 
@@ -193,17 +192,18 @@ Follows the requirements of #289: one settings panel, an unmistakable target.
   selects it. The panel adds no line for it.
 - **Copy grade / Paste grade (owner)** act on the clip or item that is **right-clicked**, never
   on what is at the playhead, which can be several objects across tracks. Each paste is one Undo
-  step. **Proposed:**
-  - Copy takes the object's grade (all settings, HSL and curves) as it is at the clicked frame,
-    which is simply its values when it has no keyframes.
-  - Paste replaces the right-clicked target's grade with it and removes the target's
-    keyframes, since source frames and item offsets do not translate between objects.
+  step.
+  - **Copy grade** is available only on a clip or item **without keyframes**; otherwise it is
+    unavailable with that reason. A right-click points at no particular frame, so a keyed grade
+    has no single value to copy. Copying keyed grades may come later.
+  - Paste replaces the right-clicked target's grade (all settings, HSL and curves) and removes
+    the target's keyframes.
   - When the target belongs to the selection, the paste applies to every selected clip and
     item, still in one Undo step.
 - **Original preview (owner).** Three modes: bypass clip grades, bypass items, or both. Holding
   a modifier while pressing the hold-to-show **Original** button chooses the mode directly, with
   no menu first. The button's tooltip and accessible description list the modifiers.
-  **Proposed** keys, for the pointer and for Enter/Space:
+  The keys, for the pointer and for Enter/Space:
   - plain: bypass both, as today;
   - **Shift**: bypass clip grades only;
   - **Alt**: bypass items only.
@@ -229,7 +229,7 @@ own, and the track-level compromise grade is removed with track Colour.
 - **Clip grades (owner):** one clip-grade edit command per clip and a batch form like
   `detail-clips`. `estimate` with `applyAs: 'shots'` writes each clip's grade values; the
   track-keyframe shots mode is removed.
-- **Items (proposed, #288),** balancing features, calls and tokens:
+- **Items (owner, #288),** balancing features, calls and tokens:
   - no new read: `describe_project` lists items compactly (id, range, non-neutral settings,
     keyframe count), and `describe_track` reports each clip's grade the same way plus the ids
     of the items overlapping it, so one read explains a clip's look;
