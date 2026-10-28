@@ -414,6 +414,7 @@ function expectSurface(engine: PreviewEngine, project: ProjectDocument, frame: n
               slot: lanes.indexOf(layer.clipId),
               sourceFrame: layer.sourceFrame,
               url: proxyUrl(layer.mediaId),
+              grade: ungraded ? NEUTRAL_COLOUR : layer.grade,
               settings: ungraded ? NEUTRAL_COLOUR : layer.colour,
               aspect: 16 / 9,
               spatial: layer.spatial,
@@ -1271,7 +1272,9 @@ describe('editor-only ungraded comparison', () => {
     engine.setUngraded(true);
     expectSurface(engine, project, frame, true);
     expect(compositor().visible).toEqual(
-      graded.map((group) => group.map((clip) => ({ ...clip, settings: NEUTRAL_COLOUR, detail: NEUTRAL_DETAIL }))),
+      graded.map((group) =>
+        group.map((clip) => ({ ...clip, grade: NEUTRAL_COLOUR, settings: NEUTRAL_COLOUR, detail: NEUTRAL_DETAIL })),
+      ),
     );
     engine.setUngraded(false);
     expect(compositor().visible).toEqual(graded);

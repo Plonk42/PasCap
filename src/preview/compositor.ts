@@ -9,7 +9,6 @@ import {
   type ColourSettings,
   createColourSettings,
   gradePixel,
-  isNeutralLocalTone,
   NEUTRAL_COLOUR,
   type RGB,
   temperatureTintGains,
@@ -22,19 +21,13 @@ import {
   isNeutralDetail,
   NEUTRAL_DETAIL,
   type DetailSettings,
+  type LocalTone,
 } from '../shared/detail.js';
+import { isNeutralTone, sourceGrades } from '../shared/grade.js';
 import { compileSpatialMapping, NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../shared/spatial.js';
 import { MAX_VIDEO_LAYERS } from '../shared/model.js';
 import type { PreviewLayer } from '../shared/timeline.js';
-import {
-  detailFragmentShader,
-  fragmentShader,
-  scalarDetailFragmentShader,
-  scalarFragmentShader,
-  singleDetailFragmentShader,
-  singleFragmentShader,
-  vertexShader,
-} from './shaders.js';
+import { fragmentShader, fragmentShaderFor, vertexShader, type FragmentVariant } from './shaders.js';
 
 const DETAIL_UNIFORMS = [
   'detail0',
@@ -45,13 +38,67 @@ const DETAIL_UNIFORMS = [
   'localTone1',
   'localContrast',
 ];
+/** Fragment uniform vectors of the two-source program grading each source twice with HSL ranges and curves. */
+export const STAGED_UNIFORM_VECTORS = 330;
 /** Two timeline video decoders per track: both dissolve sources, or the active and next clip. */
 export const MAX_VIDEO_DECODERS = 2 * MAX_VIDEO_LAYERS;
 
 type GradePath = 'full' | 'single' | 'scalar';
+interface ProgramVariant {
+  path: GradePath;
+  detail: boolean;
+  staged: boolean;
+}
+interface CompiledProgram {
+  program: WebGLProgram;
+  uniforms: Map<string, WebGLUniformLocation>;
+}
+const variantKey = ({ path, detail, staged }: ProgramVariant): string => `${path}:${detail}:${staged}`;
+const SHADER_SOURCES: Record<GradePath, Pick<FragmentVariant, 'single' | 'advanced'>> = {
+  full: { single: false, advanced: true },
+  single: { single: true, advanced: true },
+  scalar: { single: false, advanced: false },
+};
+/** Uniforms of one grade stage; the clip grade before the track's uses the `first_` ones. */
+const gradeUniforms = (p: string): string[] => [
+  `${p}tone0`,
+  `${p}tone1`,
+  `${p}extra0`,
+  `${p}extra1`,
+  `${p}correction0`,
+  `${p}correction1`,
+  `${p}vibrance`,
+  `${p}hsl0[0]`,
+  `${p}hsl1[0]`,
+  ...[0, 1].flatMap((source) => [0, 1, 2, 3].map((channel) => `${p}curve${source}_${channel}[0]`)),
+  `${p}curveCounts0`,
+  `${p}curveCounts1`,
+  `${p}curveIdentity0`,
+  `${p}curveIdentity1`,
+  `${p}neutralHsl`,
+];
+const BASE_UNIFORMS = [
+  'source0',
+  'source1',
+  ...gradeUniforms(''),
+  'coverage',
+  'brightness',
+  'imageAspect',
+  'canvasAspect',
+  'spatialU0',
+  'spatialV0',
+  'spatialU1',
+  'spatialV1',
+  'crop0',
+  'crop1',
+  'neutralSpatial',
+];
+const STAGE_UNIFORMS = gradeUniforms('first_');
 
 export interface CompositeClip {
   slot: number;
+  /** The clip's own grade, applied before `settings`, the track's Colour; absent is neutral. */
+  grade?: ColourSettings;
   settings: ColourSettings;
   aspect: number;
   spatial: SpatialPose;
@@ -102,26 +149,26 @@ function createProgram(gl: WebGL2RenderingContext, source = fragmentShader): Web
   }
 }
 
+/** What one source's two grades need from a program, and what to upload as each stage. */
+function sourceStages(source: CompositeClip): { stages: ColourSettings[]; tone: LocalTone } {
+  const { stages, tone } = sourceGrades(source.grade ?? NEUTRAL_COLOUR, source.settings);
+  return { stages, tone };
+}
+const isAdvancedStage = (settings: ColourSettings): boolean =>
+  !isNeutralHsl(settings.hsl) || CURVE_CHANNELS.some((channel) => !isIdentityCurve(settings.curves[channel]));
+
 /** Owns GPU resources, but never media clocks or React state. */
 export class Compositor {
   readonly gl: WebGL2RenderingContext;
   readonly renderer: string;
-  readonly #program: WebGLProgram;
-  #scalarProgram: WebGLProgram | null = null;
-  #singleProgram: WebGLProgram | null = null;
-  readonly #scalarUniforms = new Map<string, WebGLUniformLocation>();
-  readonly #singleUniforms = new Map<string, WebGLUniformLocation>();
-  readonly #detailPrograms = new Map<
-    GradePath,
-    { program: WebGLProgram; uniforms: Map<string, WebGLUniformLocation> }
-  >();
-  #gradePath: GradePath = 'full';
-  #detail = false;
+  /** The capacity a two-grade advanced program needs; checked before compiling one. */
+  readonly fragmentUniformVectors: number;
+  readonly #programs = new Map<string, CompiledProgram>();
+  #current: CompiledProgram;
   #advanced = true;
   readonly #vao: WebGLVertexArrayObject;
   readonly #textures: WebGLTexture[] = [];
   readonly #sizes: [number, number][] = [];
-  readonly #uniforms = new Map<string, WebGLUniformLocation>();
   readonly #hslUniform = new Float32Array(32);
   readonly #curveUniform = new Float32Array(192);
   #disposed = false;
@@ -139,59 +186,30 @@ export class Compositor {
     this.renderer = extension
       ? String(gl.getParameter(extension.UNMASKED_RENDERER_WEBGL))
       : String(gl.getParameter(gl.RENDERER));
+    this.fragmentUniformVectors = Number(gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS));
     const program = createProgram(gl);
     const vao = gl.createVertexArray();
     if (!vao) {
       gl.deleteProgram(program);
       throw new Error('Cannot allocate the preview vertex array.');
     }
-    this.#program = program;
     this.#vao = vao;
+    const uniforms = new Map<string, WebGLUniformLocation>();
+    this.#current = { program, uniforms };
+    this.#programs.set(variantKey({ path: 'full', detail: false, staged: false }), this.#current);
     try {
-      const names = [
-        'source0',
-        'source1',
-        'tone0',
-        'tone1',
-        'extra0',
-        'extra1',
-        'correction0',
-        'correction1',
-        'vibrance',
-        'coverage',
-        'brightness',
-        'imageAspect',
-        'canvasAspect',
-        'spatialU0',
-        'spatialV0',
-        'spatialU1',
-        'spatialV1',
-        'crop0',
-        'crop1',
-        'neutralSpatial',
-        'hsl0[0]',
-        'hsl1[0]',
-        ...[0, 1].flatMap((source) => [0, 1, 2, 3].map((channel) => `curve${source}_${channel}[0]`)),
-        'curveCounts0',
-        'curveCounts1',
-        'curveIdentity0',
-        'curveIdentity1',
-        'neutralHsl',
-      ];
-      for (const name of names) {
+      for (const name of BASE_UNIFORMS) {
         const location = gl.getUniformLocation(program, name);
         if (location === null) throw new Error(`Missing compositor uniform: ${name}`);
-        this.#uniforms.set(name, location);
+        uniforms.set(name, location);
       }
       // Compile the three bounded paths before playback. First Compare activation
       // must never compile/link synchronously against an advancing audio clock.
-      this.#useGrade('scalar');
-      this.#useGrade('single');
+      this.#use({ path: 'scalar', detail: false, staged: false });
+      this.#use({ path: 'single', detail: false, staged: false });
       this.setDecoderCount(2);
-      this.#useGrade('full');
+      this.#use({ path: 'full', detail: false, staged: false });
       gl.bindVertexArray(vao);
-      gl.uniform1i(this.#location('source0'), 0);
-      gl.uniform1i(this.#location('source1'), 1);
       gl.disable(gl.DITHER);
       this.clear();
     } catch (error) {
@@ -219,60 +237,49 @@ export class Compositor {
     }
   }
   #location(name: string): WebGLUniformLocation | null {
-    if (this.#detail) return this.#detailPrograms.get(this.#gradePath)!.uniforms.get(name) ?? null;
-    const uniforms = this.#gradePath === 'single' ? this.#singleUniforms : this.#scalarUniforms;
-    return (this.#gradePath === 'full' ? this.#uniforms : uniforms).get(name) ?? null;
+    return this.#current.uniforms.get(name) ?? null;
   }
 
   /** Compile the detail variants ahead of a draw that needs them, never against a running clock. */
   prepareDetail(): void {
     if (this.#disposed) return;
-    for (const path of ['full', 'single', 'scalar'] as const) this.#detailProgram(path);
+    for (const path of ['full', 'single', 'scalar'] as const) this.#compiled({ path, detail: true, staged: false });
   }
-  #detailProgram(path: GradePath): WebGLProgram {
-    const existing = this.#detailPrograms.get(path);
-    if (existing) return existing.program;
-    const gl = this.gl;
-    const sources = {
-      full: detailFragmentShader,
-      single: singleDetailFragmentShader,
-      scalar: scalarDetailFragmentShader,
-    };
-    const program = createProgram(gl, sources[path]);
-    const uniforms = new Map<string, WebGLUniformLocation>();
-    for (const name of [...this.#uniforms.keys(), ...DETAIL_UNIFORMS]) {
-      const location = gl.getUniformLocation(program, name);
-      if (location !== null) uniforms.set(name, location);
+  /** Compile the variants grading a clip before its track, ahead of a draw that needs them. */
+  prepareStaged(detail: boolean): void {
+    if (this.#disposed) return;
+    for (const path of ['full', 'single', 'scalar'] as const) {
+      this.#compiled({ path, detail: false, staged: true });
+      if (detail) this.#compiled({ path, detail: true, staged: true });
     }
-    this.#detailPrograms.set(path, { program, uniforms });
-    if (path === 'full' && DETAIL_UNIFORMS.some((name) => !uniforms.has(name))) {
-      throw new Error('Missing compositor detail uniforms.');
-    }
-    return program;
   }
-
-  #gradeProgram(path: GradePath): WebGLProgram {
-    if (path === 'full') return this.#program;
-    const existing = path === 'single' ? this.#singleProgram : this.#scalarProgram;
+  #compiled(variant: ProgramVariant): CompiledProgram {
+    const key = variantKey(variant);
+    const existing = this.#programs.get(key);
     if (existing) return existing;
     const gl = this.gl;
-    const program = createProgram(gl, path === 'single' ? singleFragmentShader : scalarFragmentShader);
-    const uniforms = path === 'single' ? this.#singleUniforms : this.#scalarUniforms;
-    if (path === 'single') this.#singleProgram = program;
-    else this.#scalarProgram = program;
-    for (const name of this.#uniforms.keys()) {
+    const program = createProgram(gl, fragmentShaderFor({ ...SHADER_SOURCES[variant.path], ...variant }));
+    const uniforms = new Map<string, WebGLUniformLocation>();
+    const names = [
+      ...BASE_UNIFORMS,
+      ...(variant.detail ? DETAIL_UNIFORMS : []),
+      ...(variant.staged ? STAGE_UNIFORMS : []),
+    ];
+    for (const name of names) {
       const location = gl.getUniformLocation(program, name);
       if (location !== null) uniforms.set(name, location);
     }
-    return program;
+    const compiled = { program, uniforms };
+    this.#programs.set(key, compiled);
+    if (variant.path === 'full' && variant.detail && DETAIL_UNIFORMS.some((name) => !uniforms.has(name)))
+      throw new Error('Missing compositor detail uniforms.');
+    return compiled;
   }
-  #useGrade(path: GradePath, detail = false): void {
+  #use(variant: ProgramVariant): void {
     const gl = this.gl;
-    const program = detail ? this.#detailProgram(path) : this.#gradeProgram(path);
-    this.#gradePath = path;
-    this.#detail = detail;
-    this.#advanced = path !== 'scalar';
-    gl.useProgram(program);
+    this.#current = this.#compiled(variant);
+    this.#advanced = variant.path !== 'scalar';
+    gl.useProgram(this.#current.program);
     gl.uniform1i(this.#location('source0'), 0);
     gl.uniform1i(this.#location('source1'), 1);
   }
@@ -347,7 +354,7 @@ export class Compositor {
     if (this.#disposed || this.gl.isContextLost()) return;
     this.clear();
     const gl = this.gl;
-    gl.useProgram(this.#program);
+    gl.useProgram(this.#current.program);
     gl.bindVertexArray(this.#vao);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.enable(gl.BLEND);
@@ -358,6 +365,47 @@ export class Compositor {
     } finally {
       gl.disable(gl.BLEND);
     }
+  }
+  /** One stage's grade uniforms, `p` '' for the last (track) grade and 'first_' for the clip grade before it. */
+  #uploadStage(p: string, index: number, settings: ColourSettings): void {
+    const gl = this.gl;
+    const gains = temperatureTintGains(settings);
+    gl.uniform4f(this.#location(`${p}correction${index}`), gains[0], gains[1], gains[2], settings.blacks);
+    gl.uniform4f(
+      this.#location(`${p}tone${index}`),
+      settings.exposure,
+      settings.brightness,
+      settings.contrast,
+      settings.saturation,
+    );
+    gl.uniform2f(this.#location(`${p}extra${index}`), (settings.hue * Math.PI) / 180, settings.whites);
+    if (!this.#advanced) return;
+    HSL_BANDS.forEach((band, at) => {
+      const value = settings.hsl[band];
+      this.#hslUniform.set([value.hue, value.saturation, value.lightness, 0], at * 4);
+    });
+    gl.uniform4fv(this.#location(`${p}hsl${index}[0]`), this.#hslUniform);
+    this.#curveUniform.fill(0);
+    CURVE_CHANNELS.forEach((channel, at) => {
+      const points = settings.curves[channel];
+      const slopes = colourCurveSlopes(points);
+      points.forEach((point, position) => {
+        this.#curveUniform.set([point.x, point.y, slopes[position]!], at * 48 + position * 3);
+      });
+    });
+    for (let channel = 0; channel < 4; channel++)
+      gl.uniform3fv(
+        this.#location(`${p}curve${index}_${channel}[0]`),
+        this.#curveUniform.subarray(channel * 48, (channel + 1) * 48),
+      );
+    gl.uniform4iv(
+      this.#location(`${p}curveCounts${index}`),
+      CURVE_CHANNELS.map((channel) => settings.curves[channel].length),
+    );
+    gl.uniform4iv(
+      this.#location(`${p}curveIdentity${index}`),
+      CURVE_CHANNELS.map((channel) => Number(isIdentityCurve(settings.curves[channel]))),
+    );
   }
   #drawGroup(group: CompositeGroup): void {
     if (group.clips.length < 1 || group.clips.length > 2)
@@ -376,14 +424,21 @@ export class Compositor {
       brightness: 0,
     };
     const sources = [group.clips[0]!, group.clips[1] ?? empty];
-    const advanced = sources.some(
-      (source) =>
-        !isNeutralHsl(source.settings.hsl) ||
-        CURVE_CHANNELS.some((channel) => !isIdentityCurve(source.settings.curves[channel])),
-    );
+    const graded = sources.map(sourceStages);
+    // One stage uploads as the program's only grade; two put the clip grade first.
+    const last = graded.map(({ stages }) => stages.at(-1) ?? NEUTRAL_COLOUR);
+    const first = graded.map(({ stages }) => (stages.length > 1 ? stages[0]! : NEUTRAL_COLOUR));
+    const staged = graded.some(({ stages }) => stages.length > 1);
+    const advanced = [...last, ...first].some(isAdvancedStage);
     const advancedPath = group.clips.length === 1 ? 'single' : 'full';
-    const detailed = sources.some((source) => !isNeutralDetail(source.detail) || !isNeutralLocalTone(source.settings));
-    this.#useGrade(advanced ? advancedPath : 'scalar', detailed);
+    const detailed = sources.some(
+      (source, index) => !isNeutralDetail(source.detail) || !isNeutralTone(graded[index]!.tone),
+    );
+    if (staged && advanced && this.fragmentUniformVectors < STAGED_UNIFORM_VECTORS)
+      throw new Error(
+        `This GPU supports ${this.fragmentUniformVectors} fragment uniform vectors; grading a clip and its track with HSL ranges or curves needs ${STAGED_UNIFORM_VECTORS}.`,
+      );
+    this.#use({ path: advanced ? advancedPath : 'scalar', detail: detailed, staged });
     const mappings = sources.map((source) =>
       compileSpatialMapping(
         source.spatial,
@@ -394,37 +449,8 @@ export class Compositor {
       ),
     );
     for (const [index, source] of sources.entries()) {
-      const settings = source.settings;
-      const gains = temperatureTintGains(settings);
-      gl.uniform4f(this.#location(`correction${index}`), gains[0], gains[1], gains[2], settings.blacks);
-      if (this.#advanced) {
-        HSL_BANDS.forEach((band, at) => {
-          const value = settings.hsl[band];
-          this.#hslUniform.set([value.hue, value.saturation, value.lightness, 0], at * 4);
-        });
-        gl.uniform4fv(this.#location(`hsl${index}[0]`), this.#hslUniform);
-        this.#curveUniform.fill(0);
-        CURVE_CHANNELS.forEach((channel, at) => {
-          const points = settings.curves[channel];
-          const slopes = colourCurveSlopes(points);
-          points.forEach((point, position) => {
-            this.#curveUniform.set([point.x, point.y, slopes[position]!], at * 48 + position * 3);
-          });
-        });
-        for (let channel = 0; channel < 4; channel++)
-          gl.uniform3fv(
-            this.#location(`curve${index}_${channel}[0]`),
-            this.#curveUniform.subarray(channel * 48, (channel + 1) * 48),
-          );
-        gl.uniform4iv(
-          this.#location(`curveCounts${index}`),
-          CURVE_CHANNELS.map((channel) => settings.curves[channel].length),
-        );
-        gl.uniform4iv(
-          this.#location(`curveIdentity${index}`),
-          CURVE_CHANNELS.map((channel) => Number(isIdentityCurve(settings.curves[channel]))),
-        );
-      }
+      this.#uploadStage('', index, last[index]!);
+      if (staged) this.#uploadStage('first_', index, first[index]!);
       const mapping = mappings[index]!;
       const [a, b, c, d, e, f] = mapping.affine;
       gl.uniform3f(this.#location(`spatialU${index}`), a, b, c);
@@ -438,14 +464,6 @@ export class Compositor {
       );
       gl.activeTexture(gl.TEXTURE0 + index);
       gl.bindTexture(gl.TEXTURE_2D, this.#texture(source.slot));
-      gl.uniform4f(
-        this.#location(`tone${index}`),
-        settings.exposure,
-        settings.brightness,
-        settings.contrast,
-        settings.saturation,
-      );
-      gl.uniform2f(this.#location(`extra${index}`), (settings.hue * Math.PI) / 180, settings.whites);
       if (detailed) {
         const { sharpen, clarity, denoise } = source.detail;
         gl.uniform4f(this.#location(`detail${index}`), sharpen, clarity, denoise, denoiseRangeFactor(denoise));
@@ -457,34 +475,33 @@ export class Compositor {
         const shiftV = (isNeutralDetail(source.detail) ? 0 : detailShift(lines)) / lines;
         // Texture rows run bottom-up: a shift down the image is negative in texture V.
         gl.uniform4f(this.#location(`detailStep${index}`), stepU, stepV, shiftV / aspect, -shiftV);
-        gl.uniform4f(
-          this.#location(`localTone${index}`),
-          settings.shadows,
-          settings.highlights,
-          settings.hdr,
-          settings.exposure,
-        );
+        const tone = graded[index]!.tone;
+        gl.uniform4f(this.#location(`localTone${index}`), tone.shadows, tone.highlights, tone.hdr, tone.exposure);
       }
     }
     if (detailed)
-      gl.uniform2f(
-        this.#location('localContrast'),
-        sources[0]!.settings.localContrast,
-        sources[1]!.settings.localContrast,
-      );
+      gl.uniform2f(this.#location('localContrast'), graded[0]!.tone.localContrast, graded[1]!.tone.localContrast);
     gl.uniform2f(
       this.#location('coverage'),
       sources[0]!.opacity * sources[0]!.blendWeight,
       sources[1]!.opacity * sources[1]!.blendWeight,
     );
     gl.uniform2f(this.#location('brightness'), sources[0]!.brightness, sources[1]!.brightness);
-    gl.uniform2f(this.#location('vibrance'), sources[0]!.settings.vibrance, sources[1]!.settings.vibrance);
-    if (this.#advanced)
+    gl.uniform2f(this.#location('vibrance'), last[0]!.vibrance, last[1]!.vibrance);
+    if (staged) gl.uniform2f(this.#location('first_vibrance'), first[0]!.vibrance, first[1]!.vibrance);
+    if (this.#advanced) {
       gl.uniform2f(
         this.#location('neutralHsl'),
-        Number(isNeutralHsl(sources[0]!.settings.hsl)),
-        Number(isNeutralHsl(sources[1]!.settings.hsl)),
+        Number(isNeutralHsl(last[0]!.hsl)),
+        Number(isNeutralHsl(last[1]!.hsl)),
       );
+      if (staged)
+        gl.uniform2f(
+          this.#location('first_neutralHsl'),
+          Number(isNeutralHsl(first[0]!.hsl)),
+          Number(isNeutralHsl(first[1]!.hsl)),
+        );
+    }
     gl.uniform2f(this.#location('neutralSpatial'), Number(mappings[0]!.neutral), Number(mappings[1]!.neutral));
     gl.uniform2f(this.#location('imageAspect'), sources[0]!.aspect, sources[1]!.aspect);
     gl.uniform1f(this.#location('canvasAspect'), this.canvas.width / this.canvas.height);
@@ -508,10 +525,7 @@ export class Compositor {
     this.#textures.length = 0;
     this.#sizes.length = 0;
     this.gl.deleteVertexArray(this.#vao);
-    this.gl.deleteProgram(this.#program);
-    if (this.#scalarProgram) this.gl.deleteProgram(this.#scalarProgram);
-    if (this.#singleProgram) this.gl.deleteProgram(this.#singleProgram);
-    for (const { program } of this.#detailPrograms.values()) this.gl.deleteProgram(program);
+    for (const { program } of this.#programs.values()) this.gl.deleteProgram(program);
   }
 }
 
@@ -525,8 +539,8 @@ export interface GpuCompositionComparison extends GpuComparison {
   cases: number;
 }
 
-/** Numeric GPU/CPU parity test, separate from browser video conversion and H.264 error. */
-export function verifyGpuColour(settings: ColourSettings): GpuComparison {
+/** Numeric GPU/CPU parity test, separate from browser video conversion and H.264 error; `grade` is a clip grade before `settings`. */
+export function verifyGpuColour(settings: ColourSettings, grade: ColourSettings = NEUTRAL_COLOUR): GpuComparison {
   const canvas = document.createElement('canvas');
   canvas.width = 17;
   canvas.height = 17;
@@ -545,6 +559,7 @@ export function verifyGpuColour(settings: ColourSettings): GpuComparison {
         clips: [
           {
             slot: 0,
+            grade,
             settings,
             aspect: 1,
             spatial: { ...NEUTRAL_SPATIAL_POSE },
@@ -563,7 +578,7 @@ export function verifyGpuColour(settings: ColourSettings): GpuComparison {
     let maximum = 0;
     for (let index = 0; index < 17 * 17; index++) {
       const input: RGB = [pixels[index * 4]! / 255, pixels[index * 4 + 1]! / 255, pixels[index * 4 + 2]! / 255];
-      const expected = gradePixel(input, settings);
+      const expected = gradePixel(gradePixel(input, grade), settings);
       for (let channel = 0; channel < 3; channel++) {
         const error = Math.abs(rendered[index * 4 + channel]! - expected[channel]! * 255);
         sum += error;

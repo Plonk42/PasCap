@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { createColourSettings, gradePixel, NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
+import { ColourLutCache } from '../../src/server/layered-colour.js';
+import { composeLayerFrame } from '../../src/server/layered-frame.js';
+import {
+  createColourSettings,
+  generateCube,
+  gradePixel,
+  NEUTRAL_COLOUR,
+  type ColourSettings,
+  type RGB,
+} from '../../src/shared/colour.js';
+import { compositePixel } from '../../src/shared/composition.js';
+import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
+import { needsLayeredExport } from '../../src/shared/export.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import {
   clipGradeSchema,
@@ -15,7 +27,8 @@ import {
 import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
-import { sampleTimeline } from '../../src/shared/timeline.js';
+import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
+import { sampleTimeline, type PreviewLayer } from '../../src/shared/timeline.js';
 
 const gradeKey = (frame: number, values: Partial<typeof EMPTY_KEY_VALUES>, curve: 'linear' | 'hold' = 'linear') =>
   layerKeyAsGradeKey(layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, curve));
@@ -244,5 +257,103 @@ describe('clip grade commands', () => {
     expect(next.clips.find((clip) => clip.id === 'a3')!.grade).toEqual(grade);
     next = applyCommand(next, { type: 'place', clipId: 'a', layerId: 'video-2', start: 500, index: 0 });
     expect(next.clips.find((clip) => clip.id === 'a')!.grade).toEqual(grade);
+  });
+});
+
+describe('clip grades in composited export', () => {
+  const target = { width: 8, height: 4 };
+  const pixels = target.width * target.height;
+  const bounds = { x: 0, y: 0, ...target };
+  const sample = (id: string, grade: ColourSettings, colour: ColourSettings, blendWeight: number): PreviewLayer => ({
+    clipId: id,
+    mediaId: id,
+    layerId: 'video-1',
+    sourceFrame: 3,
+    sourcePosition: 3,
+    spatial: { ...NEUTRAL_SPATIAL_POSE },
+    detail: { ...NEUTRAL_DETAIL },
+    grade,
+    colour,
+    weight: blendWeight,
+    blendWeight,
+    brightness: 1,
+    opacity: 1,
+  });
+  const frame = (seed: number): Buffer => {
+    const rgb = Buffer.alloc(pixels * 3);
+    for (let pixel = 0; pixel < pixels; pixel++) {
+      rgb[pixel * 3] = (pixel * 73 + seed * 41) % 256;
+      rgb[pixel * 3 + 1] = (pixel * 157 + seed * 23) % 256;
+      rgb[pixel * 3 + 2] = (pixel * 29 + seed * 61) % 256;
+    }
+    return rgb;
+  };
+  const track = { ...createColourSettings(), contrast: 1.3, saturation: 1.2 };
+  const warm = { ...createColourSettings(), temperature: 0.6, exposure: 0.3 };
+  const ranged = {
+    ...createColourSettings(),
+    exposure: -0.2,
+    hsl: { ...createColourSettings().hsl, red: { hue: 12, saturation: 0.3, lightness: 0.05 } },
+  };
+
+  for (const [name, left, right] of [
+    ['scalar clip grades through one LUT each', warm, createColourSettings()],
+    ['an HSL clip grade exactly', ranged, warm],
+  ] as const)
+    it(`grades each dissolve source by its clip, then its track: ${name}`, async () => {
+      const buffer = Buffer.alloc(pixels * 8);
+      const samples = [sample('left', left, track, 0.4), sample('right', right, track, 0.6)];
+      const input = new Map(samples.map((current, index) => [current.clipId, frame(index)]));
+      await composeLayerFrame(
+        buffer,
+        target,
+        samples.map((current) => ({ sample: current, rgb: input.get(current.clipId)!, bounds, original: target })),
+        new ColourLutCache(),
+        new AbortController().signal,
+      );
+      const output = new Uint16Array(buffer.buffer, buffer.byteOffset, pixels * 4);
+      let error = 0;
+      for (let pixel = 0; pixel < pixels; pixel++) {
+        const expected = compositePixel(samples, (current) => {
+          const rgb = input.get(current.clipId)!;
+          return [rgb[pixel * 3]! / 255, rgb[pixel * 3 + 1]! / 255, rgb[pixel * 3 + 2]! / 255];
+        });
+        for (let channel = 0; channel < 3; channel++)
+          error += Math.abs(output[pixel * 4 + channel]! / 65535 - expected[channel]!) * 255;
+      }
+      expect(error / (pixels * 3)).toBeLessThan(name.startsWith('an HSL') ? 0.05 : 1);
+      // The clip grade really changes the picture.
+      const trackOnly = compositePixel([{ ...samples[0]!, grade: createColourSettings() }], () => [0.5, 0.3, 0.2]);
+      expect(compositePixel([samples[0]!], () => [0.5, 0.3, 0.2])).not.toEqual(trackOnly);
+    });
+
+  it('bakes unkeyed scalar clip grades into the static export, and sends the rest to composited export', () => {
+    const document = project();
+    document.layers = [{ ...document.layers[0]!, transitions: [] }];
+    document.clips = [document.clips[0]!];
+    expect(needsLayeredExport(document)).toBe(false);
+    document.clips[0]!.grade.colour = warm;
+    expect(needsLayeredExport(document)).toBe(false);
+    expect(
+      needsLayeredExport({ ...document, clips: [{ ...document.clips[0]!, grade: { colour: ranged, keyframes: [] } }] }),
+    ).toBe(true);
+    expect(
+      needsLayeredExport({
+        ...document,
+        clips: [{ ...document.clips[0]!, grade: { colour: { ...warm, hdr: 0.2 }, keyframes: [] } }],
+      }),
+    ).toBe(true);
+    expect(
+      needsLayeredExport({
+        ...document,
+        clips: [{ ...document.clips[0]!, grade: { colour: warm, keyframes: [gradeKey(4, { tint: 0.1 })] } }],
+      }),
+    ).toBe(true);
+    const cube = generateCube([warm, track], 3).split('\n');
+    expect(cube.at(-2)).toBe(
+      gradePixel(gradePixel([1, 1, 1], warm), track)
+        .map((value) => value.toFixed(9))
+        .join(' '),
+    );
   });
 });

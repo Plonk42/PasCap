@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isNeutralAdvancedColour, isNeutralLocalTone } from './colour.js';
 import { isNeutralDetail } from './detail.js';
+import { isStaticClipGrade } from './grade.js';
 import {
   MAX_MUSIC_TRACKS,
   MAX_VIDEO_LAYERS,
@@ -96,7 +97,7 @@ export const LAYERED_EXPORT_RESOURCES = Object.freeze({
 export function needsLayeredExport(document: ProjectDocument): boolean {
   if (
     document.layers.length !== 1 ||
-    document.clips.some((clip) => !isNeutralDetail(clip.detail)) ||
+    document.clips.some((clip) => !isNeutralDetail(clip.detail) || !isStaticClipGrade(clip.grade)) ||
     document.layers.some(
       (layer) =>
         !layer.enabled ||

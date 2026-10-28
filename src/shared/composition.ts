@@ -1,5 +1,6 @@
 import type { ColourSettings, RGB } from './colour.js';
-import { COLOUR_CONTROLS, gradePixel } from './colour.js';
+import { COLOUR_CONTROLS } from './colour.js';
+import { gradeChainPixel, sourceGrades } from './grade.js';
 import { evaluateLayerSetting } from './keyframes.js';
 import type { VideoLayer } from './model.js';
 import type { PreviewLayer } from './timeline.js';
@@ -15,7 +16,7 @@ export function opacityAt(layer: VideoLayer, projectFrame: number): number {
   return evaluateLayerSetting(layer, 'opacity', projectFrame, layer.opacity);
 }
 
-/** Encoded BT.709, premultiplied within a dissolve, source-over across layers. */
+/** Encoded BT.709, each source graded by its clip then its track, premultiplied within a dissolve, source-over across layers. */
 export function compositePixel(layers: readonly PreviewLayer[], sampleSource: (layer: PreviewLayer) => RGB): RGB {
   const result: [number, number, number] = [0, 0, 0];
   const ids = [...new Set(layers.map((layer) => layer.layerId))];
@@ -24,7 +25,7 @@ export function compositePixel(layers: readonly PreviewLayer[], sampleSource: (l
     const colour: [number, number, number] = [0, 0, 0];
     let alpha = 0;
     for (const layer of group) {
-      const graded = gradePixel(sampleSource(layer), layer.colour);
+      const graded = gradeChainPixel(sampleSource(layer), sourceGrades(layer.grade, layer.colour).stages);
       const coverage = layer.opacity * layer.blendWeight;
       alpha += coverage;
       for (let channel = 0; channel < 3; channel++) colour[channel]! += graded[channel]! * coverage * layer.brightness;

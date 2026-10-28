@@ -1,5 +1,6 @@
 import { colourSchema, NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
 import { isNeutralDetail, NEUTRAL_DETAIL } from '../shared/detail.js';
+import { gradeUsesLocalTone, isNeutralClipGrade } from '../shared/grade.js';
 import { usesLocalTone } from '../shared/keyframes.js';
 import { PROXY_GOP_FRAMES } from '../shared/media.js';
 import { projectSchema, type ProjectDocument, type VideoClip } from '../shared/model.js';
@@ -25,11 +26,14 @@ export interface OriginalDimensions {
   readonly height: number;
 }
 export type OriginalDimensionsResolver = (mediaId: string) => OriginalDimensions;
+/** What the held Original preview bypasses: every grade, only clip grades, or only track Colour. */
+export type OriginalMode = 'all' | 'clip' | 'track';
 export interface PreviewDiagnostics {
   status: PreviewStatus;
   message: string;
   playing: boolean;
   ungraded: boolean;
+  original: OriginalMode | null;
   frame: number;
   duration: number;
   requestedFrame: number;
@@ -160,7 +164,7 @@ export class PreviewEngine {
   #raf = 0;
   #disposed = false;
   #playing = false;
-  #ungraded = false;
+  #original: OriginalMode | null = null;
   #busy = false;
   #status: PreviewStatus = 'empty';
   #message = 'Add footage to the timeline';
@@ -220,7 +224,8 @@ export class PreviewEngine {
       status: this.#status,
       message: this.#message,
       playing: this.#playing,
-      ungraded: this.#ungraded,
+      ungraded: this.#original !== null,
+      original: this.#original,
       frame: this.#frame,
       duration: this.#layout.duration,
       requestedFrame: this.#operationFrame,
@@ -465,15 +470,15 @@ export class PreviewEngine {
     await this.#showFrame(frame, signal);
   }
 
-  /** Detail shader variants compile when a document first needs them, before any draw uses them. */
+  /** Detail and clip grade shader variants compile when a document first needs them, before any draw uses them. */
   #prepareDetail(): void {
     const document = this.#document;
-    if (
-      this.#compositor.available &&
-      document &&
-      (document.clips.some((clip) => !isNeutralDetail(clip.detail)) || document.layers.some(usesLocalTone))
-    )
-      this.#compositor.prepareDetail();
+    if (!this.#compositor.available || !document) return;
+    const detail =
+      document.clips.some((clip) => !isNeutralDetail(clip.detail) || gradeUsesLocalTone(clip.grade)) ||
+      document.layers.some(usesLocalTone);
+    if (detail) this.#compositor.prepareDetail();
+    if (document.clips.some((clip) => !isNeutralClipGrade(clip.grade))) this.#compositor.prepareStaged(detail);
   }
   async loadProject(
     document: ProjectDocument,
@@ -488,7 +493,7 @@ export class PreviewEngine {
     if (!sameRate(snapshot.frameRate, PROJECT_FPS)) throw new Error('Preview requires 30000/1001 fps video.');
     this.pause();
     const signal = this.#beginOperation();
-    if (snapshot.id !== this.#document?.id) this.#ungraded = false;
+    if (snapshot.id !== this.#document?.id) this.#original = null;
     this.#document = snapshot;
     this.#prepareDetail();
     this.#layout = calculateLayout(snapshot);
@@ -655,9 +660,10 @@ export class PreviewEngine {
       void this.seek(this.#frame);
   }
   /** Editor-only bypass of Colour and clip detail filters: keep source clocks, coverage and saved settings. */
-  setUngraded(enabled: boolean): void {
-    if (this.#disposed || !this.#document || this.#ungraded === enabled) return;
-    this.#ungraded = enabled;
+  setUngraded(enabled: boolean | OriginalMode): void {
+    const mode = enabled === true ? 'all' : enabled || null;
+    if (this.#disposed || !this.#document || this.#original === mode) return;
+    this.#original = mode;
     this.#dirty = true;
     this.#redrawPaused();
     this.#emit(true);
@@ -793,10 +799,11 @@ export class PreviewEngine {
             throw new Error('Original media dimensions must be positive integers.');
           return {
             slot,
-            settings: this.#ungraded ? NEUTRAL_COLOUR : layer.colour,
+            grade: this.#original === 'all' || this.#original === 'clip' ? NEUTRAL_COLOUR : layer.grade,
+            settings: this.#original === 'all' || this.#original === 'track' ? NEUTRAL_COLOUR : layer.colour,
             aspect: aspect ?? dimensions.width / dimensions.height,
             spatial: layer.spatial,
-            detail: this.#ungraded ? NEUTRAL_DETAIL : layer.detail,
+            detail: this.#original === 'all' || this.#original === 'clip' ? NEUTRAL_DETAIL : layer.detail,
             originalWidth: dimensions.width,
             originalHeight: dimensions.height,
             opacity: layer.opacity,
@@ -960,7 +967,7 @@ export class PreviewEngine {
     this.pause();
     this.#disposed = true;
     clearTimeout(this.#settleTimer);
-    this.#ungraded = false;
+    this.#original = null;
     cancelAnimationFrame(this.#raf);
     this.canvas.removeEventListener('webglcontextlost', this.#onContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.#onContextRestored);

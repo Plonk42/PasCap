@@ -305,7 +305,7 @@ async function retimeClip(
   await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
   checkCancelled(context);
   const row = inputs.snapshot.layers.find((layer) => layer.id === clip.layerId)!;
-  await atomicWrite(path.join(directory, lut), generateCube(row.colour, EXPORT_RESOURCES.lutSize));
+  await atomicWrite(path.join(directory, lut), generateCube([clip.grade.colour, row.colour], EXPORT_RESOURCES.lutSize));
   const decodeFilter =
     `scale=${target.width}:${target.height}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:` +
     `in_color_matrix=bt709:out_color_matrix=bt709:in_range=${asset.metadata.colourRange}:out_range=pc,` +

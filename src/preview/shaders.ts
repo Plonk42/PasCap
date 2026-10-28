@@ -33,27 +33,30 @@ void main() {
 
 // Constant channel/source array selection avoids dynamic indexing across all
 // 64 points in software drivers. Generate once, never per frame or project.
-const curveUniforms = [0, 1]
-  .flatMap((source) => [0, 1, 2, 3].map((channel) => `uniform vec3 curve${source}_${channel}[16];`))
-  .join('\n');
-const curveFunctions = [0, 1]
-  .flatMap((source) =>
-    [0, 1, 2, 3].map(
-      (channel) => `
-float curve${source}_${channel}Value(float value) {
-  if (curveIdentity${source}[${channel}] != 0) return value;
-  int high = curveCounts${source}[${channel}] - 1;
-  if (value <= 0.0) return curve${source}_${channel}[0].y;
-  if (value >= 1.0) return curve${source}_${channel}[high].y;
+// `p` prefixes the uniforms of one grade stage: '' for the last (track) grade, 'first_' for a clip grade before it.
+const curveUniforms = (p: string): string =>
+  [0, 1]
+    .flatMap((source) => [0, 1, 2, 3].map((channel) => `uniform vec3 ${p}curve${source}_${channel}[16];`))
+    .join('\n');
+const curveFunctions = (p: string): string =>
+  [0, 1]
+    .flatMap((source) =>
+      [0, 1, 2, 3].map(
+        (channel) => `
+float ${p}curve${source}_${channel}Value(float value) {
+  if (${p}curveIdentity${source}[${channel}] != 0) return value;
+  int high = ${p}curveCounts${source}[${channel}] - 1;
+  if (value <= 0.0) return ${p}curve${source}_${channel}[0].y;
+  if (value >= 1.0) return ${p}curve${source}_${channel}[high].y;
   int low = 0;
   for (int i = 0; i < 4; i++) {
     if (high - low <= 1) break;
     int middle = (low + high) / 2;
-    if (value <= curve${source}_${channel}[middle].x) high = middle;
+    if (value <= ${p}curve${source}_${channel}[middle].x) high = middle;
     else low = middle;
   }
-  vec3 left = curve${source}_${channel}[low];
-  vec3 right = curve${source}_${channel}[high];
+  vec3 left = ${p}curve${source}_${channel}[low];
+  vec3 right = ${p}curve${source}_${channel}[high];
   // Cubic Hermite with shared monotone (x, y, slope) nodes; matches compileColourCurve.
   float width = right.x - left.x;
   float t = (value - left.x) / width;
@@ -62,9 +65,9 @@ float curve${source}_${channel}Value(float value) {
   return clamp((2.0 * t3 - 3.0 * t2 + 1.0) * left.y + (t3 - 2.0 * t2 + t) * width * left.z +
                (3.0 * t2 - 2.0 * t3) * right.y + (t3 - t2) * width * right.z, 0.0, 1.0);
 }`,
-    ),
-  )
-  .join('\n');
+      ),
+    )
+    .join('\n');
 
 const glslFloat = (value: number): string => (Number.isInteger(value) ? `${value}.0` : String(value));
 const glslVec2Array = (name: string, taps: readonly { x: number; y: number }[]): string =>
@@ -268,8 +271,96 @@ const groupMain = `void main() {
   outputColour = vec4(premultiplied, left.a * coverage.x + right.a * coverage.y);
 }`;
 
+// The uniforms of a clip grade applied before the track's: only in the two-stage variants.
+const stageUniforms = (p: string): string => `uniform vec4 ${p}tone0;
+uniform vec4 ${p}tone1;
+uniform vec2 ${p}extra0;
+uniform vec2 ${p}extra1;
+uniform vec4 ${p}correction0;
+uniform vec4 ${p}correction1;
+uniform vec2 ${p}vibrance;
+uniform vec4 ${p}hsl0[8];
+uniform vec4 ${p}hsl1[8];
+${curveUniforms(p)}
+uniform ivec4 ${p}curveCounts0;
+uniform ivec4 ${p}curveCounts1;
+uniform ivec4 ${p}curveIdentity0;
+uniform ivec4 ${p}curveIdentity1;
+uniform vec2 ${p}neutralHsl;`;
+const advancedGrade = (p: string): string => `
+vec3 ${p}rangeGrade(vec3 code, int sourceIndex) {
+  if (${p}neutralHsl[sourceIndex] > 0.5) return code;
+  float maximum = max(code.r, max(code.g, code.b));
+  float minimum = min(code.r, min(code.g, code.b));
+  float chroma = maximum - minimum;
+  if (chroma == 0.0) return code;
+  float h;
+  if (maximum == code.r) h = 60.0 * (code.g - code.b) / chroma;
+  else if (maximum == code.g) h = 60.0 * (2.0 + (code.b - code.r) / chroma);
+  else h = 60.0 * (4.0 + (code.r - code.g) / chroma);
+  h = mod(h + 360.0, 360.0);
+  const float centres[9] = float[9](0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 270.0, 300.0, 360.0);
+  int band = 7;
+  for (int i = 0; i < 7; i++) { if (h < centres[i + 1]) { band = i; break; } }
+  float weight = smoothstep(centres[band], centres[band + 1], h);
+  vec3 left = sourceIndex == 0 ? ${p}hsl0[band].xyz : ${p}hsl1[band].xyz;
+  vec3 right = sourceIndex == 0 ? ${p}hsl0[(band + 1) % 8].xyz : ${p}hsl1[(band + 1) % 8].xyz;
+  vec3 offset = mix(left, right, weight) * smoothstep(0.0, 0.1, chroma);
+  if (all(equal(offset, vec3(0.0)))) return code;
+  float l = (maximum + minimum) * 0.5;
+  float s = clamp(chroma / (1.0 - abs(2.0 * l - 1.0)) * (1.0 + offset.y), 0.0, 1.0);
+  l = clamp(l + offset.z, 0.0, 1.0);
+  h += offset.x;
+  float amplitude = (1.0 - abs(2.0 * l - 1.0)) * s;
+  return vec3(l) + amplitude * (vec3(hueComponent(h), hueComponent(h - 120.0), hueComponent(h - 240.0)) - 0.5);
+}
+${curveFunctions(p)}
+vec3 ${p}grade(vec3 code, vec4 tone, vec2 extra, int sourceIndex) {
+  vec3 base = scalarGrade(code, tone, extra, sourceIndex == 0 ? ${p}correction0 : ${p}correction1,
+                          sourceIndex == 0 ? ${p}vibrance.x : ${p}vibrance.y);
+  ivec4 identity = sourceIndex == 0 ? ${p}curveIdentity0 : ${p}curveIdentity1;
+  if (${p}neutralHsl[sourceIndex] > 0.5 && all(equal(identity, ivec4(1)))) return base;
+  vec3 rgb = ${p}rangeGrade(base, sourceIndex);
+  if (all(equal(identity, ivec4(1)))) return rgb;
+  if (sourceIndex == 0) return vec3(${p}curve0_1Value(${p}curve0_0Value(rgb.r)),
+                                    ${p}curve0_2Value(${p}curve0_0Value(rgb.g)),
+                                    ${p}curve0_3Value(${p}curve0_0Value(rgb.b)));
+  return vec3(${p}curve1_1Value(${p}curve1_0Value(rgb.r)),
+              ${p}curve1_2Value(${p}curve1_0Value(rgb.g)),
+              ${p}curve1_3Value(${p}curve1_0Value(rgb.b)));
+}
+`;
+const scalarGradeOnly = (p: string): string => `
+vec3 ${p}grade(vec3 code, vec4 tone, vec2 extra, int sourceIndex) {
+  return scalarGrade(code, tone, extra, sourceIndex == 0 ? ${p}correction0 : ${p}correction1,
+                     sourceIndex == 0 ? ${p}vibrance.x : ${p}vibrance.y);
+}
+`;
+// The clip grade first, then the track's, each on the other's encoded output.
+const stagedGrade = `
+vec3 stagedGrade(vec3 code, vec4 tone, vec2 extra, int sourceIndex) {
+  vec3 clipGraded = first_grade(code, sourceIndex == 0 ? first_tone0 : first_tone1,
+                                sourceIndex == 0 ? first_extra0 : first_extra1, sourceIndex);
+  return grade(clipGraded, tone, extra, sourceIndex);
+}
+`;
+
+export interface FragmentVariant {
+  /** One source only, or a dissolve group. */
+  single: boolean;
+  /** Runs the detail and local tone kernel on source taps. */
+  detail: boolean;
+  /** HSL ranges and colour curves; false keeps the scalar grade only. */
+  advanced: boolean;
+  /** A clip grade applied before the track's. */
+  staged: boolean;
+}
+
 // Deliberately implements docs/COLOUR_AND_TIMING.md, not an approximation of eq/hue.
-const createFragmentShader = (single: boolean, detail: boolean): string => `#version 300 es
+export const fragmentShaderFor = ({ single, detail, advanced, staged }: FragmentVariant): string => {
+  const gradeCall = staged ? 'stagedGrade' : 'grade';
+  const gradeFunctions = (p: string): string => (advanced ? advancedGrade(p) : scalarGradeOnly(p));
+  return `#version 300 es
 precision highp float;
 precision highp sampler2D;
 in vec2 uv;
@@ -296,13 +387,14 @@ uniform vec4 crop1;
 uniform vec2 neutralSpatial;
 uniform vec4 hsl0[8];
 uniform vec4 hsl1[8];
-${curveUniforms}
+${curveUniforms('')}
 uniform ivec4 curveCounts0;
 uniform ivec4 curveCounts1;
 uniform ivec4 curveIdentity0;
 uniform ivec4 curveIdentity1;
 uniform vec2 neutralHsl;
 ${detail ? detailUniforms : ''}
+${staged ? stageUniforms('first_') : ''}
 const float alpha = 1.09929682680944;
 const float beta = 0.018053968510807;
 const vec3 luma = vec3(0.2126, 0.7152, 0.0722);
@@ -358,51 +450,17 @@ vec3 scalarGrade(vec3 code, vec4 tone, vec2 extra, vec4 correction, float vibran
   rgb = clamp(vec3(red, green, blue), 0.0, 1.0);
   return vec3(encode709(rgb.r), encode709(rgb.g), encode709(rgb.b));
 }
-float hueComponent(float h) {
+${
+  advanced
+    ? `float hueComponent(float h) {
   float k = mod(h, 360.0) / 60.0;
   return clamp(abs(k - 3.0) - 1.0, 0.0, 1.0);
 }
-vec3 rangeGrade(vec3 code, int sourceIndex) {
-  if (neutralHsl[sourceIndex] > 0.5) return code;
-  float maximum = max(code.r, max(code.g, code.b));
-  float minimum = min(code.r, min(code.g, code.b));
-  float chroma = maximum - minimum;
-  if (chroma == 0.0) return code;
-  float h;
-  if (maximum == code.r) h = 60.0 * (code.g - code.b) / chroma;
-  else if (maximum == code.g) h = 60.0 * (2.0 + (code.b - code.r) / chroma);
-  else h = 60.0 * (4.0 + (code.r - code.g) / chroma);
-  h = mod(h + 360.0, 360.0);
-  const float centres[9] = float[9](0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 270.0, 300.0, 360.0);
-  int band = 7;
-  for (int i = 0; i < 7; i++) { if (h < centres[i + 1]) { band = i; break; } }
-  float weight = smoothstep(centres[band], centres[band + 1], h);
-  vec3 left = sourceIndex == 0 ? hsl0[band].xyz : hsl1[band].xyz;
-  vec3 right = sourceIndex == 0 ? hsl0[(band + 1) % 8].xyz : hsl1[(band + 1) % 8].xyz;
-  vec3 offset = mix(left, right, weight) * smoothstep(0.0, 0.1, chroma);
-  if (all(equal(offset, vec3(0.0)))) return code;
-  float l = (maximum + minimum) * 0.5;
-  float s = clamp(chroma / (1.0 - abs(2.0 * l - 1.0)) * (1.0 + offset.y), 0.0, 1.0);
-  l = clamp(l + offset.z, 0.0, 1.0);
-  h += offset.x;
-  float amplitude = (1.0 - abs(2.0 * l - 1.0)) * s;
-  return vec3(l) + amplitude * (vec3(hueComponent(h), hueComponent(h - 120.0), hueComponent(h - 240.0)) - 0.5);
+`
+    : ''
 }
-${curveFunctions}
-vec3 grade(vec3 code, vec4 tone, vec2 extra, int sourceIndex) {
-  vec3 base = scalarGrade(code, tone, extra, sourceIndex == 0 ? correction0 : correction1,
-                          sourceIndex == 0 ? vibrance.x : vibrance.y);
-  ivec4 identity = sourceIndex == 0 ? curveIdentity0 : curveIdentity1;
-  if (neutralHsl[sourceIndex] > 0.5 && all(equal(identity, ivec4(1)))) return base;
-  vec3 rgb = rangeGrade(base, sourceIndex);
-  if (all(equal(identity, ivec4(1)))) return rgb;
-  if (sourceIndex == 0) return vec3(curve0_1Value(curve0_0Value(rgb.r)),
-                                    curve0_2Value(curve0_0Value(rgb.g)),
-                                    curve0_3Value(curve0_0Value(rgb.b)));
-  return vec3(curve1_1Value(curve1_0Value(rgb.r)),
-              curve1_2Value(curve1_0Value(rgb.g)),
-              curve1_3Value(curve1_0Value(rgb.b)));
-}
+${gradeFunctions('')}
+${staged ? gradeFunctions('first_') + stagedGrade : ''}
 vec3 sampleRgb(sampler2D source, vec2 coordinate, int sourceIndex) {
   ${detail ? detailSample : 'return texture(source, coordinate).rgb;'}
 }
@@ -411,7 +469,7 @@ vec3 sampleGraded(sampler2D source, vec4 tone, vec2 extra, float aspect, int sou
   if (aspect > canvasAspect) local.y = (uv.y - 0.5) * aspect / canvasAspect + 0.5;
   else local.x = (uv.x - 0.5) * canvasAspect / aspect + 0.5;
   if (any(lessThan(local, vec2(0.0))) || any(greaterThan(local, vec2(1.0)))) return vec3(0.0);
-  return grade(sampleRgb(source, local, sourceIndex), tone, extra, sourceIndex);
+  return ${gradeCall}(sampleRgb(source, local, sourceIndex), tone, extra, sourceIndex);
 }
 vec4 sampleSpatial(sampler2D source, vec4 tone, vec2 extra, float aspect,
                    vec3 rowU, vec3 rowV, vec4 crop, float neutral, int sourceIndex) {
@@ -422,29 +480,30 @@ vec4 sampleSpatial(sampler2D source, vec4 tone, vec2 extra, float aspect,
   // Crop IN is inclusive; OUT is exclusive, without refitting the image.
   if (original.x < crop.x || original.x >= 1.0 - crop.y ||
       original.y < crop.z || original.y >= 1.0 - crop.w) return vec4(0.0);
-  return vec4(grade(sampleRgb(source, vec2(original.x, 1.0 - original.y), sourceIndex), tone, extra, sourceIndex), 1.0);
+  return vec4(${gradeCall}(sampleRgb(source, vec2(original.x, 1.0 - original.y), sourceIndex), tone, extra, sourceIndex), 1.0);
 }
 ${single ? singleMain : groupMain}`;
+};
 
-export const fragmentShader = createFragmentShader(false, false);
+export const fragmentShader = fragmentShaderFor({ single: false, detail: false, advanced: true, staged: false });
 // A fixed single-source specialization lets drivers eliminate unused source-1
 // grade arrays/functions. Dissolves retain the complete grouped shader above.
-export const singleFragmentShader = createFragmentShader(true, false);
-
-// Share geometry/composition verbatim. Rows with identity advanced settings use
-// a scalar-only program, avoiding driver execution cost of unused bounded arrays.
-const scalarOf = (shader: string): string =>
-  shader.slice(0, shader.indexOf('float hueComponent')) +
-  `vec3 grade(vec3 code, vec4 tone, vec2 extra, int sourceIndex) {
-    return scalarGrade(code, tone, extra, sourceIndex == 0 ? correction0 : correction1,
-                       sourceIndex == 0 ? vibrance.x : vibrance.y);
-  }
-` +
-  shader.slice(shader.indexOf('vec3 sampleRgb'));
-export const scalarFragmentShader = scalarOf(fragmentShader);
-
+export const singleFragmentShader = fragmentShaderFor({ single: true, detail: false, advanced: true, staged: false });
+// Rows with identity advanced settings use a scalar-only program, avoiding driver
+// execution cost of unused bounded arrays.
+export const scalarFragmentShader = fragmentShaderFor({ single: false, detail: false, advanced: false, staged: false });
 // Software rasterizers can execute untaken uniform branches' texture taps, so neutral
 // clips never run the detail kernel: it lives only in these separate variants.
-export const detailFragmentShader = createFragmentShader(false, true);
-export const singleDetailFragmentShader = createFragmentShader(true, true);
-export const scalarDetailFragmentShader = scalarOf(detailFragmentShader);
+export const detailFragmentShader = fragmentShaderFor({ single: false, detail: true, advanced: true, staged: false });
+export const singleDetailFragmentShader = fragmentShaderFor({
+  single: true,
+  detail: true,
+  advanced: true,
+  staged: false,
+});
+export const scalarDetailFragmentShader = fragmentShaderFor({
+  single: false,
+  detail: true,
+  advanced: false,
+  staged: false,
+});

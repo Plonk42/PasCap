@@ -1,23 +1,16 @@
 import { endianness } from 'node:os';
 import { setImmediate as yieldToEvents } from 'node:timers/promises';
-import {
-  colourSchema,
-  compileGradeInto,
-  isNeutralAdvancedColour,
-  isNeutralLocalTone,
-  type ColourSettings,
-  type PixelGrade,
-} from '../shared/colour.js';
+import { colourSchema, isNeutralAdvancedColour, type ColourSettings, type PixelGrade } from '../shared/colour.js';
 import {
   compileDetail,
   detailSchema,
   isNeutralDetail,
-  localTone,
   type DetailFilter,
   type DetailSampler,
   type DetailSettings,
   type LocalTone,
 } from '../shared/detail.js';
+import { compileGradeChain, isNeutralTone, sourceGrades } from '../shared/grade.js';
 import { forEachSerial } from '../shared/serial.js';
 import { compileSpatialMapping, type SpatialMapping } from '../shared/spatial.js';
 import type { PreviewLayer } from '../shared/timeline.js';
@@ -42,11 +35,11 @@ export interface FrameSource {
   rgb: Uint8Array;
   bounds: ContentBounds;
   lut: Float32Array | null;
-  /** Nonneutral HSL/curves grade exactly per pixel instead of through the LUT. */
-  exactColour: ColourSettings | null;
+  /** Nonneutral HSL/curves in either grade grade exactly per pixel instead of through the LUT. */
+  exactColour: ColourSettings | readonly ColourSettings[] | null;
   /** Clip Sharpen/Clarity/Denoise applied to source taps before grading; null when they and local tone are neutral. */
   detail: DetailSettings | null;
-  /** Evaluated track Colour Shadows/Highlights/HDR (and Exposure), neighbourhood stages of the same kernel. */
+  /** Summed clip and track Shadows/Highlights/HDR/Local contrast (and Exposure), neighbourhood stages of the same kernel. */
   tone: LocalTone;
   multiplier: number;
   coverage: number;
@@ -215,10 +208,10 @@ async function prepareSources(
   for (const source of sources) {
     validateBounds(source.bounds, target);
     // Validate and choose the grading path once per source/frame, never per pixel.
-    const evaluated = colourSchema.parse(source.sample.colour);
+    const grades = sourceGrades(colourSchema.parse(source.sample.grade), colourSchema.parse(source.sample.colour));
     // Local tone runs in the detail stage: keep it out of LUT identity so animation reuses one LUT.
-    const colour = { ...evaluated, shadows: 0, highlights: 0, hdr: 0, localContrast: 0 };
-    const exactColour = isNeutralAdvancedColour(colour) ? null : colour;
+    const stages = grades.stages.map((stage) => ({ ...stage, shadows: 0, highlights: 0, hdr: 0, localContrast: 0 }));
+    const exactColour = stages.every(isNeutralAdvancedColour) ? null : stages;
     const mapping = compileSpatialMapping(
       source.sample.spatial,
       source.original.width,
@@ -229,13 +222,13 @@ async function prepareSources(
     prepared.push({
       rgb: source.rgb,
       bounds: source.bounds,
-      lut: exactColour ? null : await cache.get(colour, signal, pool), // NOSONAR -- two borrowed slots, never parallel LUT builds.
+      lut: exactColour ? null : await cache.get(stages, signal, pool), // NOSONAR -- two borrowed slots, never parallel LUT builds.
       exactColour,
       detail:
-        isNeutralDetail(source.sample.detail) && isNeutralLocalTone(evaluated)
+        isNeutralDetail(source.sample.detail) && isNeutralTone(grades.tone)
           ? null
           : detailSchema.parse(source.sample.detail),
-      tone: localTone(evaluated),
+      tone: grades.tone,
       multiplier: source.sample.opacity * source.sample.blendWeight * source.sample.brightness * 65535,
       coverage: source.sample.opacity * source.sample.blendWeight,
       mapping,
@@ -275,7 +268,9 @@ export function composeRows(
     const sampled = new Float64Array(3);
     return {
       ...source,
-      exactColour: source.exactColour ? compileGradeInto(source.exactColour) : null,
+      exactColour: source.exactColour
+        ? compileGradeChain(Array.isArray(source.exactColour) ? source.exactColour : [source.exactColour])
+        : null,
       detail: source.detail
         ? compileDetail(
             source.detail,

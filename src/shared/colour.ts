@@ -252,12 +252,14 @@ export function isNeutralAdvancedColour(settings: ColourSettings): boolean {
   return isNeutralHsl(settings.hsl) && Object.values(settings.curves).every(isIdentityCurve);
 }
 
-export function generateCube(settings: ColourSettings, size = 65): string {
-  colourSchema.parse(settings);
+/** One grade, or grades applied one after another on each other's encoded output. */
+export function generateCube(settings: ColourSettings | readonly ColourSettings[], size = 65): string {
+  const stages = (Array.isArray(settings) ? settings : [settings]).map((stage) => colourSchema.parse(stage));
   if (!Number.isInteger(size) || size < 2 || size > 129)
     throw new Error('LUT size must be an integer between 2 and 129.');
   const lines = ['TITLE "PasCap BT709 linear SDR v1"', `LUT_3D_SIZE ${size}`, 'DOMAIN_MIN 0 0 0', 'DOMAIN_MAX 1 1 1'];
-  const grade = compilePixelGrade(settings);
+  const grades = stages.map(compilePixelGrade);
+  const grade = (rgb: RGB): RGB => grades.reduce((value, stage) => stage(value), rgb);
   // .cube convention: red is the fastest-moving coordinate.
   for (let blue = 0; blue < size; blue++) {
     for (let green = 0; green < size; green++) {
