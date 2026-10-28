@@ -267,7 +267,7 @@ test('follows changing light between two runs and reruns update only their two v
   memory.seed(seeded);
   await page.reload();
   await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await seek(page, 90);
   const first = await expectedBalance(page, seeded, 90);
   await autoButton(page).click();

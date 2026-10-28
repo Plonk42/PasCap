@@ -21,9 +21,9 @@ import {
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
-// Temperature/Tint are Track settings beside the keyframe list; "Clip" here means those playhead controls.
+// Temperature/Tint are the track's Colour settings beside the keyframe list; "Clip" here means those playhead controls.
 async function inspectorTab(page: Page, name: 'Clip' | 'Track keyframes'): Promise<void> {
-  await openTab(page, name === 'Clip' ? 'Track' : name);
+  await openTab(page, name === 'Clip' ? 'Track colour' : name);
 }
 
 const channels = [

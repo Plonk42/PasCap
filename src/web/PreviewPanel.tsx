@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
-import type { PreviewDiagnostics } from '../preview/engine.js';
+import type { OriginalMode, PreviewDiagnostics } from '../preview/engine.js';
 import { formatTimecode } from '../shared/timing.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
@@ -16,7 +16,7 @@ interface Props {
   /** Play covers only the selected timeline range. */
   rangeSelected: boolean;
   /** Shows the image without Colour and Detail for as long as `active` stays true. */
-  onHoldOriginal: (active: boolean) => void;
+  onHoldOriginal: (mode: OriginalMode | false) => void;
   onSeek: (frame: number) => void;
   /** Start/end of the selected range, else of the timeline. */
   onSeekBoundary: (edge: 'start' | 'end') => void;
@@ -93,6 +93,18 @@ function PreviewActions({
   );
 }
 
+const ORIGINAL_BADGES: Record<OriginalMode, string> = {
+  all: 'Original · Colour and Detail bypassed',
+  clip: 'Original · clip grades bypassed',
+  track: 'Original · track Colour bypassed',
+};
+
+/** Plain: everything; Shift: clip grades only; Alt: track Colour only. */
+function originalMode(event: { shiftKey: boolean; altKey: boolean }): OriginalMode {
+  if (event.shiftKey) return 'clip';
+  return event.altKey ? 'track' : 'all';
+}
+
 export function PreviewPanel({
   canvas,
   diagnostics,
@@ -125,12 +137,12 @@ export function PreviewPanel({
   const controlsUnavailable = !duration || drafting || loading || !!startupError;
   const label = { playing: 'Playing', paused: 'Paused' }[status as 'playing' | 'paused'] ?? status;
   const caption = previewCaption(loading, diagnostics, startupError);
-  const holding = useRef(false);
+  const holding = useRef<OriginalMode | false>(false);
   const hold = useCallback(
-    (active: boolean) => {
-      if (holding.current === active) return;
-      holding.current = active;
-      onHoldOriginal(active);
+    (mode: OriginalMode | false) => {
+      if (holding.current === mode || (holding.current && mode)) return;
+      holding.current = mode;
+      onHoldOriginal(mode);
     },
     [onHoldOriginal],
   );
@@ -142,13 +154,14 @@ export function PreviewPanel({
   const pressPointer = (event: PointerEvent<HTMLButtonElement>) => {
     if (event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
-    hold(true);
+    hold(originalMode(event));
   };
   const keyHold = (event: KeyboardEvent<HTMLButtonElement>, active: boolean) => {
     if (event.key !== ' ' && event.key !== 'Enter') return;
     event.preventDefault();
-    if (!event.repeat) hold(active);
+    if (!event.repeat) hold(active && originalMode(event));
   };
+  const original = diagnostics?.ungraded ? (diagnostics.original ?? 'all') : null;
   return (
     <section className="preview-panel" aria-label="Preview">
       <div className="preview-heading preview-comparison-heading">
@@ -162,7 +175,7 @@ export function PreviewPanel({
             className="preview-comparison-toggle"
             aria-label="Show original preview"
             aria-pressed={diagnostics?.ungraded ?? false}
-            title="Hold to show the image without Colour and Detail on every video track, keeping geometry, Opacity, fades and transitions. Preview only; saved edits and exports are unchanged."
+            title="Hold to show the image without Colour and Detail on every video track, keeping geometry, Opacity, fades and transitions. Hold Shift to bypass only clip grades, Alt only track Colour. Preview only; saved edits and exports are unchanged."
             disabled={controlsUnavailable || failed || !diagnostics || status === 'disposed'}
             onPointerDown={pressPointer}
             onPointerUp={() => hold(false)}
@@ -214,9 +227,7 @@ export function PreviewPanel({
             {diagnostics?.message}
           </div>
         )}
-        {diagnostics?.ungraded && (
-          <span className="preview-comparison-overlay">Original · Colour and Detail bypassed</span>
-        )}
+        {original && <span className="preview-comparison-overlay">{ORIGINAL_BADGES[original]}</span>}
       </div>
       <div className="transport">
         <span className="transport-note">

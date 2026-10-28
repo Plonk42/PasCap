@@ -343,7 +343,7 @@ test('Track Colour groups its sliders under labelled headings, each with a one-s
   const document = await current(page);
   Object.assign(document.layers[0]!.colour, { exposure: 0.5, shadows: -0.2, hue: 30 });
   await fixture(page, document);
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   const groups = {
     Opacity: ['Opacity'],
     Colour: ['Temperature', 'Tint', 'Hue', 'Saturation', 'Vibrance'],

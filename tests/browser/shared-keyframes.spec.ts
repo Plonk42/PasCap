@@ -133,7 +133,7 @@ for (const target of ['video-1', 'empty'] as const) {
     await fixture(page, document);
     const layerName = target === 'empty' ? 'Empty row' : 'Track 1';
     await page.getByRole('button', { name: `Select track ${layerName}`, exact: true }).click();
-    await inspectorTab(page, 'Track');
+    await inspectorTab(page, 'Track colour');
     const opacity = page.getByRole('slider', { name: 'Opacity', exact: true });
     await expect(opacity).toHaveCount(1);
     await expect(opacity).toBeVisible();
@@ -272,7 +272,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   page,
 }) => {
   await seek(page, 20);
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.4');
   await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('70');
   await expect(page.getByRole('slider', { name: 'Track opacity', exact: true })).toHaveCount(0);
@@ -290,7 +290,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
     page.getByRole('combobox', { name: 'Speed mode', exact: true }).locator('option[value="keyframes"]'),
   ).toHaveCount(0);
 
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   const exposure = diamond(page, 'Exposure');
   await expect(exposure).toBeEnabled();
   await expect(exposure).toHaveAttribute('aria-pressed', 'false');
@@ -338,7 +338,7 @@ test('the first hollow diamond creates one point; same-frame channels merge inde
   for (const label of ['Opacity', 'Exposure', 'Saturation'])
     await expect(marker).toHaveAttribute('title', new RegExp(label));
 
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await exposure.click();
   expect((await current(page)).layers[0]?.keyframes).toEqual([sharedPoint(20, { opacity: 0.7, saturation: 1 })]);
   await expect(marker).toBeVisible();
@@ -401,7 +401,7 @@ test('between points keyed controls are read-only until their own diamond explic
   await expect(rate).toHaveValue('1');
   await expect(diamond(page, 'Speed')).toBeEnabled();
   await expect(diamond(page, 'Speed')).toHaveAttribute('aria-pressed', 'false');
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await expect(page.getByRole('slider', { name: 'Saturation', exact: true })).toBeEnabled();
   expect(await current(page)).toEqual(document);
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.3');
@@ -723,7 +723,7 @@ test('a row marker opens the selected empty row independently of clips, and keyb
     'aria-label',
     'Select track Track 2',
   );
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await expect(page.getByRole('slider', { name: 'Saturation', exact: true })).toBeEnabled();
   await expect(diamond(page, 'Saturation')).toBeEnabled();
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.6');

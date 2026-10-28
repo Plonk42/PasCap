@@ -294,7 +294,7 @@ test('track keyframe navigation reaches project points and previews outside-dura
   await expect(keys.locator('.keyframe-row-skipped')).toHaveCount(1);
   await colourStep(page, 'Previous').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   const main = page.locator('.keyframe-setting-navigation').filter({
     has: page.getByRole('button', { name: 'Keyframe Exposure', exact: true }),
   });
@@ -325,7 +325,7 @@ test('track keyframe navigation reaches project points and previews outside-dura
   expect((await currentProject(page)).layers[0]?.keyframes).toEqual(document.layers[0]?.keyframes);
   await value.press('Enter');
   await page.evaluate(() => window.pascapLab!.engine.seek(0));
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   const exposure = page.getByRole('spinbutton', { name: 'Exposure', exact: true });
   await expect(exposure).toBeDisabled();
   const diamond = page
@@ -472,7 +472,7 @@ test('per-track fade/transition timing and positioned track key numbers use the 
 test('Colour resets target clip colour and row opacity or only participating Colour settings at the active point', async ({
   page,
 }) => {
-  await inspectorTab(page, 'Track');
+  await inspectorTab(page, 'Track colour');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.3');
   await resetSetting(page, 'Exposure');

@@ -47,26 +47,41 @@ export async function closeOptions(page: Page): Promise<void> {
   await forEachSerial(await opened.all(), (trigger) => trigger.click());
 }
 
-type InspectorTab = 'Clip' | 'Track' | 'Audio';
-// Track keyframes (inside Colour) and Sequence live in the Track tab; specs name the content they need.
-const TAB_FOR: Record<InspectorTab | 'Track keyframes' | 'Sequence', InspectorTab> = {
+type InspectorTab = 'Clip' | 'Colour' | 'Track' | 'Audio';
+// Colour holds a selected clip's grade or its track's Colour, chosen with the Clip/Track switch. Track keyframes
+// (inside Colour) and "Track colour" edit the track; Sequence lives in the Track tab.
+const TAB_FOR: Record<InspectorTab | 'Track colour' | 'Clip grade' | 'Track keyframes' | 'Sequence', InspectorTab> = {
   Clip: 'Clip',
+  Colour: 'Colour',
   Track: 'Track',
   Audio: 'Audio',
-  'Track keyframes': 'Track',
+  'Track colour': 'Colour',
+  'Clip grade': 'Colour',
+  'Track keyframes': 'Colour',
   Sequence: 'Track',
 };
 
 export async function inspectorTab(page: Page, name: keyof typeof TAB_FOR): Promise<void> {
   const tab = page.getByRole('tab', { name: TAB_FOR[name], exact: true });
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
+  const target = { 'Track colour': 'Track', 'Track keyframes': 'Track', 'Clip grade': 'Clip' }[name as string];
+  if (target) await colourTarget(page, target as 'Clip' | 'Track');
 }
 
-/** Speed is clip-owned (Clip tab); Opacity and Colour are track-owned (Track tab). */
+/** The Colour tab edits the selected clip's grade or its track's Colour; without a clip there is no switch. */
+export async function colourTarget(page: Page, target: 'Clip' | 'Track'): Promise<void> {
+  const radio = page.getByRole('radiogroup', { name: 'Colour target' }).getByRole('radio', { name: target });
+  if ((await radio.count()) && (await radio.getAttribute('aria-checked')) !== 'true')
+    await radio.dispatchEvent('click');
+}
+
+/** Speed is clip-owned (Clip tab); Transform is in the Track tab; Opacity and Colour are the track's (Colour tab). */
 export async function settingTab(page: Page, label: string): Promise<void> {
-  const tab = page.getByRole('tab', { name: label === 'Speed' ? 'Clip' : 'Track', exact: true });
+  const name = { Speed: 'Clip', Transform: 'Track' }[label] ?? 'Colour';
+  const tab = page.getByRole('tab', { name, exact: true });
   // A synthetic click never moves the mouse, so it cannot end an active pointer draft.
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.dispatchEvent('click');
+  if (name === 'Colour') await colourTarget(page, 'Track');
 }
 
 /** Double-clicking a setting's name resets only that setting, like its Reset button. */

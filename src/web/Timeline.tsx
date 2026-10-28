@@ -13,6 +13,8 @@ import {
 } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
+import type { ColourSettings } from '../shared/colour.js';
+import { GRADE_SETTINGS } from '../shared/grade.js';
 import { KEYFRAME_SETTINGS, keySettings } from '../shared/keyframes.js';
 import { resolveMediaSelection, type MediaSelections } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
@@ -31,9 +33,9 @@ import { spatialKeyChannels } from '../shared/spatial.js';
 import { clipDuration } from '../shared/speed.js';
 import { calculateLayout, transitionOffset, type PlacedClip } from '../shared/timeline.js';
 import { formatTimecode, framesToSeconds, secondsToFrames } from '../shared/timing.js';
-import { clipKeyframeMarkers, type ClipKeyframeMarker } from './clip-keyframe-markers.js';
+import { clipKeyframeMarkers, gradeKeyframeMarkers, type ClipKeyframeMarker } from './clip-keyframe-markers.js';
 import { clipKeyframeKind, clipKeyframeSlideTarget, type ClipKeyframeTarget } from './clip-keyframe-drag.js';
-import type { InspectorSectionTarget } from './InspectorSection.js';
+import type { ColourTarget, InspectorSectionTarget } from './InspectorSection.js';
 import { SPATIAL_CONTROLS } from './spatial-editor.js';
 import './clip-keyframe-markers.css';
 import {
@@ -119,7 +121,7 @@ interface Props {
   onSelect: (id: string) => void;
   onBoundary: (leftId: string) => void;
   onSeek: (frame: number) => void;
-  onOpenSection: (section: InspectorSectionTarget) => void;
+  onOpenSection: (section: InspectorSectionTarget, colourTarget?: ColourTarget) => void;
   onPause: () => void;
   onEdit: (command: EditCommand | readonly EditCommand[]) => void;
   onInsert: (mediaIds: string[], index: number, layerId: string, start: number) => void;
@@ -217,11 +219,13 @@ function timelineInteractionMessage(
     keyframe,
     transform,
     speed,
+    grade,
     bookmark,
   }: {
     keyframe: KeyframeSlideDraft<KeyframeSlideTarget> | null;
     transform: KeyframeSlideDraft<KeyframeSlideTarget> | null;
     speed: KeyframeSlideDraft<ClipKeyframeTarget> | null;
+    grade: KeyframeSlideDraft<ClipKeyframeTarget> | null;
     bookmark: KeyframeSlideDraft<KeyframeSlideTarget> | null;
   },
   error: string,
@@ -232,6 +236,11 @@ function timelineInteractionMessage(
   if (bookmark)
     return bookmark.error || `Bookmark · ${formatTimecode(bookmark.frame)} · release to apply · Esc cancels`;
   if (speed) return speed.error || `Speed keyframe · source frame ${speed.frame} · release to apply · Esc cancels`;
+  if (grade)
+    return (
+      grade.error ||
+      `Clip grade keyframe · source frame ${grade.frame} · all its settings move together · release to apply · Esc cancels`
+    );
   if (transform)
     return (
       transform.error ||
@@ -599,7 +608,36 @@ type ClipMarkerProps = Readonly<{
   name: string;
   blocked: () => boolean;
   speeds: KeyframeSlide<ClipKeyframeTarget>;
+  grades: KeyframeSlide<ClipKeyframeTarget>;
 }>;
+
+function gradeMarkerView(props: ClipMarkerProps, marker: ClipKeyframeMarker, sourceFrame: number, at: number | null) {
+  const point = props.placed.clip.grade.keyframes.find((key) => key.frame === marker.sourceFrame);
+  const settings = point
+    ? GRADE_SETTINGS.filter((setting) => point.values[setting] !== null)
+        .map((setting) => KEYFRAME_SETTINGS.find((definition) => definition.key === setting)!.label)
+        .join(' · ')
+    : '';
+  const output =
+    at === null ? marker.outputFrame : Math.max(0, Math.min(props.placed.duration - 1, at - props.placed.start));
+  return {
+    className: `timeline-clip-key grade${point?.reset ? ' reset' : ''}`,
+    'data-clip-keyframe': marker.type,
+    'data-source-frame': sourceFrame,
+    'data-timeline-frame': marker.timelineFrame,
+    'data-seek-frame': marker.seekFrame,
+    'aria-label': `Clip grade keyframe source ${sourceFrame} on clip ${props.placed.clip.id}, ${props.name}${point?.reset ? ' (default)' : ''}`,
+    title: `Clip grade · source frame ${sourceFrame} · timeline frame ${marker.timelineFrame} (${formatTimecode(marker.timelineFrame)}) · ${point?.reset ? 'Default keyframe: settings return to their defaults here' : settings} · Drag to move; Arrow keys: 1 source frame, Shift: 10; Delete removes`,
+    style: { '--clip-keyframe-position': `${(output / props.placed.duration) * 100}%` } as CSSProperties,
+    children: point?.reset ? (
+      <Icon name="default-key" size={13} />
+    ) : (
+      <span aria-hidden="true" className="keyframe-glyph diamond">
+        ◆
+      </span>
+    ),
+  };
+}
 
 function clipMarkerView(props: ClipMarkerProps, marker: ClipKeyframeMarker, sourceFrame: number, at: number | null) {
   const displayedSource = props.placed.retiming.sourceAt(marker.seekFrame - props.placed.start);
@@ -627,10 +665,11 @@ function clipMarkerView(props: ClipMarkerProps, marker: ClipKeyframeMarker, sour
   };
 }
 
-/** Custom-speed keys slide like shared track keys. */
+/** Custom-speed and clip grade keys slide like shared track keys. */
 function ClipKeyframeMarkers(props: ClipMarkerProps) {
   const markers = clipKeyframeMarkers(props.placed);
-  if (!markers.length) return null;
+  const grades = gradeKeyframeMarkers(props.placed);
+  if (!markers.length && !grades.length) return null;
   return (
     <div className="clip-keyframe-markers">
       <KeyframeMarkers
@@ -638,6 +677,12 @@ function ClipKeyframeMarkers(props: ClipMarkerProps) {
         targets={markers.map((marker) => clipKeyframeSlideTarget(props.placed, marker))}
         blocked={props.blocked}
         view={({ marker }, state) => clipMarkerView(props, marker, state.frame, state.at)}
+      />
+      <KeyframeMarkers
+        slide={props.grades}
+        targets={grades.map((marker) => clipKeyframeSlideTarget(props.placed, marker))}
+        blocked={props.blocked}
+        view={({ marker }, state) => gradeMarkerView(props, marker, state.frame, state.at)}
       />
     </div>
   );
@@ -678,6 +723,8 @@ export function Timeline(props: Readonly<Props>) {
   const beatSnap = useBeatSnap(audioAssets, snapping);
   const beats = beatSnap.beats;
   const [clipMenu, setClipMenu] = useState<ClipMenuAnchor | null>(null);
+  // Editor-only, for this session: a grade without keyframes, pasted onto other clips.
+  const [copiedGrade, setCopiedGrade] = useState<ColourSettings | null>(null);
   const closeClipMenu = useCallback((restoreFocus: boolean): void => {
     setClipMenu(null);
     if (restoreFocus) document.querySelector<HTMLElement>('.timeline-clip.selected .timeline-clip-body')?.focus();
@@ -765,7 +812,27 @@ export function Timeline(props: Readonly<Props>) {
     onEdit,
     onError,
   });
-  const gestureActive = keyframes.active || transformKeys.active || speedKeys.active;
+  const gradeKeys = useKeyframeSlide({
+    kind: clipKeyframeKind('grade', { ...clipKindOptions, onOpen: () => props.onOpenSection('colour', 'clip') }),
+    project,
+    frame,
+    scale,
+    width: baselineWidth,
+    disabled:
+      keyframeNavigation.disabled ||
+      musicGesture !== null ||
+      keyframes.active ||
+      transformKeys.active ||
+      speedKeys.active,
+    snapping,
+    beats,
+    viewport: scroll,
+    onPause,
+    onPreview,
+    onEdit,
+    onError,
+  });
+  const gestureActive = keyframes.active || transformKeys.active || speedKeys.active || gradeKeys.active;
   const bookmarks = useKeyframeSlide({
     kind: bookmarkKind(onSeek),
     project,
@@ -841,6 +908,7 @@ export function Timeline(props: Readonly<Props>) {
     keyframes.draft?.document ??
     transformKeys.draft?.document ??
     speedKeys.draft?.document ??
+    gradeKeys.draft?.document ??
     bookmarks.draft?.document ??
     draft ??
     musicGesture?.document ??
@@ -888,6 +956,7 @@ export function Timeline(props: Readonly<Props>) {
     keyframes.draft?.width ?? 0,
     transformKeys.draft?.width ?? 0,
     speedKeys.draft?.width ?? 0,
+    gradeKeys.draft?.width ?? 0,
     bookmarks.draft?.width ?? 0,
     musicGesture?.width ?? 0,
   );
@@ -1319,6 +1388,7 @@ export function Timeline(props: Readonly<Props>) {
           keyframe: keyframes.draft,
           transform: transformKeys.draft,
           speed: speedKeys.draft,
+          grade: gradeKeys.draft,
           bookmark: bookmarks.draft,
         },
         dragError,
@@ -1676,6 +1746,7 @@ export function Timeline(props: Readonly<Props>) {
                     name={name}
                     blocked={clipMarkerBlocked}
                     speeds={speedKeys}
+                    grades={gradeKeys}
                   />
                   {(['in', 'out'] as const).map((edge) => (
                     <button
@@ -1904,6 +1975,7 @@ export function Timeline(props: Readonly<Props>) {
                 ['track', keyframes.draft?.guide],
                 ['transform', transformKeys.draft?.guide],
                 ['speed', speedKeys.draft?.guide],
+                ['grade', gradeKeys.draft?.guide],
                 ['bookmark', bookmarks.draft?.guide],
               ] as const
             ).map(
@@ -1954,6 +2026,7 @@ export function Timeline(props: Readonly<Props>) {
               keyframes.draft?.error ||
               transformKeys.draft?.error ||
               speedKeys.draft?.error ||
+              gradeKeys.draft?.error ||
               bookmarks.draft?.error ||
               musicGesture?.error
                 ? 'trim-error'
@@ -1973,6 +2046,9 @@ export function Timeline(props: Readonly<Props>) {
             onDuplicate();
           }}
           project={project}
+          selectedClipIds={selectedClipIds}
+          copiedGrade={copiedGrade}
+          onCopyGrade={setCopiedGrade}
           onEdit={onEdit}
         />
       )}

@@ -1,3 +1,4 @@
+import { colourTarget } from './colour-owner.js';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import {
   colourCurveSchema,
@@ -278,7 +279,7 @@ function CurveEditor({
     }
     onEdit({
       type: 'colour',
-      layerId: layer.id,
+      ...colourTarget(layer),
       colour: { ...layer.colour, curves: { ...layer.colour.curves, [channel]: next } },
     });
     setError('');
@@ -334,7 +335,7 @@ function CurveEditor({
     setError(active.error ?? '');
     const command: EditCommand = {
       type: 'colour',
-      layerId: layer.id,
+      ...colourTarget(layer),
       colour: { ...active.colour, curves: { ...active.colour.curves, [channel]: active.points } },
     };
     onPreview({ document: active.error ? active.project : applyCommand(active.project, command), frame: active.frame });
@@ -352,7 +353,7 @@ function CurveEditor({
     if (active.moved)
       latest.current.onEdit({
         type: 'colour',
-        layerId: latest.current.layer.id,
+        ...colourTarget(latest.current.layer),
         colour: { ...active.colour, curves: { ...active.colour.curves, [channel]: active.points } },
       });
   };
@@ -492,7 +493,7 @@ function CurveEditor({
 
 function colourCommit({ layer, disabled, onEdit }: Readonly<Props>) {
   return (colour: ColourSettings): void => {
-    if (!disabled) onEdit({ type: 'colour', layerId: layer.id, colour: colourSchema.parse(colour) });
+    if (!disabled) onEdit({ type: 'colour', ...colourTarget(layer), colour: colourSchema.parse(colour) });
   };
 }
 
@@ -553,7 +554,9 @@ export function HslRangesSection(props: Readonly<Props>) {
                 disabled={disabled}
                 onCommit={(value) => commit(withValue(value))}
                 onDraft={(value) =>
-                  livePreview(value === null ? null : { type: 'colour', layerId: layer.id, colour: withValue(value) })
+                  livePreview(
+                    value === null ? null : { type: 'colour', ...colourTarget(layer), colour: withValue(value) },
+                  )
                 }
               />
             </div>

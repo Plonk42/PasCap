@@ -283,7 +283,7 @@ for (const viewport of [
         document.layers[0]!.transform = createSpatialSettings();
       });
       expect(document.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-      await inspectorTab(page, 'Track');
+      await inspectorTab(page, 'Track colour');
       await expect(inspector(page).getByRole('button', { name: /^Animate / })).toHaveCount(0);
       await expect(line(page, 'Colour')).toContainText('0 keyframes');
       await expect(line(page, 'Colour').getByRole('button', { name: 'Reset colour', exact: true })).toBeVisible();
@@ -397,7 +397,7 @@ for (const viewport of [
           sharedPoint(index * 5, { [key]: key === 'opacity' ? 1 : 0 }),
         );
       });
-      await inspectorTab(page, 'Track');
+      await inspectorTab(page, 'Track colour');
       await expect(
         inspector(page)
           .locator('.colour-controls')
@@ -495,7 +495,7 @@ for (const viewport of [
           sharedPoint(140, { exposure: 2 }),
         ];
       });
-      await inspectorTab(page, 'Track');
+      await inspectorTab(page, 'Track colour');
       const row = layerKeyframes(page, TRACK).locator('[data-keyframe-frame="0"]');
       const nextExposure = row
         .locator('.layer-keyframe-chip')

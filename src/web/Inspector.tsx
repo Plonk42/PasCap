@@ -1,4 +1,4 @@
-import { Fragment, memo, useEffect, useId, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { Fragment, memo, useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { colourAt } from '../shared/composition.js';
@@ -21,11 +21,21 @@ import {
   InspectorExpansionControls,
   InspectorSection,
   useInspectorExpansion,
+  type ColourTarget,
   type InspectorMode,
   type InspectorSectionRequest,
   type InspectorSectionTarget,
 } from './InspectorSection.js';
 import { ColourKeyframeList } from './ColourKeyframeList.js';
+import {
+  clipColourOwner,
+  colourTarget,
+  gradeSeekFrame,
+  isClipOwner,
+  ownerTarget,
+  type ColourOwner,
+} from './colour-owner.js';
+import { KeyframeNavigationContext, useKeyframeNavigation, type KeyframeNavigation } from './keyframe-navigation.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { clipStartRestriction } from './layer-actions.js';
 import { NumberField } from './NumberField.js';
@@ -64,6 +74,7 @@ interface Props {
 
 const INSPECTOR_MODES: readonly { id: InspectorMode; label: string }[] = [
   { id: 'clip', label: 'Clip' },
+  { id: 'colour', label: 'Colour' },
   { id: 'track', label: 'Track' },
   { id: 'audio', label: 'Audio' },
 ];
@@ -195,7 +206,7 @@ function settingState(layer: VideoLayer, setting: KeyframeSetting, frame: number
   const keyed = hasLayerKeys(layer, setting);
   const active = activeLayerSetting(layer, setting, frame);
   const validFrame = Number.isSafeInteger(frame) && frame >= 0 && frame <= 2_147_483_647;
-  return { keyed, active, baseAvailable, editable: validFrame && (keyed ? active : baseAvailable) };
+  return { keyed, active, baseAvailable, editable: keyed ? validFrame && active : baseAvailable };
 }
 
 function SettingScope({ scope }: Readonly<{ scope: string }>) {
@@ -224,7 +235,7 @@ function OpacityControl({
   });
   const command = (opacity: number): EditCommand =>
     state.keyed
-      ? { type: 'layer-key-value', layerId: layer.id, frame, setting: 'opacity', value: opacity }
+      ? { type: 'layer-key-value', ...ownerTarget(layer), frame, setting: 'opacity', value: opacity }
       : { type: 'opacity', layerId: layer.id, opacity };
   const commit = (opacity: number): void => {
     if (!disabled && state.editable) onEdit(command(opacity));
@@ -272,11 +283,17 @@ function ColourControl({
   id,
 }: Readonly<LayerControlProps & { control: ColourControlDefinition; value: number; id: string }>) {
   const state = settingState(layer, control.key, frame, true);
-  const { scope, hint } = settingPresentation({ ...state, baseLabel: 'Track', label: control.label, frame });
+  const { scope, hint } = settingPresentation({
+    ...state,
+    baseLabel: 'Track',
+    clipGrade: isClipOwner(layer),
+    label: control.label,
+    frame,
+  });
   const command = (nextValue: number): EditCommand =>
     state.keyed
-      ? { type: 'layer-key-value', layerId: layer.id, frame, setting: control.key, value: nextValue }
-      : { type: 'colour', layerId: layer.id, colour: { ...layer.colour, [control.key]: nextValue } };
+      ? { type: 'layer-key-value', ...ownerTarget(layer), frame, setting: control.key, value: nextValue }
+      : { type: 'colour', ...colourTarget(layer), colour: { ...layer.colour, [control.key]: nextValue } };
   const commit = (nextValue: number): void => {
     if (!disabled && state.editable) onEdit(command(nextValue));
   };
@@ -332,6 +349,7 @@ function ColourSection({
   }
 >) {
   const colour = colourAt(layer, frame);
+  const clipGrade = isClipOwner(layer);
   const opacity = evaluateLayerSetting(layer, 'opacity', frame, layer.opacity);
   const animated =
     hasLayerKeys(layer, 'opacity') || COLOUR_CONTROLS.some((control) => hasLayerKeys(layer, control.key));
@@ -341,9 +359,13 @@ function ColourSection({
       (control) => colour[control.key] !== NEUTRAL_COLOUR[control.key] || hasLayerKeys(layer, control.key),
     ).length + Number(opacity !== 1 || hasLayerKeys(layer, 'opacity'));
   const canReset = resetCommands.length > 0;
-  const resetTitle = animated
+  let resetTitle = animated
     ? 'Reset only the enabled Colour settings, including Opacity, at this shared keyframe. Other settings and keyframes stay unchanged.'
     : 'Reset this track’s Colour and Opacity. Keyframes stay unchanged.';
+  if (clipGrade)
+    resetTitle = animated
+      ? 'Reset only the enabled settings of this clip’s keyframe at the playhead. Other settings and keyframes stay unchanged.'
+      : 'Reset this clip’s grade. Keyframes stay unchanged.';
   const reset = (): void => {
     if (disabled || !canReset) return;
     onEdit(resetCommands);
@@ -363,8 +385,18 @@ function ColourSection({
       modified={adjusted > 0}
       help={
         <HelpPopover label="Colour animation" guide="colour-speed-and-shared-video-track-keyframes">
-          <p>These settings grade every clip on this track. To grade one clip differently, put it on its own track.</p>
-          <p className="editor-help-tip">Tip: hold Original above the preview to see the image without Colour.</p>
+          {clipGrade ? (
+            <p>
+              These settings grade this clip only, before its track’s Colour; its keyframes stay with its footage when
+              you trim or move it.
+            </p>
+          ) : (
+            <p>These settings grade every clip on this track, after each clip’s own grade.</p>
+          )}
+          <p className="editor-help-tip">
+            Tip: hold Original above the preview to see the image without Colour; with Shift only clip grades are
+            bypassed, with Alt only track Colour.
+          </p>
         </HelpPopover>
       }
     >
@@ -395,24 +427,26 @@ function ColourSection({
           aria-label={pointAtFrame?.reset ? 'Remove default keyframe' : 'Add default keyframe'}
           title={defaultTitle}
           onClick={() => {
-            if (!occupied) onEdit([{ type: 'layer-key-default', layerId: layer.id, frame }]);
+            if (!occupied) onEdit([{ type: 'layer-key-default', ...ownerTarget(layer), frame }]);
           }}
         >
           <Icon name="default-key" size={16} />
         </button>
-        <AutoAdjust
-          projectId={project.id}
-          layer={layer}
-          layout={layout}
-          assets={assets}
-          frame={frame}
-          selectedClipId={selectedClipId}
-          disabled={disabled}
-          onEdit={onEdit}
-        />
+        {!clipGrade && (
+          <AutoAdjust
+            projectId={project.id}
+            layer={layer}
+            layout={layout}
+            assets={assets}
+            frame={frame}
+            selectedClipId={selectedClipId}
+            disabled={disabled}
+            onEdit={onEdit}
+          />
+        )}
       </TrackAnimationControls>
       <div className="colour-controls">
-        {COLOUR_GROUPS.map((group) => (
+        {COLOUR_GROUPS.filter((group) => !clipGrade || group.name !== 'Opacity').map((group) => (
           <ColourGroup
             key={group.name}
             group={group}
@@ -423,16 +457,18 @@ function ColourSection({
             onEdit={onEdit}
             id={id}
             afterTint={
-              <AutoWhiteBalance
-                projectId={project.id}
-                layer={layer}
-                layout={layout}
-                assets={assets}
-                frame={frame}
-                selectedClipId={selectedClipId}
-                disabled={disabled}
-                onEdit={onEdit}
-              />
+              !clipGrade && (
+                <AutoWhiteBalance
+                  projectId={project.id}
+                  layer={layer}
+                  layout={layout}
+                  assets={assets}
+                  frame={frame}
+                  selectedClipId={selectedClipId}
+                  disabled={disabled}
+                  onEdit={onEdit}
+                />
+              )
             }
           />
         ))}
@@ -864,6 +900,30 @@ function InspectorPanel({
   }, [sectionRequest]);
   const sourceFrame =
     placed && frame >= placed.start && frame < placed.end ? placed.retiming.sourceAt(frame - placed.start) : null;
+  // A lazily mounted panel honours the marker that opened it.
+  const [colourTargetChoice, setColourTargetChoice] = useState<ColourTarget>(sectionRequest?.colourTarget ?? 'clip');
+  useEffect(() => setColourTargetChoice('clip'), [clip?.id]);
+  useEffect(() => {
+    if (sectionRequest?.colourTarget) setColourTargetChoice(sectionRequest.colourTarget);
+  }, [sectionRequest]);
+  const gradeClip = colourTargetChoice === 'clip' && layer && clip && placed ? clip : null;
+  const clipName = asset ? shortName(asset.name) : 'Unavailable recording';
+  const colourOwner: ColourOwner | undefined =
+    layer && (gradeClip ? clipColourOwner(layer, gradeClip, `clip ${trackPosition + 1} (${clipName})`) : layer);
+  const colourFrame = gradeClip ? (sourceFrame ?? -1) : frame;
+  const navigation = useKeyframeNavigation();
+  const clipNavigation = useMemo<KeyframeNavigation | null>(
+    () =>
+      placed
+        ? {
+            ...navigation,
+            inspection: null,
+            duration: (asset?.metadata.frameCount ?? placed.clip.sourceOut) + 1,
+            onSeekKeyframe: (_owner, source) => onSeek(gradeSeekFrame(placed, source)),
+          }
+        : null,
+    [navigation, placed, asset, onSeek],
+  );
   const inputContext = `${project.id}:${layer?.id}:${clip?.id ?? 'row'}`;
   const startRestriction = clip ? clipStartRestriction(project, clip) : null;
   const startHint = startRestriction ?? undefined;
@@ -880,7 +940,7 @@ function InspectorPanel({
               <InspectorExpansionControls
                 expansion={expansion}
                 tab={section}
-                hidden={(section === 'clip' && !placed) || (section === 'track' && !layer)}
+                hidden={(section === 'clip' && !placed) || ((section === 'track' || section === 'colour') && !layer)}
               />
               <PanelCollapseButton panel="inspector" disabled={collapseDisabled} onToggle={onCollapse} />
             </>
@@ -947,7 +1007,7 @@ function InspectorPanel({
                       Choose the track and timeline start for this clip. With Ripple on, only the first clip's start can
                       be typed; drag the others to reorder.
                     </p>
-                    <p className="editor-help-tip">Tip: Opacity is in Track → Colour.</p>
+                    <p className="editor-help-tip">Tip: Opacity is in the Colour tab, with Track chosen.</p>
                   </HelpPopover>
                 }
               >
@@ -1016,6 +1076,90 @@ function InspectorPanel({
         </div>
         <div
           role="tabpanel"
+          id={`${inspectorId}-colour-panel`}
+          aria-labelledby={`${inspectorId}-colour-tab`}
+          hidden={section !== 'colour'}
+        >
+          {layer && colourOwner ? (
+            <>
+              <div className="selected-clip-name inspector-selection colour-target">
+                <Icon name={gradeClip ? 'video' : 'layers'} size={17} />
+                <strong title={gradeClip ? asset?.name : layer.name}>{gradeClip ? clipName : layer.name}</strong>
+                <span>{gradeClip ? 'This clip only' : trackScope(trackClips.length)}</span>
+                {clip && placed && (
+                  <div
+                    className="colour-target-switch"
+                    role="radiogroup"
+                    aria-label="Colour target"
+                    onKeyDown={(event) => {
+                      if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+                      event.preventDefault();
+                      event.stopPropagation();
+                      const next = colourTargetChoice === 'clip' ? 'track' : 'clip';
+                      setColourTargetChoice(next);
+                      event.currentTarget.querySelector<HTMLElement>(`[data-colour-target="${next}"]`)?.focus();
+                    }}
+                  >
+                    {(['clip', 'track'] as const).map((target) => (
+                      <button
+                        key={target}
+                        type="button"
+                        role="radio"
+                        data-colour-target={target}
+                        tabIndex={colourTargetChoice === target ? 0 : -1}
+                        aria-checked={colourTargetChoice === target}
+                        disabled={drafting}
+                        title={target === 'clip' ? 'Grade only this clip' : `Grade every clip on ${layer.name}`}
+                        onClick={() => setColourTargetChoice(target)}
+                      >
+                        {target === 'clip' ? 'Clip' : 'Track'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <KeyframeNavigationContext.Provider value={gradeClip && clipNavigation ? clipNavigation : navigation}>
+                <ColourSection
+                  project={project}
+                  layer={colourOwner}
+                  frame={colourFrame}
+                  duration={gradeClip ? clipNavigation!.duration : layout.duration}
+                  layout={layout}
+                  assets={assets}
+                  selectedClipId={selectedClipId}
+                  resetKey={`${inputContext}:${colourOwner.id}:${colourFrame}`}
+                  disabled={drafting}
+                  onEdit={onEdit}
+                  id={colourControlId}
+                />
+              </KeyframeNavigationContext.Provider>
+              <HslRangesSection
+                key={`hsl:${project.id}:${colourOwner.id}`}
+                project={project}
+                layer={colourOwner}
+                frame={colourFrame}
+                disabled={drafting}
+                onEdit={onEdit}
+                onPause={onPause}
+                onPreview={onPreview}
+              />
+              <ColourCurvesSection
+                key={`curves:${project.id}:${colourOwner.id}`}
+                project={project}
+                layer={colourOwner}
+                frame={colourFrame}
+                disabled={drafting}
+                onEdit={onEdit}
+                onPause={onPause}
+                onPreview={onPreview}
+              />
+            </>
+          ) : (
+            <div className="inspector-empty">Select a clip or a video track in the timeline to grade it.</div>
+          )}
+        </div>
+        <div
+          role="tabpanel"
           id={`${inspectorId}-track-panel`}
           aria-labelledby={`${inspectorId}-track-tab`}
           hidden={section !== 'track'}
@@ -1027,39 +1171,6 @@ function InspectorPanel({
                 <strong title={layer.name}>{layer.name}</strong>
                 <span>{trackScope(trackClips.length)}</span>
               </div>
-              <ColourSection
-                project={project}
-                layer={layer}
-                frame={frame}
-                duration={layout.duration}
-                layout={layout}
-                assets={assets}
-                selectedClipId={selectedClipId}
-                resetKey={`${inputContext}:${frame}`}
-                disabled={drafting}
-                onEdit={onEdit}
-                id={colourControlId}
-              />
-              <HslRangesSection
-                key={`hsl:${project.id}:${layer.id}`}
-                project={project}
-                layer={layer}
-                frame={frame}
-                disabled={drafting}
-                onEdit={onEdit}
-                onPause={onPause}
-                onPreview={onPreview}
-              />
-              <ColourCurvesSection
-                key={`curves:${project.id}:${layer.id}`}
-                project={project}
-                layer={layer}
-                frame={frame}
-                disabled={drafting}
-                onEdit={onEdit}
-                onPause={onPause}
-                onPreview={onPreview}
-              />
               <TransformSection
                 project={project}
                 layer={layer}
