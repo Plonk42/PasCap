@@ -278,5 +278,5 @@ preview bound remain; eight tracks have 16 decoders plus one separate source-rev
 
 The approved project MIT terms and separate distribution requirements are in
 [LICENSING.md](LICENSING.md). Intended-GPU playback, consented long real-flight/A/V
-qualification and Docker/Podman delivery retain their separate gates. This document
-claims no fresh test results, CI pass, real-media run, release or container acceptance.
+qualification retain their separate gates. This document claims no fresh test
+results, CI pass, real-media run or release.

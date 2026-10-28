@@ -139,7 +139,7 @@ recursive import. A folder can register and autoqueue many recordings, so choose
 narrow one and submit only when that work is intended. This action never silently
 adds an approved root. See
 [../README.md](../README.md#footage-service-api) for the browsing/registration API
-and [DEPLOYMENT.md](DEPLOYMENT.md) for service-side paths and planned mounts.
+and [DEPLOYMENT.md](DEPLOYMENT.md) for service-side paths and storage.
 
 There is **no footage copy mode, upload endpoint, browser file picker or true
 external desktop drag-and-drop import**. A browser drop does not provide a trusted
@@ -978,12 +978,7 @@ real-duration throughput. Intended-GPU preview and consented real-flight/long-ru
 qualification are tracked in [#6](https://github.com/Plonk42/PasCap/issues/6),
 [#7](https://github.com/Plonk42/PasCap/issues/7) and
 [#8](https://github.com/Plonk42/PasCap/issues/8).
-Local Docker/Podman packaging is planned, not implemented; networking, packaging
-and both-runtime acceptance belong to
-[#9](https://github.com/Plonk42/PasCap/issues/9),
-[#10](https://github.com/Plonk42/PasCap/issues/10) and
-[#11](https://github.com/Plonk42/PasCap/issues/11), with the contract in
-[DEPLOYMENT.md](DEPLOYMENT.md). Actual-commit correctness results are available in
+PasCap runs natively ([DEPLOYMENT.md](DEPLOYMENT.md)). Actual-commit correctness results are available in
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
 
 Video track Colour includes static **HSL ranges** and **Colour curves**, each in its own collapsible Track section after Colour. They affect every clip and both dissolve sources on the track, whether or not its twelve scalar channels are keyed. Moves use the destination track's complete colour; clip edits never copy these settings. They are not speed curves or new animation channels. See [the HSL/curves contract](design/HSL_AND_CURVES.md).

@@ -17,7 +17,6 @@ body:
         - Preview/hardware (area:preview)
         - Music/A/V (area:audio)
         - Tests/CI (area:ci)
-        - Docker/Podman (area:container)
         - License/distribution obligations (area:licensing)
         - Planning/contributor workflow (area:workflow)
     validations:
@@ -52,7 +51,7 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Commit, Linux version, Node/FFmpeg versions, browser version and actual renderer if preview-related. Container packaging is not released yet.
+      description: Commit, Linux version, Node/FFmpeg versions, browser version and actual renderer if preview-related.
     validations:
       required: true
   - type: textarea

@@ -71,7 +71,7 @@ and limits are documented in [the user guide](USER_GUIDE.md),
 [development/validation guide](DEVELOPMENT.md).
 Dated acceptance evidence belongs to the corresponding work issues, with
 [CI results](https://github.com/Plonk42/PasCap/actions) for the actual delivery
-commit. Publication and CI are not a container release or a target-GPU/long-flight
+commit. Publication and CI are not a release or a target-GPU/long-flight
 qualification claim.
 
 ## Work selection and next steps
@@ -85,8 +85,7 @@ for mutable progress. [#2](https://github.com/Plonk42/PasCap/issues/2) implement
 [verified relinking](design/SOURCE_RELINK.md) of moved video and music originals with
 version-2 registries; there is no path guessing or automatic migration.
 #5 covers the approved MIT license, dependency notices and native distribution review.
-GPU/flight work requires owner setup/consent,
-and containers remain a future milestone. The private repository-linked
+GPU/flight work requires owner setup/consent. The private repository-linked
 [planning Project](https://github.com/users/Plonk42/projects/1) presents the same
 issues with aligned Status. Use its native Iteration field for explicitly agreed
 timeboxes; without an agreed cadence, use the backlog/Status board and a bounded
@@ -146,20 +145,13 @@ The long-flight run uses intended-GPU findings and export-space safety from v0.1
 Synthetic/SwiftShader CI cannot close the hardware gate. Failures must produce
 reproducible follow-ups, not relaxed frame/pixel/timing assertions.
 
-## v0.3 — Docker and Podman delivery
+## Deployment
 
-[Milestone](https://github.com/Plonk42/PasCap/milestone/3)
-
-| Issue                                                                               | Scope                                                                                                               |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| [#9 — Explicit container networking](https://github.com/Plonk42/PasCap/issues/9)    | Internal bind configuration plus exact host-loopback Host/Origin/client protection                                  |
-| [#10 — Reproducible local OCI package](https://github.com/Plonk42/PasCap/issues/10) | Built UI/service/native toolchain, read-only source binds, persistent data, non-root/rootless startup and shutdown  |
-| [#11 — Both-runtime acceptance](https://github.com/Plonk42/PasCap/issues/11)        | Read-only-mount, permissions, persistence, cancellation/reaping and native short-export parity on Docker and Podman |
-
-Implementation follows [the deployment contract](DEPLOYMENT.md). Licensing and
-network configuration precede distribution; both-runtime acceptance follows the
-image recipe. Real-workload qualification is a release gate, not an excuse to
-bundle private footage or promise GPU-native encoding.
+PasCap runs natively ([local deployment](DEPLOYMENT.md)). The v0.3 Docker/Podman
+milestone was dropped on 2026-10-28 and #9–#11 closed as not planned: without a
+published image each user would build it, and footage access and GPU export/decoding
+are simpler natively. [#290](https://github.com/Plonk42/PasCap/issues/290) checks
+the native FFmpeg toolchain at startup and scripts its local install.
 
 ## Scope boundaries
 

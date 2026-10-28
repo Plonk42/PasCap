@@ -11,9 +11,9 @@ on your machine and is **referenced in place, never uploaded, copied or modified
 PasCap is pre-release, but its owner edits real projects with it: projects saved by
 earlier versions keep opening, upgraded on load. Synthetic tests in CI target
 correctness; intended-GPU playback and a complete long-flight edit are still
-qualification work, not performance claims. The eventual package is a **local
-Docker/Podman application**; container packaging is not available yet. GitHub Pages
-and cloud editing are not deployment targets.
+qualification work, not performance claims. PasCap runs natively as a local service;
+there is no container package, and GitHub Pages and cloud editing are not deployment
+targets.
 
 ## Highlights
 
@@ -77,7 +77,7 @@ and cloud editing are not deployment targets.
 ## Requirements
 
 - **Linux**, Node.js **22.12+ or 24 LTS** and npm.
-- Native **FFmpeg and ffprobe**. The tested development toolchain is **FFmpeg 8.0.1** with `libx264`, FFV1, AAC and the required colour/transition filters. Older distribution packages have not been certified.
+- Native **FFmpeg and ffprobe**. The tested development toolchain is **FFmpeg 8.0.1** with `libx264`, FFV1, AAC and the required colour/transition filters. Older distribution packages have not been certified; [local deployment](docs/DEPLOYMENT.md#native-toolchain) shows how to build the tested version.
 - A current desktop browser with **WebCodecs** (H.264 `VideoDecoder`), **WebGL2** and AudioWorklet. Automated browser tests use Google Chrome.
 - Optional: Google Chrome or Chromium and a hardware GPU speed up heavy exports; an NVIDIA GPU with CUDA speeds up proxy preparation.
 - Enough disk space for generated proxies and export scratch. Long lossless 4K intermediate files can be large; there is no fixed-GB scratch guarantee.
@@ -153,9 +153,8 @@ The browser used for GPU export (`PASCAP_CHROME`) and the assistant's picture si
 session lease and checkpoint count (`PASCAP_ASSISTANT_*`) are described in the
 [development guide](docs/DEVELOPMENT.md#configuration-and-storage).
 
-Missing mounts and symlinks fail explicitly. In the eventual container package,
-originals will be read-only bind mounts and application data will be a separate
-persistent writable mount. See [deployment design](docs/DEPLOYMENT.md).
+Missing mounts and symlinks fail explicitly. See [local deployment](docs/DEPLOYMENT.md)
+for storage, permissions, network and toolchain rules.
 
 **Saved data:** projects follow a strict schema. A project saved by an earlier
 supported version is upgraded when it opens, and its first save keeps the original
@@ -195,7 +194,7 @@ meant for it, to the assistant over MCP.
 
 Next steps are tracked in [GitHub issues](https://github.com/Plonk42/PasCap/issues)
 and [milestones](https://github.com/Plonk42/PasCap/milestones), including real-workload
-qualification, feedback on the assistant and local Docker/Podman packaging. See
+qualification, feedback on the assistant and native toolchain setup. See
 [the roadmap](docs/ROADMAP.md) and the [documentation index](docs/README.md).
 
 - [User guide](docs/USER_GUIDE.md) and [workspace and recovery](docs/WORKSPACE_AND_RECOVERY.md)
@@ -206,7 +205,7 @@ qualification, feedback on the assistant and local Docker/Podman packaging. See
 - [Track Transform](docs/design/SPATIAL_TRANSFORMS.md) · [detail filters, HDR and Local contrast](docs/design/DETAIL_FILTERS.md)
 - [WebCodecs preview decoding](docs/design/WEBCODECS_PREVIEW.md) · [source relinking](docs/design/SOURCE_RELINK.md)
 - [Assistant rough cut through MCP](docs/design/ASSISTANT_MCP.md)
-- [UX and local hardening](docs/UX_HARDENING.md) · [deployment target](docs/DEPLOYMENT.md) · [historical feasibility study](docs/FEASIBILITY_REPORT.md)
+- [UX and local hardening](docs/UX_HARDENING.md) · [local deployment](docs/DEPLOYMENT.md) · [historical feasibility study](docs/FEASIBILITY_REPORT.md)
 
 The original [implementation plan](EDITOR_IMPLEMENTATION_PLAN.md) and feature
 inspection worksheets are retained as design history, not a promise to reproduce
@@ -234,4 +233,4 @@ chosen by the maintainer. Third-party dependencies, native codecs and user media
 retain their own terms. Builds include exact production npm notices;
 [licensing and distribution](docs/LICENSING.md) documents the inventory and the
 separate GPL-enabled FFmpeg/libx264 source/notice and release-review requirements.
-This license is not a container release or a grant of rights to recordings/music.
+This license is not a release or a grant of rights to recordings/music.

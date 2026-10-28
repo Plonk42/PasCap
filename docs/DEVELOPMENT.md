@@ -31,7 +31,7 @@ The current schema number is `PROJECT_SCHEMA_VERSION` in [the model](../src/shar
 bump it for every incompatible change. Guides say “current schema” rather than repeating the number.
 
 Local Linux setup and contributing. Editing: [USER_GUIDE.md](USER_GUIDE.md). Service
-paths and **future, not implemented** containers: [DEPLOYMENT.md](DEPLOYMENT.md).
+paths, storage, network and the native toolchain: [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Requirements
 
@@ -40,6 +40,7 @@ paths and **future, not implemented** containers: [DEPLOYMENT.md](DEPLOYMENT.md)
 - **FFmpeg/ffprobe 8.0.1**, the tested baseline; FFmpeg 6 is unqualified.
   Other builds need parity tests. Require `libx264`, FFV1, AAC, `lut3d`/`xfade`, raw
   RGB/lossless RGBA16 and the existing timing/colour filters and bitstream tools.
+  [Build it locally](DEPLOYMENT.md#native-toolchain) with the CI setup script.
 - Browser **WebCodecs** `VideoDecoder` with H.264, module workers, **WebGL2** and
   **AudioWorklet**/`getOutputTimestamp` for music; tests use installed **Google Chrome**
   (`channel: 'chrome'`), not bundled Chromium: [configuration](../playwright.config.ts).
@@ -65,7 +66,7 @@ npm start
 
 Open **http://127.0.0.1:4318**. Never run two service processes against the same
 data directory: revision protection coordinates tabs within one service only.
-This is not static hosting, LAN/SaaS deployment or a completed container recipe.
+This is not static hosting or LAN/SaaS deployment.
 
 ## Configuration and storage
 
@@ -373,7 +374,7 @@ content, runner architecture and Ubuntu release; Node dependencies use the lockf
 Native/browser jobs retain failure diagnostics for seven days, never original media
 or the whole generated cache. Action references are commit-pinned and the workflow
 uses read-only repository permissions. It does not deploy GitHub Pages or publish
-a container image. Use [the roadmap](ROADMAP.md) for remaining qualification work.
+an image or binaries. Use [the roadmap](ROADMAP.md) for remaining qualification work.
 
 The raw reader has a deterministic exit-before-read regression and eager bounded
 read ownership; [#1](https://github.com/Plonk42/PasCap/issues/1) records its delivery

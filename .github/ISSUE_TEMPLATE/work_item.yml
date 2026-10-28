@@ -17,7 +17,6 @@ body:
         - Native export/storage (area:export)
         - Preview/hardware (area:preview)
         - Music/A/V (area:audio)
-        - Docker/Podman (area:container)
         - License/distribution obligations (area:licensing)
     validations:
       required: true

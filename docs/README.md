@@ -18,7 +18,7 @@ fields, filenames and URLs retain their technical spelling.
 | [../README.md](../README.md)     | Project overview, quick local start and current scope                                                                                |
 | [USER_GUIDE.md](USER_GUIDE.md)   | Projects, no-copy import, repeated clips, timeline editing, clip speed curves, track transforms/keyframes, music/export and recovery |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Linux toolchain, commands, synthetic tests, CI, architecture and contributor safety                                                  |
-| [DEPLOYMENT.md](DEPLOYMENT.md)   | Service-side source paths/API and security; planned local Docker/Podman packaging, **not a runnable container recipe**               |
+| [DEPLOYMENT.md](DEPLOYMENT.md)   | Service-side source paths/API, storage, permissions, loopback network and the native FFmpeg toolchain                                |
 | [LICENSING.md](LICENSING.md)     | Approved project MIT terms, exact production npm notices and separate native/binary distribution review gates                        |
 
 ## Processing and editing contracts
@@ -108,7 +108,7 @@ and Git history retain earlier evidence, not current acceptance claims.
   in delivery/milestone views; sign-in is required. Existing
   [#15](https://github.com/Plonk42/PasCap/issues/15) is a preserved legacy checkpoint,
   not a tracker template. Tracking is not proof of
-  completed CI, containers or real-flight acceptance.
+  completed CI or real-flight acceptance.
 - Working through milestone issues sequentially does not authorize a release,
   milestone closure or real-media job; those still require explicit owner approval.
 - [../EDITOR_IMPLEMENTATION_PLAN.md](../EDITOR_IMPLEMENTATION_PLAN.md) retains the

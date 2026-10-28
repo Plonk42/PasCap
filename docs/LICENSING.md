@@ -4,14 +4,14 @@ PasCap's own source and documentation are **MIT licensed**, as explicitly select
 by the maintainer. The full [project license](../LICENSE) is authoritative.
 Dependencies, native tools, trademarks and user media are **not relicensed by MIT**.
 This inventory is an engineering distribution contract, not legal advice or
-certification of an unbuilt release/container. Seek qualified review for the
+certification of an unbuilt release. Seek qualified review for the
 actual distribution and applicable codec-patent jurisdiction.
 
 ## What is distributed today
 
 The Git repository contains PasCap source, tests, build instructions and the
 lockfile. It does **not** contain installed npm dependencies, Node.js, Chrome,
-FFmpeg/ffprobe binaries, native libraries, an OCI image or user recordings/music.
+FFmpeg/ffprobe binaries, native libraries, a packaged image or user recordings/music.
 The local workflow installs npm packages and uses separately installed native
 executables. No release or image is approved by adding this license.
 
@@ -112,7 +112,7 @@ Developer distro FFmpeg builds can enable many more libraries and have different
 GPL versions/terms; inventory the actual binary/configuration rather than assigning
 the minimal CI build's licensing to any executable named FFmpeg.
 
-Before shipping binaries or an OCI image, the distributor must:
+Before shipping binaries or a packaged image, the distributor must:
 
 1. Record the exact FFmpeg/ffprobe/x264/Node/OS package versions, hashes,
    configurations, linkage, patches and included runtime dependencies. Identify
@@ -129,9 +129,6 @@ Before shipping binaries or an OCI image, the distributor must:
    the legal classification of every possible package arrangement.
 5. Verify notice/source availability from the recipient's artifact, keep the
    application/native notices distinct and obtain explicit release approval.
-   Container recipe and both-runtime acceptance remain
-   [#10](https://github.com/Plonk42/PasCap/issues/10) and
-   [#11](https://github.com/Plonk42/PasCap/issues/11), not completed here.
 
 ## Media, assets and publication safety
 
@@ -140,6 +137,6 @@ logos or third-party product assets. No CapCut assets/source, licensed sample mu
 or owner footage is included in the repository or notice artifact. Generated
 proxies, caches, reports, project snapshots and private paths stay out of source
 publication. Synthetic fixtures do not license any owner's real inputs.
-Keep sources external/read-only in any future package and review the exact
+Keep sources external in any distribution and review the exact
 distribution contents before publishing. See [deployment](DEPLOYMENT.md) and
 [contributor safety](DEVELOPMENT.md#contributor-safety).
