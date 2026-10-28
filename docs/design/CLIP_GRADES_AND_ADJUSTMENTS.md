@@ -68,7 +68,7 @@ Every clip requires `grade: { colour, keyframes }`.
   … `localContrast`, without `opacity`), one Easing per enabled setting and the
   [default keyframe](../LAYERS_AND_KEYFRAMES.md#default-keyframes) flag. Frames are unique
   ascending integers in `[0, frameCount]` of the recording; keys outside the trim are kept,
-  like off-trim speed keyframes. **Proposed:** at most 64 keys per clip, the items' limit.
+  like off-trim speed keyframes. At most **64** keys per clip, the items' limit (owner).
 - A clip's grade is evaluated at its continuous source position
   `PlacedClip.retiming.sourcePositionAt(frame − start)`, so slow motion interpolates between
   keys and a reversed clip plays its keys backwards. HSL and curves stay static.
@@ -136,7 +136,7 @@ The scalar-only fast program stays for sources whose two grades are both scalar-
 roughly 180 fragment uniform vectors today (HSL 16, curve nodes 128, the rest about 35); two
 grades per source need roughly 330, above WebGL2's guaranteed 224. Desktop GPUs report far more.
 The compositor reads `MAX_FRAGMENT_UNIFORM_VECTORS` at start-up; a GPU without room fails with
-an explicit preview error naming both numbers, to revisit only if it happens. Before #273, check
+an explicit preview error naming both numbers, to revisit only if it happens. Before #273,
 check the CI renderers' value (Chrome's SwiftShader, whose value the `advanced-colour-gpu` spec
 already attaches, and Firefox's llvmpipe). No texture, decoder or lane is added.
 
@@ -182,13 +182,26 @@ Follows the requirements of #289: one settings panel, an unmistakable target.
 - **A clip's whole grade (owner).** When a clip is selected, the item also grading it at the
   playhead is highlighted on the timeline, in a style distinct from the selection; clicking it
   selects it. The panel adds no line for it.
-- **Copy grade / Paste grade (owner)** in the context menu of clips and items, each one Undo
-  step. **Proposed:** Copy takes the grade evaluated at the playhead (all settings, HSL and
-  curves); Paste replaces the target's grade with it and removes the target's keyframes, since
-  source frames and item offsets do not translate between objects.
-- **Original preview (owner).** Three modes: bypass clip grades, bypass items, or both.
-  **Proposed:** the hold-to-show **Original** button keeps its gestures and gains a menu choosing
-  the mode, a browser preference; clip Detail is bypassed with clip grades, as it is today.
+- **Copy grade / Paste grade (owner)** act on the clip or item that is **right-clicked**, never
+  on what is at the playhead, which can be several objects across tracks. Each paste is one Undo
+  step. **Proposed:**
+  - Copy takes the object's grade (all settings, HSL and curves) as it is at the clicked frame,
+    which is simply its values when it has no keyframes.
+  - Paste replaces the right-clicked target's grade with it and removes the target's
+    keyframes, since source frames and item offsets do not translate between objects.
+  - When the target belongs to the selection, the paste applies to every selected clip and
+    item, still in one Undo step.
+- **Original preview (owner).** Three modes: bypass clip grades, bypass items, or both. Holding
+  a modifier while pressing the hold-to-show **Original** button chooses the mode directly, with
+  no menu first. The button's tooltip and accessible description list the modifiers.
+  **Proposed** keys, for the pointer and for Enter/Space:
+  - plain: bypass both, as today;
+  - **Shift**: bypass clip grades only;
+  - **Alt**: bypass items only.
+
+  Ctrl is avoided because Ctrl-click opens the context menu on macOS. Clip Detail is bypassed
+  with clip grades, as it is today. The **Original** badge names the mode in effect.
+
 - **Item gestures** (#287): create from the selected ruler range or a clip's span, or by drawing;
   move, trim, split and delete with snapping, red refused placements and one Undo step per valid
   release.
