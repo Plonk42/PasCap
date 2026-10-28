@@ -6,12 +6,13 @@ import {
   isNeutralHsl,
 } from '../shared/advanced-colour.js';
 import {
+  type ColourSettings,
+  createColourSettings,
   gradePixel,
   isNeutralLocalTone,
   NEUTRAL_COLOUR,
-  temperatureTintGains,
-  type ColourSettings,
   type RGB,
+  temperatureTintGains,
 } from '../shared/colour.js';
 import { compositePixel } from '../shared/composition.js';
 import {
@@ -623,6 +624,7 @@ function comparisonSource(
       sourcePosition: 0,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
       detail: { ...NEUTRAL_DETAIL },
+      grade: createColourSettings(),
       colour: settings,
       opacity,
       blendWeight,

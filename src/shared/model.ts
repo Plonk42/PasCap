@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { colourSchema, createColourSettings } from './colour.js';
 import { createDetailSettings, detailSchema } from './detail.js';
 import { described } from './described.js';
+import { clipGradeSchema, createClipGrade } from './grade.js';
 import { layerKeyframeSchema, orderedKeys } from './keyframes.js';
 import { createSpatialSettings, spatialSettingsSchema } from './spatial.js';
 import { NORMAL_SPEED, speedSchema } from './speed.js';
@@ -27,7 +28,7 @@ export const rateSchema = z
     denominator: z.number().int().positive().max(1_000_000),
   })
   .strict();
-export const clipSchema = z
+const clipFields = z
   .object({
     id: described(idSchema, 'Unique clip ID: letters, digits, "_" and "-", at most 100.'),
     mediaId: described(idSchema, 'The video recording the clip plays.'),
@@ -41,9 +42,18 @@ export const clipSchema = z
     speed: described(speedSchema, 'Playback speed; it sets the clip duration with the source range.'),
     reverse: described(z.boolean(), 'True plays the source range backwards; duration is unchanged.'),
     detail: described(detailSchema, 'Static detail filters; all 0 is neutral.'),
+    grade: described(
+      clipGradeSchema,
+      "The clip's own Colour, applied before its track's Colour; keyframes at source frames follow the footage.",
+    ),
   })
-  .strict()
-  .refine((clip) => clip.sourceOut > clip.sourceIn, { message: 'Source OUT must be after IN (exclusive).' });
+  .strict();
+const sourceRangeOrder = { message: 'Source OUT must be after IN (exclusive).' };
+export const clipSchema = clipFields.refine((clip) => clip.sourceOut > clip.sourceIn, sourceRangeOrder);
+/** A clip as inserted: it starts with a neutral grade, set afterwards with the Colour commands. */
+export const newClipSchema = clipFields
+  .omit({ grade: true })
+  .refine((clip) => clip.sourceOut > clip.sourceIn, sourceRangeOrder);
 
 const boundary = (clips: string) => ({
   leftId: described(idSchema, `The earlier of the two adjacent ${clips}.`),
@@ -247,7 +257,7 @@ export const selectsSchema = z.record(
 );
 
 /** The only accepted project schema; bump it for every incompatible change. */
-export const PROJECT_SCHEMA_VERSION = 25;
+export const PROJECT_SCHEMA_VERSION = 26;
 
 const baseProjectSchema = z
   .object({
@@ -352,5 +362,6 @@ export function createClip(
     speed: { ...NORMAL_SPEED },
     reverse: false,
     detail: createDetailSettings(),
+    grade: createClipGrade(),
   });
 }

@@ -39,6 +39,7 @@ function source(
       sourcePosition: 3.25,
       spatial: { ...NEUTRAL_SPATIAL_POSE, ...pose },
       detail: { ...NEUTRAL_DETAIL },
+      grade: createColourSettings(),
       colour,
       weight: blendWeight,
       blendWeight,

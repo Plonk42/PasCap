@@ -116,6 +116,7 @@ describe('strict current-schema row points and independently participating setti
       'speed',
       'reverse',
       'detail',
+      'grade',
     ]);
     expect(clip.reverse).toBe(false);
     const { reverse: _reverse, ...withoutDirection } = clip;

@@ -1,3 +1,4 @@
+import { createColourSettings } from './colour.js';
 import { PROJECT_SCHEMA_VERSION } from './model.js';
 
 /** Oldest saved project schema this build still opens: the first one used for real editing. */
@@ -44,8 +45,26 @@ function withSelects(document: SavedProject): SavedProject {
   return { ...document, selects: {} };
 }
 
+/** Schema 26: every clip gets its own neutral grade, so projects render exactly as before. */
+function withClipGrades(document: SavedProject): SavedProject {
+  const clips = document['clips'];
+  if (!Array.isArray(clips)) return document;
+  return {
+    ...document,
+    clips: clips.map((clip: unknown) =>
+      typeof clip === 'object' && clip !== null && !Array.isArray(clip)
+        ? { ...clip, grade: { colour: createColourSettings(), keyframes: [] } }
+        : clip,
+    ),
+  };
+}
+
 /** `MIGRATIONS[v]` upgrades a document saved with schema `v` to schema `v + 1`; it never mutates its input. */
-const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = { 23: musicTracksWithClips, 24: withSelects };
+const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = {
+  23: musicTracksWithClips,
+  24: withSelects,
+  25: withClipGrades,
+};
 
 export function supportedProjectVersions(): string {
   return OLDEST_PROJECT_SCHEMA_VERSION === PROJECT_SCHEMA_VERSION

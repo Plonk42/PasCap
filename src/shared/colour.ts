@@ -177,7 +177,7 @@ export function isNeutralLocalTone(settings: Pick<ColourSettings, LocalToneSetti
   return LOCAL_TONE_SETTINGS.every((key) => settings[key] === 0);
 }
 const localToneSettings: ReadonlySet<string> = new Set(LOCAL_TONE_SETTINGS);
-function isNeutralScalarColour(settings: ColourSettings): boolean {
+export function isNeutralScalarColour(settings: ColourSettings): boolean {
   return COLOUR_CONTROLS.every(({ key }) => localToneSettings.has(key) || settings[key] === NEUTRAL_COLOUR[key]);
 }
 /** Scalar SDR stages from decoded linear input to an encoded triple. */

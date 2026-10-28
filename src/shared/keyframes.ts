@@ -20,7 +20,7 @@ export const keyframeSettingSchema = z.enum(
   KEYFRAME_SETTINGS.map((setting) => setting.key) as [KeyframeSetting, ...KeyframeSetting[]],
 );
 
-const layerKeyValuesSchema = z
+export const layerKeyValuesSchema = z
   .object({
     opacity: described(z.number().min(0).max(1), 'Opacity, 0 (transparent) to 1 (opaque).').nullable(),
     temperature: colourSchema.shape.temperature.nullable(),
@@ -258,9 +258,16 @@ export function usesLocalTone(layer: {
 export function keySettings(key: LayerKeyframe): KeyframeSetting[] {
   return KEYFRAME_SETTINGS.filter((setting) => key.values[setting.key] !== null).map((setting) => setting.key);
 }
-export function evaluateLayerSetting(
-  layer: { keyframes: readonly LayerKeyframe[] },
-  setting: KeyframeSetting,
+export function evaluateLayerSetting<K extends string>(
+  layer: {
+    keyframes: readonly {
+      frame: number;
+      values: Readonly<Record<K, number | null>>;
+      easing: Readonly<Record<K, Interpolation | null>>;
+      reset: boolean;
+    }[];
+  },
+  setting: K,
   projectFrame: number,
   base: number,
 ): number {
