@@ -280,6 +280,8 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
 
   it('retains per-setting arrows beside main diamonds and on chips, with one section union and no sidebar duplicates', () => {
     const document = project();
+    // The Colour tab edits the selected clip's grade.
+    document.clips[0]!.grade.keyframes = gradeInterleaved;
     document.layers[0]!.transform.keyframes = [0, 20].map((frame) => ({
       ...uniformKeyframe(frame, { ...document.layers[0]!.transform.base }, 'linear'),
       reset: false,
@@ -297,7 +299,7 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
           frame: 50,
           drafting: false,
           section: 'clip',
-          sectionRequest: { section: 'colour', colourTarget: 'adjustment', nonce: 1 },
+          sectionRequest: { section: 'colour', nonce: 1 },
           onSection: vi.fn(),
           onSelectBoundary: vi.fn(),
           onEdit: vi.fn(),
@@ -318,7 +320,7 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
     const diamonds = [
       ...inspector.matchAll(/<span class="keyframe-setting-navigation"[\s\S]*?<\/button><\/span><\/span>/g),
     ];
-    // Each scalar Colour setting of the adjustment, the clip Speed diamond and each Transform setting.
+    // Each scalar Colour setting of the clip grade, the clip Speed diamond and each Transform setting.
     expect(diamonds).toHaveLength(COLOUR_CONTROLS.length + 1 + SPATIAL_CONTROLS.length);
     const speedDiamond = diamonds.findIndex(([markup]) => markup.includes('aria-label="Keyframe Speed"'));
     // The single-setting Speed section relies on its keyframe-line pair, without a duplicate per-setting pair.
@@ -341,9 +343,9 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
       expect(controls[1]).toContain(`aria-label="Previous ${label} keyframe"`);
       expect(controls[2]).toContain(`aria-label="Next ${label} keyframe"`);
     }
-    // The adjustment's stored list ends before Transform's.
+    // The clip grade's stored list ends before Transform's.
     const colourList = inspector.slice(
-      inspector.indexOf('aria-label="Adjustment keyframes'),
+      inspector.indexOf('aria-label="Clip keyframes'),
       inspector.indexOf('aria-label="Transform keyframes'),
     );
     const chips = [...colourList.matchAll(/<span class="layer-keyframe-chip"[\s\S]*?<\/button><\/span><\/span>/g)];

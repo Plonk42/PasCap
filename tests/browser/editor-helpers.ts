@@ -18,6 +18,7 @@ import { jobSchema, type MediaJob } from '../../src/shared/media.js';
 import { operations } from '../../src/shared/operations/index.js';
 import { forEachSerial } from '../../src/shared/serial.js';
 import { SPATIAL_CHANNELS, type SpatialKeyframe, type SpatialKeyValues } from '../../src/shared/spatial.js';
+import { calculateLayout } from '../../src/shared/timeline.js';
 
 const readOperations = new Set(operations.filter((op) => op.access === 'read').map((op) => `/api/ops/${op.name}`));
 
@@ -57,8 +58,8 @@ export async function closeOptions(page: Page): Promise<void> {
 }
 
 type InspectorTab = 'Clip' | 'Colour' | 'Track' | 'Audio';
-// Colour holds a selected clip's grade or the adjustment at the playhead, chosen with the Clip/Adjustment switch;
-// Sequence lives in the Track tab.
+// Colour edits what is selected on the timeline: 'Adjustment' selects the adjustment at the playhead, 'Clip grade' a
+// clip there unless one is selected alone; Sequence lives in the Track tab.
 const TAB_FOR: Record<InspectorTab | 'Adjustment' | 'Clip grade' | 'Sequence', InspectorTab> = {
   Clip: 'Clip',
   Colour: 'Colour',
@@ -70,32 +71,82 @@ const TAB_FOR: Record<InspectorTab | 'Adjustment' | 'Clip grade' | 'Sequence', I
 };
 
 export async function inspectorTab(page: Page, name: keyof typeof TAB_FOR): Promise<void> {
+  if (name === 'Clip') await reselectClip(page);
   const tab = page.getByRole('tab', { name: TAB_FOR[name], exact: true });
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
   if (name === 'Adjustment' || name === 'Clip grade') await colourTarget(page, name === 'Clip grade' ? 'Clip' : name);
 }
 
-/** The Colour tab edits the selected clip's grade or the adjustment at the playhead; without a clip, the adjustment. */
-export async function colourTarget(page: Page, target: 'Clip' | 'Adjustment'): Promise<void> {
-  // Until the project opens, the pinned header shows an unavailable Adjustment target.
+/** The adjustment and the clips under the playhead, in track order. */
+async function atPlayhead(page: Page): Promise<{ adjustment: string | null; clips: string[]; frame: number }> {
   await page.waitForFunction(() => window.pascapLab?.project() != null);
-  await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .colour-target')).toBeVisible();
-  const radio = page
-    .getByRole('radiogroup', { name: 'Colour target' })
-    .getByRole('radio', { name: target === 'Clip' ? 'Clip grade' : 'Adjustment', exact: true });
-  // Choose even when it shows as checked: without a selected clip the Adjustment shows, and selecting a clip would then
-  // show its grade. A pointer draft disables the switch, keeping the target chosen before it.
-  if (await radio.isEnabled()) await radio.dispatchEvent('click');
-  await expect(radio).toHaveAttribute('aria-checked', 'true');
+  const { project, frame } = await page.evaluate(() => ({
+    project: window.pascapLab!.project()!,
+    frame: window.pascapLab!.engine.diagnostics().frame,
+  }));
+  const adjustment = project.adjustments.find((item) => frame >= item.start && frame < item.start + item.duration);
+  const clips = calculateLayout(project)
+    .clips.filter((placed) => frame >= placed.start && frame < placed.end)
+    .map((placed) => placed.clip.id);
+  return { adjustment: adjustment?.id ?? null, clips, frame };
+}
+
+/** Selects the first clip at the playhead; Enter on a clip seeks its start, so the playhead returns. */
+async function selectClipAtPlayhead(page: Page): Promise<void> {
+  const { clips, frame } = await atPlayhead(page);
+  if (!clips.length) throw new Error('No clip at the playhead to select.');
+  await page.locator(`[data-clip-id="${clips[0]}"] .timeline-clip-body`).first().press('Enter');
+  await expect(page.locator(`[data-clip-id="${clips[0]}"]`).first()).toHaveClass(/\bselected\b/);
+  if ((await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)) === frame) return;
+  await page.evaluate((position) => window.pascapLab!.engine.seek(position), frame);
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
+}
+
+/**
+ * The Colour tab edits the selected clip's grade or the selected adjustment. Selects, like a click on the timeline,
+ * the adjustment at the playhead or, unless a clip is selected alone, the first clip there.
+ */
+export async function colourTarget(page: Page, target: 'Clip' | 'Adjustment'): Promise<void> {
+  const { adjustment } = await atPlayhead(page);
+  const selectedClips = page.locator('.timeline-clip.selected');
+  const selectedAdjustments = page.locator('.adjustment-item.selected');
+  if (target === 'Adjustment') {
+    if (!adjustment) throw new Error('No adjustment at the playhead to select.');
+    const item = page.locator(`[data-adjustment-id="${adjustment}"]`);
+    // Already selected alone, for example during a pointer draft, which refuses a new selection.
+    const alone =
+      (await selectedClips.count()) === 0 &&
+      (await selectedAdjustments.count()) === 1 &&
+      (await item.evaluate((element) => element.classList.contains('selected')));
+    if (!alone) await item.locator('.adjustment-body').press('Enter');
+  } else if ((await selectedClips.count()) !== 1 || (await selectedAdjustments.count()) !== 0) {
+    await selectClipAtPlayhead(page);
+  }
+  const tab = page.getByRole('tab', { name: 'Colour', exact: true });
+  if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.dispatchEvent('click');
+  await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .colour-target > span')).toHaveText(
+    target === 'Clip' ? 'This clip only' : 'Every track within this range',
+  );
+}
+
+/** Selecting an adjustment for Colour left no clip for the Clip tab: select the first clip at the playhead again. */
+async function reselectClip(page: Page): Promise<void> {
+  if ((await page.locator('.adjustment-item.selected').count()) === 0) return;
+  if ((await page.locator('.timeline-clip.selected').count()) > 0) return;
+  if ((await atPlayhead(page)).clips.length) await selectClipAtPlayhead(page);
 }
 
 /** Speed is clip-owned (Clip tab); Transform and Opacity are the track's (Track tab); Colour edits the adjustment. */
 export async function settingTab(page: Page, label: string): Promise<void> {
   const name = { Speed: 'Clip', Transform: 'Track', Opacity: 'Track' }[label] ?? 'Colour';
+  if (name === 'Colour') {
+    await colourTarget(page, 'Adjustment');
+    return;
+  }
+  if (name === 'Clip') await reselectClip(page);
   const tab = page.getByRole('tab', { name, exact: true });
   // A synthetic click never moves the mouse, so it cannot end an active pointer draft.
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.dispatchEvent('click');
-  if (name === 'Colour') await colourTarget(page, 'Adjustment');
 }
 
 /** Double-clicking a setting's name resets only that setting, like its Reset button. */

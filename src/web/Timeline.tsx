@@ -43,7 +43,7 @@ import {
 } from './adjustment-ui.js';
 import { clipKeyframeMarkers, gradeKeyframeMarkers, type ClipKeyframeMarker } from './clip-keyframe-markers.js';
 import { clipKeyframeKind, clipKeyframeSlideTarget, type ClipKeyframeTarget } from './clip-keyframe-drag.js';
-import type { ColourTarget, InspectorSectionTarget } from './InspectorSection.js';
+import type { InspectorSectionTarget } from './InspectorSection.js';
 import { SPATIAL_CONTROLS } from './spatial-editor.js';
 import './clip-keyframe-markers.css';
 import {
@@ -134,7 +134,7 @@ interface Props {
   onSelect: (id: string) => void;
   onBoundary: (leftId: string) => void;
   onSeek: (frame: number) => void;
-  onOpenSection: (section: InspectorSectionTarget, colourTarget?: ColourTarget) => void;
+  onOpenSection: (section: InspectorSectionTarget) => void;
   onPause: () => void;
   onEdit: (command: EditCommand | readonly EditCommand[]) => void;
   onInsert: (mediaIds: string[], index: number, layerId: string, start: number) => void;
@@ -879,7 +879,7 @@ export function Timeline(props: Readonly<Props>) {
     onError,
   });
   const gradeKeys = useKeyframeSlide({
-    kind: clipKeyframeKind('grade', { ...clipKindOptions, onOpen: () => props.onOpenSection('colour', 'clip') }),
+    kind: clipKeyframeKind('grade', { ...clipKindOptions, onOpen: () => props.onOpenSection('colour') }),
     project,
     frame,
     scale,
@@ -897,7 +897,7 @@ export function Timeline(props: Readonly<Props>) {
     kind: adjustmentKeyframeKind({
       onSelect: props.onSelectAdjustment,
       onSeek,
-      onOpen: () => props.onOpenSection('colour', 'adjustment'),
+      onOpen: () => props.onOpenSection('colour'),
     }),
     project,
     frame,

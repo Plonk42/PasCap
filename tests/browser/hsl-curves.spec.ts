@@ -253,7 +253,7 @@ for (const cancellation of ['pointercancel', 'lostcapture', 'windowblur'] as con
   });
 }
 
-test('advanced adjustment settings survive clip selection; a clip grade target cannot apply an old invalid draft', async ({
+test('advanced adjustment settings stay with the adjustment; selecting a clip shows its grade without an old invalid draft', async ({
   page,
 }) => {
   const document = memory.snapshot();
@@ -268,11 +268,10 @@ test('advanced adjustment settings survive clip selection; a clip grade target c
   const field = page.getByRole('spinbutton', { name: 'HSL hue', exact: true });
   await field.fill('7.123456789');
   await field.press('Enter');
-  await page.locator('[data-clip-id="two"] .timeline-clip-body').click();
-  await expect(field).toHaveValue('7.123456789');
   await field.fill('31');
   await field.press('Enter');
-  await inspectorTab(page, 'Clip grade');
+  await page.locator('[data-clip-id="two"] .timeline-clip-body').click();
+  await expect(page.locator('#inspector-pane .colour-target > span')).toHaveText('This clip only');
   await expect(field).toHaveValue('0');
   await expect(field).toBeEnabled();
   await field.fill('-4.23456789');

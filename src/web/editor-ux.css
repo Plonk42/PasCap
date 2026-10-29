@@ -41,90 +41,23 @@
   color: var(--accent);
 }
 
-/* The Colour tab's target: the Clip/Adjustment switch (and Delete for an adjustment) above its name. */
+/* The Colour tab's target: the clip or adjustment it edits, with Delete for an adjustment. */
 .product-workspace .inspector-selection.colour-target {
   grid-template-columns: 18px minmax(0, 1fr) auto;
   row-gap: 2px;
 }
 
-.inspector-selection.colour-target > .colour-target-switch {
-  grid-column: 1 / 3;
-  grid-row: 1;
-  justify-self: start;
-  margin-bottom: 6px;
-}
-
 .inspector-selection.colour-target > .icon-button {
   grid-column: 3;
-  grid-row: 1;
+  grid-row: 1 / 3;
   align-self: center;
-}
-
-.inspector-selection.colour-target > svg {
-  grid-row: 2 / 4;
 }
 
 /* The name and scope wrap rather than losing a timecode or a clip count. */
 .inspector-selection.colour-target > strong,
 .inspector-selection.colour-target > span {
-  grid-column: 2 / 4;
+  grid-column: 2;
   white-space: normal;
-}
-
-/* Without an adjustment at the playhead: create one over the ruler range or the selected clip. */
-.adjustment-create {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-  min-width: 0;
-  margin: 0;
-  padding: 10px 14px;
-  border: 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.adjustment-create > legend {
-  float: left;
-  width: 100%;
-  margin-bottom: 2px;
-  padding: 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.adjustment-create > button[aria-disabled='true'] {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.colour-target-switch {
-  display: flex;
-  padding: 2px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #18211b;
-}
-
-.colour-target-switch > button {
-  min-height: 24px;
-  padding: 2px 9px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.colour-target-switch > button[aria-checked='true'] {
-  color: #e5f1e3;
-  background: #304235;
-  border-color: #4f6855;
-}
-
-.colour-target-switch > button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
 }
 
 .inspector-selection > strong,

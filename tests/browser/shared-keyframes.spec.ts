@@ -673,7 +673,7 @@ for (const rate of [0.25, 4]) {
   });
 }
 
-test('an empty track still edits the adjustment, and stored value fields keep timeline shortcuts from editing', async ({
+test('beside an empty track, a selected adjustment is edited, and stored value fields keep timeline shortcuts from editing', async ({
   page,
 }) => {
   let document = await current(page);
@@ -712,6 +712,8 @@ test('an empty track still edits the adjustment, and stored value fields keep ti
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().playing)).toBe(false);
   await field.press('Escape');
   await expect(field).toHaveValue('0.8');
+  // With only the empty track selected again, timeline shortcuts have nothing to edit.
+  await page.getByRole('button', { name: 'Select track Track 2', exact: true }).click();
   for (const name of ['Split at playhead', 'Delete selected clip'])
     await expect(page.getByRole('button', { name, exact: true })).toBeDisabled();
   await page.getByRole('region', { name: 'Video timeline' }).focus();
@@ -719,6 +721,7 @@ test('an empty track still edits the adjustment, and stored value fields keep ti
   expect(await current(page)).toEqual(edited);
   await page.keyboard.press('ArrowRight');
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(21);
+  await inspectorTab(page, 'Adjustment');
   await expect(diamond(page, 'Exposure')).toHaveAttribute('aria-pressed', 'false');
   await expect(diamond(page, 'Exposure')).toBeEnabled();
   expect(await current(page)).toEqual(edited);

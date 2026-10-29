@@ -192,10 +192,11 @@ edits real projects with it, so saved data must keep working. Details are in
   clips and never extend duration. Each source is graded by its clip grade, then the item at that
   project frame, in sequence (each stage clips and encodes; local tone summed once in the detail
   kernel). Static export requires no adjustments and unkeyed scalar clip grades without local
-  tone, one LUT per clip. The **Colour** tab (Clip / Colour / Track / Audio) edits the selected
-  clip's grade or, by its Clip/Adjustment switch, the adjustment at the playhead (created over the
-  ruler range or the selected clip, deleted from its header); clip keys are amber markers inside
-  clips; Copy/Paste grade in the clip menu; Original with Shift/Alt bypasses only clip grades /
+  tone, one LUT per clip. The **Colour** tab (Clip / Colour / Track / Audio) edits the grade of the
+  clip or adjustment selected on the timeline (adjustments are drawn on the pinned adjustment track
+  or added over the ruler range or the selected clip, deleted from its header); clip keys are amber
+  markers inside clips; Copy/Paste grade in the clip and adjustment menus; Original with Shift/Alt
+  bypasses only clip grades /
   adjustments. Colour and `layer-key-*` commands take `clipId` (`colour`: `clipIds`) or
   `adjustmentId`. No migration (owner, 2026-10-28): projects and receipt snapshots saved with track
   Colour are rejected with the reason and left unchanged. The timeline lane for items is #287, MCP

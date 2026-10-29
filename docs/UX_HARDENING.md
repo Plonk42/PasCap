@@ -34,8 +34,8 @@ This guide is not a delivery ledger or a fresh validation result.
   Main capture uses the real displayed frame; navigation never edits or saves.
   Timeline speed markers still
   omit off-trim keyframes, with exclusive OUT represented by a boundary marker.
-- The **Colour** tab edits the selected clip's grade or the adjustment at the playhead, chosen
-  with its **Clip / Adjustment** switch; video tracks have no Colour. **Track → Transform**
+- The **Colour** tab edits the grade of the clip or adjustment selected on the timeline; video
+  tracks have no Colour. **Track → Transform**
   contains the **Opacity** slider/triangle/navigation after Rotation, initially **100%**.
   Without Opacity keyframes it edits the Transform base, including on an empty track; keyed
   Opacity overrides that value on every clip and both dissolve sources. Sliders never create

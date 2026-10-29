@@ -267,8 +267,8 @@ test('adjustment native controls preserve exact precision, invalid drafts, indiv
     clip.grade.colour.tint = -0.6;
   }
   await fixture(page, document);
-  // Without a selected clip, the Colour tab edits the adjustment at the playhead.
-  await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
+  // Selecting the adjustment shows it rather than the clips' own grades.
+  await inspectorTab(page, 'Adjustment');
   await expect(page.locator('[role="tabpanel"]:not([hidden]) .selected-clip-name')).toContainText(
     'Every track within this range',
   );

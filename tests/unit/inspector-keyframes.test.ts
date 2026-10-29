@@ -19,8 +19,8 @@ const navigation = {
 };
 
 describe('dedicated Inspector keyframe controls', () => {
-  it('labels Clip, Colour, Track and Audio panels; an empty track keeps Opacity in Transform and Colour grades adjustments', () => {
-    const render = (project: ProjectDocument): string =>
+  it('labels Clip, Colour, Track and Audio panels; an empty track keeps Opacity in Transform and Colour grades the selected adjustment', () => {
+    const render = (project: ProjectDocument, selectedAdjustmentIds: string[] = []): string =>
       renderToStaticMarkup(
         createElement(
           KeyframeNavigationContext.Provider,
@@ -29,6 +29,7 @@ describe('dedicated Inspector keyframe controls', () => {
             project,
             assets: [],
             selectedClipId: null,
+            selectedAdjustmentIds,
             selectedLayerId: project.layers[0]!.id,
             boundaryId: null,
             frame: 0,
@@ -67,14 +68,10 @@ describe('dedicated Inspector keyframe controls', () => {
     expect(clipPanel).toContain('Select a clip on Track 1 to edit it.');
     expect(clipPanel).not.toContain('aria-label="Placement section"');
     expect(clipPanel).not.toContain('Opacity');
-    // Without a selected clip, the Colour tab grades adjustments; the clip grade is unavailable.
-    const target = (label: string) =>
-      new RegExp(`<button[^>]*aria-label="${label}"[^>]*>`).exec(colourPanel)?.[0] ?? '';
-    expect(colourPanel).toContain('aria-label="Colour target"');
-    expect(target('Clip grade')).toContain('aria-disabled="true"');
-    expect(target('Adjustment')).toContain('aria-checked="true"');
-    expect(colourPanel).toContain('>No adjustment</strong><span>At the playhead</span>');
-    expect(colourPanel).toContain('aria-label="New adjustment"');
+    // Without a selected clip or adjustment, the Colour tab only asks to select one.
+    expect(colourPanel).toContain('Select a clip or an adjustment in the timeline to edit its grade.');
+    expect(colourPanel).not.toContain('aria-label="Colour target"');
+    expect(colourPanel).not.toContain('aria-label="New adjustment"');
     expect(colourPanel).not.toContain('aria-label="Colour section"');
     expect(colourPanel).not.toContain('Opacity');
     // The track keeps no Colour: its Opacity is part of its Transform, editable on an empty track.
@@ -101,9 +98,9 @@ describe('dedicated Inspector keyframe controls', () => {
     expect(markup).not.toContain('Keyframe Layer opacity');
     expect(markup).not.toContain('Keyframe Clip opacity');
 
-    // An adjustment at the playhead: its stored keyframe list sits inside its Colour section, before HSL ranges.
+    // A selected adjustment: its stored keyframe list sits inside its Colour section, before HSL ranges.
     project.adjustments = [createAdjustment('look', 0, 100)];
-    const adjusted = panelsOf(render(project)).colour;
+    const adjusted = panelsOf(render(project, ['look'])).colour;
     expect(adjusted).toContain('aria-label="Colour section"');
     const colourSection = adjusted.slice(
       adjusted.indexOf('aria-label="Colour section"'),

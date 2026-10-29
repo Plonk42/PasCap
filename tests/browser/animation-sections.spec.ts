@@ -823,11 +823,9 @@ for (const viewport of [
       page,
     }) => {
       const document = await fixture(page, (document) => {
-        document.adjustments[0]!.keyframes = [gradePoint(0, { exposure: 0 }), gradePoint(40, { exposure: 0.6 })];
+        document.clips[0]!.grade.keyframes = [gradePoint(0, { exposure: 0 }), gradePoint(40, { exposure: 0.6 })];
       });
       await seek(page, document, 15);
-      // The Colour tab keeps the adjustment as its target while the clip stays selected.
-      await inspectorTab(page, 'Adjustment');
       await inspectorTab(page, 'Clip');
       const point = page.getByRole('button', { name: 'Clip speed keyframe 30', exact: true });
       await point.scrollIntoViewIfNeeded();
@@ -848,13 +846,15 @@ for (const viewport of [
       await settingTab(page, 'Transform');
       await expect(navigation(page, 'Transform', 'Next')).toBeDisabled();
       await expect(transformDiamond(page)).toBeDisabled();
-      await settingTab(page, 'Exposure');
+      // The Colour tab shows the selected clip's grade.
+      await page.getByRole('tab', { name: 'Colour', exact: true }).dispatchEvent('click');
       await expect(navigation(page, 'Colour', 'Next')).toBeDisabled();
       await expect(diamond(page, 'Exposure')).toBeDisabled();
       for (const direction of ['Previous', 'Next'] as const)
         await expect(channelNavigation(page, 'Exposure', direction)).toHaveAttribute('aria-disabled', 'true');
       await expect(
-        adjustmentKeyframes(page)
+        page
+          .getByRole('group', { name: /^Clip keyframes / })
           .locator('[data-keyframe-frame="0"] .layer-keyframe-chip')
           .getByRole('button', { name: 'Next Exposure keyframe', exact: true }),
       ).toBeDisabled();
