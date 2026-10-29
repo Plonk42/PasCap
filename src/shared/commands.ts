@@ -785,7 +785,9 @@ function editAdjustment(
       throw new Error('An adjustment with this ID already exists.');
     if (next.adjustments.length >= MAX_ADJUSTMENTS)
       throw new Error(`A project has at most ${MAX_ADJUSTMENTS} adjustments. Remove one first.`);
-    next.adjustments.push(createAdjustment(command.adjustmentId, command.start, command.duration));
+    const item = createAdjustment(command.adjustmentId, command.start, command.duration);
+    item.colour = colourSchema.parse({ ...item.colour, ...command.settings });
+    next.adjustments.push(item);
   } else {
     const item = requiredAdjustment(next, command.adjustmentId);
     if (command.keyframes !== 'move' && command.keyframes !== 'stay')

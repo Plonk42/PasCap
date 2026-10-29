@@ -338,29 +338,33 @@ export const editCommandSchema = z.discriminatedUnion('type', [
   }),
   command(
     'adjustment-add',
-    'Add an adjustment: a neutral grade of every video track over a range, after clip grades. No overlaps; at most 64.',
+    'Add an adjustment: a grade of every video track over a range, after clip grades. No overlaps; at most 64.',
     {
       adjustmentId: described(idSchema, 'Unused ID of the new adjustment.'),
-      start: described(frameSchema, 'Project frame of its first graded frame.'),
+      start: described(frameSchema, 'Its first project frame.'),
       duration: described(frameSchema.min(1), 'Frames it grades from start.'),
+      settings: described(
+        z.partialRecord(gradeSettingSchema, z.number()).optional(),
+        'Its scalar Colour settings, as in colour-setting; others neutral.',
+      ),
     },
   ),
   command('adjustment-remove', 'Remove an adjustment and its keyframes.', { adjustmentId }),
   command('adjustment-range', 'Move or resize an adjustment; no overlaps.', {
     adjustmentId,
-    start: described(frameSchema, 'New project frame of its first graded frame.'),
-    duration: described(frameSchema.min(1), 'New number of frames it grades.'),
+    start: described(frameSchema, 'Its new first project frame.'),
+    duration: described(frameSchema.min(1), 'Its new length in frames.'),
     keyframes: described(
       z.enum(['move', 'stay']),
-      'move: keyframes move with it (a move); stay: they keep their project frames (a trim).',
+      'move: keyframes move with it; stay: they keep their project frames, as in a trim.',
     ),
   }),
   command(
     'adjustment-split',
-    'Split an adjustment at a project frame inside it: both pieces keep its whole grade and every keyframe, each keyframe at its project frame.',
+    'Split an adjustment: both pieces keep its whole grade and every keyframe at its project frame.',
     {
       adjustmentId,
-      frame: described(frameSchema, 'Project frame strictly inside it: the first frame of the second piece.'),
+      frame: described(frameSchema, 'First frame of the second piece, strictly inside it.'),
       newAdjustmentId: described(idSchema, 'Unused ID of the second piece.'),
     },
   ),
@@ -389,8 +393,7 @@ export const editCommandSchema = z.discriminatedUnion('type', [
 export type EditCommand = z.infer<typeof editCommandSchema>;
 
 /** Editor commands carrying a whole track: half of edit's schema, and the assistant has a command per setting. */
-// adjustment-split waits for the assistant's adjustment commands (#288).
-const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set(['layer-add', 'layer-update', 'adjustment-split']);
+const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set(['layer-add', 'layer-update']);
 
 /** The commands of the edit operation. */
 export const assistantEditCommandSchema = z.discriminatedUnion(
