@@ -6,7 +6,8 @@ v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)). **Status: decided; 
 ([#285](https://github.com/Plonk42/PasCap/issues/285)) and adjustment items replacing track
 Colour ([#286](https://github.com/Plonk42/PasCap/issues/286)) are implemented on the v1.3 branch;
 items on the timeline (#287) are in progress (the pinned lane with selection, creation, move, trim,
-split, delete and keyframe markers is implemented); MCP (#288) and the UX evaluation (#289) are not.** The
+split, delete, keyframe markers, selection with clips and Copy / Paste grade is implemented); MCP
+(#288) and the UX evaluation (#289) are not.** The
 current contracts are [clip grades and adjustments](ROW_APPEARANCE.md),
 [spatial transforms](SPATIAL_TRANSFORMS.md) (with Opacity), [HSL and curves](HSL_AND_CURVES.md),
 [Temperature and Tint](TEMPERATURE_AND_TINT.md), [detail filters](DETAIL_FILTERS.md) and

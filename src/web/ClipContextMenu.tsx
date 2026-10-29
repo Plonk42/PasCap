@@ -4,11 +4,19 @@ import type { EditCommand } from '../shared/commands.js';
 import type { ColourSettings } from '../shared/colour.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { Icon } from './icons.js';
-import { copyGradeBlocked, pasteGradeCommands, pasteTargets } from './grade-clipboard.js';
+import {
+  copiedColour,
+  copyGradeBlocked,
+  pasteGradeCommands,
+  pasteTargets,
+  pasteTargetsLabel,
+  type GradeTarget,
+} from './grade-clipboard.js';
 import { moveToNewTrack } from './move-to-track.js';
 
 export interface ClipMenuAnchor {
-  clipId: string;
+  /** The right-clicked clip or adjustment. */
+  target: GradeTarget;
   x: number;
   y: number;
 }
@@ -17,31 +25,34 @@ interface Props {
   anchor: ClipMenuAnchor;
   onDuplicate: () => void;
   project: ProjectDocument;
-  selectedClipIds: readonly string[];
+  /** Every selected clip and adjustment. */
+  selected: readonly GradeTarget[];
   copiedGrade: ColourSettings | null;
   onCopyGrade: (colour: ColourSettings) => void;
   onEdit: (commands: readonly EditCommand[]) => void;
   onClose: (restoreFocus: boolean) => void;
 }
 
-/** Right-click (or Menu key) actions for one clip; Ctrl+D remains the keyboard shortcut. */
+/** Right-click (or Menu key) actions for one clip or adjustment; Ctrl+D remains the keyboard shortcut. */
 export function ClipContextMenu({
   anchor,
   onDuplicate,
   project,
-  selectedClipIds,
+  selected,
   copiedGrade,
   onCopyGrade,
   onEdit,
   onClose,
 }: Readonly<Props>) {
-  const moved = moveToNewTrack(project, anchor.clipId);
-  const moveBlocked = 'reason' in moved ? moved.reason : null;
-  const clip = project.clips.find((item) => item.id === anchor.clipId);
-  const copyBlocked = clip ? copyGradeBlocked(clip) : 'This clip no longer exists.';
-  const targets = pasteTargets(anchor.clipId, selectedClipIds);
-  const pasteBlocked = copiedGrade ? null : 'Copy a clip’s grade first.';
-  const pasted = targets.length > 1 ? `these ${targets.length} clips` : 'this clip';
+  const { target } = anchor;
+  const clip = target.kind === 'clip';
+  const moved = clip ? moveToNewTrack(project, target.id) : null;
+  const moveBlocked = moved && 'reason' in moved ? moved.reason : null;
+  const copyBlocked = copyGradeBlocked(project, target);
+  const targets = pasteTargets(target, selected);
+  const pasteBlocked = copiedGrade ? null : 'Copy the grade of a clip or an adjustment first.';
+  const pasted = pasteTargetsLabel(targets);
+  const noun = clip ? 'clip' : 'adjustment';
   const panel = useRef<HTMLFieldSetElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 
@@ -90,34 +101,39 @@ export function ClipContextMenu({
       className="clip-context-menu"
       style={{ left: position?.left ?? 0, top: position?.top ?? 0, visibility: position ? 'visible' : 'hidden' }}
     >
-      <legend className="sr-only">Clip actions</legend>
-      <button className="secondary-button small" aria-label="Duplicate selected clip" onClick={onDuplicate}>
-        <Icon name="plus" size={15} />
-        Duplicate <kbd>Ctrl+D</kbd>
-      </button>
+      <legend className="sr-only">{clip ? 'Clip actions' : 'Adjustment actions'}</legend>
+      {clip && (
+        <>
+          <button className="secondary-button small" aria-label="Duplicate selected clip" onClick={onDuplicate}>
+            <Icon name="plus" size={15} />
+            Duplicate <kbd>Ctrl+D</kbd>
+          </button>
+          <button
+            className="secondary-button small"
+            aria-label="Move selected clip to a new track"
+            title={moveBlocked ?? 'Move this clip to a new track, with its own Transform and Opacity'}
+            aria-disabled={moveBlocked !== null}
+            onClick={() => {
+              if (moved && 'commands' in moved) {
+                onClose(false);
+                onEdit(moved.commands);
+              }
+            }}
+          >
+            <Icon name="layers" size={15} />
+            Move to new track
+          </button>
+        </>
+      )}
       <button
         className="secondary-button small"
-        aria-label="Move selected clip to a new track"
-        title={moveBlocked ?? 'Move this clip to a new track, so it can have its own Colour and keyframes'}
-        aria-disabled={moveBlocked !== null}
-        onClick={() => {
-          if ('commands' in moved) {
-            onClose(false);
-            onEdit(moved.commands);
-          }
-        }}
-      >
-        <Icon name="layers" size={15} />
-        Move to new track
-      </button>
-      <button
-        className="secondary-button small"
-        aria-label="Copy grade of this clip"
-        title={copyBlocked ?? 'Copy this clip’s grade, to paste it on other clips'}
+        aria-label={`Copy grade of this ${noun}`}
+        title={copyBlocked ?? `Copy this ${noun}’s grade, to paste it on clips and adjustments`}
         aria-disabled={copyBlocked !== null}
         onClick={() => {
-          if (!clip || copyBlocked) return;
-          onCopyGrade(structuredClone(clip.grade.colour));
+          const colour = copiedColour(project, target);
+          if (!colour) return;
+          onCopyGrade(colour);
           onClose(true);
         }}
       >
@@ -126,7 +142,7 @@ export function ClipContextMenu({
       </button>
       <button
         className="secondary-button small"
-        aria-label={targets.length > 1 ? `Paste grade on ${targets.length} selected clips` : 'Paste grade on this clip'}
+        aria-label={`Paste grade on ${pasted}`}
         title={pasteBlocked ?? `Replace the grade of ${pasted} with the copied one, removing its keyframes`}
         aria-disabled={pasteBlocked !== null}
         onClick={() => {
@@ -136,7 +152,7 @@ export function ClipContextMenu({
         }}
       >
         <Icon name="colour" size={15} />
-        {targets.length > 1 ? `Paste grade on ${targets.length} clips` : 'Paste grade'}
+        {targets.length > 1 ? `Paste grade on ${targets.length}` : 'Paste grade'}
       </button>
     </fieldset>
   );

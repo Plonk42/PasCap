@@ -396,14 +396,19 @@ Only a clip grade has **Auto** and **Auto white balance**.
 
 An adjustment stays at its place in the film: trimming, moving, rippling or deleting clips never
 moves it, and it never makes the project longer. Its keyframes count from its start (the
-**Adjustment keyframes** list shows **Frame in adjustment**) and are not drawn on the timeline
-yet. Use it for a look over several shots or tracks, such as a warmer sunset section; give one
+**Adjustment keyframes** list shows **Frame in adjustment**). Adjustments sit on the adjustment
+track, pinned under the time ruler: drag across an empty stretch to draw one, or use **+** in its
+header to cover the selected ruler range or clip; click one to edit it in the Colour tab, drag it
+to move it with its keyframes (amber ◆ markers inside it), drag its edges to trim it, press **S** to
+split it at the playhead and Delete to remove it. When a clip is selected, the adjustment grading it
+at the playhead has a dashed ring. Ctrl-click (Cmd-click) selects clips and adjustments together, to
+drag or delete them at once. Use it for a look over several shots or tracks, such as a warmer sunset section; give one
 shot its own look with its clip grade.
 
-To give several clips the same look, right-click a clip whose grade has no keyframes and choose
-**Copy grade**, then right-click another and choose **Paste grade**: it replaces that clip's grade
-and removes its keyframes, in one Undo step. Paste on a selected clip applies to every selected
-clip.
+To give several clips or adjustments the same look, right-click one whose grade has no keyframes
+and choose **Copy grade**, then right-click another and choose **Paste grade**: it replaces that
+grade and removes its keyframes, in one Undo step. Paste on a selected clip or adjustment applies to
+everything selected.
 
 ### Animation controls
 
