@@ -32,7 +32,7 @@ const detailResultSchema = z
 
 export const estimate = defineOperation({
   name: 'estimate',
-  description: `Measure footage the way the editor's automatic tools do, from proxy frames, and return the values with the edit commands that apply them (pass them to edit; nothing changes until then). kind auto-adjust is Colour → Auto: eleven Colour settings balancing exposure, contrast, white balance and colour. white-balance is Auto white balance: Temperature and Tint. detail measures noise and softness and suggests the clip's Denoise and Sharpen (never Clarity, a look). Analyse a clip (clipId: the whole clip, or with frame the second around that project frame, as at the playhead), several clips each on its own (clipIds, up to ${MAX_ESTIMATE_CLIPS}), a whole track (layerId: all its clips by duration for one grade; each clip on its own for detail or applyAs shots) or a recording range (mediaId, sourceIn, sourceOut: values only, no commands). For a grade per shot use applyAs shots: clip grades. Estimates and pictures render one at a time: a call waits its turn, up to a few minutes. Judge the result with a still.`,
+  description: `Measure footage the way the editor's automatic tools do, from proxy frames, and return the values with the edit commands that apply them (pass them to edit; nothing changes until then). kind auto-adjust is Colour → Auto: eleven Colour settings balancing exposure, contrast, white balance and colour. white-balance is Auto white balance: Temperature and Tint. detail measures noise and softness and suggests the clip's Denoise and Sharpen (never Clarity, a look). Analyse a clip (clipId: the whole clip, or with frame the second around that project frame, as at the playhead), several clips each on its own (clipIds, up to ${MAX_ESTIMATE_CLIPS}), a whole track (layerId: each clip on its own for detail or applyAs shots; all its clips by duration for one compromise, values only with commands false) or a recording range (mediaId, sourceIn, sourceOut: values only, no commands). Commands write clip grades, applied before any adjustment; for a grade per shot use applyAs shots. Estimates and pictures render one at a time: a call waits its turn, up to a few minutes. Judge the result with a still.`,
   input: z
     .object({
       projectId: described(idSchema, 'ID of the saved project.'),
@@ -55,7 +55,7 @@ export const estimate = defineOperation({
       sourceOut: described(frameSchema.optional(), 'Source frame after the recording range (exclusive).'),
       applyAs: described(
         z.enum(['values', 'keyframe', 'shots']).default('values'),
-        "Colour kinds: values replaces the track's values (leaving animated settings unchanged); keyframe keys the settings at frame, which needs clipId and frame; shots writes each clip's own whole-clip correction (clipId, clipIds or every clip of layerId) into its clip grade, applied before the track's Colour and kept with the clip when it moves; a setting the grade animates follows its keyframes.",
+        "Colour kinds: values replaces the clip grade's values (clipId; leaving animated settings unchanged); keyframe keys the settings in the clip grade at the source frame shown at frame, which needs clipId and frame; shots writes each clip's own whole-clip correction (clipId, clipIds or every clip of layerId) into its clip grade. Clip grades apply before any adjustment and stay with the clip when it moves; a setting the grade animates follows its keyframes.",
       ),
       intensity: described(
         z.number().min(0).max(100).default(balanced),
@@ -63,7 +63,7 @@ export const estimate = defineOperation({
       ),
       commands: described(
         z.boolean().default(true),
-        "False returns the values only, without the edit commands (applying as values repeats the track's whole Colour, HSL ranges and curves included).",
+        "False returns the values only, without the edit commands (applying as values repeats the clip grade's whole Colour, HSL ranges and curves included).",
       ),
     })
     .strict(),
@@ -102,7 +102,7 @@ export const estimate = defineOperation({
       ),
       unchanged: described(
         z.array(z.string()),
-        'Settings the track animates, which applying as values leaves unchanged; key them with applyAs keyframe instead.',
+        'Settings the clip grade animates, which applying as values leaves unchanged; key them with applyAs keyframe instead.',
       ),
       commands: described(
         z.array(editCommandSchema),

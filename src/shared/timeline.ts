@@ -1,5 +1,5 @@
 import { NEUTRAL_COLOUR, type ColourSettings } from './colour.js';
-import { colourAt, opacityAt } from './composition.js';
+import { adjustmentColour } from './composition.js';
 import { NEUTRAL_DETAIL, type DetailSettings } from './detail.js';
 import { gradeColourAt } from './grade.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from './model.js';
@@ -36,9 +36,9 @@ export interface PreviewLayer {
   sourcePosition: number;
   spatial: SpatialPose;
   detail: DetailSettings;
-  /** The clip's own Colour at the source frame shown, applied before the track's. */
+  /** The clip's own Colour at the source frame shown, applied first. */
   grade: ColourSettings;
-  /** The track's Colour at the project frame. */
+  /** The Colour of the adjustment at the project frame, applied after the clip's; neutral without one. */
   colour: ColourSettings;
   weight: number;
   blendWeight: number;
@@ -280,13 +280,14 @@ export function sampleTimeline(
 ): PreviewLayer[] {
   if (!Number.isInteger(frame) || frame < 0 || frame >= layout.duration) return [];
   const active = layout.clips.filter((placed) => frame >= placed.start && frame < placed.end);
-  const opacities = new Map(project.layers.map((layer) => [layer.id, opacityAt(layer, frame)]));
+  const adjustment = adjustmentColour(project, frame);
   return active.flatMap((placed) => {
     const layer = project.layers.find((item) => item.id === placed.clip.layerId)!;
     if (!layer.enabled) return [];
     const sourceFrame = placed.retiming.sourceAt(frame - placed.start);
     const sourcePosition = placed.retiming.sourcePositionAt(frame - placed.start);
     const { blendWeight, brightness } = clipWeights(placed, frame, layer, layout);
+    const spatial = evaluateSpatial(layer.transform, frame);
     return [
       {
         clipId: placed.clip.id,
@@ -294,14 +295,14 @@ export function sampleTimeline(
         layerId: layer.id,
         sourceFrame,
         sourcePosition,
-        spatial: evaluateSpatial(layer.transform, frame),
+        spatial,
         detail: placed.clip.detail,
         grade: gradeColourAt(placed.clip.grade, gradePosition(placed, frame - placed.start)),
-        colour: colourAt(layer, frame),
+        colour: structuredClone(adjustment),
         weight: blendWeight * brightness,
         blendWeight,
         brightness,
-        opacity: opacities.get(layer.id)!,
+        opacity: spatial.opacity,
       },
     ];
   });
@@ -323,6 +324,7 @@ export function sampleSlots(
     if (!layer.enabled) return [];
     const left = layout.clips.find((item) => item.clip.id === transition.leftId)!;
     const last = left.duration - 1;
+    const spatial = evaluateSpatial(layer.transform, frame);
     return [
       {
         clipId: left.clip.id,
@@ -330,14 +332,14 @@ export function sampleSlots(
         layerId,
         sourceFrame: left.retiming.sourceAt(last),
         sourcePosition: left.retiming.sourcePositionAt(last),
-        spatial: evaluateSpatial(layer.transform, frame),
+        spatial,
         detail: { ...NEUTRAL_DETAIL },
         grade: structuredClone(NEUTRAL_COLOUR),
         colour: structuredClone(NEUTRAL_COLOUR),
         weight: 0,
         blendWeight: 1,
         brightness: 0,
-        opacity: opacityAt(layer, frame),
+        opacity: spatial.opacity,
       },
     ];
   });

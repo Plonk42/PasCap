@@ -3,13 +3,12 @@ import type { EditCommand } from './command-schema.js';
 import {
   defaultKeyframe,
   EMPTY_KEY_VALUES,
+  interpolationSchema,
   KEYFRAME_SETTINGS,
   joiningEasing,
-  keyEasingPatchSchema,
   keySettings,
   layerKeyframe,
   layerKeyframeSchema,
-  layerKeyValuesPatchSchema,
   upsertKey,
   withEasing,
   type Interpolation,
@@ -24,7 +23,6 @@ import {
   layerSchema,
   MAX_BOOKMARKS,
   MAX_SELECTS,
-  MAX_TRACK_KEYFRAMES,
   orderedSelectRanges,
   projectSchema,
   selectRangeSchema,
@@ -36,14 +34,18 @@ import {
 } from './model.js';
 import { detailSchema } from './detail.js';
 import {
-  clipGradeSchema,
+  createAdjustment,
   createClipGrade,
+  GRADE_SETTINGS,
   gradeKeyAsLayerKey,
+  gradeKeyValuesPatchSchema,
   layerKeyAsGradeKey,
+  MAX_ADJUSTMENTS,
   MAX_GRADE_KEYFRAMES,
+  type Adjustment,
 } from './grade.js';
 import { colourCurveSchema, hslBandSchema } from './advanced-colour.js';
-import { colourSchema, type ColourSettings } from './colour.js';
+import { colourSchema, type ColourSettings, type ScalarColourSetting } from './colour.js';
 import { spatialPoseSchema, spatialSettingsSchema } from './spatial.js';
 import { clipDuration } from './speed.js';
 import { trimByOutputFrames } from './source-range.js';
@@ -73,51 +75,50 @@ function requiredLayer(next: ProjectDocument, layerId: string): VideoLayer {
   return layer;
 }
 
-/** The Colour and keyframes a command changes: a track's, or a clip's own grade in the track keyframe shape. */
+/** The Colour and keyframes a command changes: a clip's grade or an adjustment, in the track keyframe shape. */
 interface ColourOwner {
-  kind: 'track' | 'clip';
+  kind: 'clip' | 'adjustment';
   name: string;
   colour: ColourSettings;
   keyframes: LayerKeyframe[];
 }
 
-/** A command's target: a track (layerId) or a clip's grade (clipId); exactly one is given. */
-type ColourTargetFields = Partial<Record<'layerId' | 'clipId', string | undefined>>;
+/** A command's target: a clip's grade (clipId) or an adjustment (adjustmentId); exactly one is given. */
+type ColourTargetFields = Partial<Record<'clipId' | 'adjustmentId', string | undefined>>;
 
 function colourOwner(next: ProjectDocument, command: ColourTargetFields): { owner: ColourOwner; save: () => void } {
-  if ((command.layerId === undefined) === (command.clipId === undefined))
-    throw new Error("Give either layerId, for a track's Colour, or clipId, for a clip's own grade.");
-  if (command.layerId !== undefined) {
-    const layer = requiredLayer(next, command.layerId);
-    const owner: ColourOwner = { kind: 'track', name: layer.name, colour: layer.colour, keyframes: layer.keyframes };
-    return {
-      owner,
-      save: () => {
-        layer.colour = owner.colour;
-        layer.keyframes = owner.keyframes;
-      },
-    };
-  }
-  const clip = next.clips.find((item) => item.id === command.clipId);
-  if (!clip) throw new Error('Clip no longer exists.');
+  if ((command.clipId === undefined) === (command.adjustmentId === undefined))
+    throw new Error("Give either clipId, for a clip's own grade, or adjustmentId, for an adjustment.");
+  const target =
+    command.clipId === undefined
+      ? requiredAdjustment(next, command.adjustmentId!)
+      : next.clips.find((item) => item.id === command.clipId)?.grade;
+  if (!target) throw new Error('Clip no longer exists.');
   const owner: ColourOwner = {
-    kind: 'clip',
-    name: `clip ${clip.id}`,
-    colour: clip.grade.colour,
-    keyframes: clip.grade.keyframes.map(gradeKeyAsLayerKey),
+    kind: command.clipId === undefined ? 'adjustment' : 'clip',
+    name: command.clipId === undefined ? `adjustment ${command.adjustmentId}` : `clip ${command.clipId}`,
+    colour: target.colour,
+    keyframes: target.keyframes.map(gradeKeyAsLayerKey),
   };
   return {
     owner,
     save: () => {
       if (owner.keyframes.some((key) => key.values.opacity !== null))
-        throw new Error("Opacity belongs to the track, not to a clip's grade.");
-      clip.grade = clipGradeSchema.parse({ colour: owner.colour, keyframes: owner.keyframes.map(layerKeyAsGradeKey) });
+        throw new Error('Opacity belongs to the track Transform, not to a grade.');
+      target.colour = owner.colour;
+      target.keyframes = owner.keyframes.map(layerKeyAsGradeKey);
     },
   };
 }
 
-function maxKeyframes(owner: ColourOwner): number {
-  return owner.kind === 'track' ? MAX_TRACK_KEYFRAMES : MAX_GRADE_KEYFRAMES;
+function requiredAdjustment(next: ProjectDocument, adjustmentId: string): Adjustment {
+  const item = next.adjustments.find((candidate) => candidate.id === adjustmentId);
+  if (!item) throw new Error('Adjustment no longer exists.');
+  return item;
+}
+
+function maxKeyframes(_owner: ColourOwner): number {
+  return MAX_GRADE_KEYFRAMES;
 }
 
 function followsKeyframes(name: string, setting: string, keys: number, list: string): void {
@@ -157,13 +158,13 @@ function editTransformSetting(layer: VideoLayer, command: Extract<EditCommand, {
   };
 }
 
-/** The same Colour on a track, or on each listed clip's grade, keeping their keyframes. */
+/** The same Colour on each listed clip's grade, or on an adjustment, keeping their keyframes. */
 function setColour(next: ProjectDocument, command: Extract<EditCommand, { type: 'colour' }>): void {
   const colour = colourSchema.parse(command.colour);
-  if ((command.layerId === undefined) === (command.clipIds === undefined))
-    throw new Error("Give either layerId, for a track's Colour, or clipIds, for clips' own grades.");
-  if (command.layerId !== undefined) {
-    requiredLayer(next, command.layerId).colour = structuredClone(colour);
+  if ((command.adjustmentId === undefined) === (command.clipIds === undefined))
+    throw new Error("Give either clipIds, for clips' own grades, or adjustmentId, for an adjustment.");
+  if (command.adjustmentId !== undefined) {
+    requiredAdjustment(next, command.adjustmentId).colour = structuredClone(colour);
     return;
   }
   const ids = new Set(command.clipIds);
@@ -329,8 +330,7 @@ type LayerKeyCommand = Extract<
 >;
 type LayerValueCommand = Extract<LayerKeyCommand, { type: 'layer-key-toggle' | 'layer-key-value' }>;
 function editLayerValue(layer: ColourOwner, point: LayerKeyframe | undefined, command: LayerValueCommand): void {
-  if (!KEYFRAME_SETTINGS.some((setting) => setting.key === command.setting))
-    throw new Error('Unknown keyframe setting.');
+  if (!GRADE_SETTINGS.includes(command.setting as ScalarColourSetting)) throw new Error('Unknown keyframe setting.');
   layerKeyframeSchema.shape.values.shape[command.setting].unwrap().parse(command.value);
   const current = point?.values[command.setting];
   if (command.type === 'layer-key-value') {
@@ -388,15 +388,31 @@ function patchKeySettings(
 }
 
 function keyframeLimit(owner: ColourOwner): Error {
-  const what = owner.kind === 'track' ? 'This track' : 'This clip';
+  const what = owner.kind === 'clip' ? 'This clip' : 'This adjustment';
   return new Error(`${what} already has ${maxKeyframes(owner)} keyframes. Change one of them, or remove one.`);
+}
+
+/** A grade frame: a source frame of a clip, or a frame counted from an adjustment's start, which may be negative. */
+function requireGradeFrame(frame: number): void {
+  if (!Number.isInteger(frame) || Math.abs(frame) > MAX_FRAME) throw new Error('Keyframe frames are whole frames.');
+}
+
+function gradeEasingPatch(
+  easing: Interpolation | Partial<Record<string, Interpolation>>,
+): Interpolation | Partial<Record<ScalarColourSetting, Interpolation>> {
+  if (typeof easing === 'string') return interpolationSchema.parse(easing);
+  for (const [setting, curve] of Object.entries(easing)) {
+    if (!GRADE_SETTINGS.includes(setting as ScalarColourSetting)) throw new Error(`Unknown setting ${setting}.`);
+    interpolationSchema.parse(curve);
+  }
+  return easing as Partial<Record<ScalarColourSetting, Interpolation>>;
 }
 
 /** Keys, changes or disables several settings of one keyframe at once, like their toggles together. */
 function setLayerKey(layer: ColourOwner, command: LayerKeySet): void {
-  frameSchema.parse(command.frame);
-  const patch = layerKeyValuesPatchSchema.parse(command.values);
-  const easing = command.easing === undefined ? undefined : keyEasingPatchSchema.parse(command.easing);
+  requireGradeFrame(command.frame);
+  const patch = gradeKeyValuesPatchSchema.parse(command.values);
+  const easing = command.easing === undefined ? undefined : gradeEasingPatch(command.easing);
   if (command.reset !== undefined && typeof command.reset !== 'boolean')
     throw new Error('Reset must be true or false.');
   const point = layer.keyframes.find((key) => key.frame === command.frame);
@@ -414,7 +430,7 @@ function setLayerKey(layer: ColourOwner, command: LayerKeySet): void {
     : layer.keyframes.filter((key) => key.frame !== command.frame);
 }
 
-/** Adds a default keyframe at `frame`, or removes the one there; a clip grade's has no Opacity. */
+/** Adds a default keyframe at `frame`, or removes the one there; a grade's has no Opacity. */
 function toggleDefaultKey(layer: ColourOwner, point: LayerKeyframe | undefined, frame: number): void {
   if (point && !point.reset)
     throw new Error('A keyframe already exists at this frame. Choose another frame for a default keyframe.');
@@ -424,18 +440,16 @@ function toggleDefaultKey(layer: ColourOwner, point: LayerKeyframe | undefined, 
   }
   if (layer.keyframes.length >= maxKeyframes(layer)) throw keyframeLimit(layer);
   const added = { ...defaultKeyframe(frame) };
-  if (layer.kind === 'clip') {
-    added.values = { ...added.values, opacity: null };
-    added.easing = { ...added.easing, opacity: null };
-  }
+  added.values = { ...added.values, opacity: null };
+  added.easing = { ...added.easing, opacity: null };
   layer.keyframes = upsertKey(layer.keyframes, added);
 }
 
 function moveLayerKey(layer: ColourOwner, point: LayerKeyframe, nextFrame: number): void {
-  frameSchema.parse(nextFrame);
+  requireGradeFrame(nextFrame);
   if (layer.keyframes.some((key) => key !== point && key.frame === nextFrame))
     throw new Error(
-      `A ${layer.kind === 'track' ? 'shared track' : 'clip grade'} keyframe already exists at the destination frame.`,
+      `${layer.kind === 'clip' ? 'A clip grade' : 'An adjustment'} keyframe already exists at the destination frame.`,
     );
   layer.keyframes = upsertKey(
     layer.keyframes.filter((key) => key !== point),
@@ -444,7 +458,7 @@ function moveLayerKey(layer: ColourOwner, point: LayerKeyframe, nextFrame: numbe
 }
 
 function editLayerKey(layer: ColourOwner, command: LayerKeyCommand): void {
-  frameSchema.parse(command.frame);
+  requireGradeFrame(command.frame);
   const point = layer.keyframes.find((key) => key.frame === command.frame);
   if (command.type === 'layer-key-toggle' || command.type === 'layer-key-value') {
     editLayerValue(layer, point, command);
@@ -454,7 +468,7 @@ function editLayerKey(layer: ColourOwner, command: LayerKeyCommand): void {
     toggleDefaultKey(layer, point, command.frame);
     return;
   }
-  if (!point) throw new Error(`${layer.kind === 'track' ? 'Track' : 'Clip grade'} keyframe no longer exists.`);
+  if (!point) throw new Error(`${layer.kind === 'clip' ? 'Clip grade' : 'Adjustment'} keyframe no longer exists.`);
   switch (command.type) {
     case 'layer-key-move':
       moveLayerKey(layer, point, command.nextFrame);
@@ -463,9 +477,9 @@ function editLayerKey(layer: ColourOwner, command: LayerKeyCommand): void {
       layer.keyframes = layer.keyframes.filter((key) => key !== point);
       break;
     case 'layer-key-easing':
-      if (command.setting !== null && !KEYFRAME_SETTINGS.some((setting) => setting.key === command.setting))
+      if (command.setting !== null && !GRADE_SETTINGS.includes(command.setting))
         throw new Error('Unknown keyframe setting.');
-      point.easing = withEasing(point, command.setting, command.interpolation);
+      point.easing = withEasing<KeyframeSetting>(point, command.setting, command.interpolation);
       break;
   }
 }
@@ -708,6 +722,54 @@ function setClipsDetail(next: ProjectDocument, clipIds: readonly string[], value
   next.clips = next.clips.map((clip) => (ids.has(clip.id) ? { ...clip, detail: { ...detail } } : clip));
 }
 
+/** Integer project frames for an adjustment: never before 0, its OUT within the supported range. */
+function adjustmentRange(start: number, duration: number): void {
+  frameSchema.parse(start);
+  if (!Number.isInteger(duration) || duration < 1) throw new Error('An adjustment lasts at least one frame.');
+  if (start + duration > MAX_FRAME) throw new Error('Adjustment OUT exceeds the supported integer project-frame range.');
+}
+
+function overlappingAdjustment(items: readonly Adjustment[], start: number, duration: number, except?: string) {
+  return items.find(
+    (item) => item.id !== except && item.start < start + duration && start < item.start + item.duration,
+  );
+}
+
+function editAdjustment(
+  next: ProjectDocument,
+  command: Extract<EditCommand, { type: 'adjustment-add' | 'adjustment-remove' | 'adjustment-range' }>,
+): void {
+  if (command.type === 'adjustment-remove') {
+    requiredAdjustment(next, command.adjustmentId);
+    next.adjustments = next.adjustments.filter((item) => item.id !== command.adjustmentId);
+    return;
+  }
+  adjustmentRange(command.start, command.duration);
+  const except = command.type === 'adjustment-range' ? command.adjustmentId : undefined;
+  const overlap = overlappingAdjustment(next.adjustments, command.start, command.duration, except);
+  if (overlap)
+    throw new Error(
+      `Adjustments cannot overlap: frames ${overlap.start}–${overlap.start + overlap.duration - 1} already have one.`,
+    );
+  if (command.type === 'adjustment-add') {
+    if (next.adjustments.some((item) => item.id === command.adjustmentId))
+      throw new Error('An adjustment with this ID already exists.');
+    if (next.adjustments.length >= MAX_ADJUSTMENTS)
+      throw new Error(`A project has at most ${MAX_ADJUSTMENTS} adjustments. Remove one first.`);
+    next.adjustments.push(createAdjustment(command.adjustmentId, command.start, command.duration));
+  } else {
+    const item = requiredAdjustment(next, command.adjustmentId);
+    if (command.keyframes !== 'move' && command.keyframes !== 'stay')
+      throw new Error('Keyframes must move with the adjustment or stay at their project frames.');
+    // Staying keyframes keep their project frame: their offset changes by the start's change.
+    const shift = command.keyframes === 'stay' ? item.start - command.start : 0;
+    item.keyframes = item.keyframes.map((key) => ({ ...key, frame: key.frame + shift }));
+    item.start = command.start;
+    item.duration = command.duration;
+  }
+  next.adjustments.sort((left, right) => left.start - right.start);
+}
+
 export function applyCommand(document: ProjectDocument, command: EditCommand): ProjectDocument {
   if (command.type === 'transition' && command.keepCut) return keepCutTransition(document, command.transition);
   const next = projectSchema.parse(document);
@@ -783,9 +845,12 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'music':
       next.music = command.music;
       break;
-    case 'opacity':
-      requiredLayer(next, command.layerId).opacity = layerSchema.shape.opacity.parse(command.opacity);
-      break;
+    case 'adjustment-add':
+    case 'adjustment-remove':
+    case 'adjustment-range':
+      editAdjustment(next, command);
+      // Adjustments never move clips or extend the project.
+      return projectSchema.parse(next);
     case 'layer-key-set': {
       const { owner, save } = colourOwner(next, command);
       setLayerKey(owner, command);

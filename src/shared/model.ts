@@ -1,9 +1,7 @@
 import { z } from 'zod';
-import { colourSchema, createColourSettings } from './colour.js';
 import { createDetailSettings, detailSchema } from './detail.js';
 import { described } from './described.js';
-import { clipGradeSchema, createClipGrade } from './grade.js';
-import { layerKeyframeSchema, orderedKeys } from './keyframes.js';
+import { adjustmentsSchema, clipGradeSchema, createClipGrade } from './grade.js';
 import { createSpatialSettings, spatialSettingsSchema } from './spatial.js';
 import { NORMAL_SPEED, speedSchema } from './speed.js';
 import { calculateLayout } from './timeline.js';
@@ -44,7 +42,7 @@ const clipFields = z
     detail: described(detailSchema, 'Static detail filters; all 0 is neutral.'),
     grade: described(
       clipGradeSchema,
-      "The clip's own Colour, applied before its track's Colour; keyframes at source frames follow the footage.",
+      "The clip's own Colour, applied before any adjustment; keyframes at source frames follow the footage.",
     ),
   })
   .strict();
@@ -91,17 +89,10 @@ export const layerSchema = z
     id: described(idSchema, 'Unique video track ID.'),
     name: described(z.string().trim().min(1).max(100), 'Name shown in the editor.'),
     enabled: described(z.boolean(), 'False hides the track in preview and export; its clips still count for duration.'),
-    // Row-wide source coverage when Opacity has no participating points.
-    opacity: described(z.number().min(0).max(1), 'Opacity of every clip on the track where Opacity has no keyframes.'),
-    colour: described(colourSchema, 'Colour of every clip on the track; keyed settings follow their keyframes.'),
-    keyframes: described(
-      z
-        .array(layerKeyframeSchema)
-        .max(MAX_TRACK_KEYFRAMES)
-        .refine(orderedKeys, { message: 'Track keyframes must have unique ascending project frames.' }),
-      'Colour and Opacity keyframes at unique ascending project frames, at most 256.',
+    transform: described(
+      spatialSettingsSchema,
+      'Crop, scale, position, rotation and Opacity of every clip on the track.',
     ),
-    transform: described(spatialSettingsSchema, 'Crop, scale, position and rotation of every clip on the track.'),
     ripple: described(
       z.boolean(),
       'True packs the clips one after another from the first clip; false keeps their starts.',
@@ -257,7 +248,7 @@ export const selectsSchema = z.record(
 );
 
 /** The only accepted project schema; bump it for every incompatible change. */
-export const PROJECT_SCHEMA_VERSION = 26;
+export const PROJECT_SCHEMA_VERSION = 27;
 
 const baseProjectSchema = z
   .object({
@@ -280,6 +271,7 @@ const baseProjectSchema = z
     colourProfile: z.literal('bt709-sdr'),
     layers: z.array(layerSchema).min(1).max(MAX_VIDEO_LAYERS),
     clips: z.array(clipSchema).max(1_000),
+    adjustments: adjustmentsSchema,
     music: musicTracksSchema,
     bookmarks: bookmarksSchema,
     selects: selectsSchema,
@@ -317,9 +309,6 @@ export function createLayer(id: string, name: string, ripple = true): VideoLayer
     id,
     name,
     enabled: true,
-    opacity: 1,
-    colour: createColourSettings(),
-    keyframes: [],
     transform: createSpatialSettings(),
     ripple,
     transitions: [],
@@ -338,6 +327,7 @@ export function createProject(id: string, title: string): ProjectDocument {
     colourProfile: 'bt709-sdr',
     layers: [createLayer(BASE_LAYER_ID, 'Track 1')],
     clips: [],
+    adjustments: [],
     music: [],
     bookmarks: [],
     selects: {},

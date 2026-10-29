@@ -35,7 +35,7 @@ export interface GpuFrameSource {
   /** Fitted content rectangle, the uploaded texture. */
   width: number;
   height: number;
-  /** The clip's own grade, applied before the track's Colour. */
+  /** The clip's own grade, applied before the adjustment's Colour. */
   grade: ColourSettings;
   colour: ColourSettings;
   spatial: SpatialPose;

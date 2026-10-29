@@ -2,13 +2,13 @@ import { useId } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import {
   continuingSettings,
-  KEYFRAME_SETTINGS,
   keyframeNeighbors,
   keySettings,
-  type KeyframeSetting,
   type LayerKeyframe,
 } from '../shared/keyframes.js';
-import type { ProjectDocument, VideoLayer } from '../shared/model.js';
+import { COLOUR_CONTROLS, type ScalarColourSetting } from '../shared/colour.js';
+import type { ProjectDocument } from '../shared/model.js';
+import type { ColourOwner } from './colour-owner.js';
 import { isClipOwner, ownerNoun, ownerTarget } from './colour-owner.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
@@ -17,11 +17,13 @@ import { livePreview } from './live-preview.js';
 import { RangeSettingControl } from './SettingValueControl.js';
 import { StoredKeyframeList, type StoredKeyframeKind } from './StoredKeyframeList.js';
 
-const SETTING_KEYS = KEYFRAME_SETTINGS.map((setting) => setting.key);
+/** A grade's settings, in control order. */
+const GRADE_KEYFRAME_SETTINGS = COLOUR_CONTROLS;
+const SETTING_KEYS = GRADE_KEYFRAME_SETTINGS.map((setting) => setting.key);
 
 interface Props {
   project: ProjectDocument;
-  layer: VideoLayer;
+  layer: ColourOwner;
   frame: number;
   duration: number;
   disabled: boolean;
@@ -32,8 +34,8 @@ function AnimationHelp({ id, clip }: Readonly<{ id: string; clip: boolean }>) {
   return (
     <HelpPopover label="Animation" className="animation-help" guide="opt-in-to-shared-video-track-animation">
       <p id={id}>
-        Each diamond adds a keyframe for that setting on the whole {clip ? 'clip, on the footage shown' : 'track'}, at
-        the playhead. Settings keyed together share one keyframe; each can have its own easing.
+        Each diamond adds a keyframe for that setting on the whole {clip ? 'clip, on the footage shown' : 'adjustment'},
+        at the playhead. Settings keyed together share one keyframe; each can have its own easing.
       </p>
       <div className="animation-legend">
         <span>
@@ -58,7 +60,7 @@ function AnimationHelp({ id, clip }: Readonly<{ id: string; clip: boolean }>) {
   );
 }
 
-/** Colour's stored keyframes (track or clip grade), through the shared central inspection cursor. */
+/** Colour's stored keyframes (clip grade or adjustment), through the shared central inspection cursor. */
 export function ColourKeyframeList({ project, layer, frame, duration, disabled, onEdit }: Readonly<Props>) {
   const navigation = useKeyframeNavigation();
   const unavailable = disabled || navigation.disabled;
@@ -76,12 +78,12 @@ export function ColourKeyframeList({ project, layer, frame, duration, disabled, 
   const navigationFrame = keyframeNavigationFrame(inspection, layer.id, frame);
   const current = inspection !== null || previewAvailable ? navigationFrame : null;
   const context = `${project.id}:${layer.id}`;
-  const kind: StoredKeyframeKind<KeyframeSetting, LayerKeyframe> = {
+  const kind: StoredKeyframeKind<ScalarColourSetting, LayerKeyframe> = {
     noun: ownerNoun(layer),
-    title: isClipOwner(layer) ? 'Clip keyframes' : 'Track keyframes',
-    frameNoun: isClipOwner(layer) ? 'source' : 'timeline',
-    settings: KEYFRAME_SETTINGS,
-    enabled: keySettings,
+    title: isClipOwner(layer) ? 'Clip keyframes' : 'Adjustment keyframes',
+    frameNoun: isClipOwner(layer) ? 'source' : 'adjustment',
+    settings: GRADE_KEYFRAME_SETTINGS,
+    enabled: (key) => keySettings(key).filter((setting): setting is ScalarColourSetting => setting !== 'opacity'),
     continuing: (key) => continuingSettings(keys, key, SETTING_KEYS),
     neighbours: (key, setting) => {
       const { previous, next } = keyframeNeighbors(
@@ -96,16 +98,16 @@ export function ColourKeyframeList({ project, layer, frame, duration, disabled, 
     },
     validateFrame: (key, value) =>
       keys.some((other) => other.frame !== key.frame && other.frame === value)
-        ? `Frame ${value} already has a shared keyframe. Choose a different frame.`
+        ? `Frame ${value} already has a keyframe. Choose a different frame.`
         : null,
     moveFrame: (key, nextFrame) =>
       onEdit({ type: 'layer-key-move', ...ownerTarget(layer), frame: key.frame, nextFrame }),
     setEasing: (key, setting, interpolation) =>
       onEdit({ type: 'layer-key-easing', ...ownerTarget(layer), frame: key.frame, setting, interpolation }),
     remove: (key) => onEdit({ type: 'layer-key-remove', ...ownerTarget(layer), frame: key.frame }),
-    removeTitle: 'Remove this whole shared keyframe and all its animated settings',
+    removeTitle: 'Remove this whole keyframe and all its animated settings',
     renderValues: (key, row) =>
-      KEYFRAME_SETTINGS.map((setting) => {
+      GRADE_KEYFRAME_SETTINGS.map((setting) => {
         const value = key.values[setting.key];
         if (value === null) return null;
         const command = (nextValue: number): EditCommand => ({
@@ -120,7 +122,7 @@ export function ColourKeyframeList({ project, layer, frame, duration, disabled, 
             applyCommand(project, command(nextValue));
             return null;
           } catch (cause) {
-            return cause instanceof Error ? cause.message : 'This value conflicts with the track timing.';
+            return cause instanceof Error ? cause.message : 'This value is not valid here.';
           }
         };
         return (
@@ -131,7 +133,7 @@ export function ColourKeyframeList({ project, layer, frame, duration, disabled, 
               label={`${setting.label} keyframe value ${key.frame}`}
               value={value}
               disabled={unavailable}
-              hint={`${setting.label} at stored ${isClipOwner(layer) ? 'source' : 'timeline'} frame ${key.frame} on ${layer.name}. Edits change only this setting's keyframe value, not the playhead, Easing or unanimated settings.`}
+              hint={`${setting.label} at stored ${isClipOwner(layer) ? 'source frame' : 'frame in adjustment'} ${key.frame} on ${layer.name}. Edits change only this setting's keyframe value, not the playhead, Easing or unanimated settings.`}
               exact={{ resetKey: `${context}:${row}:${setting.key}`, validate }}
               onCommit={(nextValue) => {
                 if (!unavailable) onEdit(command(nextValue));

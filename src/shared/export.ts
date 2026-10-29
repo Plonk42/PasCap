@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { isNeutralAdvancedColour, isNeutralLocalTone } from './colour.js';
 import { isNeutralDetail } from './detail.js';
 import { isStaticClipGrade } from './grade.js';
 import {
@@ -92,21 +91,14 @@ export const LAYERED_EXPORT_RESOURCES = Object.freeze({
   intermediateBitsPerChannel: 16,
 });
 
-/** Static chunks support only neutral HSL/curves on an opaque, unanimated, zero-origin contiguous track
- * covering the entire project, including every music instance's OUT. */
+/** Static chunks support only unkeyed scalar clip grades without adjustments, on one opaque, untransformed,
+ * zero-origin contiguous track covering the entire project, including every music instance's OUT. */
 export function needsLayeredExport(document: ProjectDocument): boolean {
   if (
     document.layers.length !== 1 ||
+    document.adjustments.length > 0 ||
     document.clips.some((clip) => !isNeutralDetail(clip.detail) || !isStaticClipGrade(clip.grade)) ||
-    document.layers.some(
-      (layer) =>
-        !layer.enabled ||
-        layer.opacity !== 1 ||
-        layer.keyframes.length > 0 ||
-        hasSpatialEdits(layer.transform) ||
-        !isNeutralLocalTone(layer.colour) ||
-        !isNeutralAdvancedColour(layer.colour),
-    )
+    document.layers.some((layer) => !layer.enabled || hasSpatialEdits(layer.transform))
   )
     return true;
   const { clips, duration } = calculateLayout(document);

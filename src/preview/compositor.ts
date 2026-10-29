@@ -97,7 +97,7 @@ const STAGE_UNIFORMS = gradeUniforms('first_');
 
 export interface CompositeClip {
   slot: number;
-  /** The clip's own grade, applied before `settings`, the track's Colour; absent is neutral. */
+  /** The clip's own grade, applied before `settings`, the adjustment's Colour; absent is neutral. */
   grade?: ColourSettings;
   settings: ColourSettings;
   aspect: number;

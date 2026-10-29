@@ -6,41 +6,35 @@ import {
   type ScalarColourSetting,
 } from '../shared/colour.js';
 import type { EditCommand } from '../shared/commands.js';
-import { hasLayerKeys, isKeyframeFrame, type KeyframeSetting } from '../shared/keyframes.js';
-import type { VideoLayer } from '../shared/model.js';
-import { colourTarget, ownerTarget } from './colour-owner.js';
+import { hasLayerKeys, isKeyframeFrame } from '../shared/keyframes.js';
+import { colourTarget, ownerTarget, type ColourOwner } from './colour-owner.js';
 
 /** Visible grouping of the Colour section; storage and keyframe channel order stay unchanged. */
-export const COLOUR_GROUPS: readonly { name: string; settings: readonly KeyframeSetting[] }[] = [
-  { name: 'Opacity', settings: ['opacity'] },
+export const COLOUR_GROUPS: readonly { name: string; settings: readonly ScalarColourSetting[] }[] = [
   { name: 'Colour', settings: ['temperature', 'tint', 'hue', 'saturation', 'vibrance'] },
   { name: 'Light', settings: ['exposure', 'brightness', 'contrast', 'highlights', 'shadows', 'whites', 'blacks'] },
   { name: 'Effects', settings: ['hdr', 'localContrast'] },
 ];
 
-const neutralValue = (setting: KeyframeSetting): number => (setting === 'opacity' ? 1 : NEUTRAL_COLOUR[setting]);
-
 /**
  * Reset each editable setting of a group, as its own Reset icon would, in one transaction: an unkeyed
- * setting's track value, or a keyed setting's keyframe at the playhead. Locked settings stay unchanged.
+ * setting's base value, or a keyed setting's keyframe at the playhead. Locked settings stay unchanged.
  */
 export function colourGroupResetCommands(
-  layer: VideoLayer,
+  layer: ColourOwner,
   frame: number,
-  settings: readonly KeyframeSetting[],
+  settings: readonly ScalarColourSetting[],
 ): EditCommand[] {
   if (!isKeyframeFrame(frame)) return [];
   const point = layer.keyframes.find((key) => key.frame === frame);
   const commands: EditCommand[] = [];
   const colour: Partial<Record<ScalarColourSetting, number>> = {};
   for (const setting of settings) {
-    const neutral = neutralValue(setting);
+    const neutral = NEUTRAL_COLOUR[setting];
     if (hasLayerKeys(layer, setting)) {
       const value = point?.values[setting];
       if (value !== undefined && value !== null && value !== neutral)
         commands.push({ type: 'layer-key-value', ...ownerTarget(layer), frame, setting, value: neutral });
-    } else if (setting === 'opacity') {
-      if (layer.opacity !== neutral) commands.push({ type: 'opacity', layerId: layer.id, opacity: neutral });
     } else if (layer.colour[setting] !== neutral) colour[setting] = neutral;
   }
   if (Object.keys(colour).length > 0)
@@ -48,36 +42,27 @@ export function colourGroupResetCommands(
   return commands;
 }
 
-function resetPointCommands(layer: VideoLayer, frame: number): EditCommand[] {
+function resetPointCommands(layer: ColourOwner, frame: number): EditCommand[] {
   const point = layer.keyframes.find((key) => key.frame === frame);
   if (!point) return [];
-  const values = { ...point.values };
-  if (values.opacity !== null) values.opacity = 1;
+  const values: Partial<Record<ScalarColourSetting, number>> = {};
   for (const control of COLOUR_CONTROLS)
-    if (values[control.key] !== null) values[control.key] = NEUTRAL_COLOUR[control.key];
-  if (
-    values.opacity === point.values.opacity &&
-    COLOUR_CONTROLS.every((control) => values[control.key] === point.values[control.key])
-  )
-    return [];
+    if (point.values[control.key] !== null) values[control.key] = NEUTRAL_COLOUR[control.key];
+  if (COLOUR_CONTROLS.every((control) => (values[control.key] ?? null) === point.values[control.key])) return [];
   return [
     {
       type: 'layer-key-set',
       ...ownerTarget(layer),
       frame: point.frame,
-      values: Object.fromEntries(Object.entries(values).filter(([, value]) => value !== null)),
+      values,
     },
   ];
 }
 
 /** Apply the complete reset as one editor transaction; never join an absent channel. */
-export function colourResetCommands(layer: VideoLayer, frame: number): EditCommand[] {
-  const animated =
-    hasLayerKeys(layer, 'opacity') || COLOUR_CONTROLS.some((control) => hasLayerKeys(layer, control.key));
-  if (animated) return resetPointCommands(layer, frame);
-  const commands: EditCommand[] = [];
-  if (!isNeutralColour(layer.colour))
-    commands.push({ type: 'colour', ...colourTarget(layer), colour: createColourSettings() });
-  if (layer.opacity !== 1) commands.push({ type: 'opacity', layerId: layer.id, opacity: 1 });
-  return commands;
+export function colourResetCommands(layer: ColourOwner, frame: number): EditCommand[] {
+  if (COLOUR_CONTROLS.some((control) => hasLayerKeys(layer, control.key))) return resetPointCommands(layer, frame);
+  return isNeutralColour(layer.colour)
+    ? []
+    : [{ type: 'colour', ...colourTarget(layer), colour: createColourSettings() }];
 }

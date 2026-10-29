@@ -36,6 +36,10 @@ export const spatialPoseSchema = z
       z.number().min(-180).max(180),
       'Clockwise rotation in degrees around the picture centre, neutral 0.',
     ),
+    opacity: described(
+      z.number().min(0).max(1),
+      'Opacity of every clip on the track, 0–1, neutral 1: coverage over the tracks below, not part of the grade.',
+    ),
   })
   .strict();
 
@@ -58,6 +62,7 @@ export const spatialKeyValuesSchema = z
     translateX: poseShape.translateX.nullable(),
     translateY: poseShape.translateY.nullable(),
     rotation: poseShape.rotation.nullable(),
+    opacity: poseShape.opacity.nullable(),
   })
   .strict()
   .refine((values) => Object.values(values).some((value) => value !== null), {
@@ -112,6 +117,7 @@ export const NEUTRAL_SPATIAL_POSE: Readonly<SpatialPose> = Object.freeze({
   translateX: 0,
   translateY: 0,
   rotation: 0,
+  opacity: 1,
 });
 
 /** Creation values only: persisted settings must supply every required field. */
@@ -171,7 +177,10 @@ export function spatialKeyChannels(key: SpatialKeyframe): SpatialChannel[] {
   return SPATIAL_CHANNELS.filter((channel) => key.values[channel] !== null);
 }
 
-/** Exact identity only; tiny edits must not enter the legacy opaque-letterbox path. */
+/**
+ * Exact identity geometry only; tiny edits must not enter the legacy opaque-letterbox path.
+ * Opacity is coverage, not geometry, so it never leaves that path.
+ */
 export function isNeutralSpatial(pose: Readonly<SpatialPose>): boolean {
   return (
     pose.cropLeft === 0 &&
@@ -185,9 +194,17 @@ export function isNeutralSpatial(pose: Readonly<SpatialPose>): boolean {
   );
 }
 
-/** Even all-neutral keys exclude the static fast path; evaluation can still be identity. */
+/** Even all-neutral keys exclude the static fast path; evaluation can still be identity. Opacity counts. */
 export function hasSpatialEdits(settings: SpatialSettings): boolean {
-  return !isNeutralSpatial(settings.base) || settings.keyframes.length > 0;
+  return !isNeutralSpatial(settings.base) || settings.base.opacity !== 1 || settings.keyframes.length > 0;
+}
+
+/** Whether any frame can evaluate a pose that is not neutral geometry; Opacity alone does not count. */
+export function hasGeometryEdits(settings: SpatialSettings): boolean {
+  return (
+    !isNeutralSpatial(settings.base) ||
+    settings.keyframes.some((key) => SPATIAL_CHANNELS.some((channel) => channel !== 'opacity' && key.values[channel] !== null))
+  );
 }
 
 export type SpatialAffine = readonly [number, number, number, number, number, number];

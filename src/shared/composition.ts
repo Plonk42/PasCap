@@ -1,22 +1,21 @@
-import type { ColourSettings, RGB } from './colour.js';
-import { COLOUR_CONTROLS } from './colour.js';
-import { gradeChainPixel, sourceGrades } from './grade.js';
-import { evaluateLayerSetting } from './keyframes.js';
-import type { VideoLayer } from './model.js';
+import { createColourSettings, type ColourSettings, type RGB } from './colour.js';
+import { adjustmentAt, adjustmentColourAt, gradeChainPixel, sourceGrades } from './grade.js';
+import type { ProjectDocument, VideoLayer } from './model.js';
+import { evaluateSpatial } from './spatial.js';
 import type { PreviewLayer } from './timeline.js';
 
-export function colourAt(layer: VideoLayer, projectFrame: number): ColourSettings {
-  const colour = { ...layer.colour };
-  for (const { key: setting } of COLOUR_CONTROLS)
-    colour[setting] = evaluateLayerSetting(layer, setting, projectFrame, layer.colour[setting]);
-  return colour;
-}
-/** One evaluated source coverage for every clip in the row; visibility is separate. */
-export function opacityAt(layer: VideoLayer, projectFrame: number): number {
-  return evaluateLayerSetting(layer, 'opacity', projectFrame, layer.opacity);
+/** The Colour every video track gets at a project frame: its adjustment's, or neutral without one. */
+export function adjustmentColour(project: Pick<ProjectDocument, 'adjustments'>, projectFrame: number): ColourSettings {
+  const item = adjustmentAt(project.adjustments, projectFrame);
+  return item ? adjustmentColourAt(item, projectFrame) : createColourSettings();
 }
 
-/** Encoded BT.709, each source graded by its clip then its track, premultiplied within a dissolve, source-over across layers. */
+/** The track's Opacity at a project frame, from its Transform. */
+export function opacityAt(layer: VideoLayer, projectFrame: number): number {
+  return evaluateSpatial(layer.transform, projectFrame).opacity;
+}
+
+/** Encoded BT.709, each source graded by its clip then the adjustment, premultiplied within a dissolve, source-over across layers. */
 export function compositePixel(layers: readonly PreviewLayer[], sampleSource: (layer: PreviewLayer) => RGB): RGB {
   const result: [number, number, number] = [0, 0, 0];
   const ids = [...new Set(layers.map((layer) => layer.layerId))];

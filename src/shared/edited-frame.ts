@@ -50,6 +50,26 @@ function changedClips(before: ProjectDocument, after: ProjectDocument): number[]
   return frames;
 }
 
+/** An added, removed, moved or resized adjustment from its start; a changed keyframe at its project frame. */
+function changedAdjustments(before: ProjectDocument, after: ProjectDocument): number[] {
+  const previous = new Map(before.adjustments.map((item) => [item.id, item]));
+  const kept = new Set(after.adjustments.map((item) => item.id));
+  const frames: number[] = [];
+  for (const item of after.adjustments) {
+    const earlier = previous.get(item.id);
+    if (!earlier || earlier.start !== item.start || earlier.duration !== item.duration) frames.push(item.start);
+    else
+      frames.push(
+        ...changedKeyframes(
+          earlier.keyframes.map((key) => ({ ...key, frame: earlier.start + key.frame })),
+          item.keyframes.map((key) => ({ ...key, frame: item.start + key.frame })),
+        ),
+      );
+  }
+  frames.push(...before.adjustments.filter((item) => !kept.has(item.id)).map((item) => item.start));
+  return frames;
+}
+
 function changedMusic(before: ProjectDocument, after: ProjectDocument): number[] {
   const previous = new Map(musicTracks(before.music).map((source) => [source.id, source]));
   const next = musicTracks(after.music);
@@ -62,18 +82,16 @@ function changedMusic(before: ProjectDocument, after: ProjectDocument): number[]
 
 /**
  * The earliest project frame where an edit changed what the timeline shows: clips and their placement,
- * transitions, fades, keyframes, bookmarks or music. Null when it changed nothing at a particular frame,
- * such as a whole track's Colour, Opacity or Transform, kept ranges or the title.
+ * transitions, fades, keyframes, adjustments, bookmarks or music. Null when it changed nothing at a particular frame,
+ * such as a whole track's Transform, an adjustment's or a clip's whole Colour, kept ranges or the title.
  */
 export function editedFrame(before: ProjectDocument, after: ProjectDocument): number | null {
   const frames = [...changedClips(before, after), ...changedMusic(before, after)];
   frames.push(...changedBookmarks(before.bookmarks, after.bookmarks));
   for (const layer of after.layers) {
     const earlier = before.layers.find((item) => item.id === layer.id);
-    frames.push(
-      ...changedKeyframes(earlier?.keyframes ?? [], layer.keyframes),
-      ...changedKeyframes(earlier?.transform.keyframes ?? [], layer.transform.keyframes),
-    );
+    frames.push(...changedKeyframes(earlier?.transform.keyframes ?? [], layer.transform.keyframes));
   }
+  frames.push(...changedAdjustments(before, after));
   return frames.length ? Math.max(0, Math.min(...frames)) : null;
 }

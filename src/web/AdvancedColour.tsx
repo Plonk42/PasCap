@@ -16,9 +16,9 @@ import {
 } from '../shared/advanced-colour.js';
 import { colourSchema, type ColourSettings } from '../shared/colour.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
-import type { ProjectDocument, VideoLayer } from '../shared/model.js';
+import type { ProjectDocument } from '../shared/model.js';
 import './advanced-colour.css';
-import { colourTarget } from './colour-owner.js';
+import { colourTarget, ownerNoun, type ColourOwner } from './colour-owner.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { InspectorSection } from './InspectorSection.js';
@@ -30,7 +30,7 @@ import { ValueControl } from './ValueControl.js';
 
 interface Props {
   project: ProjectDocument;
-  layer: VideoLayer;
+  layer: ColourOwner;
   frame: number;
   disabled: boolean;
   onEdit: (command: EditCommand) => void;
@@ -511,7 +511,7 @@ export function HslRangesSection(props: Readonly<Props>) {
       help={
         <HelpPopover label="HSL ranges" guide="colour-speed-and-shared-video-track-keyframes">
           <p>
-            Shift the hue, saturation or lightness of one colour range, such as the blues, on every clip on this track.
+            Shift the hue, saturation or lightness of one colour range, such as the blues, on this {ownerNoun(layer)}.
             Neighbouring ranges blend smoothly and greys stay untouched.
           </p>
           <p className="editor-help-tip">Tip: Reset all returns every range to neutral.</p>

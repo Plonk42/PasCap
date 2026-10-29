@@ -121,7 +121,7 @@ const NEUTRAL_TONE: Readonly<Tone> = Object.freeze({
   shadows: 0,
 });
 
-/** The eleven track Colour settings Auto adjust sets, in Track → Colour order. */
+/** The eleven Colour settings Auto adjust sets, in Colour section order. */
 export const AUTO_ADJUST_SETTINGS = [
   'temperature',
   'tint',

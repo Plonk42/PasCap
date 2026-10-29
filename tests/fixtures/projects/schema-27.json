@@ -1,0 +1,890 @@
+{
+  "schemaVersion": 27,
+  "id": "compatibility-fixture",
+  "title": "Synthetic compatibility fixture",
+  "media": {
+    "videoIds": [
+      "media-15c65bd770c8e918e18a97c649461898",
+      "media-7f88dc71115dfd5dc8ac0717acba35e7"
+    ],
+    "audioIds": [
+      "audio-653e5df4-e851-40bf-b96e-3c75247ef370"
+    ]
+  },
+  "frameRate": {
+    "numerator": 30000,
+    "denominator": 1001
+  },
+  "colourProfile": "bt709-sdr",
+  "layers": [
+    {
+      "id": "video-1",
+      "name": "Track 1",
+      "enabled": true,
+      "transform": {
+        "base": {
+          "cropLeft": 0.05,
+          "cropRight": 0,
+          "cropTop": 0,
+          "cropBottom": 0,
+          "scale": 1,
+          "translateX": 0,
+          "translateY": 0,
+          "rotation": 0,
+          "opacity": 0.9
+        },
+        "keyframes": [
+          {
+            "frame": 20,
+            "values": {
+              "cropLeft": null,
+              "cropRight": null,
+              "cropTop": null,
+              "cropBottom": null,
+              "scale": 1.2,
+              "translateX": null,
+              "translateY": null,
+              "rotation": null,
+              "opacity": 0.75
+            },
+            "easing": {
+              "cropLeft": null,
+              "cropRight": null,
+              "cropTop": null,
+              "cropBottom": null,
+              "scale": "linear",
+              "translateX": null,
+              "translateY": null,
+              "rotation": null,
+              "opacity": "smooth"
+            },
+            "reset": false
+          }
+        ]
+      },
+      "ripple": true,
+      "transitions": [
+        {
+          "leftId": "clip-a",
+          "rightId": "clip-b",
+          "type": "cut",
+          "duration": 0
+        }
+      ],
+      "openingFade": 0,
+      "closingFade": 6
+    },
+    {
+      "id": "video-2",
+      "name": "Overlay",
+      "enabled": false,
+      "transform": {
+        "base": {
+          "cropLeft": 0,
+          "cropRight": 0,
+          "cropTop": 0,
+          "cropBottom": 0,
+          "scale": 1,
+          "translateX": 0,
+          "translateY": 0,
+          "rotation": 0,
+          "opacity": 1
+        },
+        "keyframes": []
+      },
+      "ripple": false,
+      "transitions": [],
+      "openingFade": 0,
+      "closingFade": 0
+    }
+  ],
+  "clips": [
+    {
+      "id": "clip-a",
+      "mediaId": "media-15c65bd770c8e918e18a97c649461898",
+      "layerId": "video-1",
+      "start": 0,
+      "sourceIn": 15,
+      "sourceOut": 75,
+      "speed": {
+        "mode": "constant",
+        "rate": 1
+      },
+      "reverse": false,
+      "detail": {
+        "sharpen": 0.3,
+        "clarity": 0.2,
+        "denoise": 0.1
+      },
+      "grade": {
+        "colour": {
+          "temperature": -0.2,
+          "tint": 0,
+          "exposure": 0.3,
+          "brightness": 0,
+          "contrast": 1,
+          "hue": 0,
+          "saturation": 1.1,
+          "vibrance": 0,
+          "highlights": 0,
+          "shadows": 0.2,
+          "whites": 0,
+          "blacks": 0,
+          "hdr": 0,
+          "localContrast": 0,
+          "hsl": {
+            "red": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            },
+            "orange": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            },
+            "yellow": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            },
+            "green": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            },
+            "cyan": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            },
+            "blue": {
+              "hue": -4,
+              "saturation": 0.1,
+              "lightness": 0
+            },
+            "purple": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            },
+            "magenta": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            }
+          },
+          "curves": {
+            "master": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 0.5,
+                "y": 0.5
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ],
+            "red": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 0.5,
+                "y": 0.5
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ],
+            "green": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 0.5,
+                "y": 0.5
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ],
+            "blue": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 0.5,
+                "y": 0.5
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          }
+        },
+        "keyframes": [
+          {
+            "frame": 15,
+            "values": {
+              "temperature": null,
+              "tint": null,
+              "exposure": 0.1,
+              "brightness": null,
+              "contrast": 1.2,
+              "hue": null,
+              "saturation": null,
+              "vibrance": null,
+              "highlights": null,
+              "shadows": null,
+              "whites": null,
+              "blacks": null,
+              "hdr": null,
+              "localContrast": null
+            },
+            "easing": {
+              "temperature": null,
+              "tint": null,
+              "exposure": "smooth",
+              "brightness": null,
+              "contrast": "smooth",
+              "hue": null,
+              "saturation": null,
+              "vibrance": null,
+              "highlights": null,
+              "shadows": null,
+              "whites": null,
+              "blacks": null,
+              "hdr": null,
+              "localContrast": null
+            },
+            "reset": false
+          },
+          {
+            "frame": 35,
+            "values": {
+              "temperature": null,
+              "tint": null,
+              "exposure": 0.5,
+              "brightness": null,
+              "contrast": null,
+              "hue": null,
+              "saturation": null,
+              "vibrance": null,
+              "highlights": null,
+              "shadows": null,
+              "whites": null,
+              "blacks": null,
+              "hdr": null,
+              "localContrast": null
+            },
+            "easing": {
+              "temperature": null,
+              "tint": null,
+              "exposure": "linear",
+              "brightness": null,
+              "contrast": null,
+              "hue": null,
+              "saturation": null,
+              "vibrance": null,
+              "highlights": null,
+              "shadows": null,
+              "whites": null,
+              "blacks": null,
+              "hdr": null,
+              "localContrast": null
+            },
+            "reset": false
+          }
+        ]
+      }
+    },
+    {
+      "id": "clip-b",
+      "mediaId": "media-7f88dc71115dfd5dc8ac0717acba35e7",
+      "layerId": "video-1",
+      "start": 60,
+      "sourceIn": 0,
+      "sourceOut": 60,
+      "speed": {
+        "mode": "curve",
+        "keyframes": [
+          {
+            "frame": 0,
+            "rate": 0.5,
+            "interpolation": "smooth"
+          },
+          {
+            "frame": 60,
+            "rate": 2,
+            "interpolation": "linear"
+          }
+        ]
+      },
+      "reverse": true,
+      "detail": {
+        "sharpen": 0,
+        "clarity": 0,
+        "denoise": 0
+      },
+      "grade": {
+        "colour": {
+          "temperature": 0,
+          "tint": 0.1,
+          "exposure": 0,
+          "brightness": 0,
+          "contrast": 1,
+          "hue": 0,
+          "saturation": 1,
+          "vibrance": 0,
+          "highlights": 0,
+          "shadows": 0,
+          "whites": 0,
+          "blacks": 0,
+          "hdr": 0.1,
+          "localContrast": 0,
+          "hsl": {
+            "red": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            },
+            "orange": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            },
+            "yellow": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            },
+            "green": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            },
+            "cyan": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            },
+            "blue": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            },
+            "purple": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            },
+            "magenta": {
+              "hue": 0,
+              "saturation": 0,
+              "lightness": 0
+            }
+          },
+          "curves": {
+            "master": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 0.5,
+                "y": 0.5
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ],
+            "red": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 0.5,
+                "y": 0.5
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ],
+            "green": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 0.5,
+                "y": 0.5
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ],
+            "blue": [
+              {
+                "x": 0,
+                "y": 0
+              },
+              {
+                "x": 0.5,
+                "y": 0.5
+              },
+              {
+                "x": 1,
+                "y": 1
+              }
+            ]
+          }
+        },
+        "keyframes": []
+      }
+    }
+  ],
+  "adjustments": [
+    {
+      "id": "look-1",
+      "start": 12,
+      "duration": 90,
+      "colour": {
+        "temperature": 0.3,
+        "tint": -0.1,
+        "exposure": 0.2,
+        "brightness": 0,
+        "contrast": 1.1,
+        "hue": 0,
+        "saturation": 1.2,
+        "vibrance": 0.4,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0.1,
+        "blacks": -0.1,
+        "hdr": 0.2,
+        "localContrast": 0.3,
+        "hsl": {
+          "red": {
+            "hue": 5,
+            "saturation": 0.2,
+            "lightness": -0.1
+          },
+          "orange": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          },
+          "yellow": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          },
+          "green": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          },
+          "cyan": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          },
+          "blue": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          },
+          "purple": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          },
+          "magenta": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          }
+        },
+        "curves": {
+          "master": [
+            {
+              "x": 0,
+              "y": 0.02
+            },
+            {
+              "x": 0.5,
+              "y": 0.55
+            },
+            {
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "red": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.5,
+              "y": 0.5
+            },
+            {
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "green": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.5,
+              "y": 0.5
+            },
+            {
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "blue": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.5,
+              "y": 0.5
+            },
+            {
+              "x": 1,
+              "y": 1
+            }
+          ]
+        }
+      },
+      "keyframes": [
+        {
+          "frame": -2,
+          "values": {
+            "temperature": null,
+            "tint": null,
+            "exposure": 0.5,
+            "brightness": null,
+            "contrast": null,
+            "hue": null,
+            "saturation": null,
+            "vibrance": null,
+            "highlights": null,
+            "shadows": null,
+            "whites": null,
+            "blacks": null,
+            "hdr": null,
+            "localContrast": null
+          },
+          "easing": {
+            "temperature": null,
+            "tint": null,
+            "exposure": "smooth",
+            "brightness": null,
+            "contrast": null,
+            "hue": null,
+            "saturation": null,
+            "vibrance": null,
+            "highlights": null,
+            "shadows": null,
+            "whites": null,
+            "blacks": null,
+            "hdr": null,
+            "localContrast": null
+          },
+          "reset": false
+        },
+        {
+          "frame": 48,
+          "values": {
+            "temperature": 0,
+            "tint": 0,
+            "exposure": 0,
+            "brightness": 0,
+            "contrast": 1,
+            "hue": 0,
+            "saturation": 1,
+            "vibrance": 0,
+            "highlights": 0,
+            "shadows": 0,
+            "whites": 0,
+            "blacks": 0,
+            "hdr": 0,
+            "localContrast": 0
+          },
+          "easing": {
+            "temperature": "hold",
+            "tint": "hold",
+            "exposure": "hold",
+            "brightness": "hold",
+            "contrast": "hold",
+            "hue": "hold",
+            "saturation": "hold",
+            "vibrance": "hold",
+            "highlights": "hold",
+            "shadows": "hold",
+            "whites": "hold",
+            "blacks": "hold",
+            "hdr": "hold",
+            "localContrast": "hold"
+          },
+          "reset": true
+        }
+      ]
+    },
+    {
+      "id": "look-2",
+      "start": 140,
+      "duration": 30,
+      "colour": {
+        "temperature": 0.3,
+        "tint": -0.1,
+        "exposure": -0.2,
+        "brightness": 0,
+        "contrast": 1.1,
+        "hue": 0,
+        "saturation": 1.2,
+        "vibrance": 0.4,
+        "highlights": 0,
+        "shadows": 0,
+        "whites": 0.1,
+        "blacks": -0.1,
+        "hdr": 0,
+        "localContrast": 0,
+        "hsl": {
+          "red": {
+            "hue": 5,
+            "saturation": 0.2,
+            "lightness": -0.1
+          },
+          "orange": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          },
+          "yellow": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          },
+          "green": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          },
+          "cyan": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          },
+          "blue": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          },
+          "purple": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          },
+          "magenta": {
+            "hue": 0,
+            "saturation": 0,
+            "lightness": 0
+          }
+        },
+        "curves": {
+          "master": [
+            {
+              "x": 0,
+              "y": 0.02
+            },
+            {
+              "x": 0.5,
+              "y": 0.55
+            },
+            {
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "red": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.5,
+              "y": 0.5
+            },
+            {
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "green": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.5,
+              "y": 0.5
+            },
+            {
+              "x": 1,
+              "y": 1
+            }
+          ],
+          "blue": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 0.5,
+              "y": 0.5
+            },
+            {
+              "x": 1,
+              "y": 1
+            }
+          ]
+        }
+      },
+      "keyframes": []
+    }
+  ],
+  "music": [
+    {
+      "id": "music-track-1",
+      "gainDb": -3,
+      "ripple": true,
+      "openingFade": 10,
+      "closingFade": 12,
+      "clips": [
+        {
+          "id": "music-clip-1",
+          "mediaId": "audio-653e5df4-e851-40bf-b96e-3c75247ef370",
+          "sourceIn": 0,
+          "sourceOut": 90,
+          "start": 0,
+          "duration": 90,
+          "loop": false
+        },
+        {
+          "id": "music-clip-2",
+          "mediaId": "audio-653e5df4-e851-40bf-b96e-3c75247ef370",
+          "sourceIn": 30,
+          "sourceOut": 120,
+          "start": 70,
+          "duration": 90,
+          "loop": false
+        },
+        {
+          "id": "music-clip-3",
+          "mediaId": "audio-653e5df4-e851-40bf-b96e-3c75247ef370",
+          "sourceIn": 0,
+          "sourceOut": 60,
+          "start": 160,
+          "duration": 120,
+          "loop": true
+        }
+      ],
+      "transitions": [
+        {
+          "leftId": "music-clip-1",
+          "rightId": "music-clip-2",
+          "type": "crossfade",
+          "duration": 20
+        },
+        {
+          "leftId": "music-clip-2",
+          "rightId": "music-clip-3",
+          "type": "fade-through-silence",
+          "duration": 16
+        }
+      ]
+    },
+    {
+      "id": "music-track-2",
+      "gainDb": 0,
+      "ripple": false,
+      "openingFade": 0,
+      "closingFade": 0,
+      "clips": [
+        {
+          "id": "music-clip-4",
+          "mediaId": "audio-653e5df4-e851-40bf-b96e-3c75247ef370",
+          "sourceIn": 100,
+          "sourceOut": 179,
+          "start": 30,
+          "duration": 79,
+          "loop": false
+        },
+        {
+          "id": "music-clip-5",
+          "mediaId": "audio-653e5df4-e851-40bf-b96e-3c75247ef370",
+          "sourceIn": 0,
+          "sourceOut": 40,
+          "start": 150,
+          "duration": 40,
+          "loop": false
+        }
+      ],
+      "transitions": [
+        {
+          "leftId": "music-clip-4",
+          "rightId": "music-clip-5",
+          "type": "cut",
+          "duration": 0
+        }
+      ]
+    }
+  ],
+  "bookmarks": [
+    12,
+    48
+  ],
+  "selects": {
+    "media-15c65bd770c8e918e18a97c649461898": [
+      {
+        "sourceIn": 0,
+        "sourceOut": 30
+      },
+      {
+        "sourceIn": 45,
+        "sourceOut": 90
+      }
+    ],
+    "media-7f88dc71115dfd5dc8ac0717acba35e7": [
+      {
+        "sourceIn": 10,
+        "sourceOut": 60
+      }
+    ]
+  },
+  "revision": 7
+}

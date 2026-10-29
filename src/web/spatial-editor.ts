@@ -18,6 +18,8 @@ export const SPATIAL_CONTROLS: readonly {
   min: number;
   max: number;
   step: number;
+  /** Shown multiplied by this, in `unit`: Opacity reads 0–100%, stored 0–1. */
+  display?: { scale: number; unit: string };
 }[] = [
   { key: 'cropLeft', label: 'Crop left', min: 0, max: 1, step: 0.001 },
   { key: 'cropRight', label: 'Crop right', min: 0, max: 1, step: 0.001 },
@@ -27,6 +29,7 @@ export const SPATIAL_CONTROLS: readonly {
   { key: 'translateX', label: 'Translate X', min: -2, max: 2, step: 0.001 },
   { key: 'translateY', label: 'Translate Y', min: -2, max: 2, step: 0.001 },
   { key: 'rotation', label: 'Rotation', min: -180, max: 180, step: 0.1 },
+  { key: 'opacity', label: 'Opacity', min: 0, max: 1, step: 0.01, display: { scale: 100, unit: '%' } },
 ];
 
 /** Keep inline errors readable without losing strict validation. */
@@ -45,6 +48,7 @@ const NO_VALUES: Readonly<SpatialKeyValues> = Object.freeze({
   translateX: null,
   translateY: null,
   rotation: null,
+  opacity: null,
 });
 
 /**
