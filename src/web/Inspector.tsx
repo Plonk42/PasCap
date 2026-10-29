@@ -892,7 +892,7 @@ function NewAdjustment({
   ];
   return (
     <div className="adjustment-create" role="group" aria-label="New adjustment">
-      <span>New adjustment</span>
+      <span>New adjustment: one grade for every track over a stretch of the film</span>
       {choices.map(({ label, range, missing }) => {
         const reason = range ? rangeReason(project, range.start, range.end) : missing;
         return (
@@ -1006,7 +1006,7 @@ function ColourTab(props: Readonly<ColourTabProps>) {
   if (target === 'adjustment' && !item)
     return (
       <>
-        {header('colour', 'No adjustment at the playhead', 'Adjustments grade every track over a stretch of the film')}
+        {header('colour', 'No adjustment', 'At the playhead')}
         <NewAdjustment
           project={project}
           timeRange={props.timeRange}
