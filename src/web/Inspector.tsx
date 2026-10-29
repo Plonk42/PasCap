@@ -16,6 +16,7 @@ import { ClipSourceRange } from './ClipSourceRange.js';
 import { COLOUR_GROUPS, colourGroupResetCommands, colourResetCommands } from './colour-reset.js';
 import { DetailSection } from './DetailControls.js';
 import { shortName, sourceSeconds } from './display.js';
+import { countOf } from './grade-clipboard.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import {
@@ -65,8 +66,8 @@ interface Props {
   selectedClipCount?: number;
   /** The ruler range, from which an adjustment can be created. */
   timeRange?: TimelineRange | null;
-  /** The adjustment selected on the timeline, which the Colour tab edits instead of the one at the playhead. */
-  selectedAdjustmentId?: string | null;
+  /** The adjustments selected on the timeline; one is edited instead of the one at the playhead. */
+  selectedAdjustmentIds?: readonly string[];
   selectedLayerId: string;
   boundaryId: string | null;
   frame: number;
@@ -83,6 +84,8 @@ interface Props {
   onCollapse: (panel: SidePanel) => void;
   collapseDisabled: boolean;
 }
+
+const NO_ADJUSTMENTS: readonly string[] = [];
 
 const INSPECTOR_MODES: readonly { id: InspectorMode; label: string }[] = [
   { id: 'clip', label: 'Clip' },
@@ -930,7 +933,7 @@ interface ColourTabProps {
   /** The source frame the selected clip shows at the playhead, or null off the clip. */
   sourceFrame: number | null;
   timeRange: TimelineRange | null;
-  selectedAdjustmentId: string | null;
+  selectedAdjustmentIds: readonly string[];
   layout: TimelineLayout;
   drafting: boolean;
   resetKey: string;
@@ -943,6 +946,14 @@ interface ColourTabProps {
   onSeek: (frame: number) => void;
 }
 
+/** Why the Colour tab edits nothing while several clips or adjustments are selected, or null. */
+function severalSelected(clips: number, adjustments: number, target: ColourTarget): string | null {
+  const edit = 'select one to edit its grade. Paste grade sets the same grade on all of them.';
+  if (!adjustments) return target === 'clip' && clips > 1 ? `${countOf(clips, 'clip')} are selected: ${edit}` : null;
+  if (!clips) return adjustments > 1 ? `${countOf(adjustments, 'adjustment')} are selected: ${edit}` : null;
+  return `${countOf(clips, 'clip')} and ${countOf(adjustments, 'adjustment')} are selected: ${edit}`;
+}
+
 /** A clip grade's source frame at the playhead, for keyframes, and where the image evaluates it; -1 off the clip. */
 function gradeFrames(placed: PlacedClip | undefined, projectFrame: number, sourceFrame: number | null) {
   if (!placed || sourceFrame === null) return { frame: -1, valueFrame: -1 };
@@ -953,9 +964,10 @@ function gradeFrames(placed: PlacedClip | undefined, projectFrame: number, sourc
 function ColourTab(props: Readonly<ColourTabProps>) {
   const { project, clip, placed, asset, drafting, onEdit, onPreview, onPause, onSeek } = props;
   const navigation = useKeyframeNavigation();
-  const item =
-    project.adjustments.find((candidate) => candidate.id === props.selectedAdjustmentId) ??
-    adjustmentAt(project.adjustments, props.frame);
+  const adjustments = props.selectedAdjustmentIds;
+  const item = adjustments.length
+    ? project.adjustments.find((candidate) => candidate.id === adjustments[0])
+    : adjustmentAt(project.adjustments, props.frame);
   const target: ColourTarget = clip ? props.target : 'adjustment';
   const clipNavigation = useMemo<KeyframeNavigation | null>(
     () =>
@@ -997,13 +1009,8 @@ function ColourTab(props: Readonly<ColourTabProps>) {
       {actions}
     </div>
   );
-  if (target === 'clip' && clip && props.selectedClipCount > 1)
-    return (
-      <div className="inspector-empty">
-        {props.selectedClipCount} clips are selected: select one to edit its grade. Paste grade sets the same grade on
-        all of them.
-      </div>
-    );
+  const several = severalSelected(clip ? Math.max(1, props.selectedClipCount) : 0, adjustments.length, target);
+  if (several) return <div className="inspector-empty">{several}</div>;
   if (target === 'adjustment' && !item)
     return (
       <>
@@ -1106,7 +1113,7 @@ function InspectorPanel({
   selectedClipId,
   selectedClipCount = 0,
   timeRange = null,
-  selectedAdjustmentId = null,
+  selectedAdjustmentIds = NO_ADJUSTMENTS,
   selectedLayerId,
   boundaryId,
   frame,
@@ -1329,7 +1336,7 @@ function InspectorPanel({
             frame={frame}
             sourceFrame={sourceFrame}
             timeRange={timeRange}
-            selectedAdjustmentId={selectedAdjustmentId}
+            selectedAdjustmentIds={selectedAdjustmentIds}
             layout={layout}
             drafting={drafting}
             resetKey={inputContext}

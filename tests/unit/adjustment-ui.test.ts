@@ -9,13 +9,22 @@ import {
   adjustmentKeyframeKind,
   adjustmentKeyframeTargets,
   adjustmentLabel,
+  adjustmentMoveCommands,
   adjustmentSpan,
   planAdjustmentCreation,
   planAdjustmentGesture,
   planAdjustmentKeyframeMove,
+  planGroupMove,
   splitAdjustmentReason,
 } from '../../src/web/adjustment-ui.js';
-import { placementSnapPoints } from '../../src/web/timeline-placement.js';
+import { createColourSettings } from '../../src/shared/colour.js';
+import {
+  copyGradeBlocked,
+  pasteGradeCommands,
+  pasteTargets,
+  pasteTargetsLabel,
+} from '../../src/web/grade-clipboard.js';
+import { placementSnapPoints, planTimelineDrop } from '../../src/web/timeline-placement.js';
 
 function project(adjustments: Adjustment[]): ProjectDocument {
   const document = createProject('adjustment-ui', 'Adjustment UI');
@@ -123,6 +132,87 @@ describe('adjustment timeline gestures', () => {
     const points = placementSnapPoints(document, 'a', 0);
     expect(points).toEqual(expect.arrayContaining([100, 120]));
     expect(points).not.toContain(70);
+  });
+});
+
+describe('clips and adjustments selected together', () => {
+  const starts = (document: ProjectDocument) => ({
+    clip: calculateLayout(document).clips[0]!.start,
+    adjustments: document.adjustments.map((entry) => entry.start),
+  });
+
+  it('move by the same frames in one transaction, adjustments keeping their keyframes', () => {
+    const plan = planGroupMove(keyed(), ['clip'], ['a', 'b'], 10);
+    expect(plan.error).toBe('');
+    expect(starts(plan.document)).toEqual({ clip: 10, adjustments: [40, 110] });
+    expect(item(plan.document, 'a').keyframes.map((key) => key.frame)).toEqual([0, 10]);
+    // The leading adjustment moves first, so the other never overlaps it on the way.
+    expect(
+      adjustmentMoveCommands(keyed(), ['a', 'b'], 35).map(
+        (command) => 'adjustmentId' in command && command.adjustmentId,
+      ),
+    ).toEqual(['b', 'a']);
+    expect(planGroupMove(keyed(), [], ['a', 'b'], 35).error).toBe('');
+    expect(planGroupMove(keyed(), ['clip'], ['a'], -31).error).toBe(
+      'An adjustment cannot start before the first frame.',
+    );
+    expect(planGroupMove(keyed(), [], ['a'], 31).error).toMatch(/cannot overlap/);
+  });
+
+  it('follow a dragged clip by the frames it moves, shown as ghosts', () => {
+    const document = keyed();
+    const plan = planTimelineDrop(
+      document,
+      { kind: 'group', clipIds: ['clip'], clipId: 'clip', grabFrame: 0, adjustmentIds: ['b'] },
+      'video-1',
+      5,
+      false,
+      8,
+      0,
+    );
+    expect(plan.error).toBe('');
+    expect(plan.adjustmentGhosts).toEqual([{ id: 'b', start: 105, duration: 20 }]);
+    const moved = [plan.command!, ...plan.adjustmentCommands!].reduce(
+      (next, command) => applyCommand(next, command),
+      document,
+    );
+    expect(starts(moved)).toEqual({ clip: 5, adjustments: [30, 105] });
+    const blocked = planTimelineDrop(
+      document,
+      { kind: 'group', clipIds: ['clip'], clipId: 'clip', grabFrame: 0, adjustmentIds: ['a'] },
+      'video-1',
+      40,
+      false,
+      8,
+      0,
+    );
+    expect(blocked.command).toBeNull();
+    expect(blocked.error).toMatch(/cannot overlap/);
+  });
+
+  it('copy grades without keyframes and paste them on clips and adjustments, removing keyframes', () => {
+    const document = keyed();
+    const clip = { kind: 'clip' as const, id: 'clip' };
+    const a = { kind: 'adjustment' as const, id: 'a' };
+    const b = { kind: 'adjustment' as const, id: 'b' };
+    expect(copyGradeBlocked(document, a)).toBe(
+      'This adjustment’s grade has keyframes; only a grade without keyframes can be copied.',
+    );
+    expect(copyGradeBlocked(document, b)).toBeNull();
+    expect(copyGradeBlocked(document, { kind: 'adjustment', id: 'gone' })).toBe('This adjustment no longer exists.');
+    expect(pasteTargets(b, [clip, a])).toEqual([b]);
+    expect(pasteTargets(a, [clip, a])).toEqual([clip, a]);
+    expect(pasteTargetsLabel([b])).toBe('this adjustment');
+    expect(pasteTargetsLabel([clip, a, b])).toBe('1 clip and 2 adjustments');
+    expect(pasteTargetsLabel([a, b])).toBe('these 2 adjustments');
+    const colour = { ...createColourSettings(), saturation: 0.4 };
+    const pasted = pasteGradeCommands(document, [clip, a], colour).reduce(
+      (next, command) => applyCommand(next, command),
+      document,
+    );
+    expect(pasted.clips[0]!.grade).toEqual({ colour, keyframes: [] });
+    expect(item(pasted, 'a')).toMatchObject({ colour, keyframes: [] });
+    expect(item(pasted, 'b')).toEqual(item(document, 'b'));
   });
 });
 

@@ -4,6 +4,7 @@ import { sourceRangeForCut, type TimelineRange } from '../shared/rush-editing.js
 import type { PlacedClip } from '../shared/timeline.js';
 import { formatTimecode } from '../shared/timing.js';
 import { splitAdjustmentReason } from './adjustment-ui.js';
+import { countOf } from './grade-clipboard.js';
 import { Icon } from './icons.js';
 import './rush-editing.css';
 
@@ -17,6 +18,8 @@ interface Props {
   selectedCount: number;
   /** The selected adjustment, when no clip is selected: Split and Delete act on it. */
   adjustment?: Adjustment | null;
+  /** Adjustments selected, alone or with clips; deleting removes them too. */
+  adjustmentCount: number;
   onSplit: () => void;
   onDelete: () => void;
   onQuickTrim: (edge: 'in' | 'out') => void;
@@ -88,7 +91,7 @@ export function RulerRange({
 }
 
 /** What Delete removes: `rangeError` is undefined without a ruler range, else its error or null. */
-function deleteAction(rangeError: string | null | undefined, selectedCount: number, adjustment: boolean) {
+function deleteAction(rangeError: string | null | undefined, clips: number, adjustments: number) {
   if (rangeError !== undefined)
     return {
       deleteName: 'Delete selected range',
@@ -96,12 +99,22 @@ function deleteAction(rangeError: string | null | undefined, selectedCount: numb
         rangeError ??
         'Remove the selected range from the selected clip in one Undo step; this track’s Ripple setting controls gap closure · Delete',
     };
-  if (selectedCount > 1)
+  if (clips && adjustments)
+    return {
+      deleteName: 'Delete selected clips and adjustments',
+      deleteTitle: `Remove the selected ${countOf(clips, 'clip')} and ${countOf(adjustments, 'adjustment')} in one Undo step · Delete`,
+    };
+  if (clips > 1)
     return {
       deleteName: 'Delete selected clips',
-      deleteTitle: `Remove the ${selectedCount} selected clips in one Undo step; originals remain recoverable · Delete`,
+      deleteTitle: `Remove the ${clips} selected clips in one Undo step; originals remain recoverable · Delete`,
     };
-  if (adjustment)
+  if (adjustments > 1)
+    return {
+      deleteName: 'Delete selected adjustments',
+      deleteTitle: `Remove the ${adjustments} selected adjustments and their keyframes in one Undo step · Delete`,
+    };
+  if (adjustments)
     return {
       deleteName: 'Delete selected adjustment',
       deleteTitle: 'Remove this adjustment and its keyframes · Delete',
@@ -121,6 +134,7 @@ export function RushEditBar({
   timeRange,
   selectedCount,
   adjustment,
+  adjustmentCount,
   onSplit,
   onDelete,
   onQuickTrim,
@@ -136,8 +150,8 @@ export function RushEditBar({
   const error = cutRangeError(project, selected, timeRange);
   const { deleteName, deleteTitle } = deleteAction(
     timeRange ? error || null : undefined,
-    selectedCount,
-    !selected && !!adjustment,
+    selected ? Math.max(1, selectedCount) : 0,
+    adjustmentCount,
   );
 
   return (
@@ -186,7 +200,7 @@ export function RushEditBar({
           className={`secondary-button small ${timeRange ? 'range-accent' : ''}`}
           aria-label={deleteName}
           title={deleteTitle}
-          disabled={disabled || (timeRange ? !!error : !selected && !adjustment)}
+          disabled={disabled || (timeRange ? !!error : !selected && !adjustmentCount)}
           onClick={timeRange ? onCutRange : onDelete}
         >
           <Icon name="trash" size={15} />
