@@ -8,6 +8,7 @@ import {
   analysedFrames,
   analyseTarget,
   animatedParts,
+  clipsKeepingAnimated,
   autoAdjustCommands,
   autoAdjustTarget,
   cachedAnalysis,
@@ -15,6 +16,7 @@ import {
   keyframeReason,
   rememberAnalysis,
   settingLabel,
+  trackNameOf,
   type AutoAdjustApply,
   type AutoAdjustAvailability,
   type AutoAdjustContext,
@@ -43,11 +45,21 @@ interface Props {
 const TITLE = 'Analyse this clip and suggest a balanced correction for its grade';
 /** The initial Intensity, in percent: the correction as suggested. */
 const BALANCED = Math.round(AUTO_ADJUST.balancedIntensity * 100);
-const SOURCES: readonly { source: AutoAdjustSource; label: string; hint: string }[] = [
-  { source: 'playhead', label: 'Playhead', hint: '1 s around it' },
-  { source: 'clip', label: 'Clip', hint: 'all of it' },
-  { source: 'track', label: 'Track', hint: 'each clip on its own' },
-];
+/** The scope each source covers, named by what it analyses rather than by its container. */
+function sources(
+  trackName: string,
+): readonly { source: AutoAdjustSource; label: string; name: string; hint: string }[] {
+  return [
+    { source: 'playhead', label: 'Playhead', name: 'Playhead', hint: '1 s around it' },
+    { source: 'clip', label: 'This clip', name: 'This clip', hint: 'all of it' },
+    {
+      source: 'track',
+      label: 'Every clip',
+      name: `Every clip on ${trackName}`,
+      hint: `on ${trackName}, each analysed on its own`,
+    },
+  ];
+}
 const APPLIES: readonly { apply: AutoAdjustApply; label: string; name: string; hint: string }[] = [
   { apply: 'values', label: 'Grade values', name: 'Grade values', hint: 'whole clip' },
   { apply: 'keyframe', label: 'Keyframe', name: 'Keyframe at playhead', hint: 'at playhead' },
@@ -93,9 +105,17 @@ export function AutoAdjust({ project, clipId, layout, assets, playhead, disabled
   );
 }
 
-function applyHint(option: (typeof APPLIES)[number], source: AutoAdjustSource, unavailable: boolean): string {
-  if (unavailable) return 'needs Playhead';
-  return option.apply === 'values' && source === 'track' ? 'each clip' : option.hint;
+/** Why Keyframe is unavailable from `source`: keyframes go to this clip only, at the playhead. */
+function keyframeUnavailable(source: AutoAdjustSource): { hint: string; title: string } | null {
+  if (source === 'playhead') return null;
+  return source === 'track'
+    ? { hint: 'this clip only', title: 'Keyframes go to this clip only, at the playhead.' }
+    : { hint: 'needs Playhead', title: 'Analyse the playhead to key it.' };
+}
+
+function applyHint(option: (typeof APPLIES)[number], source: AutoAdjustSource): string {
+  if (option.apply === 'keyframe') return keyframeUnavailable(source)?.hint ?? option.hint;
+  return source === 'track' ? 'each clip’s grade' : option.hint;
 }
 
 type Phase =
@@ -198,6 +218,8 @@ function AutoAdjustPopover({
   };
 
   const animated = applyAs === 'keyframe' || !target ? [] : animatedParts(context.project, target);
+  const clips = applyAs === 'values' ? (target?.parts.length ?? 1) : 1;
+  const keeping = clips > 1 && target ? clipsKeepingAnimated(context.project, target) : 0;
   const nothing = ready !== null && commandsAt(percent).length === 0;
   const analysed = available.target?.label ?? availabilities.clip.target?.label ?? '';
   return (
@@ -229,12 +251,12 @@ function AutoAdjustPopover({
               </p>
               <fieldset className="auto-adjust-mode">
                 <legend>Source</legend>
-                {SOURCES.map((option) => (
+                {sources(trackNameOf(context)).map((option) => (
                   <label key={option.source}>
                     <input
                       type="radio"
                       name={`${id}-source`}
-                      aria-label={option.label}
+                      aria-label={option.name}
                       checked={source === option.source}
                       onChange={() => {
                         setDraft(null);
@@ -253,15 +275,15 @@ function AutoAdjustPopover({
               <fieldset className="auto-adjust-mode">
                 <legend>Apply as</legend>
                 {APPLIES.map((option) => {
-                  const unavailable = option.apply === 'keyframe' && source !== 'playhead';
+                  const unavailable = option.apply === 'keyframe' ? keyframeUnavailable(source) : null;
                   return (
-                    <label key={option.apply} title={unavailable ? 'Analyse the playhead to key it.' : undefined}>
+                    <label key={option.apply} title={unavailable?.title}>
                       <input
                         type="radio"
                         name={`${id}-apply`}
                         aria-label={option.name}
                         checked={applyAs === option.apply}
-                        disabled={unavailable}
+                        disabled={unavailable !== null}
                         onChange={() => {
                           setDraft(null);
                           setApplyAs(option.apply);
@@ -269,7 +291,7 @@ function AutoAdjustPopover({
                       />
                       <span>
                         {option.label}
-                        <small>{applyHint(option, source, unavailable)}</small>
+                        <small>{applyHint(option, source)}</small>
                       </span>
                     </label>
                   );
@@ -318,12 +340,18 @@ function AutoAdjustPopover({
                   </div>
                   {animated.length > 0 && (
                     <ul className="auto-adjust-animated">
-                      {animated.map(({ setting, clips }) => (
-                        <li key={setting}>
-                          {settingLabel(setting)} is animated{clips > 1 ? ` on ${clips} clips` : ''}: not changed
+                      {animated.map((item) => (
+                        <li key={item.setting}>
+                          {settingLabel(item.setting)} is animated{item.clips > 1 ? ` on ${item.clips} clips` : ''}: not
+                          changed
                         </li>
                       ))}
                     </ul>
+                  )}
+                  {keeping > 0 && (
+                    <p className="auto-adjust-scope">
+                      {keeping} of {clips} clips keep their animated settings.
+                    </p>
                   )}
                 </>
               )}
@@ -338,7 +366,7 @@ function AutoAdjustPopover({
                     }
                     onClick={() => apply(close)}
                   >
-                    Apply
+                    {clips > 1 ? `Apply to ${clips} clips` : 'Apply'}
                   </button>
                 )}
                 <button type="button" className="secondary-button small" onClick={close}>

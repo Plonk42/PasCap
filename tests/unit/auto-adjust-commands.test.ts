@@ -17,6 +17,7 @@ import { calculateLayout, type PlacedClip } from '../../src/shared/timeline.js';
 import {
   animatedParts,
   autoAdjustCommands,
+  clipsKeepingAnimated,
   autoAdjustTarget,
   cachedAnalysis,
   initialChoice,
@@ -264,6 +265,7 @@ describe('Auto adjust on clip grades', () => {
       { setting: 'exposure', clips: 2 },
       { setting: 'contrast', clips: 1 },
     ]);
+    expect(clipsKeepingAnimated(document, track)).toBe(2);
     const next = applied(
       document,
       autoAdjustCommands(
@@ -280,6 +282,8 @@ describe('Auto adjust on clip grades', () => {
     expect(grade(next, 'a').colour.exposure).toBe(0);
     expect(grade(next, 'b').colour.contrast).toBe(1);
     expect(grade(next, 'a').colour.contrast).toBe(scaleCorrection(CORRECTION, 0.8).contrast);
+    grade(document, 'a').keyframes = [];
+    expect(clipsKeepingAnimated(document, target(document, 'a', 10, 'track'))).toBe(1);
   });
 });
 
@@ -343,7 +347,9 @@ describe('Auto adjust keyframe', () => {
     const document = project();
     expect(keyframeReason(context(document, 'a', 11), 'playhead')).toBeNull();
     expect(keyframeReason(context(document, 'a', 11), 'clip')).toMatch(/analyse the playhead/);
-    expect(keyframeReason(context(document, 'a', 11), 'track')).toMatch(/analyse the playhead/);
+    expect(keyframeReason(context(document, 'a', 11), 'track')).toBe(
+      'Keyframes go to this clip only, at the playhead.',
+    );
     expect(keyframeReason(context(document, 'a', 350), 'playhead')).toBe('Move the playhead over this clip to key it.');
     // Playhead 11 shows source frame 111, 10 shows 110.
     grade(document, 'a').keyframes = Array.from({ length: MAX_GRADE_KEYFRAMES }, (_, index) =>

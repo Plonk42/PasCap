@@ -173,8 +173,8 @@ edits real projects with it, so saved data must keep working. Details are in
   fits eleven scalar settings from 16 proxy frames through the real grade (#225: colour is raised with
   Saturation and Vibrance, Saturation giving way first on strong colours such as skies), previews them in a
   popover with Intensity (initially 80%, the fitted correction; 100% exaggerates it by a
-  quarter) and applies one Undo step. **Source**: Playhead (±30 frames), Clip (whole graded clip)
-  or Track (each clip of its track on its own, one `colour` edit per clip). **Apply as**: Grade values edits
+  quarter) and applies one Undo step. **Source** (named by scope): Playhead (±30 frames), This clip (whole graded clip) or Every clip on <track>
+  (each analysed on its own, one `colour` edit per clip, **Apply to N clips**; keyframes go to this clip only). **Apply as**: Grade values edits
   the grades' values, leaving animated settings and keyframes unchanged; Keyframe (Playhead source only)
   captures all eleven at the source frame like their diamonds (initial, with Playhead, once any is
   animated). Constants in `src/shared/auto-adjust.ts`, no schema/render change

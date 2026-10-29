@@ -94,7 +94,6 @@
 
 .auto-adjust-mode small {
   margin-left: 4px;
-  white-space: nowrap;
   color: var(--muted);
   font-size: 11px;
 }
@@ -113,6 +112,12 @@
   list-style: none;
   color: var(--muted);
   font-size: 11px;
+}
+
+.auto-adjust-scope {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .auto-adjust-actions {
