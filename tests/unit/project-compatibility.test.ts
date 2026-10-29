@@ -3,15 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ProjectStore } from '../../src/server/storage.js';
-import { createClipGrade } from '../../src/shared/grade.js';
-import {
-  musicTracksSchema,
-  PROJECT_SCHEMA_VERSION,
-  projectSchema,
-  type MusicLane,
-  type MusicTrack,
-} from '../../src/shared/model.js';
-import { musicTracks } from '../../src/shared/music-lanes.js';
+import { PROJECT_SCHEMA_VERSION, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import {
   missingMigrations,
   OLDEST_PROJECT_SCHEMA_VERSION,
@@ -19,6 +11,8 @@ import {
 } from '../../src/shared/project-migrations.js';
 
 const FIXTURES = path.join(import.meta.dirname, '../fixtures/projects');
+/** Projects saved before schema 27, which used track Colour: rejected, never upgraded. */
+const UNSUPPORTED = path.join(FIXTURES, 'unsupported');
 const temporary: string[] = [];
 
 afterEach(async () => {
@@ -59,83 +53,34 @@ describe('project compatibility', () => {
     }
   });
 
-  it('upgrades each schema-23 music track to a track holding one clip that plays exactly the same', async () => {
-    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-23.json'), 'utf8')) as {
-      music: MusicTrack[];
-    };
-    const before = structuredClone(saved);
-    const upgraded = projectSchema.parse(upgradeProject(saved));
-    expect(saved).toEqual(before);
-    expect(saved.music.length).toBeGreaterThan(0);
-    expect(musicTracks(upgraded.music)).toEqual(saved.music);
-    expect(upgraded.music.map((lane) => lane.id)).toEqual(saved.music.map((_, index) => `music-track-${index + 1}`));
-    for (const lane of upgraded.music) expect(lane).toMatchObject({ ripple: false, transitions: [] });
+  it('keeps the adjustments, clip grades and Transform Opacity of a schema-27 project through the load', async () => {
+    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-27.json'), 'utf8')) as ProjectDocument;
+    const loaded = projectSchema.parse(upgradeProject(saved));
+    expect(loaded).toEqual(saved);
+    expect(loaded.adjustments.length).toBeGreaterThan(1);
+    expect(loaded.adjustments[0]!.keyframes.some((key) => key.frame < 0)).toBe(true);
+    expect(loaded.layers[0]!.transform.base.opacity).toBeLessThan(1);
+    expect(loaded.clips.some((clip) => clip.grade.keyframes.length > 0)).toBe(true);
   });
 
-  it('keeps every saved music value through the upgrade, so invalid data is still rejected', () => {
-    const track = {
-      id: 'music-track-1',
-      mediaId: 'song',
-      sourceIn: 0,
-      sourceOut: 30,
-      start: 0,
-      duration: 30,
-      gainDb: 0,
-      fadeIn: 0,
-      fadeOut: 0,
-      loop: false,
-    };
-    const upgrade = (music: unknown) => upgradeProject({ schemaVersion: 23, music }) as { music: unknown };
-    const [lane] = upgrade([track]).music as MusicLane[];
-    const { gainDb, fadeIn, fadeOut, ...clip } = track;
-    // A lane ID never collides with a saved ID, which the clip keeps.
-    expect(lane).toEqual({
-      id: 'music-track-1-x',
-      gainDb,
-      ripple: false,
-      openingFade: fadeIn,
-      closingFade: fadeOut,
-      clips: [clip],
-      transitions: [],
-    });
-    expect(musicTracksSchema.safeParse(upgrade([{ ...track, extra: true }]).music).success).toBe(false);
-    const { gainDb: _gain, ...missing } = track;
-    expect(musicTracksSchema.safeParse(upgrade([missing]).music).success).toBe(false);
-    expect(upgrade(null).music).toBeNull();
-    expect(upgrade([null]).music).toEqual([null]);
-  });
-
-  it('upgrades schema-24 projects with no kept ranges, so every whole recording stays available', async () => {
-    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-24.json'), 'utf8')) as Record<string, unknown>;
-    const before = structuredClone(saved);
-    const upgraded = projectSchema.parse(upgradeProject(saved));
-    expect(saved).toEqual(before);
-    expect(upgraded.selects).toEqual({});
-    const { selects: _selects, schemaVersion: _version, clips, ...rest } = upgraded;
-    const { schemaVersion: _saved, clips: savedClips, ...expected } = saved;
-    expect(rest).toEqual(expected);
-    expect(clips.map(({ grade: _grade, ...clip }) => clip)).toEqual(savedClips);
-  });
-
-  it('upgrades schema-25 projects with a neutral grade on every clip, so they render as before', async () => {
-    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-25.json'), 'utf8')) as Record<string, unknown>;
-    const before = structuredClone(saved);
-    const upgraded = projectSchema.parse(upgradeProject(saved));
-    expect(saved).toEqual(before);
-    expect(upgraded.clips.length).toBeGreaterThan(0);
-    for (const clip of upgraded.clips) expect(clip.grade).toEqual(createClipGrade());
-    const { schemaVersion: _version, clips, ...rest } = upgraded;
-    const { schemaVersion: _saved, clips: savedClips, ...expected } = saved;
-    expect(rest).toEqual(expected);
-    expect(clips.map(({ grade: _grade, ...clip }) => clip)).toEqual(savedClips);
-  });
-
-  it('keeps the kept ranges of a schema-25 project through the load', async () => {
-    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-25.json'), 'utf8')) as {
-      selects: Record<string, unknown>;
-    };
-    expect(Object.keys(saved.selects).length).toBeGreaterThan(1);
-    expect(projectSchema.parse(upgradeProject(saved)).selects).toEqual(saved.selects);
+  it('rejects projects saved with track Colour, with the reason, and leaves their files unchanged', async () => {
+    const dataDir = await mkdtemp(path.join(os.tmpdir(), 'pascap-compatibility-'));
+    temporary.push(dataDir);
+    await mkdir(path.join(dataDir, 'projects'));
+    const store = new ProjectStore(dataDir);
+    const names = (await readdir(UNSUPPORTED)).filter((entry) => entry.endsWith('.json'));
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) {
+      const bytes = await readFile(path.join(UNSUPPORTED, name), 'utf8');
+      const saved = JSON.parse(bytes) as { id: string; schemaVersion: number };
+      expect(saved.schemaVersion).toBeLessThan(OLDEST_PROJECT_SCHEMA_VERSION);
+      const filename = path.join(dataDir, 'projects', `${saved.id}.json`);
+      await writeFile(filename, bytes);
+      await expect(store.load(saved.id)).rejects.toThrow('track Colour, which PasCap replaced');
+      expect(await readFile(filename, 'utf8')).toBe(bytes);
+      expect(await readdir(path.join(dataDir, 'projects'))).toEqual([`${saved.id}.json`]);
+      await rm(filename);
+    }
   });
 
   it('rejects versions outside the supported range with the reason', () => {
@@ -143,7 +88,7 @@ describe('project compatibility', () => {
     expect(() => upgradeProject({ schemaVersion: PROJECT_SCHEMA_VERSION + 1 })).toThrow(
       'saved by a newer PasCap version',
     );
-    expect(() => upgradeProject({ schemaVersion: '23' })).toThrow('Unsupported project schema version 23');
+    expect(() => upgradeProject({ schemaVersion: '27' })).toThrow('Unsupported project schema version 27');
     expect(() => upgradeProject(null)).toThrow('Unsupported project schema version missing or invalid');
     expect(() => upgradeProject({ schemaVersion: 1 }, 'export snapshot')).toThrow(
       'Unsupported export snapshot schema version 1',

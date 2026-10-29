@@ -8,8 +8,8 @@ import { readPreference, writePreference } from './preferences.js';
 export type InspectorMode = 'clip' | 'colour' | 'track' | 'audio';
 /** A timeline marker or boundary asks the Inspector to show the section that edits it. */
 export type InspectorSectionTarget = 'colour' | 'speed' | 'transform' | 'transition';
-/** Which grade the Colour tab edits: the selected clip's own or its track's. */
-export type ColourTarget = 'clip' | 'track';
+/** Which grade the Colour tab edits: the selected clip's own, or the adjustment at the playhead. */
+export type ColourTarget = 'clip' | 'adjustment';
 export interface InspectorSectionRequest {
   section: InspectorSectionTarget;
   /** For Colour: the grade whose marker was clicked. */

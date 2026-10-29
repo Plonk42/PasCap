@@ -7,12 +7,15 @@ import {
   trackSamples,
   whiteBalanceCommands,
   windowSourceFrames,
+  type AutoOwner,
+  type GradeValues,
 } from '../../shared/auto-colour.js';
 import type { EditCommand } from '../../shared/commands.js';
 import { detailFrames, measureDetail, suggestDetail } from '../../shared/detail-estimate.js';
 import type { ScalarColourSetting } from '../../shared/colour.js';
+import { gradeKeyAsLayerKey } from '../../shared/grade.js';
 import { hasLayerKeys } from '../../shared/keyframes.js';
-import type { ProjectDocument, VideoLayer } from '../../shared/model.js';
+import type { ProjectDocument } from '../../shared/model.js';
 import type { estimate } from '../../shared/operations/estimate.js';
 import { projectVideoIds } from '../../shared/projects.js';
 import { forEachSerial } from '../../shared/serial.js';
@@ -35,12 +38,28 @@ interface Read {
   sourceFrames: number[];
 }
 
-/** What an estimate analyses, and the track (or clip) its commands edit. */
+/** The clip grade an estimate's Colour commands edit, and the source frame a keyframe goes to. */
+interface GradeTarget {
+  owner: AutoOwner;
+  values: GradeValues;
+  keyFrame: number | null;
+}
+
+/** What an estimate analyses, and the clip grade its commands edit. */
 interface Target {
   description: string;
   reads: Read[];
-  layer: VideoLayer | null;
+  grade: GradeTarget | null;
   clip: PlacedClip | null;
+}
+
+function clipGrade(clip: PlacedClip, keyFrame: number | null): GradeTarget {
+  const { grade } = clip.clip;
+  return {
+    owner: { kind: 'clip', clipId: clip.clip.id },
+    values: { colour: grade.colour, keyframes: grade.keyframes.map(gradeKeyAsLayerKey) },
+    keyFrame,
+  };
 }
 
 const invalid = (message: string): ServiceError => new ServiceError(message, 422);
@@ -48,12 +67,16 @@ const invalid = (message: string): ServiceError => new ServiceError(message, 422
 function clipTarget(project: ProjectDocument, input: Input): Target {
   const clip = calculateLayout(project).clips.find((item) => item.clip.id === input.clipId);
   if (!clip) throw new ServiceError(`The project has no clip ${input.clipId}; read describe_project.`, 404);
-  const layer = project.layers.find((item) => item.id === clip.clip.layerId)!;
   const { mediaId, sourceIn, sourceOut } = clip.clip;
   if (input.frame === undefined) {
     const sourceFrames =
       input.kind === 'detail' ? detailFrames(sourceIn, sourceOut) : autoAdjustFrames(sourceIn, sourceOut);
-    return { description: `the whole clip ${clip.clip.id}`, reads: [{ mediaId, sourceFrames }], layer, clip };
+    return {
+      description: `the whole clip ${clip.clip.id}`,
+      reads: [{ mediaId, sourceFrames }],
+      grade: clipGrade(clip, null),
+      clip,
+    };
   }
   const frame = input.frame;
   if (frame < clip.start || frame >= clip.end)
@@ -66,7 +89,7 @@ function clipTarget(project: ProjectDocument, input: Input): Target {
   return {
     description: `1 s around frame ${frame} in clip ${clip.clip.id}`,
     reads: [{ mediaId, sourceFrames }],
-    layer,
+    grade: clipGrade(clip, clip.retiming.sourceAt(frame - clip.start)),
     clip,
   };
 }
@@ -84,7 +107,7 @@ function trackTarget(project: ProjectDocument, input: Input): Target {
     reads.set(read.mediaId, read);
   }
   const clipsWord = clips.length === 1 ? 'clip' : `${clips.length} clips`;
-  return { description: `the ${clipsWord} of ${layer.name}`, reads: [...reads.values()], layer, clip: null };
+  return { description: `the ${clipsWord} of ${layer.name}`, reads: [...reads.values()], grade: null, clip: null };
 }
 
 function rangeTarget(project: ProjectDocument, input: Input, context: ServiceContext): Target {
@@ -102,7 +125,7 @@ function rangeTarget(project: ProjectDocument, input: Input, context: ServiceCon
   return {
     description: `${asset.name} from ${sourceIn} to ${sourceOut}`,
     reads: [{ mediaId, sourceFrames }],
-    layer: null,
+    grade: null,
     clip: null,
   };
 }
@@ -120,7 +143,13 @@ function targetOf(project: ProjectDocument, input: Input, context: ServiceContex
   if (input.applyAs === 'keyframe' && (input.kind === 'detail' || input.frame === undefined))
     throw invalid('A keyframe takes the light at one frame: give clipId and frame, for a Colour kind.');
   if (input.clipId !== undefined) return clipTarget(project, input);
-  if (input.layerId !== undefined) return trackTarget(project, input);
+  if (input.layerId !== undefined) {
+    if (input.kind !== 'detail' && input.commands)
+      throw invalid(
+        'A track has no Colour of its own: write each clip\'s grade with applyAs shots, or give commands false for the values of one compromise.',
+      );
+    return trackTarget(project, input);
+  }
   return rangeTarget(project, input, context);
 }
 
@@ -134,7 +163,7 @@ function separateClips(project: ProjectDocument, input: Input): PlacedClip[] | n
   if (!each) return null;
   if (input.kind !== 'detail' && !shots)
     throw invalid(
-      'A track has one Colour: give several clips a grade each with applyAs shots (their clip grades); layerId alone fits one grade to the whole track.',
+      'Several clips get a grade each with applyAs shots (their clip grades); layerId with commands false fits one compromise to the whole track.',
     );
   const layout = calculateLayout(project).clips;
   if (input.layerId !== undefined) {
@@ -161,13 +190,13 @@ async function colourFrames(stills: ServiceContext['stills'], reads: readonly Re
   return frames;
 }
 
-/** Temperature and Tint as track values, leaving an animated one unchanged. */
-function whiteBalanceValues(layer: VideoLayer, balance: WhiteBalance): EditCommand[] {
-  const settings = (['temperature', 'tint'] as const).filter((setting) => !hasLayerKeys(layer, setting));
-  if (!settings.length) return [];
-  const colour = { ...layer.colour };
+/** Temperature and Tint as the grade's values, leaving an animated one unchanged. */
+function whiteBalanceValues({ owner, values }: GradeTarget, balance: WhiteBalance): EditCommand[] {
+  const settings = (['temperature', 'tint'] as const).filter((setting) => !hasLayerKeys(values, setting));
+  if (!settings.length || owner.kind !== 'clip') return [];
+  const colour = { ...values.colour };
   for (const setting of settings) colour[setting] = balance[setting];
-  return [{ type: 'colour', layerId: layer.id, colour }];
+  return [{ type: 'colour', clipIds: [owner.clipId], colour }];
 }
 
 const tooUniform = (): ServiceError =>
@@ -176,7 +205,7 @@ const tooUniform = (): ServiceError =>
 interface Estimated {
   fields: object;
   commands: EditCommand[];
-  /** Settings the track animates, which applying as values leaves unchanged. */
+  /** Settings the grade animates, which applying as values leaves unchanged. */
   unchanged: string[];
 }
 
@@ -190,29 +219,37 @@ async function estimateDetail({ stills }: ServiceContext, { reads, clip }: Targe
 
 async function estimateWhiteBalance(
   context: ServiceContext,
-  { reads, layer }: Target,
+  { reads, grade }: Target,
   input: Input,
 ): Promise<Estimated> {
   const balance = poolWhiteBalance((await colourFrames(context.stills, reads)).map(frameIlluminant));
   if (!balance) throw tooUniform();
   const fields = { whiteBalance: balance };
-  if (!layer) return { fields, commands: [], unchanged: [] };
+  if (!grade) return { fields, commands: [], unchanged: [] };
   if (input.applyAs === 'keyframe')
-    return { fields, commands: whiteBalanceCommands(layer, input.frame!, balance), unchanged: [] };
-  const unchanged = (['temperature', 'tint'] as const).filter((setting) => hasLayerKeys(layer, setting));
-  return { fields, commands: whiteBalanceValues(layer, balance), unchanged };
+    return {
+      fields,
+      commands: whiteBalanceCommands(grade.values, grade.keyFrame!, balance, grade.owner),
+      unchanged: [],
+    };
+  const unchanged = (['temperature', 'tint'] as const).filter((setting) => hasLayerKeys(grade.values, setting));
+  return { fields, commands: whiteBalanceValues(grade, balance), unchanged };
 }
 
-async function estimateAutoAdjust(context: ServiceContext, { reads, layer }: Target, input: Input): Promise<Estimated> {
+async function estimateAutoAdjust(context: ServiceContext, { reads, grade }: Target, input: Input): Promise<Estimated> {
   const fitted = analyseAutoAdjust(await colourFrames(context.stills, reads));
   if (!fitted) throw tooUniform();
   const intensity = input.intensity / 100;
   const fields = { correction: scaleCorrection(fitted, intensity) };
-  if (!layer) return { fields, commands: [], unchanged: [] };
+  if (!grade) return { fields, commands: [], unchanged: [] };
   if (input.applyAs === 'keyframe')
-    return { fields, commands: captureCommands(layer, input.frame!, fields.correction), unchanged: [] };
-  const command = autoAdjustCommand(layer, fitted, intensity);
-  return { fields, commands: command ? [command] : [], unchanged: animatedSettings(layer) };
+    return {
+      fields,
+      commands: captureCommands(grade.values, grade.keyFrame!, fields.correction, grade.owner),
+      unchanged: [],
+    };
+  const command = autoAdjustCommand(grade.values, fitted, intensity, grade.owner);
+  return { fields, commands: command ? [command] : [], unchanged: animatedSettings(grade.values) };
 }
 
 const estimators = {
@@ -224,7 +261,7 @@ const estimators = {
 type ShotValues = Partial<Record<ScalarColourSetting, number>>;
 
 /**
- * Each shot's values written into its clip's grade, which applies before its track's Colour and stays with the
+ * Each shot's values written into its clip's grade, which applies before any adjustment and stays with the
  * clip; settings the grade animates follow their keyframes. A cross-dissolve then blends the two clips' grades.
  */
 export function shotCommands(shots: readonly { clip: PlacedClip; values: ShotValues }[]): EditCommand[] {
@@ -245,7 +282,7 @@ async function estimateClips(context: ServiceContext, clips: readonly PlacedClip
     const { mediaId, sourceIn, sourceOut } = clip.clip;
     const sourceFrames =
       input.kind === 'detail' ? detailFrames(sourceIn, sourceOut) : autoAdjustFrames(sourceIn, sourceOut);
-    const target = { description: '', reads: [{ mediaId, sourceFrames }], layer: null, clip };
+    const target = { description: '', reads: [{ mediaId, sourceFrames }], grade: null, clip };
     const estimated = await estimators[input.kind](context, target, input);
     const count = new Set(sourceFrames).size;
     frames += count;
@@ -276,7 +313,8 @@ export const runEstimate: OperationRunner<typeof estimate> = async (context, inp
   }
   const target = targetOf(project, input, context);
   if (input.applyAs === 'keyframe') {
-    const full = keyframeLimitReason(target.layer!, input.frame!);
+    const { values, keyFrame, owner } = target.grade!;
+    const full = keyframeLimitReason(values, keyFrame!, owner);
     if (full !== null) throw new ServiceError(full, 409);
   }
   const { fields, commands, unchanged } = await estimators[input.kind](context, target, input);

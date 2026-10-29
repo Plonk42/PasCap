@@ -8,7 +8,9 @@ import { createConfig } from '../../src/server/config.js';
 import { restoreExports } from '../../src/server/export-archive.js';
 import { JobQueue } from '../../src/server/jobs.js';
 import { audioAssetSchema } from '../../src/shared/audio.js';
+import { createColourSettings } from '../../src/shared/colour.js';
 import { planExportMusic } from '../../src/shared/export.js';
+import { createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import {
   createClip,
@@ -149,13 +151,18 @@ describe('durable export receipts', () => {
     const snapshot = createProject('flight', 'Flight');
     snapshot.clips.push(createClip('one', 'source', 0, 10));
     snapshot.layers[0]!.transform = {
-      base: { ...NEUTRAL_SPATIAL_POSE, cropLeft: 0.125, scale: 1.23456789 },
+      base: { ...NEUTRAL_SPATIAL_POSE, cropLeft: 0.125, scale: 1.23456789, opacity: 0.5 },
       keyframes: [
         { ...uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE, rotation: -90 }, 'smooth'), reset: false },
         { ...uniformKeyframe(100, { ...NEUTRAL_SPATIAL_POSE, translateX: 0.5 }, 'hold'), reset: true },
       ],
     };
-    snapshot.layers[0]!.keyframes = [layerKeyframe(5, { ...EMPTY_KEY_VALUES, opacity: 0.5, exposure: 0.7 }, 'smooth')];
+    snapshot.adjustments = [
+      {
+        ...createAdjustment('look', 3, 40),
+        keyframes: [layerKeyAsGradeKey(layerKeyframe(2, { ...EMPTY_KEY_VALUES, exposure: 0.7 }, 'smooth'))],
+      },
+    ];
     snapshot.music = Array.from({ length: 8 }, (_, index) =>
       singleClipLane({
         id: `music-${index}`,
@@ -186,9 +193,9 @@ describe('durable export receipts', () => {
       outputUrl: `/api/jobs/${id}/export`,
     });
     expect(await readFile(path.join(folder, 'receipt.json'), 'utf8')).toBe(text);
-    expect(JSON.parse(await readFile(path.join(folder, 'receipt.json'), 'utf8')).snapshot.layers[0].transform).toEqual(
-      snapshot.layers[0]!.transform,
-    );
+    const restored = JSON.parse(await readFile(path.join(folder, 'receipt.json'), 'utf8')).snapshot;
+    expect(restored.layers[0].transform).toEqual(snapshot.layers[0]!.transform);
+    expect(restored.adjustments).toEqual(snapshot.adjustments);
     expect(await readFile(path.join(folder, 'export.mp4'), 'utf8')).toBe('verified output fixture');
     await restoreExports(createConfig({ dataDir: root }), jobs);
     expect(jobs.list()).toHaveLength(1);
@@ -216,54 +223,35 @@ describe('durable export receipts', () => {
     }
   });
 
-  it('restores a receipt whose schema-23 snapshot has one music track per placement, unchanged', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'pascap-archive-'));
-    temporary.push(root);
-    const id = randomUUID();
-    const folder = path.join(root, 'renders', id);
-    await mkdir(folder, { recursive: true });
-    const current = receiptFixture(musicProject(), id);
-    // Schema 23 stored each music placement as a track with its own gain and fades; its plans match them.
-    const [lane] = current.snapshot.music;
-    const { clips: _clips, ripple: _ripple, transitions: _transitions, ...rest } = lane!;
-    const saved = {
-      ...current,
-      snapshot: {
-        ...current.snapshot,
-        schemaVersion: 23,
-        music: [{ ...lane!.clips[0]!, gainDb: rest.gainDb, fadeIn: rest.openingFade, fadeOut: rest.closingFade }],
-      },
-    };
-    const text = JSON.stringify(saved);
-    await writeFile(path.join(folder, 'receipt.json'), text);
-    await writeFile(path.join(folder, 'export.mp4'), 'verified output fixture');
-    const jobs = new JobQueue();
-    try {
-      expect(await restoreExports(createConfig({ dataDir: root }), jobs)).toEqual([]);
-      expect(jobs.get(id)?.state).toBe('completed');
-      expect(await readFile(path.join(folder, 'receipt.json'), 'utf8')).toBe(text);
-    } finally {
-      await jobs.close();
-    }
-  });
-
   const invalidReceipts: { name: string; change: (receipt: ReceiptFixture) => void }[] = [
     {
-      name: 'missing row colour',
+      name: 'saved track colour',
       change: (receipt) => {
-        Reflect.deleteProperty(receipt.snapshot.layers[0]!, 'colour');
+        Object.assign(receipt.snapshot.layers[0]!, { colour: createColourSettings() });
+      },
+    },
+    {
+      name: 'missing track Transform Opacity',
+      change: (receipt) => {
+        Reflect.deleteProperty(receipt.snapshot.layers[0]!.transform.base, 'opacity');
+      },
+    },
+    {
+      name: 'overlapping adjustments',
+      change: (receipt) => {
+        receipt.snapshot.adjustments = [createAdjustment('a', 0, 20), createAdjustment('b', 10, 20)];
       },
     },
     {
       name: 'forbidden clip correction',
       change: (receipt) => {
-        Object.assign(receipt.snapshot.clips[0]!, { correction: receipt.snapshot.layers[0]!.colour });
+        Object.assign(receipt.snapshot.clips[0]!, { correction: createColourSettings() });
       },
     },
     {
       name: 'old clip colour',
       change: (receipt) => {
-        Object.assign(receipt.snapshot.clips[0]!, { colour: receipt.snapshot.layers[0]!.colour });
+        Object.assign(receipt.snapshot.clips[0]!, { colour: createColourSettings() });
       },
     },
     {

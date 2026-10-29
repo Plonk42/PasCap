@@ -235,7 +235,7 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
   return clamp(denoised + delta, 0.0, 1.0);
 }`;
 // (sharpen, clarity, denoise, denoise range factor), the texture UV stride and measurement shift
-// and the evaluated track Colour (shadows, highlights, hdr, exposure) and Local contrast per source.
+// and the summed local tone of both grades (shadows, highlights, hdr, exposure) and Local contrast per source.
 const detailUniforms = `uniform vec4 detail0;
 uniform vec4 detail1;
 uniform vec4 detailStep0;

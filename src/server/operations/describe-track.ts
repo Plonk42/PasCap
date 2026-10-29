@@ -1,7 +1,6 @@
 import { scalarColourValues } from '../../shared/colour.js';
-import { colourAt, opacityAt } from '../../shared/composition.js';
-import { gradeColourAt, isNeutralClipGrade } from '../../shared/grade.js';
-import { hasLayerKeys, KEYFRAME_SETTINGS, type Interpolation } from '../../shared/keyframes.js';
+import { adjustmentAt, adjustmentColourAt, gradeColourAt, isNeutralClipGrade } from '../../shared/grade.js';
+import type { Interpolation } from '../../shared/keyframes.js';
 import type { describeTrack } from '../../shared/operations/describe-track.js';
 import { evaluateSpatial, hasSpatialChannelKeys, SPATIAL_CHANNELS } from '../../shared/spatial.js';
 import { calculateLayout, gradePosition } from '../../shared/timeline.js';
@@ -49,7 +48,7 @@ export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
     revision: project.revision,
     ...(parts.has('track') && { track }),
     ...(parts.has('keyframes') && {
-      keyframes: { colour: track.keyframes.map(compact), transform: track.transform.keyframes.map(compact) },
+      keyframes: { transform: track.transform.keyframes.map(compact) },
     }),
     ...(parts.has('grades') && {
       grades: graded.map(({ clip }) => ({
@@ -59,7 +58,6 @@ export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
       })),
     }),
     keyed: {
-      colour: KEYFRAME_SETTINGS.map((setting) => setting.key).filter((setting) => hasLayerKeys(track, setting)),
       transform: SPATIAL_CHANNELS.filter((channel) => hasSpatialChannelKeys(track.transform, channel)),
     },
     ...(parts.has('at') && {
@@ -71,10 +69,16 @@ export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
             const values = scalarColourValues(gradeColourAt(item.clip.grade, gradePosition(item, frame - item.start)));
             return { clipId: item.clip.id, sourceFrame, values: only(values, chosen) };
           });
+        const item = adjustmentAt(project.adjustments, frame);
         return {
           frame,
           timecode: formatTimecode(frame),
-          values: only({ opacity: opacityAt(track, frame), ...scalarColourValues(colourAt(track, frame)) }, chosen),
+          ...(item && {
+            adjustment: {
+              adjustmentId: item.id,
+              values: only(scalarColourValues(adjustmentColourAt(item, frame)), chosen),
+            },
+          }),
           transform: only(evaluateSpatial(track.transform, frame), chosen),
           ...(clipGrades.length > 0 && { clipGrades }),
         };

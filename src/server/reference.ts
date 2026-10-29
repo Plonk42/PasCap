@@ -1,10 +1,10 @@
 import { mkdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { generateCube, isNeutralLocalTone } from '../shared/colour.js';
+import { generateCube } from '../shared/colour.js';
 import type { MediaJob } from '../shared/media.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
 import { isNeutralDetail } from '../shared/detail.js';
-import { isNeutralClipGrade } from '../shared/grade.js';
+import { isStaticClipGrade } from '../shared/grade.js';
 import { hasSpatialEdits } from '../shared/spatial.js';
 import { blackFadeParts, calculateLayout, layerClips } from '../shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS, sameRate } from '../shared/timing.js';
@@ -36,10 +36,11 @@ export function validateReference(project: ProjectDocument, library: MediaLibrar
     );
   if (
     snapshot.layers.length !== 1 ||
-    snapshot.layers.some((layer) => !layer.enabled || layer.opacity !== 1 || layer.keyframes.length > 0)
+    snapshot.layers.some((layer) => !layer.enabled) ||
+    snapshot.adjustments.length > 0
   ) {
     throw new ServiceError(
-      'The diagnostic reference does not support video tracks, opacity or shared project-frame track keyframes (including speed). Use Export.',
+      'The diagnostic reference does not support several or hidden video tracks, or adjustments. Use Export.',
     );
   }
   if (snapshot.clips.some((clip) => clip.reverse || clip.speed.mode !== 'constant' || clip.speed.rate !== 1))
@@ -47,13 +48,12 @@ export function validateReference(project: ProjectDocument, library: MediaLibrar
       'The diagnostic reference only supports normal forward speed. Use Export for retimed or reversed clips.',
     );
   if (hasSpatialEdits(snapshot.layers[0]!.transform))
-    throw new ServiceError('The diagnostic reference does not support Transform edits or keyframes. Use Export.');
-  if (
-    snapshot.clips.some((clip) => !isNeutralDetail(clip.detail) || !isNeutralClipGrade(clip.grade)) ||
-    !isNeutralLocalTone(snapshot.layers[0]!.colour)
-  )
     throw new ServiceError(
-      'The diagnostic reference does not support clip grades, Shadows, Highlights, HDR, Sharpen, Clarity or Denoise. Use Export.',
+      'The diagnostic reference does not support Transform or Opacity edits or keyframes. Use Export.',
+    );
+  if (snapshot.clips.some((clip) => !isNeutralDetail(clip.detail) || !isStaticClipGrade(clip.grade)))
+    throw new ServiceError(
+      'The diagnostic reference supports only unkeyed clip grades without HSL ranges, curves, Shadows, Highlights, HDR or Local contrast, and no Sharpen, Clarity or Denoise. Use Export.',
     );
   const layout = calculateLayout(snapshot);
   const [left, right] = layout.clips;
@@ -102,7 +102,7 @@ export async function renderReference(
     for (const asset of assets) await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true); // NOSONAR -- read-only checks are deliberately serial.
     context.update(0.01, 'Generating 65³ LUTs from the CPU colour contract');
     for (const index of clips.keys())
-      await atomicWrite(path.join(directory, `clip-${index}.cube`), generateCube(layer.colour)); // NOSONAR -- bound CPU LUT generation to one at a time.
+      await atomicWrite(path.join(directory, `clip-${index}.cube`), generateCube(clips[index]!.grade.colour)); // NOSONAR -- bound CPU LUT generation to one at a time.
     const transition = layer.transitions[0]!;
     const black = transition.type === 'fade-through-black' ? blackFadeParts(transition.duration) : { out: 0, in: 0 };
     const chains = clips.map((clip, index) => {

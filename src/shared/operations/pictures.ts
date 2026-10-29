@@ -106,7 +106,7 @@ export const timelineSheet = defineOperation({
 export const recordingSheet = defineOperation({
   name: 'recording_sheet',
   description:
-    "Render source frames of one video recording's editing proxy as a contact sheet, without any track Colour or Transform, to choose footage before placing it. A single frame renders at the still width.",
+    "Render source frames of one video recording's editing proxy as a contact sheet, without any grade or Transform, to choose footage before placing it. A single frame renders at the still width.",
   input: z
     .object({
       mediaId: described(idSchema, 'ID of a prepared video recording.'),
@@ -151,7 +151,7 @@ const candidateSchema = z
 export const compareRecordings = defineOperation({
   name: 'compare_recordings',
   description:
-    "Show candidate shots from several video recordings in one contact sheet, without track Colour or Transform, to pick the best of similar takes before placing it. Each candidate takes `frames` cells in a row, spread across its range (frames 1 lays the candidates out row by row). A candidate without a range shows its recording's best steady range (rank 1) inside the kept ranges at the session's allowed movement, as describe_recording lists them, else its first kept range or the whole recording. The number of cells is limited by the service's image budget.",
+    "Show candidate shots from several video recordings in one contact sheet, without any grade or Transform, to pick the best of similar takes before placing it. Each candidate takes `frames` cells in a row, spread across its range (frames 1 lays the candidates out row by row). A candidate without a range shows its recording's best steady range (rank 1) inside the kept ranges at the session's allowed movement, as describe_recording lists them, else its first kept range or the whole recording. The number of cells is limited by the service's image budget.",
   input: z
     .object({
       projectId,

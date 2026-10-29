@@ -21,7 +21,7 @@ function span(start: number, end: number) {
 }
 
 /** "none", "static" or "N keyframes". */
-function gradeSummary(grade: ClipGrade): string {
+function gradeSummary(grade: Pick<ClipGrade, 'colour' | 'keyframes'>): string {
   if (grade.keyframes.length) return `${grade.keyframes.length} keyframe${grade.keyframes.length === 1 ? '' : 's'}`;
   return isNeutralClipGrade(grade) ? 'none' : 'static';
 }
@@ -45,8 +45,7 @@ export const runDescribeProject: OperationRunner<typeof describeProject> = async
         name: layer.name,
         enabled: layer.enabled,
         ripple: layer.ripple,
-        opacity: layer.opacity,
-        colourKeyframes: layer.keyframes.length,
+        opacity: layer.transform.base.opacity,
         transformKeyframes: layer.transform.keyframes.length,
         openingFade: layer.openingFade,
         closingFade: layer.closingFade,
@@ -101,6 +100,13 @@ export const runDescribeProject: OperationRunner<typeof describeProject> = async
     revision: project.revision,
     duration: durationOf(layout.duration),
     ...(parts.has('videoTracks') && { videoTracks: videoTracks() }),
+    ...(parts.has('adjustments') && {
+      adjustments: project.adjustments.map((item) => ({
+        id: item.id,
+        ...span(item.start, item.start + item.duration),
+        grade: gradeSummary(item),
+      })),
+    }),
     ...(parts.has('musicTracks') && { musicTracks: musicTracks() }),
     ...(parts.has('recordings') && {
       recordings: recordings(),

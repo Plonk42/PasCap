@@ -8,7 +8,6 @@ import {
   needsLayeredExport,
   type ExportProfile,
 } from '../shared/export.js';
-import { keySettings } from '../shared/keyframes.js';
 import type { MediaJob } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { calculateLayout } from '../shared/timeline.js';
@@ -30,17 +29,13 @@ export interface ExportDialogProps {
 }
 
 export function summarizeExport(project: ProjectDocument) {
-  const keys = { points: 0, settings: 0, colour: 0, opacity: 0 };
-  for (const layer of project.layers) {
-    keys.points += layer.keyframes.length;
-    for (const point of layer.keyframes) {
-      for (const setting of keySettings(point)) {
-        keys.settings++;
-        if (setting === 'opacity') keys.opacity++;
-        else keys.colour++;
-      }
+  const keys = { points: 0, settings: 0, transform: 0 };
+  for (const grade of [...project.clips.map((clip) => clip.grade), ...project.adjustments])
+    for (const point of grade.keyframes) {
+      keys.points++;
+      keys.settings += Object.values(point.values).filter((value) => value !== null).length;
     }
-  }
+  for (const layer of project.layers) keys.transform += layer.transform.keyframes.length;
   const layout = calculateLayout(project);
   const videoDuration = layout.clips.reduce((duration, clip) => Math.max(duration, clip.end), 0);
   return {
@@ -50,6 +45,7 @@ export function summarizeExport(project: ProjectDocument) {
     layers: project.layers.length,
     enabledLayers: project.layers.filter((layer) => layer.enabled).length,
     musicTracks: project.music.length,
+    adjustments: project.adjustments.length,
     keys,
     keyframeCount: keys.points,
     layered: needsLayeredExport(project),
@@ -219,7 +215,11 @@ export function ExportDialog({
               </dd>
             </div>
             <div>
-              <dt>Track keyframes</dt>
+              <dt>Adjustments</dt>
+              <dd>{summary.adjustments}</dd>
+            </div>
+            <div>
+              <dt>Colour keyframes</dt>
               <dd>
                 {summary.keyframeCount} <small>({summary.keys.settings} animated settings)</small>
               </dd>
@@ -230,8 +230,8 @@ export function ExportDialog({
             </div>
           </dl>
           <p>
-            The submitted edit includes clip speed and transforms, each video track’s Colour, Ripple, transitions and
-            fades, enabled video tracks, bottom-to-top composition order, track Opacity and keyframes
+            The submitted edit includes clip speed and grades, adjustments, each video track’s Transform and Opacity,
+            Ripple, transitions and fades, enabled video tracks, bottom-to-top composition order and keyframes
             {summary.musicTracks ? `, and all ${summary.musicTracks} music tracks` : '; no music tracks are placed'}.
             Later edits do not change a submitted render.
           </p>
@@ -245,8 +245,8 @@ export function ExportDialog({
           <p>After submission, rendering continues in Activity and the editor remains available.</p>
         </section>
         <p className="activity-hint">
-          {settings.width} × {settings.height} · {summary.keys.colour} colour values · {summary.keys.opacity} opacity
-          values.
+          {settings.width} × {settings.height} · {summary.keys.settings} keyed colour values ·{' '}
+          {summary.keys.transform} Transform keyframes.
         </p>
         {summary.layered ? (
           <aside className="activity-export-warning" aria-labelledby={`${id}-resources`}>

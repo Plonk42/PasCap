@@ -134,7 +134,7 @@ export function detailTapCount(settings: Readonly<DetailSettings>, localTone: bo
   );
 }
 
-/** Track Colour settings this stage evaluates at the project frame instead of the per-pixel grade. */
+/** Local tone settings of both grades, evaluated at the project frame instead of in the per-pixel grade. */
 export interface LocalTone {
   shadows: number;
   highlights: number;
@@ -216,7 +216,7 @@ export function denoiseRangeFactor(denoise: number): number {
  * Null when neutral.
  * `aspect` is the original width / height, so radii follow the image height.
  * `lines` is the sampled image's height in pixels.
- * `tone` holds the evaluated track Colour local tone settings at this project frame.
+ * `tone` holds the summed local tone settings of both grades at this project frame.
  */
 export function compileDetail(
   settings: Readonly<DetailSettings>,

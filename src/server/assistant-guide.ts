@@ -72,17 +72,19 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
 
 ## 6. Grade
 - Each clip has its own grade (a clipId on the colour commands), applied first and kept with
-  the clip when it moves; its track's Colour then applies to all its clips, for a shared look.
-  describe_track reads both before you change them: settings interact (Contrast with Shadows,
-  Highlights, Whites and Blacks shape one tone curve). Prefer static grades; animate only when
-  the brief asks or the light changes within a shot (clip keyframes are source frames). Once you
-  know the track, include keyframes or at with the settings you changed rather than all of it.
-- Start from estimate: auto-adjust on a representative clip (or the whole track) gives the
-  editor's Auto correction and the edit applying it; white-balance only Temperature and Tint;
-  detail suggests a clip's Denoise and Sharpen (clipIds or layerId: every clip in one call).
-  For a correction per shot, estimate with applyAs shots (layerId or clipIds) writes each clip's
-  own correction into its clip grade in one call; dissolves blend the two grades. Keep the track
-  Colour for the look shared by every shot.
+  the clip when it moves. An adjustment (adjustment-add, then an adjustmentId on the colour
+  commands) grades every track over a stretch of the film, after the clip grades, for a shared
+  look; adjustments never overlap. describe_track reads the grades before you change them:
+  settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve).
+  Prefer static grades; animate only when the brief asks or the light changes within a shot
+  (clip keyframes are source frames, adjustment keyframes count from its start). Once you know
+  the track, include keyframes or at with the settings you changed rather than all of it.
+- Start from estimate: auto-adjust on a representative clip gives the editor's Auto correction
+  and the edit applying it to its clip grade; white-balance only Temperature and Tint; detail
+  suggests a clip's Denoise and Sharpen (clipIds or layerId: every clip in one call). For a
+  correction per shot, estimate with applyAs shots (layerId or clipIds) writes each clip's own
+  correction into its clip grade in one call; dissolves blend the two grades. Keep adjustments
+  for the look shared by every shot of a stretch.
 - Change one setting with colour-setting, hsl-band, colour-curve or transform-setting, which
   keep every other value; a keyed setting follows its keyframes, so change those instead
   (layer-key-value). The colour and transform commands replace everything and suit a full grade.

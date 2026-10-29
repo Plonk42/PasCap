@@ -6,7 +6,7 @@ import { setImmediate as yieldToEvents } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
 import { isNeutralAdvancedColour, isNeutralLocalTone } from '../shared/colour.js';
 import { detailTapCount, isNeutralDetail } from '../shared/detail.js';
-import { usesLocalTone } from '../shared/keyframes.js';
+import { gradeUsesLocalTone, type ClipGrade } from '../shared/grade.js';
 import {
   LAYERED_EXPORT_RESOURCES,
   planLayeredExport,
@@ -18,7 +18,7 @@ import {
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
-import { hasSpatialEdits, isNeutralSpatial } from '../shared/spatial.js';
+import { hasGeometryEdits, isNeutralSpatial } from '../shared/spatial.js';
 import type { Retiming } from '../shared/speed.js';
 import {
   calculateLayout,
@@ -449,23 +449,29 @@ class SequentialLayeredRenderer {
   }
   /** Progress units of one composed frame, where a retimed or source-over frame is one unit. */
   private frameCost(layerId: string, clipIndexes: readonly number[]): number {
-    const layer = this.options.document.layers.find((item) => item.id === layerId)!;
-    const local = usesLocalTone(layer);
-    const taps = clipIndexes.reduce(
-      (sum, index) => sum + detailTapCount(this.options.document.clips[index]!.detail, local),
-      0,
-    );
+    const { document } = this.options;
+    const layer = document.layers.find((item) => item.id === layerId)!;
+    const adjustmentTone = document.adjustments.some(gradeUsesLocalTone);
+    const taps = clipIndexes.reduce((sum, index) => {
+      const clip = document.clips[index]!;
+      return sum + detailTapCount(clip.detail, adjustmentTone || gradeUsesLocalTone(clip.grade));
+    }, 0);
     if (this.#gpu && this.mayUseGpu(layer, clipIndexes)) return 1 + PROGRESS_UNITS_PER_GPU_FRAME;
     if (!taps) return 1;
     return 1 + PROGRESS_UNITS_PER_TAP * taps;
   }
   /** Whether any frame of these clips can need the GPU kernel (keyframes may evaluate neutral). */
   private mayUseGpu(layer: ProjectDocument['layers'][number], clipIndexes: readonly number[]): boolean {
+    const { document } = this.options;
+    const heavyGrade = (grade: Pick<ClipGrade, 'colour' | 'keyframes'>) =>
+      gradeUsesLocalTone(grade) || !isNeutralAdvancedColour(grade.colour);
     return (
-      usesLocalTone(layer) ||
-      !isNeutralAdvancedColour(layer.colour) ||
-      hasSpatialEdits(layer.transform) ||
-      clipIndexes.some((index) => !isNeutralDetail(this.options.document.clips[index]!.detail))
+      document.adjustments.some(heavyGrade) ||
+      hasGeometryEdits(layer.transform) ||
+      clipIndexes.some((index) => {
+        const clip = document.clips[index]!;
+        return !isNeutralDetail(clip.detail) || heavyGrade(clip.grade);
+      })
     );
   }
   private update(frames: number, message: string): void {

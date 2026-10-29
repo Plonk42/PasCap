@@ -7,62 +7,63 @@ import {
   type AutoCorrection,
 } from './auto-adjust.js';
 import type { EditCommand } from './commands.js';
+import type { ColourSettings } from './colour.js';
 import { MAX_GRADE_KEYFRAMES } from './grade.js';
-import { activeLayerSetting, hasLayerKeys, type KeyframeSetting } from './keyframes.js';
-import { MAX_TRACK_KEYFRAMES, type VideoLayer } from './model.js';
+import { activeLayerSetting, hasLayerKeys, type KeyframeSetting, type LayerKeyframe } from './keyframes.js';
 import type { PlacedClip } from './timeline.js';
 import type { WhiteBalance } from './white-balance.js';
 
 /** The edits of Auto adjust and Auto white balance, shared by the editor and the `estimate` operation. */
 
-/**
- * What an edit changes: a track's Colour, or a clip's grade shown in the track's shape (its keyframes and frames are
- * then source frames of the recording).
- */
-export type AutoOwner = { kind: 'track'; layerId: string } | { kind: 'clip'; clipId: string };
+/** What an edit changes: a clip's grade (keyframes at source frames) or an adjustment (frames from its start). */
+export type AutoOwner = { kind: 'clip'; clipId: string } | { kind: 'adjustment'; adjustmentId: string };
 
-export const trackOwner = (layer: VideoLayer): AutoOwner => ({ kind: 'track', layerId: layer.id });
+/** A grade's Colour and keyframes, in the track keyframe shape the keyframe tools read. */
+export interface GradeValues {
+  colour: ColourSettings;
+  keyframes: readonly LayerKeyframe[];
+}
 
 const keyTarget = (owner: AutoOwner) =>
-  owner.kind === 'track' ? { layerId: owner.layerId } : { clipId: owner.clipId };
+  owner.kind === 'clip' ? { clipId: owner.clipId } : { adjustmentId: owner.adjustmentId };
 
-/** Why no keyframe can be captured at `frame`: the track or clip grade is full and none is there to join. */
-export function keyframeLimitReason(layer: VideoLayer, frame: number, owner = trackOwner(layer)): string | null {
-  const limit = owner.kind === 'track' ? MAX_TRACK_KEYFRAMES : MAX_GRADE_KEYFRAMES;
-  if (layer.keyframes.length < limit || layer.keyframes.some((key) => key.frame === frame)) return null;
-  return owner.kind === 'track'
-    ? `This track already has ${limit} keyframes. Move the playhead to one of them, or remove one.`
-    : `This clip's grade already has ${limit} keyframes. Move the playhead to one of them, or remove one.`;
+/** Why no keyframe can be captured at `frame`: the grade is full and none is there to join. */
+export function keyframeLimitReason(grade: GradeValues, frame: number, owner: AutoOwner): string | null {
+  if (grade.keyframes.length < MAX_GRADE_KEYFRAMES || grade.keyframes.some((key) => key.frame === frame)) return null;
+  const what = owner.kind === 'clip' ? "This clip's grade" : 'This adjustment';
+  return `${what} already has ${MAX_GRADE_KEYFRAMES} keyframes. Move the playhead to one of them, or remove one.`;
 }
 
 /** Captures each value at `frame` exactly like its diamond (joining or overwriting), in one transaction. */
 export function captureCommands(
-  layer: VideoLayer,
+  grade: GradeValues,
   frame: number,
   values: Readonly<Partial<Record<KeyframeSetting, number>>>,
-  owner = trackOwner(layer),
+  owner: AutoOwner,
 ): EditCommand[] {
-  return (Object.entries(values) as [KeyframeSetting, number][]).map(([setting, value]): EditCommand => {
-    const capture = { ...keyTarget(owner), frame, setting, value };
-    return activeLayerSetting(layer, setting, frame)
-      ? { type: 'layer-key-value', ...capture }
-      : { type: 'layer-key-toggle', ...capture };
-  });
+  return (Object.entries(values) as [Exclude<KeyframeSetting, 'opacity'>, number][]).map(
+    ([setting, value]): EditCommand => {
+      const capture = { ...keyTarget(owner), frame, setting, value };
+      return activeLayerSetting(grade, setting, frame)
+        ? { type: 'layer-key-value', ...capture }
+        : { type: 'layer-key-toggle', ...capture };
+    },
+  );
 }
 
 /** Captures both settings at the playhead exactly like their diamonds, in one transaction. */
 export function whiteBalanceCommands(
-  layer: VideoLayer,
+  grade: GradeValues,
   frame: number,
   balance: WhiteBalance,
-  owner = trackOwner(layer),
+  owner: AutoOwner,
 ): EditCommand[] {
-  return captureCommands(layer, frame, { temperature: balance.temperature, tint: balance.tint }, owner);
+  return captureCommands(grade, frame, { temperature: balance.temperature, tint: balance.tint }, owner);
 }
 
-/** The settings Auto sets that this track animates: Auto leaves them unchanged. */
-export function animatedSettings(layer: VideoLayer): AutoAdjustSetting[] {
-  return AUTO_ADJUST_SETTINGS.filter((setting) => hasLayerKeys(layer, setting));
+/** The settings Auto sets that this grade animates: Auto leaves them unchanged. */
+export function animatedSettings(grade: GradeValues): AutoAdjustSetting[] {
+  return AUTO_ADJUST_SETTINGS.filter((setting) => hasLayerKeys(grade, setting));
 }
 
 /**
@@ -70,20 +71,20 @@ export function animatedSettings(layer: VideoLayer): AutoAdjustSetting[] {
  * settings, except animated ones. Null when every one of them is animated.
  */
 export function autoAdjustCommand(
-  layer: VideoLayer,
+  grade: GradeValues,
   correction: Readonly<AutoCorrection>,
   intensity: number,
-  owner = trackOwner(layer),
+  owner: AutoOwner,
 ): EditCommand | null {
-  const animated = new Set(animatedSettings(layer));
+  const animated = new Set(animatedSettings(grade));
   const settings = AUTO_ADJUST_SETTINGS.filter((setting) => !animated.has(setting));
   if (!settings.length) return null;
   const scaled = scaleCorrection(correction, intensity);
-  const colour = { ...layer.colour };
+  const colour = { ...grade.colour };
   for (const setting of settings) colour[setting] = scaled[setting];
-  return owner.kind === 'track'
-    ? { type: 'colour', layerId: owner.layerId, colour }
-    : { type: 'colour', clipIds: [owner.clipId], colour };
+  return owner.kind === 'clip'
+    ? { type: 'colour', clipIds: [owner.clipId], colour }
+    : { type: 'colour', adjustmentId: owner.adjustmentId, colour };
 }
 
 /** Source frames shown at the project frames within 1 s of `frame` in `clip`, each once. */
