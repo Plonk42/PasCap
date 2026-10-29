@@ -30,7 +30,9 @@ import { ColourKeyframeList } from './ColourKeyframeList.js';
 import {
   clipColourOwner,
   colourTarget,
+  displayedColour,
   gradeSeekFrame,
+  gradeValuePosition,
   isClipOwner,
   ownerTarget,
   type ColourOwner,
@@ -340,6 +342,7 @@ function ColourSection({
   disabled,
   onEdit,
   id,
+  valueFrame = frame,
 }: Readonly<
   LayerControlProps & {
     project: ProjectDocument;
@@ -348,6 +351,8 @@ function ColourSection({
     assets: readonly MediaAsset[];
     selectedClipId: string | null;
     id: string;
+    /** Where the image evaluates the values, when it differs from the frame keyframes are captured at. */
+    valueFrame?: number;
   }
 >) {
   const colour = colourAt(layer, frame);
@@ -454,6 +459,7 @@ function ColourSection({
             group={group}
             layer={layer}
             frame={frame}
+            valueFrame={valueFrame}
             resetKey={resetKey}
             disabled={disabled}
             onEdit={onEdit}
@@ -496,8 +502,11 @@ function ColourGroup({
   onEdit,
   id,
   afterTint,
-}: Readonly<LayerControlProps & { group: (typeof COLOUR_GROUPS)[number]; id: string; afterTint: ReactNode }>) {
-  const colour = colourAt(layer, frame);
+  valueFrame,
+}: Readonly<
+  LayerControlProps & { group: (typeof COLOUR_GROUPS)[number]; id: string; afterTint: ReactNode; valueFrame: number }
+>) {
+  const colour = displayedColour(layer, frame, valueFrame);
   const headingId = `${id}-group-${group.name.toLowerCase()}`;
   const neutral = group.settings.every((setting) =>
     setting === 'opacity'
@@ -915,6 +924,12 @@ interface ColourTabProps {
   onSeek: (frame: number) => void;
 }
 
+/** A clip grade's source frame at the playhead, for keyframes, and where the image evaluates it; -1 off the clip. */
+function gradeFrames(placed: PlacedClip | undefined, projectFrame: number, sourceFrame: number | null) {
+  if (!placed || sourceFrame === null) return { frame: -1, valueFrame: -1 };
+  return { frame: sourceFrame, valueFrame: gradeValuePosition(placed, projectFrame) };
+}
+
 /** Colour, HSL ranges and Colour curves for the selected clip's grade or its track's Colour. */
 function ColourTab(props: Readonly<ColourTabProps>) {
   const { project, layer, clip, placed, asset, target, drafting, onEdit, onPreview, onPause, onSeek } = props;
@@ -945,7 +960,9 @@ function ColourTab(props: Readonly<ColourTabProps>) {
     );
   const clipName = asset ? shortName(asset.name) : 'Unavailable recording';
   const owner: ColourOwner = gradeClip ? clipColourOwner(layer, gradeClip, `${props.clipLabel} (${clipName})`) : layer;
-  const frame = gradeClip ? (props.sourceFrame ?? -1) : props.frame;
+  const { frame, valueFrame } = gradeClip
+    ? gradeFrames(placed, props.frame, props.sourceFrame)
+    : { frame: props.frame, valueFrame: props.frame };
   const resetKey = `${props.resetKey}:${owner.id}:${frame}`;
   return (
     <>
@@ -970,6 +987,7 @@ function ColourTab(props: Readonly<ColourTabProps>) {
           disabled={drafting}
           onEdit={onEdit}
           id={props.id}
+          valueFrame={valueFrame}
         />
       </KeyframeNavigationContext.Provider>
       <HslRangesSection
