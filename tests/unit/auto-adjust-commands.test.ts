@@ -7,9 +7,9 @@ import {
   scaleCorrection,
   type AutoCorrection,
 } from '../../src/shared/auto-adjust.js';
-import { animatedSettings, autoAdjustCommand, trackSamples } from '../../src/shared/auto-colour.js';
+import { animatedSettings, autoAdjustCommand, trackSamples, type AutoOwner } from '../../src/shared/auto-colour.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
-import { layerKeyAsGradeKey, MAX_GRADE_KEYFRAMES } from '../../src/shared/grade.js';
+import { createAdjustment, layerKeyAsGradeKey, MAX_GRADE_KEYFRAMES } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
@@ -27,7 +27,7 @@ import {
   type AutoAdjustContext,
   type AutoAdjustSource,
 } from '../../src/web/auto-adjust.js';
-import { gradeOwnerOf } from '../../src/web/colour-owner.js';
+import { adjustmentColourOwner, gradeOwnerOf } from '../../src/web/colour-owner.js';
 import { analysisAsset as asset } from './analysis-asset.js';
 
 /** Clip A (source 100–400) cut to a reversed clip B (source 0–300 at 2×), on one track; an empty second track. */
@@ -133,21 +133,30 @@ describe('Auto adjust target', () => {
 });
 
 describe('Auto adjust edit', () => {
-  it('replaces the eleven settings with the scaled correction in one Colour edit and one Undo step', () => {
+  const LOOK: AutoOwner = { kind: 'adjustment', adjustmentId: 'look' };
+  /** The project with an adjustment over its first clip. */
+  function adjusted(): ProjectDocument {
     const document = project();
-    const layer = document.layers[0]!;
-    layer.colour = { ...layer.colour, hue: 12, vibrance: 0.4, hdr: 0.3, localContrast: 0.2, exposure: -1 };
-    layer.colour.hsl.red.saturation = 0.25;
-    layer.opacity = 0.8;
+    document.adjustments = [createAdjustment('look', 0, 300)];
+    return document;
+  }
+  const look = (document: ProjectDocument) => adjustmentColourOwner(document.adjustments[0]!, 'look');
+
+  it('replaces the eleven settings with the scaled correction in one Colour edit and one Undo step', () => {
+    const document = adjusted();
+    const item = document.adjustments[0]!;
+    item.colour = { ...item.colour, hue: 12, vibrance: 0.4, hdr: 0.3, localContrast: 0.2, exposure: -1 };
+    item.colour.hsl.red.saturation = 0.25;
+    document.layers[0]!.transform.base.opacity = 0.8;
     const before = structuredClone(document);
-    const command = autoAdjustCommand(layer, CORRECTION, 0.5)!;
+    const command = autoAdjustCommand(look(document), CORRECTION, 0.5, LOOK)!;
     const next = applyCommand(document, command);
     const scaled = scaleCorrection(CORRECTION, 0.5);
-    expect(next.layers[0]!.colour).toEqual({ ...layer.colour, ...scaled });
-    // Hue, HDR, Local contrast, HSL, curves, Opacity, Transform and keyframes are untouched.
-    expect({ ...next.layers[0]!, colour: before.layers[0]!.colour }).toEqual(before.layers[0]);
-    expect(next.layers[0]!.colour.hsl).toEqual(before.layers[0]!.colour.hsl);
-    expect(next.layers[1]).toEqual(before.layers[1]);
+    expect(next.adjustments[0]!.colour).toEqual({ ...item.colour, ...scaled });
+    // Hue, HDR, Local contrast, HSL, curves, keyframes, the range, the tracks (Opacity, Transform) and clips are untouched.
+    expect({ ...next.adjustments[0]!, colour: before.adjustments[0]!.colour }).toEqual(before.adjustments[0]);
+    expect(next.adjustments[0]!.colour.hsl).toEqual(before.adjustments[0]!.colour.hsl);
+    expect(next.layers).toEqual(before.layers);
     expect(next.clips).toEqual(before.clips);
     const history = new EditHistory(document);
     history.replace(next);
@@ -156,46 +165,51 @@ describe('Auto adjust edit', () => {
   });
 
   it('leaves animated settings and every keyframe unchanged, and reports them', () => {
-    const document = project();
-    const layer = document.layers[0]!;
-    layer.colour.exposure = 0.25;
-    layer.keyframes = [
-      layerKeyframe(20, { ...EMPTY_KEY_VALUES, exposure: 0.5, hue: 10 }, 'smooth'),
-      layerKeyframe(90, { ...EMPTY_KEY_VALUES, saturation: 1.3 }, 'linear'),
+    const document = adjusted();
+    const item = document.adjustments[0]!;
+    item.colour.exposure = 0.25;
+    item.keyframes = [
+      layerKeyAsGradeKey(layerKeyframe(20, { ...EMPTY_KEY_VALUES, exposure: 0.5, hue: 10 }, 'smooth')),
+      layerKeyAsGradeKey(layerKeyframe(90, { ...EMPTY_KEY_VALUES, saturation: 1.3 }, 'linear')),
     ];
-    expect(animatedSettings(layer).map(settingLabel)).toEqual(['Saturation', 'Exposure']);
-    const next = applyCommand(document, autoAdjustCommand(layer, CORRECTION, AUTO_ADJUST.balancedIntensity)!);
-    const colour = next.layers[0]!.colour;
+    expect(animatedSettings(look(document)).map(settingLabel)).toEqual(['Saturation', 'Exposure']);
+    const next = applyCommand(
+      document,
+      autoAdjustCommand(look(document), CORRECTION, AUTO_ADJUST.balancedIntensity, LOOK)!,
+    );
+    const colour = next.adjustments[0]!.colour;
     expect(colour.exposure).toBe(0.25);
-    expect(colour.saturation).toBe(layer.colour.saturation);
+    expect(colour.saturation).toBe(item.colour.saturation);
     expect(colour.contrast).toBe(CORRECTION.contrast);
     expect(colour.blacks).toBe(CORRECTION.blacks);
-    expect(next.layers[0]!.keyframes).toEqual(layer.keyframes);
+    expect(next.adjustments[0]!.keyframes).toEqual(item.keyframes);
   });
 
   it('has nothing to apply when all eleven settings are animated', () => {
-    const layer = project().layers[0]!;
-    layer.keyframes = [
-      layerKeyframe(
-        20,
-        {
-          ...EMPTY_KEY_VALUES,
-          temperature: 0,
-          tint: 0,
-          saturation: 1,
-          vibrance: 0,
-          exposure: 0,
-          brightness: 0,
-          contrast: 1,
-          highlights: 0,
-          shadows: 0,
-          whites: 0,
-          blacks: 0,
-        },
-        'linear',
+    const document = adjusted();
+    document.adjustments[0]!.keyframes = [
+      layerKeyAsGradeKey(
+        layerKeyframe(
+          20,
+          {
+            ...EMPTY_KEY_VALUES,
+            temperature: 0,
+            tint: 0,
+            saturation: 1,
+            vibrance: 0,
+            exposure: 0,
+            brightness: 0,
+            contrast: 1,
+            highlights: 0,
+            shadows: 0,
+            whites: 0,
+            blacks: 0,
+          },
+          'linear',
+        ),
       ),
     ];
-    expect(autoAdjustCommand(layer, CORRECTION, 1)).toBeNull();
+    expect(autoAdjustCommand(look(document), CORRECTION, 1, LOOK)).toBeNull();
   });
 });
 

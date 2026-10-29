@@ -33,6 +33,7 @@ const NO_VALUES = {
   translateX: null,
   translateY: null,
   rotation: null,
+  opacity: null,
 };
 
 function key(frame: number, values: Partial<SpatialKeyValues>, curve: Interpolation): SpatialKeyframe {
@@ -40,10 +41,10 @@ function key(frame: number, values: Partial<SpatialKeyValues>, curve: Interpolat
 }
 
 describe('per-setting track Transform editor', () => {
-  it('exposes all eight exact value controls and edits only the unanimated base', () => {
+  it('exposes all nine exact value controls, Opacity included, and edits only the unanimated base', () => {
     expect(SPATIAL_CONTROLS.map((control) => control.key)).toEqual(Object.keys(NEUTRAL_SPATIAL_POSE));
     let settings = createSpatialSettings();
-    const values = [0.1234567, 0.2, 0.3, 0.4, 1.234567, -0.1234567, 0.1234567, 17.1234567];
+    const values = [0.1234567, 0.2, 0.3, 0.4, 1.234567, -0.1234567, 0.1234567, 17.1234567, 0.4567891];
     for (const [index, control] of SPATIAL_CONTROLS.entries()) {
       settings = editSpatialPose(settings, null, control.key, values[index]!);
       expect(settings.base[control.key]).toBe(values[index]);

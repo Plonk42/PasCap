@@ -13,6 +13,7 @@ import {
 } from '../../src/server/stills.js';
 import { createColourSettings } from '../../src/shared/colour.js';
 import { compositePixel } from '../../src/shared/composition.js';
+import { createAdjustment, createClipGrade } from '../../src/shared/grade.js';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
@@ -52,25 +53,21 @@ function context(read: (media: MediaAsset, sourceFrame: number) => Promise<Buffe
   return { assetOf: (id: string) => asset(id), decode: read, cache: new ColourLutCache(), signal };
 }
 
-/** Track 1: A dissolving into B; track 2 above at Opacity 0.6 with Exposure 0.5. */
+/** Track 1: A dissolving into B; track 2 above at Opacity 0.6, its clip C graded Exposure 0.5; a warm adjustment over all. */
 function dissolveProject(): ProjectDocument {
   const base = createProject('stills', 'Stills');
-  const overlay = {
-    ...createLayer('video-2', 'Overlay'),
-    opacity: 0.6,
-    colour: { ...createColourSettings(), exposure: 0.5 },
-  };
+  const overlay = createLayer('video-2', 'Overlay');
+  overlay.transform.base.opacity = 0.6;
+  const graded = clip('c', 'rec-c', 'video-2', 0, 100);
+  graded.grade.colour.exposure = 0.5;
   return projectSchema.parse({
     ...base,
     layers: [
       { ...base.layers[0]!, transitions: [{ leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 20 }] },
       overlay,
     ],
-    clips: [
-      clip('a', 'rec-a', 'video-1', 0, 60),
-      clip('b', 'rec-b', 'video-1', 40, 60),
-      clip('c', 'rec-c', 'video-2', 0, 100),
-    ],
+    clips: [clip('a', 'rec-a', 'video-1', 0, 60), clip('b', 'rec-b', 'video-1', 40, 60), graded],
+    adjustments: [{ ...createAdjustment('warm', 30, 40), colour: { ...createColourSettings(), temperature: 0.4 } }],
   });
 }
 
@@ -85,10 +82,15 @@ describe('project stills', () => {
     const composed = await composeProjectFrame(document, layout, 50, context(decode));
     const output = new Uint16Array(composed.buffer, composed.byteOffset, PIXELS * 4);
     const samples = sampleTimeline(document, 50, layout);
-    expect(samples.map((sample) => [sample.clipId, sample.blendWeight])).toEqual([
-      ['a', 0.5],
-      ['b', 0.5],
-      ['c', 1],
+    expect(samples.map((sample) => [sample.clipId, sample.blendWeight, sample.opacity])).toEqual([
+      ['a', 0.5, 1],
+      ['b', 0.5, 1],
+      ['c', 1, 0.6],
+    ]);
+    expect(samples.map((sample) => [sample.grade.exposure, sample.colour.temperature])).toEqual([
+      [0, 0.4],
+      [0, 0.4],
+      [0.5, 0.4],
     ]);
     let error = 0;
     const checked = Array.from({ length: 400 }, (_, index) => (index * 2_311) % PIXELS);
@@ -113,12 +115,16 @@ describe('project stills', () => {
     };
     const plain = projectSchema.parse({
       ...graded,
-      layers: graded.layers.map((layer) => ({ ...layer, colour: createColourSettings() })),
+      clips: graded.clips.map((item) => ({ ...item, grade: createClipGrade() })),
+      adjustments: [],
     });
-    const layout = calculateLayout(graded);
-    const original = await composeProjectFrame(detailed, layout, 50, { ...context(decode), ungraded: true });
-    expect(original.equals(await composeProjectFrame(plain, layout, 50, context(decode)))).toBe(true);
-    expect(original.equals(await composeProjectFrame(graded, layout, 50, context(decode)))).toBe(false);
+    // Each document with its own layout: clip grades and detail travel with the placed clips.
+    const compose = (document: ProjectDocument, ungraded = false) =>
+      composeProjectFrame(document, calculateLayout(document), 50, { ...context(decode), ungraded });
+    const original = await compose(detailed, true);
+    expect(original.equals(await compose(plain))).toBe(true);
+    expect(original.equals(await compose(graded))).toBe(false);
+    expect(original.equals(await compose(detailed))).toBe(false);
   });
 
   it('draws a transition timeslot as opaque black geometry without decoding it', async () => {

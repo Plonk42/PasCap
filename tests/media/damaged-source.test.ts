@@ -208,7 +208,7 @@ describe.skipIf(!enabled)('damaged originals · disposable native fixtures', () 
     const reversed = createProject('damaged-reversed', 'Disposable damaged reversed');
     reversed.clips = [{ ...createClip('reversed', asset.id, 25, 65), reverse: true }];
     reversed.media.videoIds = [asset.id];
-    reversed.layers[0]!.opacity = 0.9;
+    reversed.layers[0]!.transform.base.opacity = 0.9;
     // Output frame f shows source frame 64 - f.
     expectBlack(await exported(reversed, 'sequential-layered'), (frame) => 64 - frame >= 30 && 64 - frame < 60);
     expect(await readFile(asset.sourcePath)).toEqual(originalBytes);

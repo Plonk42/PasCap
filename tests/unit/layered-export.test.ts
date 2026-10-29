@@ -21,7 +21,7 @@ import {
   type ColourSettings,
   type RGB,
 } from '../../src/shared/colour.js';
-import { colourAt, compositePixel } from '../../src/shared/composition.js';
+import { adjustmentColour, compositePixel } from '../../src/shared/composition.js';
 import {
   exportRequestSchema,
   LAYERED_EXPORT_RESOURCES,
@@ -29,6 +29,7 @@ import {
   planExport,
   planLayeredExport,
 } from '../../src/shared/export.js';
+import { createAdjustment, layerKeyAsGradeKey, type Adjustment } from '../../src/shared/grade.js';
 import {
   EMPTY_KEY_VALUES,
   type Interpolation,
@@ -48,9 +49,15 @@ import {
   type VideoLayer,
 } from '../../src/shared/model.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
-import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
+import {
+  NEUTRAL_SPATIAL_POSE,
+  SPATIAL_CHANNELS,
+  type SpatialChannel,
+  type SpatialKeyframe,
+  type SpatialKeyValues,
+} from '../../src/shared/spatial.js';
 import { compileRetiming, type Retiming } from '../../src/shared/speed.js';
-import { calculateLayout, type PreviewLayer } from '../../src/shared/timeline.js';
+import { calculateLayout, sampleTimeline, type PreviewLayer } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
 import { EARLIER_SCHEMA_VERSIONS, SUPPORTED_VERSIONS, unsupportedProject } from './project-fixtures.js';
 
@@ -74,6 +81,21 @@ function document(): ProjectDocument {
 }
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
   return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
+}
+const NO_TRANSFORM = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<
+  SpatialChannel,
+  null
+>;
+function transformKey(
+  frame: number,
+  values: Partial<SpatialKeyValues>,
+  interpolation: Interpolation = 'linear',
+): SpatialKeyframe {
+  return { ...uniformKeyframe(frame, { ...NO_TRANSFORM, ...values }, interpolation), reset: false };
+}
+/** A long adjustment; started at 0, its keyframe frames are project frames. It never extends the project. */
+function look(keyframes: LayerKeyframe[], start = 0): Adjustment {
+  return { ...createAdjustment('look', start, 10_000), keyframes: keyframes.map(layerKeyAsGradeKey) };
 }
 function layer(id = 'video-2'): VideoLayer {
   return createLayer(id, id, false);
@@ -116,7 +138,7 @@ function fakeLibrary(): MediaLibrary {
 }
 
 describe('current-schema production dispatch and read-only validation', () => {
-  it('keeps static constant/curve speed on the cheap path and dispatches shared track points with their placed map', () => {
+  it('keeps static constant/curve speed on the cheap path and dispatches keyed adjustments with their placed map', () => {
     const project = document();
     expect(needsLayeredExport(project)).toBe(false);
     expect(planExport(project).duration).toBe(compileRetiming(project.clips[0]!).duration);
@@ -134,7 +156,7 @@ describe('current-schema production dispatch and read-only validation', () => {
       expect(needsLayeredExport(project)).toBe(false);
       expect(planExport(project).duration).toBe(compileRetiming(project.clips[0]!).duration);
     }
-    project.layers[0]!.keyframes = [point(0, { exposure: 0.5 }, 'smooth'), point(40, { exposure: 2 }, 'hold')];
+    project.adjustments = [look([point(0, { exposure: 0.5 }, 'smooth'), point(40, { exposure: 2 }, 'hold')])];
     expect(needsLayeredExport(project)).toBe(true);
     expect(() => planExport(project)).toThrow('layered exporter');
     const placed = calculateLayout(project).clips[0]!;
@@ -163,19 +185,25 @@ describe('current-schema production dispatch and read-only validation', () => {
         project.layers[0]!.enabled = false;
       },
       (project) => {
-        project.layers[0]!.opacity = 0.4;
+        project.layers[0]!.transform.base.opacity = 0.4;
       },
       (project) => {
-        project.layers[0]!.opacity = 0;
+        project.layers[0]!.transform.base.opacity = 0;
       },
       (project) => {
-        project.layers[0]!.keyframes = [point(7, { opacity: 1 }, 'hold')];
+        project.layers[0]!.transform.keyframes = [transformKey(7, { opacity: 1 }, 'hold')];
       },
       (project) => {
-        project.layers[0]!.keyframes = [point(7, scalarColourValues(NEUTRAL_COLOUR))];
+        project.adjustments = [createAdjustment('look', 0, 5)];
+      },
+      (project) => {
+        project.adjustments = [look([point(7, scalarColourValues(NEUTRAL_COLOUR))])];
+      },
+      (project) => {
+        project.clips[0]!.grade.keyframes = [layerKeyAsGradeKey(point(7, scalarColourValues(NEUTRAL_COLOUR)))];
       },
       ...COLOUR_CONTROLS.map(({ key }) => (project: ProjectDocument) => {
-        project.layers[0]!.keyframes = [point(7, { [key]: NEUTRAL_COLOUR[key] })];
+        project.clips[0]!.grade.keyframes = [layerKeyAsGradeKey(point(7, { [key]: NEUTRAL_COLOUR[key] }))];
       }),
     ];
     for (const change of variants) {
@@ -233,17 +261,29 @@ describe('current-schema production dispatch and read-only validation', () => {
     expect(projectSchema.safeParse({ ...project, media: undefined }).success).toBe(false);
     expect(projectSchema.safeParse({ ...project, layers: [...project.layers, layer('video-9')] }).success).toBe(false);
     expect(projectSchema.safeParse({ ...project, layers: undefined }).success).toBe(false);
-    const { keyframes: _keyframes, ...incompleteLayer } = project.layers[0]!;
+    const { transform: _transform, ...incompleteLayer } = project.layers[0]!;
     expect(projectSchema.safeParse({ ...project, layers: [incompleteLayer, ...project.layers.slice(1)] }).success).toBe(
+      false,
+    );
+    expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], grade: undefined }] }).success).toBe(
       false,
     );
     expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], colour: undefined }] }).success).toBe(
       false,
     );
     expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], opacity: 1 }] }).success).toBe(false);
+    const { opacity: _opacity, ...transparentPose } = project.layers[0]!.transform.base;
     expect(
-      projectSchema.safeParse({ ...project, layers: [{ ...project.layers[0], opacity: undefined }] }).success,
+      projectSchema.safeParse({
+        ...project,
+        layers: [{ ...project.layers[0], transform: { ...project.layers[0]!.transform, base: transparentPose } }],
+      }).success,
     ).toBe(false);
+    // A track has no Colour, Opacity or keyframes of its own.
+    for (const removed of [{ opacity: 1 }, { colour: createColourSettings() }, { keyframes: [] }])
+      expect(projectSchema.safeParse({ ...project, layers: [{ ...project.layers[0], ...removed }] }).success).toBe(
+        false,
+      );
     expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], speed: undefined }] }).success).toBe(
       false,
     );
@@ -270,7 +310,8 @@ describe('current-schema production dispatch and read-only validation', () => {
     ];
     project.layers[0]!.transitions = [{ type: 'cross-dissolve', leftId: 'left', rightId: 'right', duration: 2 }];
     project.layers[1]!.transitions = [{ type: 'cut', leftId: 'overlay-early', rightId: 'overlay-late', duration: 0 }];
-    project.layers[0]!.keyframes = [point(3, { opacity: 0.65, exposure: 0.4 }, 'hold')];
+    project.layers[0]!.transform.keyframes = [transformKey(3, { opacity: 0.65 }, 'hold')];
+    project.adjustments = [look([point(3, { exposure: 0.4 }, 'hold')])];
     const plan = planLayeredExport(project);
     expect(plan.duration).toBe(20);
     expect(plan.layers[0]!.plan.duration).toBe(10);
@@ -288,15 +329,19 @@ describe('current-schema production dispatch and read-only validation', () => {
     const snapshot = validateExport(project, library);
     expect(library.get).toHaveBeenCalledWith('hidden-source');
     expect(snapshot.clips).toHaveLength(5);
-    project.layers[0]!.opacity = 0;
-    project.layers[0]!.keyframes[0]!.values.exposure = -1;
+    project.layers[0]!.transform.base.opacity = 0;
+    project.layers[0]!.transform.keyframes[0]!.values.opacity = 0.1;
+    project.adjustments[0]!.keyframes[0]!.values.exposure = -1;
     expect(snapshot.clips[0]).not.toHaveProperty('opacity');
-    expect(snapshot.layers[0]!.opacity).toBe(1);
-    expect(snapshot.layers[0]!.keyframes[0]!.values.exposure).toBe(0.4);
-    expect(Object.isFrozen(snapshot.layers[0]!.keyframes)).toBe(true);
-    expect(Object.isFrozen(snapshot.layers[0]!.keyframes[0])).toBe(true);
-    expect(Object.isFrozen(snapshot.layers[0]!.keyframes[0]!.values)).toBe(true);
-    expect(Object.isFrozen(snapshot.layers[0]!.colour)).toBe(true);
+    expect(snapshot.layers[0]!.transform.base.opacity).toBe(1);
+    expect(snapshot.layers[0]!.transform.keyframes[0]!.values.opacity).toBe(0.65);
+    expect(snapshot.adjustments[0]!.keyframes[0]!.values.exposure).toBe(0.4);
+    expect(Object.isFrozen(snapshot.adjustments)).toBe(true);
+    expect(Object.isFrozen(snapshot.adjustments[0]!.keyframes)).toBe(true);
+    expect(Object.isFrozen(snapshot.adjustments[0]!.keyframes[0])).toBe(true);
+    expect(Object.isFrozen(snapshot.adjustments[0]!.keyframes[0]!.values)).toBe(true);
+    expect(Object.isFrozen(snapshot.adjustments[0]!.colour)).toBe(true);
+    expect(Object.isFrozen(snapshot.clips[0]!.grade.colour)).toBe(true);
   });
   it('strictly loads the current schema but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
     const directory = await temp();
@@ -371,16 +416,22 @@ describe('current-schema production dispatch and read-only validation', () => {
         project.layers.push(layer());
       },
       (project: ProjectDocument) => {
-        project.layers[0]!.opacity = 0.5;
+        project.layers[0]!.transform.base.opacity = 0.5;
       },
       (project: ProjectDocument) => {
-        project.layers[0]!.keyframes.push(point(2, { opacity: 0 }, 'hold'));
+        project.layers[0]!.transform.keyframes.push(transformKey(2, { opacity: 0 }, 'hold'));
       },
       (project: ProjectDocument) => {
-        project.layers[0]!.keyframes.push(point(7, scalarColourValues(NEUTRAL_COLOUR)));
+        project.adjustments.push(createAdjustment('look', 0, 5));
       },
       (project: ProjectDocument) => {
-        project.layers[0]!.keyframes.push(point(7, { opacity: 0.5 }, 'smooth'));
+        project.clips[0]!.grade.keyframes.push(layerKeyAsGradeKey(point(7, scalarColourValues(NEUTRAL_COLOUR))));
+      },
+      (project: ProjectDocument) => {
+        project.clips[1]!.grade.colour.hdr = 0.3;
+      },
+      (project: ProjectDocument) => {
+        project.layers[0]!.transform.keyframes.push(transformKey(7, { opacity: 0.5 }, 'smooth'));
       },
     ]) {
       const project = structuredClone(plain);
@@ -693,13 +744,13 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
     console.log(`Layered Float32 tetrahedral 65³ LUT maximum mean error: ${maximumMae.toFixed(4)} / 255`);
   });
   it('evaluates interpolated colour PARAMETERS at the absolute project frame, not original source time or endpoint RGB grades', async () => {
-    const clip = createClip('animated', 'video', 200, 210);
-    const row = layer();
-    clip.layerId = row.id;
-    clip.start = 20;
-    row.keyframes = [point(10, { exposure: -2 }), point(40, { exposure: 2 }, 'hold')];
-    expect(compileRetiming(clip).sourceAt(5)).toBe(205);
-    const settings = colourAt(row, 25);
+    const project = document();
+    project.clips = [{ ...createClip('animated', 'video', 200, 210), start: 20 }];
+    // Started at frame 5, the adjustment's keyframes at 5 and 35 sit on project frames 10 and 40.
+    project.adjustments = [look([point(5, { exposure: -2 }), point(35, { exposure: 2 }, 'hold')], 5)];
+    expect(calculateLayout(project).clips[0]!.retiming.sourceAt(5)).toBe(205);
+    const settings = sampleTimeline(project, 25)[0]!.colour;
+    expect(settings).toEqual(adjustmentColour(project, 25));
     expect(settings.exposure).toBe(0);
     const cache = new ColourLutCache();
     const lut = await cache.get(settings, new AbortController().signal);
@@ -707,8 +758,8 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
     sampleColourLut(lut, 100, 130, 160, actual);
     const source: RGB = [100 / 255, 130 / 255, 160 / 255];
     const correct = gradePixel(source, settings);
-    const left = gradePixel(source, colourAt(row, 10));
-    const right = gradePixel(source, colourAt(row, 40));
+    const left = gradePixel(source, adjustmentColour(project, 10));
+    const right = gradePixel(source, adjustmentColour(project, 40));
     for (let channel = 0; channel < 3; channel++)
       expect(Math.abs(actual[channel]! - correct[channel]!)).toBeLessThan(1 / 255);
     expect(Math.abs(correct[0] - (left[0] + right[0]) / 2)).toBeGreaterThan(4 / 255);

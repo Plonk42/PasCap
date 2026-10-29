@@ -49,7 +49,12 @@ describe('transitions with their own timeslot', () => {
 
   it('samples the slot as an image-less black layer with the track geometry and Opacity', () => {
     const base = applyCommand(sequence(), { type: 'transition', transition: pause(3, 4) });
-    const project = applyCommand(base, { type: 'layer-update', layer: { ...base.layers[0]!, opacity: 0.6 } });
+    const project = applyCommand(base, {
+      type: 'transform-setting',
+      layerId: 'video-1',
+      setting: 'opacity',
+      value: 0.6,
+    });
     for (const frame of [100, 103]) {
       expect(sampleTimeline(project, frame)).toEqual([]);
       expect(sampleSlots(project, frame)).toEqual([

@@ -95,8 +95,14 @@ export function TrackAnimationControls({
       disabled={disabled || navigation.disabled}
       previous={!!previous}
       next={!!next}
-      previousTitle={previous ? keySeekHint(previous.frame, navigation.duration) : `No previous ${label} keyframe`}
-      nextTitle={next ? keySeekHint(next.frame, navigation.duration) : `No next ${label} keyframe`}
+      previousTitle={
+        previous
+          ? keySeekHint(previous.frame, navigation.duration, navigation.frameNoun)
+          : `No previous ${label} keyframe`
+      }
+      nextTitle={
+        next ? keySeekHint(next.frame, navigation.duration, navigation.frameNoun) : `No next ${label} keyframe`
+      }
       onPrevious={() => {
         if (previous) navigation.onSeekKeyframe(layer.id, previous.frame);
       }}
@@ -115,6 +121,7 @@ export function ChannelSteps({
   previous,
   next,
   duration,
+  frameNoun,
   disabled,
   onSeek,
 }: Readonly<{
@@ -122,6 +129,7 @@ export function ChannelSteps({
   previous: number | undefined;
   next: number | undefined;
   duration: number;
+  frameNoun?: string | undefined;
   disabled: boolean;
   onSeek: (frame: number) => void;
 }>) {
@@ -131,7 +139,7 @@ export function ChannelSteps({
         type="button"
         className="icon-button"
         aria-label={`Previous ${label} keyframe`}
-        title={previous === undefined ? `No previous ${label} keyframe` : keySeekHint(previous, duration)}
+        title={previous === undefined ? `No previous ${label} keyframe` : keySeekHint(previous, duration, frameNoun)}
         aria-disabled={disabled || previous === undefined}
         tabIndex={disabled || previous === undefined ? -1 : 0}
         onClick={() => {
@@ -144,7 +152,7 @@ export function ChannelSteps({
         type="button"
         className="icon-button"
         aria-label={`Next ${label} keyframe`}
-        title={next === undefined ? `No next ${label} keyframe` : keySeekHint(next, duration)}
+        title={next === undefined ? `No next ${label} keyframe` : keySeekHint(next, duration, frameNoun)}
         aria-disabled={disabled || next === undefined}
         tabIndex={disabled || next === undefined ? -1 : 0}
         onClick={() => {
@@ -183,6 +191,7 @@ export function ChannelKeyframeNavigation({
       previous={previous?.frame}
       next={next?.frame}
       duration={navigation.duration}
+      frameNoun={navigation.frameNoun}
       disabled={disabled || navigation.disabled}
       onSeek={(target) => navigation.onSeekKeyframe(layer.id, target)}
     />

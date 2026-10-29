@@ -1,7 +1,8 @@
 import { createElement, type ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { applyCommand, EditHistory } from '../../src/shared/commands.js';
+import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
+import { createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import {
   activeLayerSetting,
   EMPTY_KEY_VALUES,
@@ -13,23 +14,15 @@ import {
   layerKeyframe,
   uniformKeyframe,
 } from '../../src/shared/keyframes.js';
-import {
-  createClip,
-  createProject,
-  PROJECT_SCHEMA_VERSION,
-  projectSchema,
-  type ProjectDocument,
-  type VideoLayer,
-} from '../../src/shared/model.js';
+import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { Inspector } from '../../src/web/Inspector.js';
 import { ChannelKeyframeNavigation, TrackAnimationControls } from '../../src/web/AnimationControls.js';
+import { adjustmentColourOwner, type ColourOwner } from '../../src/web/colour-owner.js';
 import {
-  inspectKeyframe,
   KeyframeNavigationContext,
   keyframeNavigationFrame,
   keySeekHint,
   previewFrameFor,
-  reconcileKeyframeInspection,
   type KeyframeNavigation,
 } from '../../src/web/keyframe-navigation.js';
 import { KeyframeToggle, type KeyframeToggleProps } from '../../src/web/KeyframeToggle.js';
@@ -43,20 +36,20 @@ function point(frame: number, values: Partial<LayerKeyValues>): LayerKeyframe {
 const interleaved = [0, 100, 200].flatMap((start) =>
   KEYFRAME_SETTINGS.map(({ key }, index) => point(start + index * 3, { [key]: 0 })),
 );
+/** The interleaved keyframes of every scalar Colour setting, as an adjustment stores them. */
+const gradeInterleaved = interleaved.filter((key) => key.values.opacity === null).map(layerKeyAsGradeKey);
 
-function project(
-  keys = [
-    point(10, { exposure: 0 }),
-    point(60, { exposure: 0.2 }),
-    point(70, { brightness: 0 }),
-    point(80, { exposure: 0.4 }),
-    point(100, { exposure: 0.6 }),
-  ],
-): ProjectDocument {
+/** An adjustment from project frame 0, as the Colour controls edit it: its keyframe frames are timeline frames. */
+function owner(keyframes: LayerKeyframe[]): ColourOwner {
+  const item = { ...createAdjustment('look', 0, 1_000), keyframes: keyframes.map(layerKeyAsGradeKey) };
+  return adjustmentColourOwner(item, 'Look');
+}
+
+function project(): ProjectDocument {
   const document = createProject('navigation', 'Memory-only navigation');
-  document.layers[0]!.keyframes = keys;
   document.media.videoIds = ['synthetic'];
   document.clips = [createClip('clip', 'synthetic', 0, 20)];
+  document.adjustments = [{ ...createAdjustment('look', 0, 1_000), keyframes: gradeInterleaved }];
   return projectSchema.parse(document);
 }
 
@@ -72,10 +65,7 @@ function navigation(changes: Partial<KeyframeNavigation> = {}): KeyframeNavigati
 }
 
 function toggleMarkup(changes: Partial<KeyframeToggleProps> = {}, context = navigation()): string {
-  const layer: VideoLayer = {
-    ...createProject('markup', 'Markup').layers[0]!,
-    keyframes: [point(10, { exposure: 0 }), point(15, { brightness: 0 }), point(20, { exposure: 0.4 })],
-  };
+  const layer = owner([point(10, { exposure: 0 }), point(15, { brightness: 0 }), point(20, { exposure: 0.4 })]);
   return renderToStaticMarkup(
     createElement(
       KeyframeNavigationContext.Provider,
@@ -102,10 +92,7 @@ function channelMarkup(
   changes: Partial<ComponentProps<typeof ChannelKeyframeNavigation>> = {},
   context = navigation(),
 ): string {
-  const layer = {
-    ...createProject('markup', 'Markup').layers[0]!,
-    keyframes: [point(10, { exposure: 0 }), point(15, { brightness: 0 }), point(20, { exposure: 0.4 })],
-  };
+  const layer = owner([point(10, { exposure: 0 }), point(15, { brightness: 0 }), point(20, { exposure: 0.4 })]);
   return renderToStaticMarkup(
     createElement(
       KeyframeNavigationContext.Provider,
@@ -178,147 +165,19 @@ describe('ordered per-setting keyframe neighbours', () => {
   });
 });
 
-describe('one editor-only stored-point cursor', () => {
-  it('progresses through several outside-duration keys even though preview stays at the same last frame', () => {
-    const document = project();
-    const layer = document.layers[0]!;
-    let cursor = inspectKeyframe(document.id, layer, 60, 0, 20)!;
-    expect(cursor.expectedFrame).toBe(19);
-    expect(reconcileKeyframeInspection(cursor, document, layer.id, 0, 20, false)).toBe(cursor);
-    cursor = reconcileKeyframeInspection(cursor, document, layer.id, 19, 20, false)!;
-    expect(cursor.observedFrame).toBe(19);
-    for (const frame of [80, 100]) {
-      const next = keyframeNeighbors(layer.keyframes, keyframeNavigationFrame(cursor, layer.id, 19), 'exposure').next!;
-      expect(next.frame).toBe(frame);
-      cursor = inspectKeyframe(document.id, layer, next.frame, 19, 20)!;
-      expect(reconcileKeyframeInspection(cursor, document, layer.id, 19, 20, false)).toBe(cursor);
-    }
-    expect(keyframeNeighbors(layer.keyframes, cursor.frame, 'exposure')).toEqual({
-      previous: layer.keyframes[3],
-      next: null,
-    });
-    expect(keyframeNeighbors(layer.keyframes, cursor.frame).previous?.frame).toBe(80);
-    cursor = inspectKeyframe(document.id, layer, 70, 19, 20)!;
-    expect(keyframeNeighbors(layer.keyframes, cursor.frame, 'exposure').previous?.frame).toBe(60);
-    expect(keyframeNeighbors(layer.keyframes, cursor.frame, 'exposure').next?.frame).toBe(80);
-    expect(keyframeNavigationFrame(cursor, 'different-row', 19)).toBe(19);
-  });
-
-  it('retains stored navigation on an empty timeline without inventing a preview frame', () => {
-    const document = { ...project(), clips: [] };
-    const layer = document.layers[0]!;
-    const cursor = inspectKeyframe(document.id, layer, 80, 0, 0)!;
-    expect(cursor.frame).toBe(80);
-    expect(cursor.expectedFrame).toBe(0);
-    expect(reconcileKeyframeInspection(cursor, document, layer.id, 0, 0, false)).toBe(cursor);
-    expect(keyframeNeighbors(layer.keyframes, cursor.frame, 'exposure').next?.frame).toBe(100);
-    expect(keySeekHint(80, 0)).toBe(
-      'Stored timeline frame 80; the timeline is empty, so there is no frame to preview.',
-    );
-    expect(activeLayerSetting(layer, 'exposure', 0)).toBe(false);
-  });
-
-  it('clears inspection on playback, an external frame, another row/project or closing the project', () => {
-    const document = project();
-    const layer = document.layers[0]!;
-    const cursor = inspectKeyframe(document.id, layer, 80, 19, 20)!;
-    expect(reconcileKeyframeInspection(cursor, document, layer.id, 19, 20, true)).toBeNull();
-    expect(reconcileKeyframeInspection(cursor, document, layer.id, 8, 20, false)).toBeNull();
-    expect(reconcileKeyframeInspection(cursor, document, 'other', 19, 20, false)).toBeNull();
-    expect(reconcileKeyframeInspection(cursor, { ...document, id: 'other' }, layer.id, 19, 20, false)).toBeNull();
-    expect(reconcileKeyframeInspection(cursor, null, layer.id, 19, 20, false)).toBeNull();
-    expect(keyframeNavigationFrame(null, layer.id, 19)).toBe(19);
-  });
-
-  it('follows a point time edit, its Undo/Redo and duration changes, but not deletion', () => {
-    const document = project();
-    const layer = document.layers[0]!;
-    const history = new EditHistory(document);
-    let cursor = inspectKeyframe(document.id, layer, 80, 19, 20)!;
-    history.commit({ type: 'layer-key-move', layerId: layer.id, frame: 80, nextFrame: 90 });
-    cursor = reconcileKeyframeInspection(cursor, history.current, layer.id, 19, 20, false)!;
-    expect(cursor.frame).toBe(90);
-    cursor = reconcileKeyframeInspection(cursor, history.undo(), layer.id, 19, 20, false)!;
-    expect(cursor.frame).toBe(80);
-    cursor = reconcileKeyframeInspection(cursor, history.redo(), layer.id, 19, 20, false)!;
-    expect(cursor.frame).toBe(90);
-    cursor = reconcileKeyframeInspection(cursor, history.current, layer.id, 9, 10, false)!;
-    expect(cursor.expectedFrame).toBe(9);
-    expect(cursor.observedFrame).toBe(9);
-    history.commit({ type: 'layer-key-remove', layerId: layer.id, frame: 90 });
-    expect(reconcileKeyframeInspection(cursor, history.current, layer.id, 9, 10, false)).toBeNull();
-    const restored = history.undo();
-    expect(reconcileKeyframeInspection(null, restored, layer.id, 19, 20, false)).toBeNull();
-    expect(keyframeNeighbors(restored.layers[0]!.keyframes, 19, 'exposure').next?.frame).toBe(60);
-  });
-
-  it('keeps an existing shared point after removing one channel, and clears ambiguous removals', () => {
-    const document = project([
-      point(10, { exposure: 0 }),
-      point(60, { exposure: 0.2, brightness: 0 }),
-      point(80, { exposure: 0.4 }),
-    ]);
-    const layer = document.layers[0]!;
-    const cursor = inspectKeyframe(document.id, layer, 60, 19, 20)!;
-    const changed = applyCommand(document, {
-      type: 'layer-key-toggle',
-      layerId: layer.id,
-      frame: 60,
-      setting: 'exposure',
-      value: 0.2,
-    });
-    expect(reconcileKeyframeInspection(cursor, changed, layer.id, 19, 20, false)).toBe(cursor);
-    expect(keyframeNeighbors(changed.layers[0]!.keyframes, cursor.frame, 'exposure')).toEqual({
-      previous: changed.layers[0]!.keyframes[0],
-      next: changed.layers[0]!.keyframes[2],
-    });
-    const removed = {
-      ...document,
-      layers: [{ ...layer, keyframes: [point(30, { exposure: 0 }), point(90, { exposure: 1 })] }],
-    };
-    expect(reconcileKeyframeInspection(cursor, removed, layer.id, 19, 20, false)).toBeNull();
-    expect(reconcileKeyframeInspection(cursor, { ...document, layers: [] }, layer.id, 19, 20, false)).toBeNull();
-  });
-
-  it('is read-only: navigation changes neither the strict document nor history or clip bases', () => {
-    const document = project();
-    const history = new EditHistory(document);
-    const before = JSON.stringify(history.current);
-    for (const key of history.current.layers[0]!.keyframes) {
-      const cursor = inspectKeyframe(document.id, history.current.layers[0]!, key.frame, 19, 20)!;
-      reconcileKeyframeInspection(cursor, history.current, 'video-1', 19, 20, false);
-      keyframeNeighbors(history.current.layers[0]!.keyframes, cursor.frame, 'exposure');
-    }
-    expect(JSON.stringify(history.current)).toBe(before);
-    expect(history.canUndo).toBe(false);
-    expect(history.canRedo).toBe(false);
-    expect(projectSchema.parse(history.current)).toEqual(document);
-    expect(history.current.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-  });
-
-  it.each([-1, NaN, Infinity, 0.5, 2_147_483_648])(
-    'cannot inspect invalid stored/observed/duration frame %s',
-    (frame) => {
-      const document = project();
-      const layer = document.layers[0]!;
-      expect(inspectKeyframe(document.id, layer, frame, 0, 20)).toBeNull();
-      expect(inspectKeyframe(document.id, layer, 60, frame, 20)).toBeNull();
-      expect(inspectKeyframe(document.id, layer, 60, 0, frame)).toBeNull();
-      const cursor = inspectKeyframe(document.id, layer, 60, 0, 20)!;
-      expect(reconcileKeyframeInspection(cursor, document, layer.id, frame, 20, false)).toBeNull();
-      expect(reconcileKeyframeInspection(cursor, document, layer.id, 0, frame, false)).toBeNull();
-    },
-  );
-
-  it('does not inspect a missing point and describes the nearest available preview truthfully', () => {
-    const document = project();
-    expect(inspectKeyframe(document.id, document.layers[0]!, 40, 0, 20)).toBeNull();
+describe('stored keyframe preview hints', () => {
+  it('describes the nearest available preview truthfully, including on an empty timeline', () => {
     expect(previewFrameFor(10, 20)).toBe(10);
     expect(previewFrameFor(80, 20)).toBe(19);
+    expect(previewFrameFor(80, 0)).toBe(0);
     expect(keySeekHint(10, 20)).toBe('Go to timeline frame 10.');
     expect(keySeekHint(20, 20)).toBe(
       'Stored timeline frame 20; preview the nearest available frame 19. The keyframe stays in place.',
     );
+    expect(keySeekHint(80, 0)).toBe(
+      'Stored timeline frame 80; the timeline is empty, so there is no frame to preview.',
+    );
+    expect(keyframeNavigationFrame(null, 'look', 19)).toBe(19);
   });
 });
 
@@ -366,10 +225,7 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
   it.each(['disabled prop', 'no project / draft context', 'no keys', 'unkeyed channel', 'invalid frame'] as const)(
     'keeps both navigation buttons in the DOM when disabled: %s',
     (reason) => {
-      const layer = {
-        ...createProject('empty', 'Empty').layers[0]!,
-        keyframes: reason === 'no keys' ? [] : [point(10, { exposure: 0 }), point(20, { exposure: 1 })],
-      };
+      const layer = owner(reason === 'no keys' ? [] : [point(10, { exposure: 0 }), point(20, { exposure: 1 })]);
       const props = {
         layer,
         disabled: reason === 'disabled prop',
@@ -390,29 +246,12 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
     },
   );
 
-  it('uses the shared stored-point cursor without presenting a fictional active diamond', () => {
-    const layer = {
-      ...createProject('outside', 'Outside').layers[0]!,
-      keyframes: [point(60, { exposure: 0 }), point(80, { exposure: 1 }), point(100, { exposure: 2 })],
-    };
-    const inspection = inspectKeyframe('outside', layer, 80, 19, 20)!;
-    const context = navigation({ inspection, duration: 20 });
-    const main = buttons(toggleMarkup({ layer, frame: 19 }, context));
-    expect(main).toHaveLength(3);
-    expect(main[0]).toContain('aria-pressed="false"');
-    expect(main[0]).toContain('timeline frame 19');
-    const controls = buttons(channelMarkup({ layer, frame: 60 }, context));
-    expect(main.slice(1)).toEqual(controls);
-    expect(controls[0]).toContain('Stored timeline frame 60');
-    expect(controls[1]).toContain('Stored timeline frame 100');
-    expect(controls[0]).toContain('nearest available frame 19');
-  });
-
-  it('uses the stored row frame without inspection, with strict bounds and zero-valued participants', () => {
-    const layer = {
-      ...createProject('stored', 'Stored').layers[0]!,
-      keyframes: [point(0, { exposure: 0 }), point(10, { brightness: 0 }), point(2_147_483_647, { exposure: 1 })],
-    };
+  it('uses the playhead frame, with strict bounds and zero-valued participants', () => {
+    const layer = owner([
+      point(0, { exposure: 0 }),
+      point(10, { brightness: 0 }),
+      point(2_147_483_647, { exposure: 1 }),
+    ]);
     const first = buttons(channelMarkup({ layer, frame: 0 }));
     expect(first[0]).toContain('aria-disabled="true"');
     expect(first[0]).toContain('tabindex="-1"');
@@ -424,31 +263,23 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
     expect(last[0]).toContain('tabindex="0"');
     expect(last[1]).toContain('aria-disabled="true"');
     expect(last[1]).toContain('tabindex="-1"');
-    const foreign = inspectKeyframe('other', { ...layer, id: 'other' }, 0, 0, 250)!;
-    expect(channelMarkup({ layer, frame: 2_147_483_647 }, navigation({ inspection: foreign }))).toBe(
-      channelMarkup({ layer, frame: 2_147_483_647 }),
-    );
   });
 
-  it('retains both channel arrows and endpoint disabling on an empty timeline while inspecting stored points', () => {
-    const layer = {
-      ...createProject('empty', 'Empty').layers[0]!,
-      keyframes: [point(30, { exposure: 0 }), point(45, { brightness: 0 }), point(60, { exposure: 1 })],
-    };
+  it('retains both channel arrows and endpoint disabling on an empty timeline', () => {
+    const layer = owner([point(30, { exposure: 0 }), point(45, { brightness: 0 }), point(60, { exposure: 1 })]);
     const first = buttons(channelMarkup({ layer, frame: 30 }, navigation({ duration: 0 })));
     expect(first[0]).toContain('aria-disabled="true"');
     expect(first[0]).toContain('tabindex="-1"');
     expect(first[1]).toContain('Stored timeline frame 60; the timeline is empty');
-    const inspection = inspectKeyframe('empty', layer, 60, 0, 0)!;
-    const last = buttons(channelMarkup({ layer, frame: 30 }, navigation({ inspection, duration: 0 })));
+    const last = buttons(channelMarkup({ layer, frame: 60 }, navigation({ duration: 0 })));
     expect(last[0]).toContain('Stored timeline frame 30; the timeline is empty');
     expect(last[1]).toContain('aria-disabled="true"');
     expect(last[1]).toContain('tabindex="-1"');
-    expect(buttons(toggleMarkup({ layer, frame: 0 }, navigation({ inspection, duration: 0 }))).slice(1)).toEqual(last);
+    expect(buttons(toggleMarkup({ layer, frame: 60 }, navigation({ duration: 0 }))).slice(1)).toEqual(last);
   });
 
   it('retains per-setting arrows beside main diamonds and on chips, with one section union and no sidebar duplicates', () => {
-    const document = project(interleaved);
+    const document = project();
     document.layers[0]!.transform.keyframes = [0, 20].map((frame) => ({
       ...uniformKeyframe(frame, { ...document.layers[0]!.transform.base }, 'linear'),
       reset: false,
@@ -466,7 +297,7 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
           frame: 50,
           drafting: false,
           section: 'clip',
-          sectionRequest: { section: 'colour', colourTarget: 'track', nonce: 1 },
+          sectionRequest: { section: 'colour', colourTarget: 'adjustment', nonce: 1 },
           onSection: vi.fn(),
           onSelectBoundary: vi.fn(),
           onEdit: vi.fn(),
@@ -478,7 +309,7 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
         }),
       ),
     );
-    for (const { label } of KEYFRAME_SETTINGS) {
+    for (const { label } of COLOUR_CONTROLS) {
       expect(inspector.split(`aria-label="Keyframe ${label}"`)).toHaveLength(2);
       // One main pair and three stored participants.
       for (const direction of ['Previous', 'Next'])
@@ -487,8 +318,8 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
     const diamonds = [
       ...inspector.matchAll(/<span class="keyframe-setting-navigation"[\s\S]*?<\/button><\/span><\/span>/g),
     ];
-    // Ten track settings, the clip Speed diamond and each Transform setting.
-    expect(diamonds).toHaveLength(KEYFRAME_SETTINGS.length + 1 + SPATIAL_CONTROLS.length);
+    // Each scalar Colour setting of the adjustment, the clip Speed diamond and each Transform setting.
+    expect(diamonds).toHaveLength(COLOUR_CONTROLS.length + 1 + SPATIAL_CONTROLS.length);
     const speedDiamond = diamonds.findIndex(([markup]) => markup.includes('aria-label="Keyframe Speed"'));
     // The single-setting Speed section relies on its keyframe-line pair, without a duplicate per-setting pair.
     expect(buttons(diamonds.splice(speedDiamond, 1)[0]![0])).toHaveLength(1);
@@ -510,13 +341,13 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
       expect(controls[1]).toContain(`aria-label="Previous ${label} keyframe"`);
       expect(controls[2]).toContain(`aria-label="Next ${label} keyframe"`);
     }
-    // Colour's stored list ends before Transform's, whose plain chips have no arrows.
+    // The adjustment's stored list ends before Transform's.
     const colourList = inspector.slice(
-      inspector.indexOf('aria-label="Track keyframes'),
+      inspector.indexOf('aria-label="Adjustment keyframes'),
       inspector.indexOf('aria-label="Transform keyframes'),
     );
     const chips = [...colourList.matchAll(/<span class="layer-keyframe-chip"[\s\S]*?<\/button><\/span><\/span>/g)];
-    expect(chips).toHaveLength(interleaved.length);
+    expect(chips).toHaveLength(gradeInterleaved.length);
     for (const [markup] of chips) expect(buttons(markup)).toHaveLength(2);
     const sections = [...inspector.matchAll(/<div class="[^"]*section-keyframe-line">[\s\S]*?<\/div>/g)];
     expect(sections).toHaveLength(3);
@@ -547,7 +378,8 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
       ),
     );
     expect(sidebar).toContain('Track options Track 1');
-    expect(KEYFRAME_SETTINGS).toHaveLength(15);
+    expect(COLOUR_CONTROLS).toHaveLength(14);
+    expect(SPATIAL_CONTROLS.map((control) => control.key)).toContain('opacity');
     expect(inspector).toContain('aria-label="Keyframe Opacity"');
     expect(inspector).not.toContain('Keyframe Track opacity');
     expect(inspector).not.toContain('Keyframe Clip opacity');
@@ -558,12 +390,9 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
 });
 
 describe('Colour section union navigation', () => {
-  it.each([0, 10, 20, 30, 40, 2_147_483_647])('visits Opacity and scalar Colour only from frame %s', (frame) => {
-    const layer = {
-      ...createProject('union', 'Union').layers[0]!,
-      keyframes: [point(0, { opacity: 0 }), point(20, { temperature: 0, tint: 0 }), point(40, { shadows: 0 })],
-    };
-    const settings = KEYFRAME_SETTINGS.map(({ key }) => key);
+  it.each([0, 10, 20, 30, 40, 2_147_483_647])('visits every scalar Colour setting from frame %s', (frame) => {
+    const layer = owner([point(0, { exposure: 0 }), point(20, { temperature: 0, tint: 0 }), point(40, { shadows: 0 })]);
+    const settings = COLOUR_CONTROLS.map(({ key }) => key);
     const expected = keyframeNeighbors(layer.keyframes, frame);
     const context = navigation();
     const markup = renderToStaticMarkup(

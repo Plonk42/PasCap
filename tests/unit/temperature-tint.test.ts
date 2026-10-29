@@ -10,22 +10,24 @@ import {
   temperatureTintGains,
   type RGB,
 } from '../../src/shared/colour.js';
-import { EMPTY_KEY_VALUES, layerKeyframeSchema, uniformKeyframe } from '../../src/shared/keyframes.js';
-import { createLayer, createProject, PROJECT_SCHEMA_VERSION, projectSchema } from '../../src/shared/model.js';
+import { createAdjustment, gradeKeyframeSchema, layerKeyAsGradeKey } from '../../src/shared/grade.js';
+import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
+import { createClip, createProject, PROJECT_SCHEMA_VERSION, projectSchema } from '../../src/shared/model.js';
 import { EARLIER_SCHEMA_VERSIONS } from './project-fixtures.js';
 
 const luma: RGB = [0.2126, 0.7152, 0.0722];
 const axes = [-2, -1, -0.234567891, 0, 0.123456789, 1, 2];
 
 describe('normalized linear Temperature and Tint', () => {
-  it('keeps exact neutral identity and makes new rows neutral without compatibility defaults', () => {
+  it('keeps exact neutral identity and makes new grades neutral without compatibility defaults', () => {
     const settings = createColourSettings();
     expect(temperatureTintGains(settings)).toEqual([1, 1, 1]);
     const input: RGB = [0.123456789, 0.4, 0.78];
     expect(gradePixel(input, settings)).toBe(input);
     expect(compilePixelGrade(settings)(input)).toBe(input);
-    expect(createLayer('empty', 'Empty').colour).toEqual(settings);
-    expect(Object.keys(EMPTY_KEY_VALUES)).toHaveLength(15);
+    expect(createClip('shot', 'rec', 0, 10).grade.colour).toEqual(settings);
+    expect(createAdjustment('look', 0, 10).colour).toEqual(settings);
+    expect(Object.keys(layerKeyAsGradeKey(layerKeyframe(0, EMPTY_KEY_VALUES, 'linear')).values)).toHaveLength(14);
     const project = createProject('strict', 'Strict');
     expect(project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     for (const schemaVersion of EARLIER_SCHEMA_VERSIONS)
@@ -37,11 +39,11 @@ describe('normalized linear Temperature and Tint', () => {
       const incomplete = { ...settings };
       delete (incomplete as Partial<typeof settings>)[channel];
       expect(colourSchema.safeParse(incomplete).success).toBe(false);
-      const values: Partial<typeof EMPTY_KEY_VALUES> = { ...EMPTY_KEY_VALUES, exposure: 0 };
+      const key = layerKeyAsGradeKey(layerKeyframe(0, { ...EMPTY_KEY_VALUES, exposure: 0 }, 'linear'));
+      expect(gradeKeyframeSchema.safeParse(key).success).toBe(true);
+      const values: Partial<typeof key.values> = { ...key.values };
       delete values[channel];
-      expect(layerKeyframeSchema.safeParse({ ...uniformKeyframe(0, values, 'linear'), reset: false }).success).toBe(
-        false,
-      );
+      expect(gradeKeyframeSchema.safeParse({ ...key, values }).success).toBe(false);
       for (const value of [-limit - 0.000001, limit + 0.000001, NaN, Infinity, -Infinity, null, undefined])
         expect(colourSchema.safeParse({ ...settings, [channel]: value }).success).toBe(false);
       for (const value of [-limit, 0, 0.123456789, limit])

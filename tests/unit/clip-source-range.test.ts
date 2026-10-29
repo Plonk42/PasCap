@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { applyCommand } from '../../src/shared/commands.js';
+import { createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, projectSchema } from '../../src/shared/model.js';
-import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
+import { NEUTRAL_SPATIAL_POSE, SPATIAL_CHANNELS, type SpatialChannel } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { formatTimecode } from '../../src/shared/timing.js';
 import { validateFrameDraft } from '../../src/web/FrameField.js';
@@ -10,6 +11,10 @@ import { clipSourceBoundary, planClipSourceRange } from '../../src/web/clip-sour
 
 const MAX_FRAME = 2_147_483_647;
 const FORMAT_ERROR = 'Use MM:SS:FF (30 fps NDF), or a whole source frame.';
+const NO_TRANSFORM = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<
+  SpatialChannel,
+  null
+>;
 
 function rangeProject(ripple = true) {
   const project = createProject('source-range', 'Source range');
@@ -215,7 +220,7 @@ describe('atomic clip source-range plans', () => {
     },
   );
 
-  it('preserves row points, appearance, track Transform, original speed anchors and independent nested data', () => {
+  it('preserves grades, adjustments, track Transform, original speed anchors and independent nested data', () => {
     const project = rangeProject();
     const clip = project.clips[0]!;
     clip.speed = {
@@ -226,25 +231,33 @@ describe('atomic clip source-range plans', () => {
       ],
     };
     project.layers[0]!.transform.base.translateX = 0.25;
+    project.layers[0]!.transform.base.opacity = 0.7;
     project.layers[0]!.transform.keyframes = [
       { ...uniformKeyframe(0, { ...NEUTRAL_SPATIAL_POSE, scale: 2 }, 'linear'), reset: false },
       { ...uniformKeyframe(600, { ...NEUTRAL_SPATIAL_POSE, rotation: 90 }, 'smooth'), reset: false },
+      { ...uniformKeyframe(1_000, { ...NO_TRANSFORM, opacity: 0.4 }, 'linear'), reset: false },
     ];
-    project.layers[0]!.colour.temperature = 0.25;
-    project.layers[0]!.opacity = 0.7;
-    project.layers[0]!.keyframes = [
-      layerKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.5 }, 'smooth'),
-      layerKeyframe(1_000, { ...EMPTY_KEY_VALUES, opacity: 0.4 }, 'linear'),
+    clip.grade.colour.temperature = 0.25;
+    clip.grade.keyframes = [layerKeyAsGradeKey(layerKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.5 }, 'smooth'))];
+    project.adjustments = [
+      {
+        ...createAdjustment('look', 0, 1_200),
+        keyframes: [layerKeyAsGradeKey(layerKeyframe(1_000, { ...EMPTY_KEY_VALUES, saturation: 1.4 }, 'linear'))],
+      },
     ];
     const before = structuredClone(project);
     const plan = planClipSourceRange(project, clip, 'in', 200, 600, 75);
     expect(plan.error).toBe('');
     expect(plan.document.layers).toEqual(before.layers);
+    expect(plan.document.adjustments).toEqual(before.adjustments);
     expect(plan.document.clips[0]!.speed).toEqual(before.clips[0]!.speed);
+    // The clip's own grade follows its footage: source-frame keyframes are kept outside the new range.
+    expect(plan.document.clips[0]!.grade).toEqual(before.clips[0]!.grade);
     expect(plan.document.layers[0]!.transform.keyframes[0]!.values).not.toBe(
       project.layers[0]!.transform.keyframes[0]!.values,
     );
-    expect(plan.document.layers[0]!.keyframes[0]!.values).not.toBe(project.layers[0]!.keyframes[0]!.values);
+    expect(plan.document.clips[0]!.grade.keyframes[0]!.values).not.toBe(clip.grade.keyframes[0]!.values);
+    expect(plan.document.adjustments[0]!.keyframes[0]!.values).not.toBe(project.adjustments[0]!.keyframes[0]!.values);
     expect(project).toEqual(before);
   });
 

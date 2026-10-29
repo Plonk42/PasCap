@@ -11,9 +11,9 @@ import { atomicWrite, ProjectStore } from '../../src/server/storage.js';
 import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
 import { NEUTRAL_COLOUR, scalarColourValues } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
+import { createAdjustment, GRADE_SETTINGS, layerKeyAsGradeKey, type GradeKeyframe } from '../../src/shared/grade.js';
 import {
   EMPTY_KEY_VALUES,
-  KEYFRAME_SETTINGS,
   type Interpolation,
   type LayerKeyframe,
   type LayerKeyValues,
@@ -32,7 +32,14 @@ import {
   type ProjectDocument,
 } from '../../src/shared/model.js';
 import { projectSummarySchema } from '../../src/shared/projects.js';
-import { createSpatialSettings, NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
+import {
+  createSpatialSettings,
+  NEUTRAL_SPATIAL_POSE,
+  SPATIAL_CHANNELS,
+  type SpatialChannel,
+  type SpatialKeyframe,
+  type SpatialKeyValues,
+} from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
 import { musicTracks } from '../../src/shared/music-lanes.js';
@@ -45,6 +52,24 @@ const queues: JobQueue[] = [];
 const headers = { host: '127.0.0.1:4318', 'x-pascap-client': 'preview-lab' };
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
   return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
+}
+function gradeKey(
+  frame: number,
+  values: Partial<LayerKeyValues>,
+  interpolation: Interpolation = 'linear',
+): GradeKeyframe {
+  return layerKeyAsGradeKey(point(frame, values, interpolation));
+}
+const NO_TRANSFORM = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<
+  SpatialChannel,
+  null
+>;
+function transformKey(
+  frame: number,
+  values: Partial<SpatialKeyValues>,
+  interpolation: Interpolation = 'linear',
+): SpatialKeyframe {
+  return { ...uniformKeyframe(frame, { ...NO_TRANSFORM, ...values }, interpolation), reset: false };
 }
 async function temp(): Promise<string> {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'pascap-projects-'));
@@ -113,14 +138,19 @@ describe('multiple-project store', () => {
     const store = new ProjectStore(directory);
     const project = createProject('appearance-saved', 'Independent appearance');
     project.clips = [createClip('shot', 'registered-video', 0, 10)];
-    project.layers[0]!.colour.exposure = 0.5;
+    project.clips[0]!.grade.colour.exposure = 0.5;
+    project.adjustments = [{ ...createAdjustment('look', 0, 10), colour: { ...NEUTRAL_COLOUR, saturation: 1.2 } }];
     const saved = await store.save(project, 0);
     expect(await store.load(saved.id)).toEqual(saved);
     const currentPath = path.join(directory, 'projects', `${saved.id}.json`);
     const currentBytes = await readFile(currentPath);
-    const { colour: _row, ...missingRow } = saved.layers[0]!;
+    const { grade: _grade, ...missingGrade } = saved.clips[0]!;
+    const { adjustments: _adjustments, ...missingAdjustments } = saved;
     const malformed = [
-      { ...saved, layers: [missingRow] },
+      { ...saved, clips: [missingGrade] },
+      missingAdjustments,
+      { ...saved, adjustments: [{ ...saved.adjustments[0]!, colour: { exposure: 0 } }] },
+      { ...saved, layers: [{ ...saved.layers[0]!, colour: NEUTRAL_COLOUR }] },
       { ...saved, clips: [{ ...saved.clips[0], correction: NEUTRAL_COLOUR }] },
       { ...saved, clips: [{ ...saved.clips[0], colour: NEUTRAL_COLOUR }] },
       { ...saved, schemaVersion: 9 },
@@ -236,7 +266,8 @@ describe('multiple-project store', () => {
     expect(first.title).toBe('First flight');
     expect(first.revision).toBe(1);
     expect(first.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-    expect(first.layers[0]!.keyframes).toEqual([]);
+    expect(first.layers[0]!.transform.keyframes).toEqual([]);
+    expect(first.adjustments).toEqual([]);
     const clip = { ...createClip('clip-a', 'registered-video', 0, 120), speed: { mode: 'constant' as const, rate: 2 } };
     const saved = await store.save({ ...first, clips: [clip] }, 1);
     expect(saved.revision).toBe(2);
@@ -261,21 +292,22 @@ describe('multiple-project store', () => {
     expect((await readdir(path.join(directory, 'projects'))).some((name) => name.endsWith('.tmp'))).toBe(false);
   });
 
-  it('round-trips 256 strict row points and rejects malformed current-schema data without changing confirmed bytes', async () => {
+  it('round-trips 256 strict Transform keyframes and rejects malformed current-schema data without changing confirmed bytes', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const document = createProject('strict-row', 'Shared row');
     document.clips = [createClip('excerpt', 'registered-video', 500, 600)];
     document.clips[0]!.speed = { mode: 'constant', rate: 1.25 };
-    document.layers[0]!.keyframes = Array.from({ length: 256 }, (_, index) =>
-      point(index * 10, { exposure: index % 2 }),
+    document.layers[0]!.transform.keyframes = Array.from({ length: 256 }, (_, index) =>
+      transformKey(index * 10, { opacity: index % 2 }),
     );
-    document.layers[0]!.keyframes[0] = point(0, { ...scalarColourValues(NEUTRAL_COLOUR), opacity: 0 }, 'smooth');
+    document.layers[0]!.transform.keyframes[0] = transformKey(0, { ...NEUTRAL_SPATIAL_POSE, opacity: 0 }, 'smooth');
     const saved = await store.save(document, 0);
     expect(saved.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-    expect(saved.layers[0]!.keyframes).toHaveLength(256);
-    expect(Object.keys(saved.layers[0]!.keyframes[0]!.values)).toEqual(KEYFRAME_SETTINGS.map((setting) => setting.key));
-    expect(saved.layers[0]!.keyframes.at(-1)!.frame).toBeGreaterThan(saved.clips[0]!.sourceOut);
+    const { transform } = saved.layers[0]!;
+    expect(transform.keyframes).toHaveLength(256);
+    expect(Object.keys(transform.keyframes[0]!.values)).toEqual(SPATIAL_CHANNELS);
+    expect(transform.keyframes.at(-1)!.frame).toBeGreaterThan(saved.clips[0]!.sourceOut);
     expect(await store.load(saved.id)).toEqual(saved);
     expect((await store.list())[0]).toMatchObject({
       id: saved.id,
@@ -286,17 +318,19 @@ describe('multiple-project store', () => {
     });
     const filename = path.join(directory, 'projects', `${saved.id}.json`);
     const bytes = await readFile(filename, 'utf8');
-    const first = saved.layers[0]!.keyframes[0]!;
-    const { shadows: _shadows, ...missingValue } = first.values;
-    const { keyframes: _keyframes, ...missingPoints } = saved.layers[0]!;
-    const malformedRows: unknown[] = [
-      [...saved.layers[0]!.keyframes, point(2560, { hue: 90 })],
-      [point(10, { opacity: 0 }), point(10, { hue: 90 })],
-      [point(20, { exposure: 0 }), point(10, { hue: 90 })],
-      [point(0, {})],
+    const first = transform.keyframes[0]!;
+    const { rotation: _rotation, ...missingValue } = first.values;
+    const { transform: _transform, ...missingTransform } = saved.layers[0]!;
+    const malformedKeyframes: unknown[] = [
+      [...transform.keyframes, transformKey(2560, { rotation: 90 })],
+      [transformKey(10, { opacity: 0 }), transformKey(10, { rotation: 90 })],
+      [transformKey(20, { scale: 2 }), transformKey(10, { rotation: 90 })],
+      [transformKey(0, {})],
       [{ ...first, values: missingValue }],
-      [{ ...first, values: { ...first.values, shadows: undefined } }],
+      [{ ...first, values: { ...first.values, rotation: undefined } }],
       [{ ...first, values: { ...first.values, legacy: 1 } }],
+      // Colour belongs to clip grades and adjustments, never to a track.
+      [{ ...first, values: { ...first.values, exposure: null } }],
       [{ ...first, values: { ...first.values, layerOpacity: null } }],
       [{ ...first, values: { ...first.values, clipOpacity: null } }],
       [{ ...first, values: { ...first.values, speed: null } }],
@@ -306,11 +340,22 @@ describe('multiple-project store', () => {
       [{ ...first, interpolation: 'cubic' }],
       [{ ...first, sourceFrame: 500 }],
     ];
+    const withPose = (base: unknown) => ({
+      ...saved,
+      layers: [{ ...saved.layers[0]!, transform: { ...transform, base } }],
+    });
     const invalid: unknown[] = [
-      ...malformedRows.map((keyframes) => ({ ...saved, layers: [{ ...saved.layers[0]!, keyframes }] })),
-      { ...saved, layers: [missingPoints] },
-      { ...saved, layers: [{ ...saved.layers[0]!, opacity: undefined }] },
-      { ...saved, layers: [{ ...saved.layers[0]!, opacity: null }] },
+      ...malformedKeyframes.map((keyframes) => ({
+        ...saved,
+        layers: [{ ...saved.layers[0]!, transform: { ...transform, keyframes } }],
+      })),
+      { ...saved, layers: [missingTransform] },
+      withPose({ ...transform.base, opacity: undefined }),
+      withPose({ ...transform.base, opacity: null }),
+      withPose({ ...transform.base, opacity: 1.5 }),
+      { ...saved, layers: [{ ...saved.layers[0]!, opacity: 1 }] },
+      { ...saved, layers: [{ ...saved.layers[0]!, keyframes: [] }] },
+      { ...saved, layers: [{ ...saved.layers[0]!, colour: NEUTRAL_COLOUR }] },
       { ...saved, clips: [{ ...saved.clips[0]!, opacity: 1 }] },
       { ...saved, layers: [{ ...saved.layers[0]!, opacityKeys: [] }] },
       { ...saved, clips: [{ ...saved.clips[0]!, animation: { opacity: [], colour: [] } }] },
@@ -343,6 +388,60 @@ describe('multiple-project store', () => {
     expect(await store.load(saved.id)).toEqual(saved);
   });
 
+  it('round-trips 64 strict adjustment and clip grade keyframes and rejects malformed grades without changing confirmed bytes', async () => {
+    const directory = await temp();
+    const store = new ProjectStore(directory);
+    const document = createProject('strict-grades', 'Grades');
+    document.clips = [createClip('excerpt', 'registered-video', 500, 600)];
+    document.clips[0]!.grade = {
+      colour: { ...NEUTRAL_COLOUR, exposure: 0.25 },
+      keyframes: [gradeKey(550, { tint: 0.1 }), gradeKey(590, { tint: -0.1 }, 'hold')],
+    };
+    // Counted from the adjustment's start, its keyframes may precede it while they stay on project frames.
+    document.adjustments = [
+      {
+        ...createAdjustment('look', 50, 40),
+        keyframes: Array.from({ length: 64 }, (_, index) => gradeKey(index * 10 - 50, { exposure: index % 2 })),
+      },
+    ];
+    document.adjustments[0]!.keyframes[0] = gradeKey(-50, scalarColourValues(NEUTRAL_COLOUR), 'smooth');
+    const saved = await store.save(document, 0);
+    expect(saved.adjustments[0]!.keyframes).toHaveLength(64);
+    expect(Object.keys(saved.adjustments[0]!.keyframes[0]!.values)).toEqual(GRADE_SETTINGS);
+    expect(await store.load(saved.id)).toEqual(saved);
+    const filename = path.join(directory, 'projects', `${saved.id}.json`);
+    const bytes = await readFile(filename, 'utf8');
+    const item = saved.adjustments[0]!;
+    const first = item.keyframes[0]!;
+    const grade = saved.clips[0]!.grade;
+    const invalid: unknown[] = [
+      { ...saved, adjustments: [{ ...item, keyframes: [...item.keyframes, gradeKey(600, { hue: 90 })] }] },
+      { ...saved, adjustments: [{ ...item, keyframes: [{ ...first, values: { ...first.values, opacity: 0 } }] }] },
+      { ...saved, adjustments: [{ ...item, keyframes: [{ ...first, frame: -51 }] }] },
+      { ...saved, adjustments: [{ ...item, keyframes: [gradeKey(10, {})] }] },
+      { ...saved, adjustments: [{ ...item, duration: 0 }] },
+      { ...saved, adjustments: [{ ...item, layerId: 'video-1' }] },
+      { ...saved, adjustments: [item, { ...item, id: 'overlapping', start: 60 }] },
+      {
+        ...saved,
+        adjustments: [
+          { ...item, start: 100 },
+          { ...item, id: 'earlier', start: 0, keyframes: [] },
+        ],
+      },
+      { ...saved, adjustments: [item, { ...item, start: 200 }] },
+      { ...saved, clips: [{ ...saved.clips[0]!, grade: { ...grade, keyframes: [{ ...first, frame: -1 }] } }] },
+      { ...saved, clips: [{ ...saved.clips[0]!, grade: { ...grade, keyframes: [...grade.keyframes].reverse() } }] },
+      { ...saved, clips: [{ ...saved.clips[0]!, grade: { ...grade, opacity: 1 } }] },
+    ];
+    for (const candidate of invalid) {
+      expect(projectSchema.safeParse(candidate).success).toBe(false);
+      await expect(store.save(candidate as ProjectDocument, 1)).rejects.toThrow();
+      expect(await readFile(filename, 'utf8')).toBe(bytes);
+    }
+    expect(await store.load(saved.id)).toEqual(saved);
+  });
+
   it('round-trips arbitrary track order, Ripple settings, dormant fades and every authoritative clip start', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
@@ -358,7 +457,10 @@ describe('multiple-project store', () => {
     document.layers[1]!.closingFade = 5;
     document.layers[2]!.openingFade = 20;
     document.layers[2]!.closingFade = 30;
-    document.layers[1]!.keyframes = [point(0, { exposure: 0.123456789 }, 'hold'), point(500, { hue: 90 }, 'smooth')];
+    document.layers[1]!.transform.keyframes = [
+      transformKey(0, { opacity: 0.123456789 }, 'hold'),
+      transformKey(500, { rotation: 90 }, 'smooth'),
+    ];
     document.clips = [
       { ...createClip('positioned-left', 'one', 100, 130, 'positioned-first'), start: 10 },
       { ...createClip('packed-left', 'two', 200, 230, 'packed-last'), start: 25 },

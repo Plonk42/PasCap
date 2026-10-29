@@ -10,20 +10,23 @@ import { JobQueue } from '../../src/server/jobs.js';
 import { renderLayeredExport, type LayeredRenderReport } from '../../src/server/layered-export.js';
 import { MediaLibrary } from '../../src/server/library.js';
 import { runProcess } from '../../src/server/process.js';
-import { gradePixel, NEUTRAL_COLOUR, type ColourSettings, type RGB } from '../../src/shared/colour.js';
-import { compileDetail, localTone, type DetailFilter, type DetailSettings } from '../../src/shared/detail.js';
+import { NEUTRAL_COLOUR, type ColourSettings, type RGB } from '../../src/shared/colour.js';
+import { compileDetail, type DetailFilter, type DetailSettings } from '../../src/shared/detail.js';
 import {
   EXPORT_PROFILES,
   LAYERED_EXPORT_RESOURCES,
   needsLayeredExport,
   planLayeredExport,
 } from '../../src/shared/export.js';
+import { createAdjustment, gradeChainPixel, layerKeyAsGradeKey, sourceGrades } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import {
   isNeutralSpatial,
   NEUTRAL_SPATIAL_POSE,
+  SPATIAL_CHANNELS,
+  type SpatialChannel,
   type SpatialPose,
   type SpatialSettings,
 } from '../../src/shared/spatial.js';
@@ -33,6 +36,7 @@ const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const BASE = ['-hide_banner', '-loglevel', 'error', '-nostdin'];
 type Target = { width: number; height: number };
 type Bounds = Target & { x: number; y: number };
+const NO_POSE = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<SpatialChannel, null>;
 
 function pose(changes: Partial<SpatialPose> = {}): SpatialPose {
   return { ...NEUTRAL_SPATIAL_POSE, ...changes };
@@ -83,6 +87,8 @@ interface ReferenceSource {
   bounds: Bounds;
   rgb: Buffer;
   neutral: boolean;
+  /** The clip grade, then the adjustment, each on the previous one's encoded output. */
+  stages: ColourSettings[];
   /** Shared detail kernel on this independent bilinear sampler; null when neutral. */
   detail: DetailFilter | null;
   cosine: number;
@@ -141,9 +147,9 @@ function sourceRgb(source: ReferenceSource, u: number, v: number, x: number, y: 
     if (x < bounds.x || x >= bounds.x + bounds.width || y < bounds.y || y >= bounds.y + bounds.height) return [0, 0, 0]; // Exact legacy padding: opaque, black and never graded.
     if (!source.detail) {
       const offset = (y * target.width + x) * 3;
-      return gradePixel(
+      return gradeChainPixel(
         [source.rgb[offset]! / 255, source.rgb[offset + 1]! / 255, source.rgb[offset + 2]! / 255],
-        source.sample.colour,
+        source.stages,
       );
     }
     u = (x + 0.5 - bounds.x) / bounds.width;
@@ -152,7 +158,7 @@ function sourceRgb(source: ReferenceSource, u: number, v: number, x: number, y: 
   const out = new Float64Array(3);
   if (source.detail) source.detail.apply((su, sv, target_) => fittedRgb(source, su, sv, target, target_), u, v, out);
   else fittedRgb(source, u, v, target, out);
-  return gradePixel([out[0]!, out[1]!, out[2]!], source.sample.colour);
+  return gradeChainPixel([out[0]!, out[1]!, out[2]!], source.stages);
 }
 
 function referencePixel(groups: readonly ReferenceSource[][], x: number, y: number, target: Target): readonly number[] {
@@ -356,20 +362,18 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       );
       const fit = Math.min(target.width / asset.metadata.width, target.height / asset.metadata.height);
       const radians = (spatial.rotation * Math.PI) / 180;
+      const grades = sourceGrades(sample.grade, sample.colour);
       prepared.push({
         sample,
         pose: spatial,
         bounds,
         rgb,
+        // Exact identity is geometric: Opacity is coverage and keeps the neutral letterbox path.
         neutral: (Object.keys(spatial) as (keyof SpatialPose)[]).every(
-          (key) => spatial[key] === NEUTRAL_SPATIAL_POSE[key],
+          (key) => key === 'opacity' || spatial[key] === NEUTRAL_SPATIAL_POSE[key],
         ),
-        detail: compileDetail(
-          sample.detail,
-          asset.metadata.width / asset.metadata.height,
-          localTone(sample.colour),
-          bounds.height,
-        ),
+        stages: grades.stages,
+        detail: compileDetail(sample.detail, asset.metadata.width / asset.metadata.height, grades.tone, bounds.height),
         cosine: Math.cos(radians),
         sine: Math.sin(radians),
         denominatorX: fit * asset.metadata.width * spatial.scale,
@@ -601,28 +605,28 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       changes: { scale: 1.2, rotation: 13, translateX: 0.04 },
       detail: { sharpen: 0.5, clarity: -0.7, denoise: 0.9 },
     },
-    { name: 'track HDR on the neutral letterboxed path', asset: 1, changes: {}, tone: { hdr: 0.8 } },
+    { name: 'adjustment HDR on the neutral letterboxed path', asset: 1, changes: {}, tone: { hdr: 0.8 } },
     {
-      name: 'track HDR with clip detail before a rotated, scaled grade',
+      name: 'adjustment HDR with clip detail before a rotated, scaled grade',
       asset: 0,
       changes: { scale: 1.2, rotation: 13, translateX: 0.04 },
       detail: { sharpen: 0.4, clarity: 0.3, denoise: 0.5 },
       tone: { hdr: 0.6 },
     },
     {
-      name: 'track Shadows and Highlights on the neutral letterboxed path',
+      name: 'adjustment Shadows and Highlights on the neutral letterboxed path',
       asset: 1,
       changes: {},
       tone: { shadows: 0.8, highlights: -0.7 },
     },
     {
-      name: 'track Local contrast on the neutral letterboxed path',
+      name: 'adjustment Local contrast on the neutral letterboxed path',
       asset: 1,
       changes: {},
       tone: { localContrast: 0.9 },
     },
     {
-      name: 'track Shadows, Highlights, HDR and Exposure with clip detail before a rotated, scaled grade',
+      name: 'adjustment Shadows, Highlights, HDR and Exposure with clip detail before a rotated, scaled grade',
       asset: 0,
       changes: { scale: 1.2, rotation: 13, translateX: 0.04 },
       detail: { sharpen: 0.4, clarity: 0.3, denoise: 0.5 },
@@ -652,7 +656,12 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     const clip = createClip('pattern', assets[asset]!.id, 1, 2);
     project.layers[0]!.transform.base = pose(changes);
     if (detail) clip.detail = detail;
-    Object.assign(project.layers[0]!.colour, tone);
+    if (tone) {
+      // The local tone grades the whole film: an adjustment over the clip's one frame.
+      const look = createAdjustment('look', 0, 1);
+      Object.assign(look.colour, tone);
+      project.adjustments = [look];
+    }
     project.clips = [clip];
     const captured = projectSchema.parse(project);
     expect(needsLayeredExport(captured)).toBe(true);
@@ -670,22 +679,17 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
   function compound(): ProjectDocument {
     const project = createProject('animated-spatial', 'Four-frame held-source spatial dissolve');
     const lower = project.layers[0]!;
-    lower.opacity = 0.8;
+    lower.transform.base.opacity = 0.8;
     const upper = createLayer('upper', 'Independent spatial sources', true);
-    upper.opacity = 0.91; // Keys override this once, not again after composition.
     upper.openingFade = 1;
     upper.closingFade = 1;
-    upper.keyframes = [
-      layerKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.35, temperature: -0.8, tint: 0.6 }, 'linear'),
-      layerKeyframe(3, { ...EMPTY_KEY_VALUES, opacity: 0.75, temperature: 0.9, tint: -0.7 }, 'hold'),
-    ];
     project.layers.push(upper);
     const base = createClip('base', assets[0]!.id, 0, 4);
     const left = createClip('left', assets[1]!.id, 1, 2, upper.id);
     const right = createClip('right', assets[2]!.id, 2, 3, upper.id);
     left.speed = right.speed = { mode: 'constant', rate: 1 / 3 };
     right.start = 1;
-    project.layers[0]!.colour = {
+    base.grade.colour = {
       ...NEUTRAL_COLOUR,
       temperature: 0.7,
       tint: -0.5,
@@ -694,23 +698,38 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       saturation: 0.8,
       brightness: 0.03,
     };
-    // Both dissolve sources share the track pose, animated in project time over held images.
+    // An adjustment over the whole film grades every source in project time, over held images too.
+    project.adjustments = [
+      {
+        ...createAdjustment('look', 0, 4),
+        keyframes: [
+          layerKeyAsGradeKey(layerKeyframe(0, { ...EMPTY_KEY_VALUES, temperature: -0.8, tint: 0.6 }, 'linear')),
+          layerKeyAsGradeKey(layerKeyframe(3, { ...EMPTY_KEY_VALUES, temperature: 0.9, tint: -0.7 }, 'hold')),
+        ],
+      },
+    ];
+    // Both dissolve sources share the track pose, animated in project time over held images. Opacity keys
+    // override the base Opacity once, not again after composition.
     upper.transform = {
-      base: pose({ scale: 3 }),
+      base: { ...pose({ scale: 3 }), opacity: 0.91 },
       keyframes: [
+        { ...uniformKeyframe(0, { ...NO_POSE, opacity: 0.35 }, 'linear'), reset: false },
         {
           ...uniformKeyframe(
             1,
-            pose({
-              cropLeft: 0.12,
-              cropRight: 0.18,
-              cropTop: 0.09,
-              cropBottom: 0.21,
-              scale: 0.83,
-              rotation: 21,
-              translateX: -0.1,
-              translateY: 0.08,
-            }),
+            {
+              ...pose({
+                cropLeft: 0.12,
+                cropRight: 0.18,
+                cropTop: 0.09,
+                cropBottom: 0.21,
+                scale: 0.83,
+                rotation: 21,
+                translateX: -0.1,
+                translateY: 0.08,
+              }),
+              opacity: null,
+            },
             'smooth',
           ),
           reset: false,
@@ -727,6 +746,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
               rotation: -17,
               translateX: 0.16,
               translateY: -0.13,
+              opacity: 0.75,
             }),
             'hold',
           ),
@@ -824,7 +844,8 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
 
   it('720p lossless native parity through the GPU worker: HSL ranges and a master curve', async () => {
     const project = createProject('gpu-advanced-colour', 'Disposable one-frame advanced colour test');
-    project.layers[0]!.colour = {
+    const clip = createClip('pattern', assets[1]!.id, 1, 2);
+    clip.grade.colour = {
       ...NEUTRAL_COLOUR,
       exposure: 0.2,
       hsl: { ...NEUTRAL_COLOUR.hsl, red: { hue: 12, saturation: -0.3, lightness: 0.04 } },
@@ -838,7 +859,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
         ],
       },
     };
-    project.clips = [createClip('pattern', assets[1]!.id, 1, 2)];
+    project.clips = [clip];
     const captured = projectSchema.parse(project);
     const work = await mkdtemp(path.join(root, 'advanced-gpu-'));
     try {

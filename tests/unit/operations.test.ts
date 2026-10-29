@@ -14,7 +14,9 @@ import { createProject, projectSchema, type ProjectDocument } from '../../src/sh
 import type { TrackDescription } from '../../src/shared/operations/describe-track.js';
 import { operations } from '../../src/shared/operations/index.js';
 import { durationOf } from '../../src/shared/operations/timecode.js';
-import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
+import { NEUTRAL_SPATIAL_POSE, SPATIAL_CHANNELS } from '../../src/shared/spatial.js';
+
+const NO_TRANSFORM = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null]));
 
 const headers = { host: '127.0.0.1:4318', 'x-pascap-client': 'preview-lab' };
 const temporary: string[] = [];
@@ -91,6 +93,7 @@ describe('operation routes', () => {
       revision: 1,
       duration: { frames: 0, timecode: '00:00:00' },
       videoTracks: [{ id: 'video-1', clips: [] }],
+      adjustments: [],
       bookmarks: [],
     });
 
@@ -101,7 +104,7 @@ describe('operation routes', () => {
         { type: 'bookmark-add', frame: 90 },
         { type: 'bookmark-add', frame: 30 },
         { type: 'layer-create', layerId: 'video-2', name: 'Overlay' },
-        { type: 'opacity', layerId: 'video-2', opacity: 0.5 },
+        { type: 'transform-setting', layerId: 'video-2', setting: 'opacity', value: 0.5 },
       ],
     });
     expect(edited.statusCode).toBe(200);
@@ -249,7 +252,7 @@ describe('operation routes', () => {
         },
       },
     } as unknown as Parameters<typeof runners.still>[0];
-    const candidate = [{ type: 'colour-setting', layerId: 'video-1', setting: 'exposure', value: 0.5 }] as const;
+    const candidate = [{ type: 'colour-setting', clipId: 'clip-1', setting: 'exposure', value: 0.5 }] as const;
     const compared = await runners.still(pictures, {
       projectId: project.id,
       frame: 10,
@@ -277,7 +280,7 @@ describe('operation routes', () => {
       480,
       null,
     ]);
-    expect(edited.document.layers[0]!.colour.exposure).toBe(0.5);
+    expect(edited.document.clips[0]!.grade.colour.exposure).toBe(0.5);
     const original = await runners.still(pictures, { projectId: project.id, frame: 10, compare: 'original' });
     expect(original.legend.map(({ shows }) => shows)).toEqual(['original', 'saved']);
     expect((sides[1] as [{ ungraded: boolean }[]])[0].map((side) => side.ungraded)).toEqual([true, false]);
@@ -288,20 +291,30 @@ describe('operation routes', () => {
     );
   });
 
-  it('reads a whole track, its keyed settings and the values that apply at frames', async () => {
+  it('reads a whole track, its keyed settings and the values that apply at frames, with the adjustment there', async () => {
     const { app, project } = await service();
+    const opacityKey = (frame: number, opacity: number) => ({
+      frame,
+      values: { ...NO_TRANSFORM, opacity },
+      easing: { ...NO_TRANSFORM, opacity: 'linear' },
+      reset: false,
+    });
     const edited = await call(app, 'edit', {
       projectId: project.id,
       expectedRevision: 1,
       commands: [
-        { type: 'colour', layerId: 'video-1', colour: { ...createColourSettings(), shadows: 0.3, contrast: 1.2 } },
+        { type: 'adjustment-add', adjustmentId: 'look', start: 0, duration: 200 },
+        { type: 'colour', adjustmentId: 'look', colour: { ...createColourSettings(), shadows: 0.3, contrast: 1.2 } },
         {
           type: 'transform',
           layerId: 'video-1',
-          transform: { base: { ...NEUTRAL_SPATIAL_POSE, scale: 1.5 }, keyframes: [] },
+          transform: {
+            base: { ...NEUTRAL_SPATIAL_POSE, scale: 1.5 },
+            keyframes: [opacityKey(30, 1), opacityKey(90, 0.5)],
+          },
         },
-        { type: 'layer-key-toggle', layerId: 'video-1', frame: 30, setting: 'exposure', value: 1 },
-        { type: 'layer-key-toggle', layerId: 'video-1', frame: 90, setting: 'exposure', value: 0 },
+        { type: 'layer-key-toggle', adjustmentId: 'look', frame: 30, setting: 'exposure', value: 1 },
+        { type: 'layer-key-toggle', adjustmentId: 'look', frame: 90, setting: 'exposure', value: 0 },
       ],
     });
     expect(edited.statusCode).toBe(200);
@@ -313,23 +326,35 @@ describe('operation routes', () => {
     });
     expect(response.statusCode).toBe(200);
     const description = response.json<TrackDescription>();
-    const saved = (await call(app, 'describe_project', { projectId: project.id })).json<{ revision: number }>();
+    const saved = (await call(app, 'describe_project', { projectId: project.id })).json<{
+      revision: number;
+      adjustments: unknown[];
+    }>();
     expect(description.revision).toBe(saved.revision);
-    expect(description.track!.colour).toMatchObject({ shadows: 0.3, contrast: 1.2, exposure: 0 });
-    expect(description.track!.keyframes.map((key) => [key.frame, key.values.exposure])).toEqual([
-      [30, 1],
-      [90, 0],
+    expect(saved.adjustments).toEqual([
+      expect.objectContaining({ id: 'look', start: 0, end: 200, grade: '2 keyframes' }),
     ]);
-    expect(description.keyed).toEqual({ colour: ['exposure'], transform: [] });
+    expect(description.track!.transform.base).toMatchObject({ scale: 1.5, opacity: 1 });
+    expect(description.track!.transform.keyframes.map((key) => [key.frame, key.values.opacity])).toEqual([
+      [30, 1],
+      [90, 0.5],
+    ]);
+    expect(description.keyed).toEqual({ transform: ['opacity'] });
     expect(description.keyframes).toBeUndefined();
     expect(
-      description.at!.map(({ frame, timecode, values }) => [frame, timecode, values.exposure, values.shadows]),
+      description.at!.map(({ frame, timecode, adjustment }) => [
+        frame,
+        timecode,
+        adjustment?.adjustmentId,
+        adjustment?.values.exposure,
+        adjustment?.values.shadows,
+      ]),
     ).toEqual([
-      [0, '00:00:00', 1, 0.3],
-      [60, '00:02:00', 0.5, 0.3],
-      [120, '00:04:00', 0, 0.3],
+      [0, '00:00:00', 'look', 1, 0.3],
+      [60, '00:02:00', 'look', 0.5, 0.3],
+      [120, '00:04:00', 'look', 0, 0.3],
     ]);
-    expect(description.at![1]!.values.opacity).toBe(1);
+    expect(description.at![1]!.transform.opacity).toBe(0.75);
     expect(description.at![1]!.transform.scale).toBe(1.5);
 
     // Compact: keyframes with only their keyed settings, and the values of the settings asked for.
@@ -342,15 +367,21 @@ describe('operation routes', () => {
     });
     expect(compact.json()).toEqual({
       revision: saved.revision,
-      keyed: { colour: ['exposure'], transform: [] },
+      keyed: { transform: ['opacity'] },
       keyframes: {
-        colour: [
-          { frame: 30, timecode: '00:01:00', values: { exposure: 1 }, easing: { exposure: 'linear' }, reset: false },
-          { frame: 90, timecode: '00:03:00', values: { exposure: 0 }, easing: { exposure: 'linear' }, reset: false },
+        transform: [
+          { frame: 30, timecode: '00:01:00', values: { opacity: 1 }, easing: { opacity: 'linear' }, reset: false },
+          { frame: 90, timecode: '00:03:00', values: { opacity: 0.5 }, easing: { opacity: 'linear' }, reset: false },
         ],
-        transform: [],
       },
-      at: [{ frame: 60, timecode: '00:02:00', values: { exposure: 0.5 }, transform: { scale: 1.5 } }],
+      at: [
+        {
+          frame: 60,
+          timecode: '00:02:00',
+          adjustment: { adjustmentId: 'look', values: { exposure: 0.5 } },
+          transform: { scale: 1.5 },
+        },
+      ],
     });
     const parts = await call(app, 'describe_project', {
       projectId: project.id,

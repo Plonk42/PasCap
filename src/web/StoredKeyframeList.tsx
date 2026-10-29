@@ -135,7 +135,7 @@ function StoredKeyframeRow<S extends string, K extends StoredKeyframe<S>>({
           type="button"
           className="text-button stored-keyframe-select"
           aria-label={`Go to ${kind.noun} keyframe ${point.frame}`}
-          title={keySeekHint(point.frame, duration)}
+          title={keySeekHint(point.frame, duration, FRAME_LABELS[kind.frameNoun ?? 'timeline'].toLowerCase())}
           disabled={disabled}
           onClick={() => kind.seek(point.frame)}
         >
@@ -186,6 +186,7 @@ function StoredKeyframeRow<S extends string, K extends StoredKeyframe<S>>({
                     previous={previous}
                     next={next}
                     duration={duration}
+                    frameNoun={FRAME_LABELS[kind.frameNoun ?? 'timeline'].toLowerCase()}
                     disabled={disabled}
                     onSeek={kind.seek}
                   />

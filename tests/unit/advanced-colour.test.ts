@@ -21,12 +21,14 @@ import {
   type RGB,
 } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
-import { colourAt } from '../../src/shared/composition.js';
 import { needsLayeredExport, planExport } from '../../src/shared/export.js';
+import { createAdjustment, gradeColourAt, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, layerKeyframe } from '../../src/shared/keyframes.js';
-import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
+import { createClip, createProject, projectSchema } from '../../src/shared/model.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
+import { sampleTimeline } from '../../src/shared/timeline.js';
+import { clipColourOwner } from '../../src/web/colour-owner.js';
 import { colourResetCommands } from '../../src/web/colour-reset.js';
 import { EARLIER_SCHEMA_VERSIONS } from './project-fixtures.js';
 
@@ -36,26 +38,28 @@ function hueRgb(hue: number): RGB {
   return [value(0), value(-120), value(-240)];
 }
 
-describe('strict current-schema static advanced row colour', () => {
-  it('creates deeply independent bands and curves for settings, rows and projects', () => {
+describe('strict current-schema static advanced grade colour', () => {
+  it('creates deeply independent bands and curves for settings, clip grades and adjustments', () => {
     const a = createColourSettings(),
       b = createColourSettings();
     a.hsl.red.hue = 12;
     a.curves.master[0]!.y = 0.2;
     expect(b).toEqual(NEUTRAL_COLOUR);
-    const project = createProject('p', 'P');
-    project.layers.push(createLayer('other', 'Other'));
-    project.layers[0]!.colour.hsl.blue.saturation = -0.3;
-    project.layers[0]!.colour.curves.red[1]!.y = 0.8;
-    expect(project.layers[1]!.colour).toEqual(NEUTRAL_COLOUR);
-    expect(createProject('b', 'B').layers[0]!.colour).toEqual(NEUTRAL_COLOUR);
+    const graded = createClip('graded', 'm', 0, 2);
+    graded.grade.colour.hsl.blue.saturation = -0.3;
+    graded.grade.colour.curves.red[1]!.y = 0.8;
+    expect(createClip('other', 'm', 0, 2).grade.colour).toEqual(NEUTRAL_COLOUR);
+    const look = createAdjustment('look', 0, 10);
+    look.colour.hsl.blue.saturation = -0.3;
+    look.colour.curves.red[1]!.y = 0.8;
+    expect(createAdjustment('other', 10, 10).colour).toEqual(NEUTRAL_COLOUR);
   });
   it('requires every field and rejects old schemas, unknown entries and nonfinite data without repair', () => {
     const document = createProject('p', 'P');
     for (const schemaVersion of EARLIER_SCHEMA_VERSIONS)
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
     for (const field of ['hsl', 'curves'] as const) {
-      const value = { ...document.layers[0]!.colour };
+      const value = createColourSettings();
       delete (value as Partial<typeof value>)[field];
       expect(colourSchema.safeParse(value).success).toBe(false);
     }
@@ -208,49 +212,56 @@ describe('strict current-schema static advanced row colour', () => {
   it('keeps advanced settings with scalar keys and reset-keys; advanced static edits are one Undo and require exact layered export', () => {
     const project = createProject('p', 'P');
     project.clips = [createClip('c', 'source', 0, 4)];
-    const layer = project.layers[0]!;
-    layer.colour.hsl.red.hue = 12;
-    layer.colour.curves.master[0]!.y = 0.1;
+    const grade = project.clips[0]!.grade;
+    grade.colour.hsl.red.hue = 12;
+    grade.colour.curves.master[0]!.y = 0.1;
     expect(needsLayeredExport(project)).toBe(true);
     expect(() => planExport(project)).toThrow('layered exporter');
-    layer.keyframes = [layerKeyframe(0, { ...EMPTY_KEY_VALUES, exposure: 1, opacity: 0.7 }, 'linear')];
-    expect(colourAt(layer, 2)).toMatchObject({ exposure: 1, hsl: layer.colour.hsl, curves: layer.colour.curves });
+    grade.keyframes = [layerKeyAsGradeKey(layerKeyframe(0, { ...EMPTY_KEY_VALUES, exposure: 1 }, 'linear'))];
+    expect(gradeColourAt(grade, 2)).toMatchObject({ exposure: 1, hsl: grade.colour.hsl, curves: grade.colour.curves });
+    expect(sampleTimeline(project, 2)[0]!.grade).toEqual(gradeColourAt(grade, 2));
     const history = new EditHistory(project);
     const before = structuredClone(project);
     history.replace(
-      colourResetCommands(layer, 0).reduce((document, command) => applyCommand(document, command), history.current),
+      colourResetCommands(clipColourOwner(project.clips[0]!, 'clip c'), 0).reduce(
+        (document, command) => applyCommand(document, command),
+        history.current,
+      ),
     );
-    expect(history.current.layers[0]!.colour).toEqual(before.layers[0]!.colour);
+    expect(history.current.clips[0]!.grade.colour).toEqual(before.clips[0]!.grade.colour);
+    expect(history.current.clips[0]!.grade.keyframes[0]!.values.exposure).toBe(0);
     expect(history.undo()).toEqual(before);
     history.commit({
       type: 'colour',
-      layerId: layer.id,
-      colour: { ...layer.colour, hsl: { ...layer.colour.hsl, red: { hue: 0, saturation: 0, lightness: 0 } } },
+      clipIds: ['c'],
+      colour: { ...grade.colour, hsl: { ...grade.colour.hsl, red: { hue: 0, saturation: 0, lightness: 0 } } },
     });
-    expect(history.current.layers[0]!.keyframes).toEqual(layer.keyframes);
+    expect(history.current.clips[0]!.grade.keyframes).toEqual(grade.keyframes);
     expect(history.undo()).toEqual(before);
     expect(
-      applyCommand(project, { type: 'colour', layerId: layer.id, colour: createColourSettings() }).layers[0]!.keyframes,
-    ).toEqual(layer.keyframes);
+      applyCommand(project, { type: 'colour', clipIds: ['c'], colour: createColourSettings() }).clips[0]!.grade
+        .keyframes,
+    ).toEqual(grade.keyframes);
   });
   it('routes every nonneutral band/curve through layered export and preserves neutral advanced static eligibility', () => {
     const project = createProject('dispatch', 'Dispatch');
     project.clips = [createClip('c', 'source', 0, 4)];
-    project.layers[0]!.colour.exposure = 0.7;
+    const grade = project.clips[0]!.grade;
+    grade.colour.exposure = 0.7;
     for (const channel of CURVE_CHANNELS)
-      project.layers[0]!.colour.curves[channel] = Array.from({ length: 16 }, (_, i) => ({ x: i / 15, y: i / 15 }));
-    const neutral = structuredClone(project.layers[0]!.colour);
+      grade.colour.curves[channel] = Array.from({ length: 16 }, (_, i) => ({ x: i / 15, y: i / 15 }));
+    const neutral = structuredClone(grade.colour);
     expect(needsLayeredExport(project)).toBe(false);
     expect(planExport(project).duration).toBe(4);
     for (const band of HSL_BANDS) {
-      project.layers[0]!.colour = structuredClone(neutral);
-      project.layers[0]!.colour.hsl[band].hue = 0.000001;
+      grade.colour = structuredClone(neutral);
+      grade.colour.hsl[band].hue = 0.000001;
       expect(needsLayeredExport(project)).toBe(true);
       expect(() => planExport(project)).toThrow('layered exporter');
     }
     for (const channel of CURVE_CHANNELS) {
-      project.layers[0]!.colour = structuredClone(neutral);
-      project.layers[0]!.colour.curves[channel][1]!.y += 0.000001;
+      grade.colour = structuredClone(neutral);
+      grade.colour.curves[channel][1]!.y += 0.000001;
       expect(needsLayeredExport(project)).toBe(true);
       expect(() => planExport(project)).toThrow('layered exporter');
     }

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { createColourSettings } from '../../src/shared/colour.js';
 import { applyCommand, type EditCommand } from '../../src/shared/commands.js';
 import { editedFrame } from '../../src/shared/edited-frame.js';
+import { createAdjustment } from '../../src/shared/grade.js';
+import { uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { SPATIAL_CHANNELS, type SpatialChannel } from '../../src/shared/spatial.js';
 
 const base: ProjectDocument = projectSchema.parse({
   ...createProject('edited', 'Edited'),
@@ -20,8 +23,13 @@ const base: ProjectDocument = projectSchema.parse({
       ],
     },
   ],
+  adjustments: [createAdjustment('look', 40, 100)],
 });
 const layerId = base.layers[0]!.id;
+const NO_TRANSFORM = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<
+  SpatialChannel,
+  null
+>;
 
 function after(...commands: EditCommand[]): number | null {
   return editedFrame(
@@ -42,8 +50,23 @@ describe('edited frame', () => {
     expect(after({ type: 'reverse', clipId: 'c', reverse: true })).toBe(120);
   });
 
-  it('is the frame of a changed keyframe, bookmark or music clip', () => {
-    expect(after({ type: 'layer-key-toggle', layerId, frame: 90, setting: 'exposure', value: 0.5 })).toBe(90);
+  it('is the frame of a changed keyframe, adjustment, bookmark or music clip', () => {
+    // Adjustment keyframes are relative to its start (40).
+    expect(after({ type: 'layer-key-toggle', adjustmentId: 'look', frame: 50, setting: 'exposure', value: 0.5 })).toBe(
+      90,
+    );
+    expect(
+      after({
+        type: 'transform',
+        layerId,
+        transform: {
+          ...base.layers[0]!.transform,
+          keyframes: [{ ...uniformKeyframe(75, { ...NO_TRANSFORM, opacity: 0.5 }, 'linear'), reset: false }],
+        },
+      }),
+    ).toBe(75);
+    expect(after({ type: 'adjustment-add', adjustmentId: 'later', start: 150, duration: 20 })).toBe(150);
+    expect(after({ type: 'adjustment-remove', adjustmentId: 'look' })).toBe(40);
     expect(after({ type: 'bookmark-add', frame: 200 })).toBe(200);
     expect(
       after({
@@ -65,9 +88,11 @@ describe('edited frame', () => {
     ).toBe(30);
   });
 
-  it('is null for whole-track appearance, kept ranges or nothing at all', () => {
-    expect(after({ type: 'colour', layerId, colour: { ...createColourSettings(), exposure: 0.5 } })).toBeNull();
-    expect(after({ type: 'opacity', layerId, opacity: 0.5 })).toBeNull();
+  it('is null for a whole adjustment Colour, a track Transform base, kept ranges or nothing at all', () => {
+    expect(
+      after({ type: 'colour', adjustmentId: 'look', colour: { ...createColourSettings(), exposure: 0.5 } }),
+    ).toBeNull();
+    expect(after({ type: 'transform-setting', layerId, setting: 'opacity', value: 0.5 })).toBeNull();
     expect(after({ type: 'select-set', mediaId: 'rec', ranges: [{ sourceIn: 0, sourceOut: 90 }] })).toBeNull();
     expect(editedFrame(base, base)).toBeNull();
   });

@@ -18,6 +18,7 @@ import {
   formatStorageBytes,
   MIN_EXPORT_FREE_BYTES,
 } from '../../src/shared/export-space.js';
+import { createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
@@ -125,10 +126,14 @@ describe('duration-dependent planning allowance, not a codec guarantee', () => {
     expect(estimateExportSpace(document, 'draft720').losslessBytes).toBe(1280 * 720 * 60 * 4);
     expect(estimateExportSpace(document, 'final4k').losslessBytes).toBe(3840 * 2160 * 60 * 4);
   });
-  it('budgets three RGBA16 timeline representations for row animation, even a neutral key', () => {
-    const document = documentWithClips();
-    document.layers[0]!.keyframes = [layerKeyframe(0, { ...EMPTY_KEY_VALUES, exposure: 0 }, 'linear')];
-    expect(estimateExportSpace(document, 'draft720').losslessBytes).toBe(1280 * 720 * (30 * 4 + 3 * 30 * 8));
+  it('budgets three RGBA16 timeline representations for grade animation or adjustments, even a neutral key', () => {
+    const neutralKey = layerKeyAsGradeKey(layerKeyframe(0, { ...EMPTY_KEY_VALUES, exposure: 0 }, 'linear'));
+    const keyed = documentWithClips();
+    keyed.clips[0]!.grade.keyframes = [neutralKey];
+    expect(estimateExportSpace(keyed, 'draft720').losslessBytes).toBe(1280 * 720 * (30 * 4 + 3 * 30 * 8));
+    const adjusted = documentWithClips();
+    adjusted.adjustments = [{ ...createAdjustment('look', 0, 30), keyframes: [neutralKey] }];
+    expect(estimateExportSpace(adjusted, 'draft720').losslessBytes).toBe(1280 * 720 * (30 * 4 + 3 * 30 * 8));
   });
   it('keeps disabled tails in full timeline allowance but excludes their unrendered clip files', () => {
     const document = documentWithClips();

@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { createAdjustment, layerKeyAsGradeKey, type GradeKeyframe } from '../../src/shared/grade.js';
 import {
   EMPTY_KEY_VALUES,
   type Interpolation,
-  type LayerKeyframe,
   type LayerKeyValues,
   layerKeyframe,
+  uniformKeyframe,
 } from '../../src/shared/keyframes.js';
 import type { MediaJob } from '../../src/shared/media.js';
 import {
@@ -15,6 +17,7 @@ import {
   type ProjectDocument,
 } from '../../src/shared/model.js';
 import type { ProjectSummary } from '../../src/shared/projects.js';
+import { SPATIAL_CHANNELS, type SpatialKeyframe, type SpatialKeyValues } from '../../src/shared/spatial.js';
 import { summarizeExport } from '../../src/web/ExportDialog.js';
 import {
   activityResultSummary,
@@ -25,8 +28,16 @@ import {
 } from '../../src/web/Jobs.js';
 import { filterProjects } from '../../src/web/Projects.js';
 
-function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
+function gradeKey(
+  frame: number,
+  values: Partial<LayerKeyValues>,
+  interpolation: Interpolation = 'linear',
+): GradeKeyframe {
+  return layerKeyAsGradeKey(layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation));
+}
+const NO_TRANSFORM = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as SpatialKeyValues;
+function transformKey(frame: number, values: Partial<SpatialKeyValues>): SpatialKeyframe {
+  return { ...uniformKeyframe(frame, { ...NO_TRANSFORM, ...values }, 'linear'), reset: false };
 }
 function job(id: string, overrides: Partial<MediaJob> = {}): MediaJob {
   return {
@@ -220,22 +231,30 @@ describe('export snapshot summary', () => {
   it('summarizes an empty strict current-schema project without adding defaults', () => {
     const document = createProject('empty', 'Empty');
     const summary = summarizeExport(document);
-    expect(summary).toMatchObject({ duration: 0, clips: 0, layers: 1, enabledLayers: 1, layered: false });
-    expect(summary.keys).toEqual({ points: 0, settings: 0, colour: 0, opacity: 0 });
+    expect(summary).toMatchObject({
+      duration: 0,
+      clips: 0,
+      layers: 1,
+      enabledLayers: 1,
+      adjustments: 0,
+      keyframeCount: 0,
+      layered: false,
+    });
+    expect(summary.keys).toEqual({ points: 0, settings: 0, transform: 0 });
     expect(document.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     expect(document.media).toEqual({ videoIds: [], audioIds: [] });
-    expect(document.layers[0]!.keyframes).toEqual([]);
+    expect(document.layers[0]!.transform.keyframes).toEqual([]);
+    expect(document.adjustments).toEqual([]);
   });
 
   it('uses retimed duration and includes disabled overlay tails and stored keys', () => {
     const document: ProjectDocument = createProject('layers', 'Layers');
     const primary = createClip('primary', 'source', 0, 60);
     primary.speed = { mode: 'constant', rate: 2 };
-    document.layers[0]!.keyframes = [
-      point(
+    primary.grade.keyframes = [
+      gradeKey(
         0,
         {
-          opacity: 1,
           temperature: 0,
           tint: 0,
           exposure: 0,
@@ -249,51 +268,68 @@ describe('export snapshot summary', () => {
         'hold',
       ),
     ];
+    document.layers[0]!.transform.keyframes = [transformKey(0, { opacity: 1 })];
     const overlay = createClip('overlay', 'source', 0, 30);
     overlay.layerId = 'video-2';
     overlay.start = 100;
-    document.layers.push({
-      ...createLayer('video-2', 'Overlay', false),
-      enabled: false,
-      keyframes: [point(0, { opacity: 1 }), point(200, { brightness: 0.1 }, 'hold')],
-    });
+    overlay.grade.keyframes = [gradeKey(5, { brightness: 0.1 }, 'hold')];
+    const hidden = createLayer('video-2', 'Overlay', false);
+    hidden.transform.keyframes = [transformKey(0, { opacity: 1 })];
+    document.layers.push({ ...hidden, enabled: false });
+    // An adjustment keeps its keyframes outside its range, and never extends the project.
+    document.adjustments = [{ ...createAdjustment('look', 0, 50), keyframes: [gradeKey(200, { brightness: 0.1 })] }];
     document.clips = [primary, overlay];
     const before = JSON.stringify(document);
     const summary = summarizeExport(document);
-    expect(summary).toMatchObject({ duration: 130, clips: 2, layers: 2, enabledLayers: 1, layered: true });
-    expect(summary.keys).toEqual({ points: 3, settings: 12, colour: 10, opacity: 2 });
+    expect(summary).toMatchObject({
+      duration: 130,
+      clips: 2,
+      layers: 2,
+      enabledLayers: 1,
+      adjustments: 1,
+      keyframeCount: 3,
+      layered: true,
+    });
+    expect(summary.keys).toEqual({ points: 3, settings: 11, transform: 2 });
     expect(JSON.stringify(document)).toBe(before);
   });
 
-  it('distinguishes shared track points from the static-only export path and still detects row opacity', () => {
+  it('distinguishes keyed grades and adjustments from the static-only export path and still detects track Opacity', () => {
     const document = createProject('points', 'Points');
     const clip = createClip('clip', 'source', 0, 60);
-    document.layers[0]!.keyframes = [point(0, { exposure: 0.5 })];
+    document.adjustments = [{ ...createAdjustment('look', 0, 60), keyframes: [gradeKey(0, { exposure: 0.5 })] }];
     document.clips = [clip];
     const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 60, layered: true });
-    expect(summary.keys).toEqual({ points: 1, settings: 1, colour: 1, opacity: 0 });
-    document.layers[0]!.keyframes = [];
+    expect(summary.keys).toEqual({ points: 1, settings: 1, transform: 0 });
+    document.adjustments = [];
     expect(summarizeExport(document)).toMatchObject({ duration: 60, layered: false });
-    document.layers[0]!.opacity = 0.5;
+    clip.grade.keyframes = [gradeKey(10, { exposure: 0.5 })];
+    expect(summarizeExport(document)).toMatchObject({ layered: true, keys: { points: 1, settings: 1, transform: 0 } });
+    clip.grade.keyframes = [];
+    expect(summarizeExport(document).layered).toBe(false);
+    document.layers[0]!.transform.base.opacity = 0.5;
     expect(summarizeExport(document).layered).toBe(true);
   });
 
-  it('counts each row point once across its clips and counts zero-valued colour members individually', () => {
+  it('counts each adjustment point once across the clips it grades and counts zero-valued members individually', () => {
     const document = createProject('participants', 'Participants');
     const left = createClip('left', 'source', 0, 30);
     const right = createClip('right', 'source', 100, 130);
-    document.layers[0]!.colour.hue = 90;
     document.clips = [left, right];
     document.layers[0]!.transitions = [{ leftId: 'left', rightId: 'right', type: 'cut', duration: 0 }];
-    document.layers[0]!.keyframes = [
-      point(0, { exposure: 0, brightness: 0, opacity: 0 }),
-      point(60, { exposure: 1, shadows: 0 }),
+    document.layers[0]!.transform.keyframes = [transformKey(0, { opacity: 0 })];
+    document.adjustments = [
+      {
+        ...createAdjustment('look', 0, 60),
+        colour: { ...NEUTRAL_COLOUR, hue: 90 },
+        keyframes: [gradeKey(0, { exposure: 0, brightness: 0 }), gradeKey(60, { exposure: 1, shadows: 0 })],
+      },
     ];
     const before = JSON.stringify(document);
     const summary = summarizeExport(document);
     expect(summary).toMatchObject({ duration: 60, clips: 2, layers: 1, enabledLayers: 1, layered: true });
-    expect(summary.keys).toEqual({ points: 2, settings: 5, colour: 4, opacity: 1 });
+    expect(summary.keys).toEqual({ points: 2, settings: 4, transform: 1 });
     expect(JSON.stringify(document)).toBe(before);
   });
 });

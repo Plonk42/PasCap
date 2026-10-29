@@ -6,7 +6,7 @@ import { createColourSettings } from '../../src/shared/colour.js';
 import { editCommandSchema, type EditCommand } from '../../src/shared/commands.js';
 import { assistantEditCommandSchema, referencedEditCommandSchema } from '../../src/shared/command-schema.js';
 import { createDetailSettings, type DetailSettings } from '../../src/shared/detail.js';
-import type { Interpolation, KeyframeSetting } from '../../src/shared/keyframes.js';
+import type { Interpolation } from '../../src/shared/keyframes.js';
 import {
   createClip,
   createLayer,
@@ -20,28 +20,28 @@ import { createSpatialSettings, type SpatialChannel, type SpatialSettings } from
 import type { SpeedSettings } from '../../src/shared/speed.js';
 
 /**
- * The hand-written union `editCommandSchema` replaced (#228), plus the partial track settings (#252);
- * the inferred type must stay identical.
+ * The hand-written union `editCommandSchema` replaced (#228), plus the partial track settings (#252), with Colour
+ * commands naming a clip grade or an adjustment (#286); the inferred type must stay identical.
  */
 type FormerEditCommand =
   | {
       type: 'colour-setting';
-      layerId?: string | undefined;
       clipId?: string | undefined;
+      adjustmentId?: string | undefined;
       setting: ScalarColourSetting;
       value: number;
     }
   | {
       type: 'hsl-band';
-      layerId?: string | undefined;
       clipId?: string | undefined;
+      adjustmentId?: string | undefined;
       band: HslBand;
       values: { hue: number; saturation: number; lightness: number };
     }
   | {
       type: 'colour-curve';
-      layerId?: string | undefined;
       clipId?: string | undefined;
+      adjustmentId?: string | undefined;
       channel: CurveChannel;
       points: ColourCurvePoint[];
     }
@@ -56,8 +56,8 @@ type FormerEditCommand =
   | { type: 'duplicate'; clipId: string; newClipId: string }
   | {
       type: 'colour';
-      layerId?: string | undefined;
       clipIds?: string[] | undefined;
+      adjustmentId?: string | undefined;
       colour: ColourSettings;
     }
   | { type: 'speed'; clipId: string; speed: SpeedSettings }
@@ -66,47 +66,46 @@ type FormerEditCommand =
   | { type: 'detail'; clipId: string; detail: DetailSettings }
   | { type: 'detail-clips'; clipIds: string[]; detail: DetailSettings }
   | { type: 'music'; music: MusicLane[] }
-  | { type: 'opacity'; layerId: string; opacity: number }
   | {
       type: 'layer-key-toggle';
-      layerId?: string | undefined;
       clipId?: string | undefined;
+      adjustmentId?: string | undefined;
       frame: number;
-      setting: KeyframeSetting;
+      setting: ScalarColourSetting;
       value: number;
     }
   | {
       type: 'layer-key-set';
-      layerId?: string | undefined;
       clipId?: string | undefined;
+      adjustmentId?: string | undefined;
       frame: number;
-      values: { [K in KeyframeSetting]?: number | null | undefined };
-      easing?: Interpolation | { [K in KeyframeSetting]?: Interpolation } | undefined;
+      values: { [K in ScalarColourSetting]?: number | null | undefined };
+      easing?: Interpolation | { [K in ScalarColourSetting]?: Interpolation } | undefined;
       reset?: boolean | undefined;
     }
   | {
       type: 'layer-key-value';
-      layerId?: string | undefined;
       clipId?: string | undefined;
+      adjustmentId?: string | undefined;
       frame: number;
-      setting: KeyframeSetting;
+      setting: ScalarColourSetting;
       value: number;
     }
   | {
       type: 'layer-key-move';
-      layerId?: string | undefined;
       clipId?: string | undefined;
+      adjustmentId?: string | undefined;
       frame: number;
       nextFrame: number;
     }
-  | { type: 'layer-key-remove'; layerId?: string | undefined; clipId?: string | undefined; frame: number }
-  | { type: 'layer-key-default'; layerId?: string | undefined; clipId?: string | undefined; frame: number }
+  | { type: 'layer-key-remove'; clipId?: string | undefined; adjustmentId?: string | undefined; frame: number }
+  | { type: 'layer-key-default'; clipId?: string | undefined; adjustmentId?: string | undefined; frame: number }
   | {
       type: 'layer-key-easing';
-      layerId?: string | undefined;
       clipId?: string | undefined;
+      adjustmentId?: string | undefined;
       frame: number;
-      setting: KeyframeSetting | null;
+      setting: ScalarColourSetting | null;
       interpolation: Interpolation;
     }
   | { type: 'layer-add'; layer: VideoLayer }
@@ -125,6 +124,9 @@ type FormerEditCommand =
   | { type: 'move-clips'; clipIds: string[]; delta: number; layerId: string | null }
   | { type: 'transition'; transition: Transition; keepCut?: boolean | undefined }
   | { type: 'fades'; layerId: string; opening: number; closing: number }
+  | { type: 'adjustment-add'; adjustmentId: string; start: number; duration: number }
+  | { type: 'adjustment-remove'; adjustmentId: string }
+  | { type: 'adjustment-range'; adjustmentId: string; start: number; duration: number; keyframes: 'move' | 'stay' }
   | { type: 'bookmark-add'; frame: number }
   | { type: 'bookmark-move'; frame: number; nextFrame: number }
   | { type: 'bookmark-remove'; frame: number }
@@ -146,42 +148,46 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
     newClipId: 'clip-3',
   },
   duplicate: { type: 'duplicate', clipId: 'clip-1', newClipId: 'clip-3' },
-  colour: { type: 'colour', layerId: 'video-1', colour: createColourSettings() },
-  'colour-setting': { type: 'colour-setting', layerId: 'video-1', setting: 'exposure', value: 0.5 },
-  'hsl-band': { type: 'hsl-band', layerId: 'video-1', band: 'blue', values: { hue: 5, saturation: 0.2, lightness: 0 } },
+  colour: { type: 'colour', adjustmentId: 'look', colour: createColourSettings() },
+  'colour-setting': { type: 'colour-setting', clipId: 'clip-1', setting: 'exposure', value: 0.5 },
+  'hsl-band': {
+    type: 'hsl-band',
+    adjustmentId: 'look',
+    band: 'blue',
+    values: { hue: 5, saturation: 0.2, lightness: 0 },
+  },
   'colour-curve': {
     type: 'colour-curve',
-    layerId: 'video-1',
+    clipId: 'clip-1',
     channel: 'master',
     points: [
       { x: 0, y: 0.05 },
       { x: 1, y: 0.95 },
     ],
   },
-  'transform-setting': { type: 'transform-setting', layerId: 'video-1', setting: 'scale', value: 1.2 },
+  'transform-setting': { type: 'transform-setting', layerId: 'video-1', setting: 'opacity', value: 0.5 },
   speed: { type: 'speed', clipId: 'clip-1', speed: { mode: 'constant', rate: 2 } },
   reverse: { type: 'reverse', clipId: 'clip-1', reverse: true },
   transform: { type: 'transform', layerId: 'video-1', transform: createSpatialSettings() },
   detail: { type: 'detail', clipId: 'clip-1', detail: createDetailSettings() },
   'detail-clips': { type: 'detail-clips', clipIds: ['clip-1', 'clip-2'], detail: createDetailSettings() },
   music: { type: 'music', music: [] },
-  opacity: { type: 'opacity', layerId: 'video-1', opacity: 0.5 },
-  'layer-key-toggle': { type: 'layer-key-toggle', layerId: 'video-1', frame: 4, setting: 'exposure', value: 0.5 },
+  'layer-key-toggle': { type: 'layer-key-toggle', clipId: 'clip-1', frame: 4, setting: 'exposure', value: 0.5 },
   'layer-key-set': {
     type: 'layer-key-set',
-    layerId: 'video-1',
-    frame: 4,
+    adjustmentId: 'look',
+    frame: -4,
     values: { exposure: 0.5, contrast: null },
     easing: { exposure: 'hold' },
     reset: false,
   },
-  'layer-key-value': { type: 'layer-key-value', layerId: 'video-1', frame: 4, setting: 'opacity', value: 0.2 },
-  'layer-key-move': { type: 'layer-key-move', layerId: 'video-1', frame: 4, nextFrame: 9 },
-  'layer-key-remove': { type: 'layer-key-remove', layerId: 'video-1', frame: 4 },
-  'layer-key-default': { type: 'layer-key-default', layerId: 'video-1', frame: 4 },
+  'layer-key-value': { type: 'layer-key-value', clipId: 'clip-1', frame: 4, setting: 'tint', value: 0.2 },
+  'layer-key-move': { type: 'layer-key-move', adjustmentId: 'look', frame: -4, nextFrame: 9 },
+  'layer-key-remove': { type: 'layer-key-remove', clipId: 'clip-1', frame: 4 },
+  'layer-key-default': { type: 'layer-key-default', adjustmentId: 'look', frame: 4 },
   'layer-key-easing': {
     type: 'layer-key-easing',
-    layerId: 'video-1',
+    clipId: 'clip-1',
     frame: 4,
     setting: null,
     interpolation: 'smooth',
@@ -199,6 +205,9 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
     transition: { leftId: 'clip-1', rightId: 'clip-2', type: 'cross-dissolve', duration: 10 },
   },
   fades: { type: 'fades', layerId: 'video-1', opening: 15, closing: 0 },
+  'adjustment-add': { type: 'adjustment-add', adjustmentId: 'look', start: 30, duration: 60 },
+  'adjustment-remove': { type: 'adjustment-remove', adjustmentId: 'look' },
+  'adjustment-range': { type: 'adjustment-range', adjustmentId: 'look', start: 0, duration: 90, keyframes: 'stay' },
   'bookmark-add': { type: 'bookmark-add', frame: 30 },
   'bookmark-move': { type: 'bookmark-move', frame: 30, nextFrame: 45 },
   'bookmark-remove': { type: 'bookmark-remove', frame: 45 },
@@ -275,6 +284,12 @@ describe('editCommandSchema', () => {
     expect(editCommandSchema.safeParse({ ...samples.delete, clip: 'clip-1' }).success).toBe(false);
     expect(editCommandSchema.safeParse({ ...samples['bookmark-add'], frame: 1.5 }).success).toBe(false);
     expect(editCommandSchema.safeParse({ ...samples['layer-key-value'], setting: 'gamma' }).success).toBe(false);
+    // Opacity belongs to the track Transform, and a track has no Colour of its own.
+    expect(editCommandSchema.safeParse({ ...samples['layer-key-value'], setting: 'opacity' }).success).toBe(false);
+    expect(editCommandSchema.safeParse({ type: 'opacity', layerId: 'video-1', opacity: 0.5 }).success).toBe(false);
+    expect(editCommandSchema.safeParse({ ...samples['colour-setting'], layerId: 'video-1' }).success).toBe(false);
+    expect(editCommandSchema.safeParse({ ...samples['adjustment-range'], keyframes: 'follow' }).success).toBe(false);
+    expect(editCommandSchema.safeParse({ ...samples['adjustment-add'], duration: 0 }).success).toBe(false);
     expect(editCommandSchema.safeParse({ ...samples['select-narrow'], ranges: [] }).success).toBe(false);
     const error = editCommandSchema.safeParse({ ...samples.trim, sourceIn: -1 }).error;
     expect(error?.issues[0]?.path).toEqual(['sourceIn']);

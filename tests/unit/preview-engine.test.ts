@@ -1,17 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { CompositeGroup } from '../../src/preview/compositor.js';
 import { PreviewEngine } from '../../src/preview/engine.js';
-import { gradePixel, NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
 import { compositePixel } from '../../src/shared/composition.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import {
-  EMPTY_KEY_VALUES,
-  type Interpolation,
-  type LayerKeyframe,
-  type LayerKeyValues,
-  layerKeyframe,
-  uniformKeyframe,
-} from '../../src/shared/keyframes.js';
+  createAdjustment,
+  gradeChainPixel,
+  layerKeyAsGradeKey,
+  sourceGrades,
+  type GradeKeyframe,
+  type GradeKeyValues,
+} from '../../src/shared/grade.js';
+import { EMPTY_KEY_VALUES, type Interpolation, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import {
   createClip,
   createLayer,
@@ -22,7 +23,12 @@ import {
   type ProjectDocument,
 } from '../../src/shared/model.js';
 import { musicTracks } from '../../src/shared/music-lanes.js';
-import { evaluateSpatial } from '../../src/shared/spatial.js';
+import {
+  evaluateSpatial,
+  SPATIAL_CHANNELS,
+  type SpatialChannel,
+  type SpatialKeyframe,
+} from '../../src/shared/spatial.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { framesToSeconds } from '../../src/shared/timing.js';
 import { singleClipLane } from '../music-lanes.js';
@@ -68,6 +74,7 @@ interface CompositorDouble {
   textures: Map<number, { sourceFrame: number; url: string }>;
   setDecoderCount: Mock<(count: number) => void>;
   prepareDetail: Mock<() => void>;
+  prepareStaged: Mock<(detail: boolean) => void>;
   uploadFrame: Mock<(slot: number, frame: FakeFrame) => void>;
   drawFrame: Mock<(groups: readonly CompositeGroup[]) => void>;
   clear: Mock<() => void>;
@@ -272,6 +279,7 @@ vi.mock('../../src/preview/compositor.js', () => ({
       this.count = count;
     });
     prepareDetail = vi.fn();
+    prepareStaged = vi.fn();
     uploadFrame = vi.fn((slot: number, frame: FakeFrame): void => {
       if (frame.closed || slot >= this.count) throw new Error('Cannot upload a closed or unassigned frame.');
       this.textures.set(slot, { sourceFrame: frame.sourceFrame, url: frame.url });
@@ -402,7 +410,14 @@ function laneOf(engine: PreviewEngine, clipId: string): number {
   expect(lane, `${clipId} has a decoder`).toBeGreaterThanOrEqual(0);
   return lane;
 }
-function expectSurface(engine: PreviewEngine, project: ProjectDocument, frame: number, ungraded = false): void {
+function expectSurface(
+  engine: PreviewEngine,
+  project: ProjectDocument,
+  frame: number,
+  original: boolean | 'clip' | 'adjustment' = false,
+): void {
+  const clipOriginal = original === true || original === 'clip';
+  const adjustmentOriginal = original === true || original === 'adjustment';
   const layers = sampleTimeline(project, frame, calculateLayout(project));
   const lanes = engine.diagnostics().assignedClipIds;
   expect(compositor().visible).toEqual(
@@ -414,11 +429,11 @@ function expectSurface(engine: PreviewEngine, project: ProjectDocument, frame: n
               slot: lanes.indexOf(layer.clipId),
               sourceFrame: layer.sourceFrame,
               url: proxyUrl(layer.mediaId),
-              grade: ungraded ? NEUTRAL_COLOUR : layer.grade,
-              settings: ungraded ? NEUTRAL_COLOUR : layer.colour,
+              grade: clipOriginal ? NEUTRAL_COLOUR : layer.grade,
+              settings: adjustmentOriginal ? NEUTRAL_COLOUR : layer.colour,
               aspect: 16 / 9,
               spatial: layer.spatial,
-              detail: ungraded ? NEUTRAL_DETAIL : layer.detail,
+              detail: clipOriginal ? NEUTRAL_DETAIL : layer.detail,
               originalWidth: 1920,
               originalHeight: 1080,
               opacity: layer.opacity,
@@ -430,8 +445,19 @@ function expectSurface(engine: PreviewEngine, project: ProjectDocument, frame: n
     }),
   );
 }
-function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
+function gradeKey(
+  frame: number,
+  values: Partial<GradeKeyValues>,
+  interpolation: Interpolation = 'linear',
+): GradeKeyframe {
+  return layerKeyAsGradeKey(layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation));
+}
+const NO_SETTINGS = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<
+  SpatialChannel,
+  null
+>;
+function opacityKey(frame: number, opacity: number, interpolation: Interpolation = 'linear'): SpatialKeyframe {
+  return { ...uniformKeyframe(frame, { ...NO_SETTINGS, opacity }, interpolation), reset: false };
 }
 function musicSource(duration = 600): MusicTrack {
   return {
@@ -492,27 +518,34 @@ function gradedLayersProject(): ProjectDocument {
   const project = singleProject(true);
   const lower = project.layers[0]!;
   const left = project.clips[0]!;
-  lower.colour = { ...NEUTRAL_COLOUR, hue: 15, saturation: 0.8 };
+  left.grade = {
+    colour: { ...NEUTRAL_COLOUR, hue: 15, saturation: 0.8 },
+    keyframes: [gradeKey(0, { exposure: -1 }), gradeKey(50, { exposure: 1 }, 'hold')],
+  };
   left.speed = { mode: 'constant', rate: 2 };
   const right = createClip('right', 'other-video', 100, 115, lower.id);
   right.start = 20;
   right.speed = { mode: 'constant', rate: 0.5 };
-  lower.opacity = 0.55;
+  lower.transform.base.opacity = 0.55;
   lower.openingFade = 6;
   lower.closingFade = 8;
   lower.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 10 }];
-  lower.keyframes = [point(0, { exposure: -1, opacity: 0.6 }), point(50, { exposure: 1, opacity: 0.3 }, 'hold')];
+  lower.transform.keyframes = [opacityKey(0, 0.6), opacityKey(50, 0.3, 'hold')];
   const upper = createLayer('upper', 'Upper');
-  upper.opacity = 0.75;
-  upper.keyframes = [
-    point(0, { exposure: 0.7, hue: 20, opacity: 0.35 }, 'smooth'),
-    point(60, { opacity: 0.7 }, 'hold'),
-  ];
+  upper.transform.base.opacity = 0.75;
+  upper.transform.keyframes = [opacityKey(0, 0.35, 'smooth'), opacityKey(60, 0.7, 'hold')];
   const top = createClip('upper-clip', 'upper-video', 200, 275, upper.id);
   top.speed = { mode: 'constant', rate: 1.25 };
+  top.grade.colour.temperature = 0.4;
   project.layers.push(upper);
   project.clips.push(right, top);
   project.media.videoIds.push('other-video', 'upper-video');
+  project.adjustments = [
+    {
+      ...createAdjustment('look', 10, 70),
+      keyframes: [gradeKey(0, { exposure: 0.7, hue: 20 }, 'smooth'), gradeKey(40, { exposure: -0.2 }, 'hold')],
+    },
+  ];
   return project;
 }
 async function paused(project: ProjectDocument, frame = 8): Promise<PreviewEngine> {
@@ -975,7 +1008,7 @@ describe('playback on one clock', () => {
         start: 42,
       });
       layer.transitions = [{ leftId: left.id, rightId: `upper-right-${index}`, type: 'cross-dissolve', duration: 18 }];
-      layer.opacity = 0.2 + index / 10;
+      layer.transform.base.opacity = 0.2 + index / 10;
     }
     const { engine } = await playing(project, 51);
     expect(sampleTimeline(project, 51)).toHaveLength(16);
@@ -991,9 +1024,11 @@ describe('playback on one clock', () => {
       for (const clip of group) {
         const coverage = clip.opacity * clip.blendWeight;
         alpha += coverage;
-        gradePixel(rgb(lanes[clip.slot]!), clip.settings).forEach((channel, index) => {
-          colour[index]! += channel * coverage * clip.brightness;
-        });
+        gradeChainPixel(rgb(lanes[clip.slot]!), sourceGrades(clip.grade!, clip.settings).stages).forEach(
+          (channel, index) => {
+            colour[index]! += channel * coverage * clip.brightness;
+          },
+        );
       }
       pixel = pixel.map((channel, index) => colour[index]! + channel * (1 - alpha));
     }
@@ -1004,7 +1039,7 @@ describe('playback on one clock', () => {
 
   it('never decodes disabled tracks but composes enabled zero-opacity ones', async () => {
     const project = layeredProject(3);
-    project.layers[1]!.opacity = 0;
+    project.layers[1]!.transform.base.opacity = 0;
     project.layers[2]!.enabled = false;
     const { engine } = await playing(project, 0);
     expect(compositor().visible).toHaveLength(2);
@@ -1107,7 +1142,7 @@ describe('appearance without reloading timing', () => {
 
     const animated = singleProject(true);
     animated.clips[0]!.speed = { mode: 'constant', rate: 0.25 };
-    animated.layers[0]!.keyframes = [point(0, { opacity: 0 }), point(4, { opacity: 1 }, 'hold')];
+    animated.layers[0]!.transform.keyframes = [opacityKey(0, 0), opacityKey(4, 1, 'hold')];
     const keyed = await playing(animated, 0);
     for (const frame of [1, 2, 3]) {
       tick(keyed.anchor, frame);
@@ -1142,7 +1177,8 @@ describe('appearance without reloading timing', () => {
     const starts = streams().starts.length;
     const stops = streams().stops.length;
     const appearance = structuredClone(project);
-    appearance.layers[0]!.keyframes = [point(0, { opacity: 0, exposure: 0.7 }), point(30, { opacity: 1 }, 'hold')];
+    appearance.layers[0]!.transform.keyframes = [opacityKey(0, 0), opacityKey(30, 1, 'hold')];
+    appearance.adjustments = [{ ...createAdjustment('look', 0, 60), keyframes: [gradeKey(0, { exposure: 0.7 })] }];
     appearance.layers = [appearance.layers[0]!, appearance.layers[2]!, appearance.layers[1]!];
     engine.updateProjectAppearance(appearance);
     tick(anchor, 1);
@@ -1154,14 +1190,17 @@ describe('appearance without reloading timing', () => {
     expect(music().start).toHaveBeenCalledOnce();
   });
 
-  it('redraws paused colour and appearance edits from the same textures', async () => {
+  it('redraws paused grade and appearance edits from the same textures', async () => {
     const project = layeredProject(2);
+    project.adjustments = [createAdjustment('look', 0, 60)];
     const engine = await paused(project, 10);
     const starts = streams().starts.length;
-    expect(() => engine.updateColour('missing-track', NEUTRAL_COLOUR)).toThrow('The graded track does not exist.');
-    engine.updateColour(project.layers[0]!.id, { ...NEUTRAL_COLOUR, saturation: 0.4 });
-    expect(compositor().visible![0]![0]!.settings.saturation).toBe(0.4);
-    project.layers[0]!.opacity = 0.25;
+    project.adjustments[0]!.colour.saturation = 0.4;
+    project.clips[0]!.grade.colour.exposure = 0.3;
+    engine.updateProjectAppearance(project);
+    expect(compositor().visible![0]![0]).toMatchObject({ grade: { exposure: 0.3 }, settings: { saturation: 0.4 } });
+    expect(compositor().visible![1]![0]).toMatchObject({ grade: { exposure: 0 }, settings: { saturation: 0.4 } });
+    project.layers[0]!.transform.base.opacity = 0.25;
     project.clips[0]!.detail = { sharpen: 0.6, clarity: -0.3, denoise: 0.2 };
     engine.updateProjectAppearance(project);
     expect(compositor().prepareDetail).toHaveBeenCalledOnce();
@@ -1170,15 +1209,23 @@ describe('appearance without reloading timing', () => {
     expect(compositor().uploadFrame).toHaveBeenCalledTimes(2);
   });
 
-  it('prepares the detail programs for a live track HDR draft', async () => {
+  it('prepares the detail and staged programs for live adjustment HDR and clip grade drafts', async () => {
     const project = singleProject();
+    project.adjustments = [createAdjustment('look', 0, 60)];
     const engine = await paused(project, 8);
-    const layer = project.layers[0]!;
-    engine.updateColour(layer.id, { ...layer.colour, hdr: 0 });
+    const draft = structuredClone(project);
+    draft.adjustments[0]!.colour.hdr = 0;
+    engine.updateProjectAppearance(draft);
     expect(compositor().prepareDetail).not.toHaveBeenCalled();
-    engine.updateColour(layer.id, { ...layer.colour, hdr: 0.7 });
+    draft.adjustments[0]!.colour.hdr = 0.7;
+    engine.updateProjectAppearance(draft);
     expect(compositor().prepareDetail).toHaveBeenCalledOnce();
     expect(compositor().visible![0]![0]!.settings.hdr).toBe(0.7);
+    expect(compositor().prepareStaged).not.toHaveBeenCalled();
+    draft.clips[0]!.grade.colour.saturation = 0.5;
+    engine.updateProjectAppearance(draft);
+    expect(compositor().prepareStaged).toHaveBeenCalledWith(true);
+    expect(compositor().visible![0]![0]!.grade!.saturation).toBe(0.5);
   });
 
   it('rejects timing changes rather than silently keeping old timing', async () => {
@@ -1263,24 +1310,34 @@ describe('editor-only ungraded comparison', () => {
     expect(compositor().drawFrame).not.toHaveBeenCalled();
   });
 
-  it.each([3, 25, 47])('neutralizes every source grade and detail but not composition at frame %i', async (frame) => {
-    const project = gradedLayersProject();
-    project.clips[0]!.detail = { sharpen: 0.5, clarity: 0, denoise: 0 };
-    const engine = await paused(project, frame);
-    const graded = structuredClone(compositor().visible)!;
-    const starts = streams().starts.length;
-    engine.setUngraded(true);
-    expectSurface(engine, project, frame, true);
-    expect(compositor().visible).toEqual(
-      graded.map((group) =>
-        group.map((clip) => ({ ...clip, grade: NEUTRAL_COLOUR, settings: NEUTRAL_COLOUR, detail: NEUTRAL_DETAIL })),
-      ),
-    );
-    engine.setUngraded(false);
-    expect(compositor().visible).toEqual(graded);
-    expect(streams().starts).toHaveLength(starts);
-    expect(music().start).not.toHaveBeenCalled();
-  });
+  it.each([3, 25, 47])(
+    'neutralizes clip grades and detail, the adjustment, or both, but not composition at frame %i',
+    async (frame) => {
+      const project = gradedLayersProject();
+      project.clips[0]!.detail = { sharpen: 0.5, clarity: 0, denoise: 0 };
+      const engine = await paused(project, frame);
+      const graded = structuredClone(compositor().visible)!;
+      const starts = streams().starts.length;
+      engine.setUngraded(true);
+      expectSurface(engine, project, frame, true);
+      expect(compositor().visible).toEqual(
+        graded.map((group) =>
+          group.map((clip) => ({ ...clip, grade: NEUTRAL_COLOUR, settings: NEUTRAL_COLOUR, detail: NEUTRAL_DETAIL })),
+        ),
+      );
+      engine.setUngraded('clip');
+      expect(engine.diagnostics()).toMatchObject({ ungraded: true, original: 'clip' });
+      expectSurface(engine, project, frame, 'clip');
+      engine.setUngraded('adjustment');
+      expect(engine.diagnostics()).toMatchObject({ ungraded: true, original: 'adjustment' });
+      expectSurface(engine, project, frame, 'adjustment');
+      engine.setUngraded(false);
+      expect(engine.diagnostics()).toMatchObject({ ungraded: false, original: null });
+      expect(compositor().visible).toEqual(graded);
+      expect(streams().starts).toHaveLength(starts);
+      expect(music().start).not.toHaveBeenCalled();
+    },
+  );
 
   it('keeps the mode through a same-project reload and resets it for another project', async () => {
     const project = singleProject(true);
@@ -1394,7 +1451,7 @@ describe('lifecycle', () => {
       message: 'Synthetic GPU allocation failed.',
       decoderCount: 0,
     });
-    project.layers[0]!.opacity = 0.2;
+    project.layers[0]!.transform.base.opacity = 0.2;
     expect(() => engine.updateProjectAppearance(project)).not.toThrow();
     expect(() => engine.capturePixels()).toThrow(/required decoded frames/);
   });
@@ -1403,9 +1460,9 @@ describe('lifecycle', () => {
     const project = singleProject();
     const engine = await paused(project, 8);
     const before = structuredClone(compositor().visible);
-    project.layers[0]!.colour.exposure = 2;
+    project.clips[0]!.grade.colour.exposure = 2;
     engine.capturePixels();
     expect(compositor().visible).toEqual(before);
-    expect(projectSchema.parse(project).layers[0]!.colour.exposure).toBe(2);
+    expect(projectSchema.parse(project).clips[0]!.grade.colour.exposure).toBe(2);
   });
 });

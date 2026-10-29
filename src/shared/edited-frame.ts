@@ -83,7 +83,7 @@ function changedMusic(before: ProjectDocument, after: ProjectDocument): number[]
 /**
  * The earliest project frame where an edit changed what the timeline shows: clips and their placement,
  * transitions, fades, keyframes, adjustments, bookmarks or music. Null when it changed nothing at a particular frame,
- * such as a whole track's Transform, an adjustment's or a clip's whole Colour, kept ranges or the title.
+ * such as a whole track's Transform, an adjustment's whole Colour, kept ranges or the title.
  */
 export function editedFrame(before: ProjectDocument, after: ProjectDocument): number | null {
   const frames = [...changedClips(before, after), ...changedMusic(before, after)];

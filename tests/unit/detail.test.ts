@@ -23,6 +23,7 @@ import {
   type LocalTone,
 } from '../../src/shared/detail.js';
 import { needsLayeredExport } from '../../src/shared/export.js';
+import { createAdjustment } from '../../src/shared/grade.js';
 import { clipSchema, createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { compileSpatialMapping, NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout, sampleTimeline, type PreviewLayer } from '../../src/shared/timeline.js';
@@ -471,22 +472,31 @@ describe('track HDR look', () => {
     expect(Math.abs(near - far)).toBeLessThan(1e-3);
   });
 
-  it('routes nonzero or keyed track HDR through the composited exporter', () => {
+  it('routes nonzero or keyed HDR through the composited exporter', () => {
     const document = project(NEUTRAL_DETAIL);
-    const layer = document.layers[0]!;
+    const clip = document.clips[0]!;
     expect(needsLayeredExport(document)).toBe(false);
-    const withHdr = { ...document, layers: [{ ...layer, colour: { ...layer.colour, hdr: 0.4 } }] };
+    const withHdr = {
+      ...document,
+      clips: [{ ...clip, grade: { ...clip.grade, colour: { ...clip.grade.colour, hdr: 0.4 } } }],
+    };
     expect(needsLayeredExport(projectSchema.parse(withHdr))).toBe(true);
     const keyed = applyCommand(document, {
       type: 'layer-key-toggle',
-      layerId: layer.id,
+      clipId: clip.id,
       frame: 5,
       setting: 'hdr',
       value: 0.6,
     });
-    expect(keyed.layers[0]!.keyframes[0]!.values.hdr).toBe(0.6);
-    expect(sampleTimeline(keyed, 20)[0]!.colour.hdr).toBe(0.6);
+    expect(keyed.clips[0]!.grade.keyframes[0]!.values.hdr).toBe(0.6);
+    expect(sampleTimeline(keyed, 20)[0]!.grade.hdr).toBe(0.6);
     expect(needsLayeredExport(keyed)).toBe(true);
+    const adjusted = applyCommand(
+      projectSchema.parse({ ...document, adjustments: [createAdjustment('look', 0, 30)] }),
+      { type: 'layer-key-toggle', adjustmentId: 'look', frame: 5, setting: 'hdr', value: 0.6 },
+    );
+    expect(sampleTimeline(adjusted, 20)[0]!.colour.hdr).toBe(0.6);
+    expect(needsLayeredExport(adjusted)).toBe(true);
   });
 });
 
@@ -551,8 +561,11 @@ describe('track Local contrast', () => {
 
   it('routes a nonzero value through the composited exporter', () => {
     const document = project(NEUTRAL_DETAIL);
-    const layer = document.layers[0]!;
-    const edited = { ...document, layers: [{ ...layer, colour: { ...layer.colour, localContrast: -0.2 } }] };
+    const clip = document.clips[0]!;
+    const edited = {
+      ...document,
+      clips: [{ ...clip, grade: { ...clip.grade, colour: { ...clip.grade.colour, localContrast: -0.2 } } }],
+    };
     expect(needsLayeredExport(projectSchema.parse(edited))).toBe(true);
   });
 });
@@ -663,9 +676,12 @@ describe('local Shadows and Highlights', () => {
 
   it('route nonzero or keyed Shadows and Highlights through the composited exporter', () => {
     const document = project(NEUTRAL_DETAIL);
-    const layer = document.layers[0]!;
+    const clip = document.clips[0]!;
     for (const setting of ['shadows', 'highlights'] as const) {
-      const edited = { ...document, layers: [{ ...layer, colour: { ...layer.colour, [setting]: -0.2 } }] };
+      const edited = {
+        ...document,
+        clips: [{ ...clip, grade: { ...clip.grade, colour: { ...clip.grade.colour, [setting]: -0.2 } } }],
+      };
       expect(needsLayeredExport(projectSchema.parse(edited))).toBe(true);
     }
   });

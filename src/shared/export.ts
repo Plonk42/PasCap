@@ -235,7 +235,7 @@ export function planExport(document: ProjectDocument): ExportPlan {
   const snapshot = exportDocumentSchema.parse(document);
   if (needsLayeredExport(snapshot))
     throw new Error(
-      'Multiple/disabled tracks, opacity, shared track keyframes, Shadows/Highlights/HDR, HSL/curves, spatial edits, detail filters, gaps, leading starts or music beyond video OUT require the layered exporter, not a static chunk plan.',
+      'Multiple/disabled tracks, adjustments, keyed or advanced clip grades, Transform or Opacity edits, detail filters, gaps, leading starts or music beyond video OUT require the layered exporter, not a static chunk plan.',
     );
   const layout = calculateLayout(snapshot);
   validateDuration(layout);
