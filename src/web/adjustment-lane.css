@@ -1,0 +1,203 @@
+/* The adjustment track stays under the pinned ruler while the video tracks scroll beneath it. */
+.adjustment-lane {
+  position: sticky;
+  top: 31px;
+  z-index: 14;
+  height: 36px;
+  min-width: 100%;
+  background: #121a15;
+  border-bottom: 1px solid #2b3e31;
+}
+
+.adjustment-item {
+  position: absolute;
+  top: 3px;
+  height: 29px;
+  min-width: 2px;
+  border: 1px solid #8a7440;
+  border-radius: 4px;
+  background: repeating-linear-gradient(135deg, #3a3220, #3a3220 6px, #332c1c 6px, #332c1c 12px);
+}
+
+.adjustment-item.selected {
+  border-color: #ffd27a;
+  outline: 1px solid #ffd27a;
+  z-index: 2;
+}
+
+/* Grades the selected clip at the playhead: a dashed ring, distinct from the solid selection. */
+.adjustment-item.grading {
+  border-color: #ffd27a;
+  outline: 1px dashed #ffd27a;
+  outline-offset: 2px;
+}
+
+.adjustment-item.invalid {
+  border-color: var(--error);
+  outline: 1px solid var(--error);
+  background: #5a2c2c;
+}
+
+.adjustment-body {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: #f4e2b8;
+  text-align: left;
+  cursor: grab;
+  touch-action: none;
+}
+
+.adjustment-item.moving .adjustment-body {
+  cursor: grabbing;
+}
+
+.adjustment-body:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.adjustment-label {
+  position: sticky;
+  left: 4px;
+  display: inline-block;
+  max-width: calc(100% - 12px);
+  padding: 1px 8px 0;
+  overflow: hidden;
+  font-size: 9px;
+  line-height: 11px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: top;
+}
+
+.adjustment-keyframes {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Below the range label, amber like a clip grade's markers below the clip name. */
+.timeline-adjustment-key {
+  position: absolute;
+  top: 13px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 14px;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid #b8913a;
+  border-radius: 4px;
+  background: #3d3214ee;
+  color: #ffd27a;
+  font-size: 10px;
+  line-height: 1;
+  cursor: ew-resize;
+  touch-action: none;
+  pointer-events: auto;
+}
+
+.timeline-adjustment-key > span {
+  line-height: 12px;
+  text-shadow:
+    0 0 2px #101512,
+    0 0 2px #101512;
+  pointer-events: none;
+}
+
+.timeline-adjustment-key.reset {
+  background: #8a6a1f;
+  color: #fff3d6;
+}
+
+.timeline-adjustment-key:is(:hover, :focus-visible):not(:disabled) {
+  background: #5a4718;
+  border-color: #f0c35c;
+  filter: none;
+}
+
+.timeline-adjustment-key:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.timeline-adjustment-key.moving {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  cursor: grabbing;
+}
+
+.timeline-adjustment-key.invalid {
+  border-color: var(--error);
+  color: var(--error);
+  outline-color: var(--error);
+}
+
+.timeline-adjustment-key:disabled {
+  opacity: 1;
+}
+
+.timeline-adjustment-key:disabled > span {
+  opacity: 0.6;
+}
+
+.adjustment-item .trim-handle {
+  background: #6b5525c9;
+}
+
+.adjustment-item .trim-handle > span {
+  height: 14px;
+  background: #e9d6a8;
+}
+
+.adjustment-item.selected .trim-handle,
+.adjustment-item:hover .trim-handle {
+  background: #ffd27a;
+  opacity: 1;
+}
+
+.adjustment-item.selected .trim-handle > span,
+.adjustment-item:hover .trim-handle > span {
+  background: #3d3214;
+}
+
+.adjustment-playhead,
+.adjustment-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.adjustment-playhead {
+  background: #eef8ee;
+}
+
+.adjustment-guide {
+  background: #ffd27a;
+}
+
+.layer-sidebar-adjustments {
+  position: sticky;
+  top: 31px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 4px 0 9px;
+  font-size: 10px;
+  color: #e9d6a8;
+  background: #121a15;
+  border-bottom: 1px solid #2b3e31;
+}

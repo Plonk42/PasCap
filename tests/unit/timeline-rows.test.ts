@@ -4,7 +4,7 @@ import {
   LANE_HEIGHT,
   LANE_OFFSET,
   musicLanesTop,
-  TIMELINE_RULER_HEIGHT,
+  TIMELINE_PINNED_HEIGHT,
   timelineLayerAt,
   timelineRows,
 } from '../../src/web/timeline-rows.js';
@@ -21,8 +21,8 @@ describe('uniform bottom-to-top editor row geometry', () => {
     const before = structuredClone(source);
     const rows = timelineRows(source);
     expect(rows.map((row) => row.index)).toEqual(Array.from({ length: count }, (_, index) => index));
-    expect(rows.map((row) => row.top)).toEqual(Array.from({ length: count }, (_, index) => 36 + index * 78));
-    expect(rows[0]!.top - LANE_OFFSET).toBe(TIMELINE_RULER_HEIGHT);
+    expect(rows.map((row) => row.top)).toEqual(Array.from({ length: count }, (_, index) => 72 + index * 78));
+    expect(rows[0]!.top - LANE_OFFSET).toBe(TIMELINE_PINNED_HEIGHT);
     expect(musicLanesTop(count)).toBe(rows.at(-1)!.top - LANE_OFFSET + LANE_HEIGHT);
     expect(source).toEqual(before);
     for (const row of rows) expect(row.layer).toBe(source[row.index]);
@@ -36,7 +36,7 @@ describe('uniform bottom-to-top editor row geometry', () => {
       expect(timelineLayerAt(rows, row.top - 6)).toBe(rows[row.index - 1]?.layer.id ?? null);
       expect(timelineLayerAt(rows, row.top + 73)).toBe(rows[row.index + 1]?.layer.id ?? null);
     }
-    for (const y of [-1, 0, TIMELINE_RULER_HEIGHT - 1, musicLanesTop(8), 700, NaN, Infinity])
+    for (const y of [-1, 0, TIMELINE_PINNED_HEIGHT - 1, musicLanesTop(8), 712, NaN, Infinity])
       expect(timelineLayerAt(rows, y)).toBeNull();
   });
 

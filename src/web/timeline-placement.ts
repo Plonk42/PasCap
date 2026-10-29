@@ -89,6 +89,9 @@ function snapPointsWithout(
     ...musicClips(project.music)
       .filter((clip) => !excluded.has(clip.id))
       .flatMap((clip) => [clip.start, clip.start + clip.duration]),
+    ...project.adjustments
+      .filter((item) => !excluded.has(item.id))
+      .flatMap((item) => [item.start, item.start + item.duration]),
     ...project.bookmarks,
     ...beats(project, excluded),
   );

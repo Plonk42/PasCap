@@ -1,11 +1,15 @@
 import type { VideoLayer } from '../shared/model.js';
 
 export const TIMELINE_RULER_HEIGHT = 31;
+/** The adjustment track, pinned under the ruler above the video tracks. */
+export const ADJUSTMENT_LANE_HEIGHT = 36;
+/** Ruler and adjustment track stay visible while the tracks scroll under them. */
+export const TIMELINE_PINNED_HEIGHT = TIMELINE_RULER_HEIGHT + ADJUSTMENT_LANE_HEIGHT;
 /** Clip top inside its lane; the lane and its track header share one box. */
 export const LANE_OFFSET = 5;
 export const LANE_HEIGHT = 78;
 export const MUSIC_LANE_HEIGHT = 80;
-const ROW_TOP = TIMELINE_RULER_HEIGHT + LANE_OFFSET;
+const ROW_TOP = TIMELINE_PINNED_HEIGHT + LANE_OFFSET;
 
 export interface TimelineRow {
   layer: VideoLayer;
@@ -22,7 +26,7 @@ export function timelineRows(layers: readonly VideoLayer[]): TimelineRow[] {
 
 /** Music lanes follow the last video lane directly. */
 export function musicLanesTop(layerCount: number): number {
-  return TIMELINE_RULER_HEIGHT + layerCount * LANE_HEIGHT;
+  return TIMELINE_PINNED_HEIGHT + layerCount * LANE_HEIGHT;
 }
 
 /** Content-space hit testing shares the exact row geometry used for drawing. */
