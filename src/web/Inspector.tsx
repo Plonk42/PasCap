@@ -902,7 +902,10 @@ function NewAdjustment({
             className="text-button"
             disabled={disabled}
             aria-disabled={reason !== null || undefined}
-            title={reason ?? `Grade every track ${range ? adjustmentLabel({ start: range.start, duration: range.end - range.start }) : ''}`}
+            title={
+              reason ??
+              `Grade every track ${range ? adjustmentLabel({ start: range.start, duration: range.end - range.start }) : ''}`
+            }
             onClick={() => {
               if (range && reason === null) create(range.start, range.end);
             }}
@@ -960,6 +963,7 @@ function ColourTab(props: Readonly<ColourTabProps>) {
             ...navigation,
             inspection: null,
             duration: (asset?.metadata.frameCount ?? placed.clip.sourceOut) + 1,
+            frameNoun: 'source frame',
             onSeekKeyframe: (_owner, source) => onSeek(gradeSeekFrame(placed, source)),
           }
         : null,
@@ -972,8 +976,8 @@ function ColourTab(props: Readonly<ColourTabProps>) {
             ...navigation,
             inspection: null,
             duration: item.duration,
-            onSeekKeyframe: (_owner, offset) =>
-              onSeek(item.start + Math.min(Math.max(offset, 0), item.duration - 1)),
+            frameNoun: 'frame in adjustment',
+            onSeekKeyframe: (_owner, offset) => onSeek(item.start + Math.min(Math.max(offset, 0), item.duration - 1)),
           }
         : null,
     [navigation, item, onSeek],
@@ -995,8 +999,8 @@ function ColourTab(props: Readonly<ColourTabProps>) {
   if (target === 'clip' && clip && props.selectedClipCount > 1)
     return (
       <div className="inspector-empty">
-        {props.selectedClipCount} clips are selected: select one to edit its grade. Paste grade sets the same grade on all
-        of them.
+        {props.selectedClipCount} clips are selected: select one to edit its grade. Paste grade sets the same grade on
+        all of them.
       </div>
     );
   if (target === 'adjustment' && !item)

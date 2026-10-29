@@ -7,6 +7,7 @@ import {
   createSpatialSettings,
   defaultSpatialKeyframe,
   evaluateSpatial,
+  hasGeometryEdits,
   hasSpatialChannelKeys,
   hasSpatialEdits,
   isNeutralSpatial,
@@ -232,11 +233,17 @@ describe('full-pose project-time Transform animation', () => {
   it('marks exact identity independently from static-fast-path eligibility', () => {
     expect(isNeutralSpatial(NEUTRAL_SPATIAL_POSE)).toBe(true);
     expect(hasSpatialEdits(settings())).toBe(false);
-    for (const channel of channels) {
+    for (const channel of channels.filter((channel) => channel !== 'opacity')) {
       const changed = pose({ [channel]: NEUTRAL_SPATIAL_POSE[channel] + Number.EPSILON });
       expect(isNeutralSpatial(changed)).toBe(false);
       expect(hasSpatialEdits(settings([], changed))).toBe(true);
+      expect(hasGeometryEdits(settings([], changed))).toBe(true);
     }
+    // Opacity is coverage, not geometry: the pose keeps its exact identity, yet it is an edit.
+    const faded = pose({ opacity: 1 - Number.EPSILON });
+    expect(isNeutralSpatial(faded)).toBe(true);
+    expect(hasSpatialEdits(settings([], faded))).toBe(true);
+    expect(hasGeometryEdits(settings([], faded))).toBe(false);
     const animatedNeutral = settings([key(1), key(10)]);
     expect(isNeutralSpatial(evaluateSpatial(animatedNeutral, 5))).toBe(true);
     expect(hasSpatialEdits(animatedNeutral)).toBe(true);

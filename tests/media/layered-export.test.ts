@@ -20,8 +20,11 @@ import {
   COLOUR_CONTROLS,
   LOCAL_TONE_SETTINGS,
   NEUTRAL_COLOUR,
+  colourSchema,
   createColourSettings,
+  isNeutralAdvancedColour,
   scalarColourValues,
+  type ColourSettings,
 } from '../../src/shared/colour.js';
 import { compositePixel } from '../../src/shared/composition.js';
 import { estimateExportSpace } from '../../src/shared/export-space.js';
@@ -33,7 +36,16 @@ import {
   planExport,
   planLayeredExport,
 } from '../../src/shared/export.js';
-import { layerKeyAsGradeKey } from '../../src/shared/grade.js';
+import {
+  adjustmentAt,
+  createAdjustment,
+  gradeKeyAsLayerKey,
+  layerKeyAsGradeKey,
+  sourceGrades,
+  type Adjustment,
+  type ClipGrade,
+  type GradeKeyframe,
+} from '../../src/shared/grade.js';
 import {
   EMPTY_KEY_VALUES,
   KEYFRAME_SETTINGS,
@@ -43,6 +55,7 @@ import {
   type LayerKeyValues,
   type LayerKeyframe,
   layerKeyframe,
+  uniformKeyframe,
 } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import {
@@ -55,7 +68,14 @@ import {
 } from '../../src/shared/model.js';
 import { compileRetiming } from '../../src/shared/speed.js';
 import {
+  evaluateSpatial,
+  SPATIAL_CHANNELS,
+  type SpatialChannel,
+  type SpatialKeyframe,
+} from '../../src/shared/spatial.js';
+import {
   calculateLayout,
+  gradePosition,
   sampleSlots,
   sampleTimeline,
   type PreviewLayer,
@@ -82,6 +102,28 @@ function layer(id: string): VideoLayer {
 }
 function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
   return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
+}
+/** A clip grade or adjustment keyframe with only `values`. */
+function gradePoint(
+  frame: number,
+  values: Partial<Omit<LayerKeyValues, 'opacity'>>,
+  interpolation: Interpolation = 'linear',
+): GradeKeyframe {
+  return layerKeyAsGradeKey(point(frame, values, interpolation));
+}
+const NO_POSE = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<SpatialChannel, null>;
+/** A track Transform keyframe keying only Opacity. */
+function opacityKey(frame: number, opacity: number, interpolation: Interpolation = 'linear'): SpatialKeyframe {
+  return { ...uniformKeyframe(frame, { ...NO_POSE, opacity }, interpolation), reset: false };
+}
+/** A track with base Opacity `opacity`. */
+function faded(row: VideoLayer, opacity: number): VideoLayer {
+  row.transform.base.opacity = opacity;
+  return row;
+}
+/** An adjustment grading the whole film, from frame 0 to its end. */
+function wholeFilm(project: ProjectDocument, colour: ColourSettings, keyframes: GradeKeyframe[] = []): Adjustment {
+  return { ...createAdjustment('look', 0, calculateLayout(project).duration), colour, keyframes };
 }
 
 async function rawRgb(config: ServiceConfig, filename: string, range = 'tv'): Promise<Buffer> {
@@ -273,7 +315,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
   }
   function simple(frames = 4): ProjectDocument {
     const project = createProject('native-layered', 'Disposable layered export');
-    project.layers.push({ ...layer('video-2'), opacity: 0.5 });
+    project.layers.push(faded(layer('video-2'), 0.5));
     project.clips = [
       createClip('base', assets[0]!.id, 0, frames),
       { ...createClip('overlay', assets[1]!.id, 8, 10), layerId: 'video-2', start: 1 },
@@ -330,7 +372,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
       const input = originals.get(assets[0]!.id)![(20 * WIDTH + 20) * 3]! / 255;
       expect(input).toBeGreaterThan(0);
       expect(input).toBeLessThan(1);
-      project.layers[0]!.colour.curves.master = [
+      project.clips[0]!.grade.colour.curves.master = [
         ...Array.from({ length: 7 }, (_, i) => ({ x: (input * i) / 8, y: 0 })),
         { x: input - 1e-7, y: 0 },
         { x: input, y: 1 },
@@ -377,7 +419,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
       expect(decoded).toHaveLength(width * height * 3 * 2);
       const actual = await rawRgb(config, result.filename);
       expect(actual).toHaveLength(FRAME_BYTES * 2);
-      const curve = project.layers[0]!.colour.curves.master;
+      const curve = project.clips[0]!.grade.colour.curves.master;
       const values = Array.from({ length: 256 }, (_, byte) => evaluateColourCurve(curve, byte / 255) * 255);
       const factor = width / WIDTH;
       expect(Number.isInteger(factor)).toBe(true);
@@ -405,7 +447,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     },
   );
   it.each(['draft720', 'final4k'] as const)(
-    'exports full row HSL/curves with scalar keys at %s without resource growth',
+    'exports full clip-grade HSL/curves with scalar keys at %s without resource growth',
     async (profile) => {
       const project = simple(3);
       const colour = createColourSettings();
@@ -424,24 +466,28 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
         { x: 0, y: 0.03 },
         { x: 1, y: 0.93 },
       ];
-      project.layers[0]!.colour = colour;
-      project.layers[0]!.keyframes = [
-        point(0, { exposure: -0.15, temperature: -0.8 }),
-        point(1, { tint: 0.7 }, 'ease-out'),
-        point(2, { exposure: 0.25, temperature: 0.9, tint: -0.5 }),
-      ];
-      project.layers[1]!.colour = { ...colour, temperature: -0.75, tint: 0.85, hue: 12 };
+      // Each track's one clip carries its grade; the base clip shows source frame f at frame f.
+      const [base, overlay] = project.clips;
+      base!.grade = {
+        colour,
+        keyframes: [
+          gradePoint(0, { exposure: -0.15, temperature: -0.8 }),
+          gradePoint(1, { tint: 0.7 }, 'ease-out'),
+          gradePoint(2, { exposure: 0.25, temperature: 0.9, tint: -0.5 }),
+        ],
+      };
+      overlay!.grade.colour = { ...colour, temperature: -0.75, tint: 0.85, hue: 12 };
       assertSharedSamples(project);
       const samples = sampleTimeline(project, 1);
       expect(samples).toHaveLength(2);
-      expect(samples[0]!.colour.temperature).toBeCloseTo(0.05, 12);
-      expect(samples[0]!.colour.tint).toBe(0.7);
-      expect(samples[1]!.colour).toMatchObject({ temperature: -0.75, tint: 0.85 });
+      expect(samples[0]!.grade.temperature).toBeCloseTo(0.05, 12);
+      expect(samples[0]!.grade.tint).toBe(0.7);
+      expect(samples[1]!.grade).toMatchObject({ temperature: -0.75, tint: 0.85 });
       const result = await complete(project, profile);
       await parity(project, result.filename);
       bounds(result.receipt);
       expect(result.receipt.verification.frameCount).toBe(3);
-      expect(result.receipt.snapshot.layers[0]!.colour).toEqual(colour);
+      expect(result.receipt.snapshot.clips[0]!.grade.colour).toEqual(colour);
       expect(result.receipt.settings.layered).toMatchObject({ peakLutEntries: 0, lutBytes: 0, lutsGenerated: 0 });
       for (const [index, asset] of assets.entries())
         expect(await readFile(asset.sourcePath)).toEqual(originalBytes[index]);
@@ -505,27 +551,23 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     }
   }
 
+  /** Each track's Opacity keys stay in its Transform; its Colour becomes the same keyed grade on each of its clips. */
   function concurrentTracks(count: 2 | 3): ProjectDocument {
     const project = createProject(`concurrent-${count}`, 'Synthetic independent track dissolves');
-    const packed = {
-      ...createLayer('packed-track', 'Ripple track', true),
-      opacity: 0.6,
-      openingFade: 1,
-      closingFade: 1,
+    const packed = faded({ ...createLayer('packed-track', 'Ripple track', true), openingFade: 1, closingFade: 1 }, 0.6);
+    packed.transform.keyframes = [opacityKey(2, 0.35), opacityKey(6, 0.85, 'smooth'), opacityKey(14, 0.55, 'hold')];
+    const packedGrade: ClipGrade = {
+      colour: { ...NEUTRAL_COLOUR, contrast: 0.9, saturation: 0.8, whites: -0.2 },
+      keyframes: [
+        gradePoint(2, { exposure: -0.3, brightness: 0.015, hue: -20, blacks: 0.2 }),
+        gradePoint(6, { exposure: 0.25, brightness: 0.06, hue: 20, blacks: -0.1 }, 'smooth'),
+        gradePoint(14, { exposure: -0.1, brightness: 0.025, hue: -5, blacks: 0.1 }, 'hold'),
+      ],
     };
-    packed.keyframes = [
-      point(2, {
-        opacity: 0.35,
-        exposure: -0.3,
-        brightness: 0.015,
-        hue: -20,
-        blacks: 0.2,
-      }),
-      point(6, { opacity: 0.85, exposure: 0.25, brightness: 0.06, hue: 20, blacks: -0.1 }, 'smooth'),
-      point(14, { opacity: 0.55, exposure: -0.1, brightness: 0.025, hue: -5, blacks: 0.1 }, 'hold'),
-    ];
     const packedLeft = { ...createClip('packed-left', assets[0]!.id, 2, 8, packed.id), start: 2 };
     const packedRight = createClip('packed-right', assets[1]!.id, 8, 14, packed.id);
+    packedLeft.grade = structuredClone(packedGrade);
+    packedRight.grade = structuredClone(packedGrade);
     packedLeft.speed = {
       mode: 'curve',
       keyframes: [
@@ -542,60 +584,62 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
         { frame: 14, rate: 1.5, interpolation: 'hold' },
       ],
     };
-    packed.colour = { ...NEUTRAL_COLOUR, contrast: 0.9, saturation: 0.8, whites: -0.2 };
     packed.transitions = [{ leftId: packedLeft.id, rightId: packedRight.id, type: 'cross-dissolve', duration: 2 }];
     project.layers = [packed];
     project.clips = [packedLeft, packedRight];
     const overlap = calculateLayout(project).transitions[0]!;
     packedRight.start = overlap.start;
 
-    const positioned = {
-      ...createLayer('positioned-track', 'Independent track', false),
-      opacity: 0.4,
-      openingFade: 1,
-      closingFade: 1,
+    const positioned = faded(
+      { ...createLayer('positioned-track', 'Independent track', false), openingFade: 1, closingFade: 1 },
+      0.4,
+    );
+    const positionedGrade: ClipGrade = {
+      colour: { ...NEUTRAL_COLOUR, brightness: 0.025, contrast: 1.1, saturation: 0.7, blacks: 0.2 },
+      keyframes: [
+        gradePoint(2, { exposure: -0.2, hue: 25 }, 'ease-in'),
+        gradePoint(9, { exposure: 0.3, hue: -20 }, 'hold'),
+      ],
     };
-    positioned.keyframes = [
-      point(2, { exposure: -0.2, hue: 25 }, 'ease-in'),
-      point(9, { exposure: 0.3, hue: -20 }, 'hold'),
-    ];
     const positionedLeft = {
       ...createClip('positioned-left', assets[1]!.id, 1, 5, positioned.id),
       start: overlap.end - 4,
+      grade: structuredClone(positionedGrade),
     };
     const positionedRight = {
       ...createClip('positioned-right', assets[0]!.id, 11, 15, positioned.id),
       start: overlap.start,
+      grade: structuredClone(positionedGrade),
     };
-    positioned.colour = { ...NEUTRAL_COLOUR, brightness: 0.025, contrast: 1.1, saturation: 0.7, blacks: 0.2 };
     const afterGap = {
       ...createClip('after-gap', assets[1]!.id, 17, 19, positioned.id),
       start: positionedRight.start + 6,
+      grade: structuredClone(positionedGrade),
     };
     positioned.transitions = [
       { leftId: positionedLeft.id, rightId: positionedRight.id, type: 'cross-dissolve', duration: 2 },
       { leftId: positionedRight.id, rightId: afterGap.id, type: 'cut', duration: 0 },
     ];
 
-    const third = {
-      ...createLayer('third-track', 'Another Ripple track', true),
-      opacity: 0.55,
-      openingFade: 1,
-      closingFade: 1,
+    const third = faded(
+      { ...createLayer('third-track', 'Another Ripple track', true), openingFade: 1, closingFade: 1 },
+      0.55,
+    );
+    third.transform.keyframes = [opacityKey(3, 0.2), opacityKey(9, 0.75, 'hold')];
+    const thirdGrade: ClipGrade = {
+      colour: { ...NEUTRAL_COLOUR, exposure: -0.2, hue: -15, saturation: 1.1 },
+      keyframes: [gradePoint(3, { brightness: 0.015 }), gradePoint(9, { brightness: 0.07 }, 'hold')],
     };
-    third.keyframes = [
-      point(3, { opacity: 0.2, brightness: 0.015 }),
-      point(9, { opacity: 0.75, brightness: 0.07 }, 'hold'),
-    ];
     const thirdLeft = {
       ...createClip('third-left', assets[0]!.id, 4, 8, third.id),
       start: positionedLeft.start,
+      grade: structuredClone(thirdGrade),
     };
     const thirdRight = {
       ...createClip('third-right', assets[1]!.id, 12, 16, third.id),
       start: overlap.start,
+      grade: structuredClone(thirdGrade),
     };
-    third.colour = { ...NEUTRAL_COLOUR, exposure: -0.2, hue: -15, saturation: 1.1 };
     third.transitions = [{ leftId: thirdLeft.id, rightId: thirdRight.id, type: 'cross-dissolve', duration: 2 }];
     const empty = { ...createLayer('empty-track', 'Dormant timing', false), openingFade: 7, closingFade: 9 };
     const hidden = { ...createLayer('hidden-track', 'Hidden tail', false), enabled: false };
@@ -620,6 +664,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
   function assertSharedSamples(project: ProjectDocument): void {
     const layout = calculateLayout(project);
     for (let frame = 0; frame < layout.duration; frame++) {
+      const item = adjustmentAt(project.adjustments, frame);
       for (const sample of sampleTimeline(project, frame, layout)) {
         const placed = layout.clips.find((item) => item.clip.id === sample.clipId)!;
         const row = project.layers.find((item) => item.id === sample.layerId)!;
@@ -627,10 +672,18 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
         expect(Number.isSafeInteger(sample.sourceFrame)).toBe(true);
         expect(sample.sourceFrame).toBeGreaterThanOrEqual(placed.clip.sourceIn);
         expect(sample.sourceFrame).toBeLessThan(placed.clip.sourceOut);
-        expect(sample.opacity).toBe(evaluateLayerSetting(row, 'opacity', frame, row.opacity));
+        // Opacity follows the track Transform in project time.
+        expect(sample.opacity).toBe(evaluateSpatial(row.transform, frame).opacity);
         expect(sample).not.toHaveProperty('layerOpacity');
-        for (const { key } of COLOUR_CONTROLS)
-          expect(sample.colour[key]).toBe(evaluateLayerSetting(row, key, frame, row.colour[key]));
+        // The clip grade follows its footage; the adjustment, project time.
+        const position = gradePosition(placed, frame - placed.start);
+        const { grade } = placed.clip;
+        for (const { key } of COLOUR_CONTROLS) {
+          expect(sample.grade[key]).toBe(evaluateLayerSetting(grade, key, position, grade.colour[key]));
+          expect(sample.colour[key]).toBe(
+            item ? evaluateLayerSetting(item, key, frame - item.start, item.colour[key]) : NEUTRAL_COLOUR[key],
+          );
+        }
       }
     }
   }
@@ -646,7 +699,13 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
         const samples = sampleTimeline(project, frame, layout).filter((sample) => sample.layerId === row.id);
         if (coverage(samples) === 0) continue;
         for (const sample of samples) {
-          const key = JSON.stringify(sample.colour);
+          // One LUT per chain of the clip grade and the adjustment; local tone stays out of its identity, and
+          // HSL or curves take the exact grade instead.
+          const stages = sourceGrades(colourSchema.parse(sample.grade), colourSchema.parse(sample.colour)).stages.map(
+            (stage) => ({ ...stage, shadows: 0, highlights: 0, hdr: 0, localContrast: 0 }),
+          );
+          if (!stages.every(isNeutralAdvancedColour)) continue;
+          const key = JSON.stringify(stages);
           const previous = keys.indexOf(key);
           if (previous >= 0) keys.splice(previous, 1);
           else {
@@ -888,65 +947,45 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     120_000,
   );
 
-  it('exports shared row opacity and nine independently participating colour channels over clip speed curves across dissolves, gaps and hidden black holds', async () => {
+  it('exports shared track opacity and nine independently participating colour channels over clip speed curves across dissolves, gaps and hidden black holds', async () => {
     const project = createProject('native-compound', 'Compound keyed layers');
     project.layers.push(layer('video-2'), layer('video-3'), { ...layer('video-4'), enabled: false });
-    project.layers[0]!.opacity = 0.7;
-    project.layers[1]!.opacity = 0.6;
-    project.layers[2]!.opacity = 0.45;
-    project.layers[0]!.keyframes = [
-      point(
+    faded(project.layers[0]!, 0.7);
+    faded(project.layers[1]!, 0.6);
+    faded(project.layers[2]!, 0.45);
+    project.layers[0]!.transform.keyframes = [
+      opacityKey(0, 0.3, 'smooth'),
+      opacityKey(8, 0.8, 'ease-out'),
+      opacityKey(12, 0.4),
+      opacityKey(18, 0.9, 'hold'),
+    ];
+    project.layers[1]!.transform.keyframes = [
+      opacityKey(0, 0.2, 'ease-in'),
+      opacityKey(6, 0.85, 'smooth'),
+      opacityKey(10, 0.8, 'smooth'),
+      opacityKey(24, 0.45, 'hold'),
+    ];
+    // The nine channels animate independently in project time on an adjustment grading the whole film.
+    const channels = [
+      gradePoint(
         0,
-        {
-          opacity: 0.3,
-          temperature: -0.8,
-          exposure: -0.5,
-          hue: -25,
-          saturation: 0.7,
-          vibrance: 0.3,
-          whites: -0.4,
-          blacks: -0.2,
-        },
+        { temperature: -0.8, exposure: -0.5, hue: -25, saturation: 0.7, vibrance: 0.3, whites: -0.4, blacks: -0.2 },
         'smooth',
       ),
-      point(4, { brightness: 0.02, contrast: 1.1, tint: 0.6 }, 'ease-in'),
-      point(
+      gradePoint(4, { brightness: 0.02, contrast: 1.1, tint: 0.6 }, 'ease-in'),
+      gradePoint(
         8,
-        {
-          opacity: 0.8,
-          temperature: 0.9,
-          exposure: 0.4,
-          hue: 30,
-          saturation: 1.2,
-          vibrance: -0.25,
-          whites: -0.35,
-        },
+        { temperature: 0.9, exposure: 0.4, hue: 30, saturation: 1.2, vibrance: -0.25, whites: -0.35 },
         'ease-out',
       ),
-      point(12, { opacity: 0.4, brightness: 0.06, contrast: 1.25, blacks: -0.1, tint: -0.7 }),
-      point(18, { opacity: 0.9, whites: 0.3, blacks: 0.15 }, 'hold'),
-    ];
-    project.layers[1]!.keyframes = [
-      point(0, { opacity: 0.2, hue: 40, whites: -0.3, tint: -0.5 }, 'ease-in'),
-      point(6, { opacity: 0.85, exposure: 0.2, blacks: 0.15, temperature: 0.8 }, 'smooth'),
-      point(10, { opacity: 0.8, hue: -35, exposure: 0.4, whites: -0.1, tint: 0.65 }, 'smooth'),
-      point(24, { opacity: 0.45, hue: 15, blacks: -0.2, temperature: -0.6 }, 'hold'),
-    ];
-    project.layers[2]!.keyframes = [
-      point(0, { brightness: 0.08, hue: -15, temperature: -0.7, tint: 0.8 }, 'ease-out'),
-      point(
-        12,
-        { exposure: -0.2, blacks: 0.4, saturation: 1.3, brightness: -0.02, hue: 40, temperature: 0.5, tint: -0.6 },
-        'hold',
-      ),
+      gradePoint(12, { brightness: 0.06, contrast: 1.25, blacks: -0.1, tint: -0.7 }),
+      gradePoint(18, { whites: 0.3, blacks: 0.15 }, 'hold'),
     ];
     // Shadows, Highlights and HDR are source-tap stages, covered by tests/media/spatial-transforms.test.ts.
     const local: readonly string[] = LOCAL_TONE_SETTINGS;
     for (const { key } of COLOUR_CONTROLS.filter((control) => !local.includes(control.key))) {
-      expect(hasLayerKeys(project.layers[0]!, key)).toBe(true);
-      expect(
-        project.layers[0]!.keyframes.filter((keyframe) => keyframe.values[key] !== null).length,
-      ).toBeGreaterThanOrEqual(2);
+      expect(hasLayerKeys({ keyframes: channels.map(gradeKeyAsLayerKey) }, key)).toBe(true);
+      expect(channels.filter((keyframe) => keyframe.values[key] !== null).length).toBeGreaterThanOrEqual(2);
     }
     const left = createClip('left', assets[0]!.id, 2, 10);
     const right = createClip('right', assets[1]!.id, 3, 11);
@@ -954,13 +993,22 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     right.speed = { mode: 'constant', rate: 2 };
     // A reversed dissolve source decodes through the chunked reverse path.
     right.reverse = true;
-    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, brightness: 0.015, blacks: 0.05 };
+    left.grade.colour = { ...NEUTRAL_COLOUR, exposure: 0.2, brightness: 0.015, blacks: 0.05 };
+    right.grade.colour = structuredClone(left.grade.colour);
     project.clips = [left, right];
     project.layers[0]!.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 2 }];
     project.layers[0]!.openingFade = 1;
     project.layers[0]!.closingFade = 1;
     const baseEnd = calculateLayout(project).duration;
+    // The upper tracks' own Colour keys become their clips' grades, at source frames inside the 20-frame recordings.
+    const upperGrade: GradeKeyframe[] = [
+      gradePoint(0, { hue: 40, whites: -0.3, tint: -0.5 }, 'ease-in'),
+      gradePoint(6, { exposure: 0.2, blacks: 0.15, temperature: 0.8 }, 'smooth'),
+      gradePoint(10, { hue: -35, exposure: 0.4, whites: -0.1, tint: 0.65 }, 'smooth'),
+      gradePoint(20, { hue: 15, blacks: -0.2, temperature: -0.6 }, 'hold'),
+    ];
     const early = { ...createClip('early-overlay', assets[0]!.id, 1, 6), layerId: 'video-2', start: 2 };
+    early.grade.keyframes = structuredClone(upperGrade);
     early.speed = {
       mode: 'curve',
       keyframes: [
@@ -975,7 +1023,16 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
       start: baseEnd + 2,
     };
     late.speed = { mode: 'constant', rate: 1.25 };
+    late.grade.keyframes = structuredClone(upperGrade);
     const top = { ...createClip('top-overlay', assets[0]!.id, 4, 9), layerId: 'video-3', start: 4 };
+    top.grade.keyframes = [
+      gradePoint(0, { brightness: 0.08, hue: -15, temperature: -0.7, tint: 0.8 }, 'ease-out'),
+      gradePoint(
+        12,
+        { exposure: -0.2, blacks: 0.4, saturation: 1.3, brightness: -0.02, hue: 40, temperature: 0.5, tint: -0.6 },
+        'hold',
+      ),
+    ];
     project.clips = [late, left, top, early, right]; // Flat indices deliberately differ from track/chronological order.
     project.layers[1]!.transitions = [{ leftId: early.id, rightId: late.id, type: 'cut', duration: 0 }];
     const hiddenStart = calculateLayout(project).clips.find((placed) => placed.clip.id === late.id)!.end + 2;
@@ -985,18 +1042,11 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
       start: hiddenStart,
     };
     project.clips.push(hidden);
+    project.adjustments = [wholeFilm(project, NEUTRAL_COLOUR, channels)];
     const layout = calculateLayout(project);
     const earlyPlaced = layout.clips.find((placed) => placed.clip.id === early.id)!;
     expect(late.start).toBeGreaterThan(earlyPlaced.end);
-    for (let frame = 0; frame < layout.duration; frame++) {
-      for (const sample of sampleTimeline(project, frame, layout)) {
-        const placed = layout.clips.find((placed) => placed.clip.id === sample.clipId)!;
-        const row = project.layers.find((row) => row.id === sample.layerId)!;
-        expect(sample.sourceFrame).toBe(placed.retiming.sourceAt(frame - placed.start));
-        for (const { key } of COLOUR_CONTROLS)
-          expect(sample.colour[key]).toBe(evaluateLayerSetting(row, key, frame, row.colour[key]));
-      }
-    }
+    assertSharedSamples(project);
     const updates: number[] = [];
     let peakObservedClipFiles = 0;
     let sawLutFile = false;
@@ -1069,7 +1119,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     );
   }, 120_000);
 
-  it('grades each dissolve source by its own keyed clip grade, then the keyed track Colour, over slow motion and reverse', async () => {
+  it('grades each dissolve source by its own keyed clip grade, then the keyed adjustment, over slow motion and reverse', async () => {
     const project = createProject('native-clip-grades', 'Clip grades · synthetic');
     const left = createClip('graded-left', assets[0]!.id, 2, 12);
     const right = createClip('graded-right', assets[1]!.id, 4, 14);
@@ -1087,13 +1137,17 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
       colour: { ...createColourSettings(), contrast: 1.2, blacks: 0.06 },
       keyframes: [layerKeyAsGradeKey(layerKeyframe(8, { ...EMPTY_KEY_VALUES, tint: 0.5 }, 'linear'))],
     };
-    // HSL in one clip grade takes its source through the exact grade, in sequence with the track's.
+    // HSL in one clip grade takes its source through the exact grade, in sequence with the adjustment's.
     right.grade.colour.hsl.blue = { hue: 12, saturation: 0.3, lightness: -0.1 };
     project.clips = [left, right];
     const row = project.layers[0]!;
     row.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 4 }];
-    row.colour = { ...NEUTRAL_COLOUR, exposure: 0.1, whites: -0.15 };
-    row.keyframes = [point(0, { saturation: 0.9 }), point(20, { saturation: 1.1, temperature: -0.4 }, 'ease-in')];
+    project.adjustments = [
+      wholeFilm(project, { ...NEUTRAL_COLOUR, exposure: 0.1, whites: -0.15 }, [
+        gradePoint(0, { saturation: 0.9 }),
+        gradePoint(20, { saturation: 1.1, temperature: -0.4 }, 'ease-in'),
+      ]),
+    ];
     const captured = projectSchema.parse(project);
     expect(needsLayeredExport(captured)).toBe(true);
     const layout = calculateLayout(captured);
@@ -1108,34 +1162,34 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
   }, 120_000);
 
   it.each(['draft720', 'final4k'] as const)(
-    'grades both dissolve sources once with shared keyed row Colour, opacity and black fades at %s',
+    'grades both dissolve sources once with a shared keyed adjustment, track opacity and black fades at %s',
     async (profile) => {
       const project = createProject(`row-appearance-${profile}`, 'Joint appearance · synthetic');
-      const row = project.layers[0]!;
-      row.colour = {
-        ...NEUTRAL_COLOUR,
-        temperature: 0.9,
-        tint: -0.7,
-        contrast: 1.1,
-        brightness: 0.02,
-        saturation: 0.85,
-      };
-      row.opacity = 0.8;
+      const row = faded(project.layers[0]!, 0.8);
       row.openingFade = 1;
       row.closingFade = 1;
-      row.keyframes = [
-        point(0, { exposure: 0.15, opacity: 0.65, temperature: -1 }),
-        point(1, { tint: 0.8 }, 'ease-in'),
-        point(4, { exposure: -0.1, opacity: 0.9, temperature: 1, tint: -0.9 }),
-      ];
+      row.transform.keyframes = [opacityKey(0, 0.65), opacityKey(4, 0.9)];
       const left = createClip('joint-left', assets[0]!.id, 1, 4);
       const right = { ...createClip('joint-right', assets[1]!.id, 5, 8), start: 2 };
       project.clips = [left, right];
       row.transitions = [{ leftId: left.id, rightId: right.id, type: 'cross-dissolve', duration: 1 }];
       const lower = layer('joint-lower');
-      lower.colour = { ...NEUTRAL_COLOUR, temperature: 0.7, tint: -0.6 };
       project.layers.unshift(lower);
-      project.clips.push(createClip('lower', assets[2]!.id, 0, 5, lower.id));
+      const lowerClip = createClip('lower', assets[2]!.id, 0, 5, lower.id);
+      lowerClip.grade.colour = { ...NEUTRAL_COLOUR, temperature: 0.7, tint: -0.6 };
+      project.clips.push(lowerClip);
+      // The keyed Colour grades the whole film: both dissolve sources take the same one at each project frame.
+      project.adjustments = [
+        wholeFilm(
+          project,
+          { ...NEUTRAL_COLOUR, temperature: 0.9, tint: -0.7, contrast: 1.1, brightness: 0.02, saturation: 0.85 },
+          [
+            gradePoint(0, { exposure: 0.15, temperature: -1 }),
+            gradePoint(1, { tint: 0.8 }, 'ease-in'),
+            gradePoint(4, { exposure: -0.1, temperature: 1, tint: -0.9 }),
+          ],
+        ),
+      ];
       const before = structuredClone(project);
       for (const frame of [0, 2, 4]) {
         const sources = sampleTimeline(project, frame).filter((sample) => sample.layerId === row.id);
@@ -1162,20 +1216,25 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     expect(validateReference(plain, library).clips).toHaveLength(2);
     const neutral: LayerKeyValues = { ...scalarColourValues(NEUTRAL_COLOUR), opacity: 1 };
     const variants: ((document: ProjectDocument) => void)[] = [
+      // Even a neutral keyframe of a clip grade or of the track Transform's Opacity.
       ...KEYFRAME_SETTINGS.map(({ key }) => (document: ProjectDocument) => {
-        document.layers[0]!.keyframes = [point(20, { [key]: neutral[key]! }, 'smooth')];
+        if (key === 'opacity') document.layers[0]!.transform.keyframes = [opacityKey(20, neutral.opacity!, 'smooth')];
+        else document.clips[0]!.grade.keyframes = [gradePoint(20, { [key]: neutral[key]! }, 'smooth')];
       }),
+      (document) => {
+        document.adjustments = [createAdjustment('neutral', 0, 4)];
+      },
       (document) => {
         document.layers[0]!.enabled = false;
       },
       (document) => {
-        document.layers[0]!.opacity = 0.6;
+        document.layers[0]!.transform.base.opacity = 0.6;
       },
       (document) => {
         document.layers.push(layer('video-2'));
       },
       (document) => {
-        document.layers[0]!.opacity = 0.5;
+        document.layers[0]!.transform.base.opacity = 0.5;
       },
     ];
     const before = jobs.list();
@@ -1194,7 +1253,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     await unchanged();
   });
 
-  it('preserves RGBA16 premultiplied colour/coverage before H.264, including uniform row opacity during dissolves and transparent gaps', async () => {
+  it('preserves RGBA16 premultiplied colour/coverage before H.264, including uniform track opacity during dissolves and transparent gaps', async () => {
     const project = simple(3);
     project.clips[0]!.sourceOut = 2;
     const right = createClip('right', assets[1]!.id, 5, 7);
@@ -1202,18 +1261,20 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     project.layers[0]!.transitions = [{ leftId: 'base', rightId: 'right', type: 'cross-dissolve', duration: 1 }];
     project.layers[0]!.openingFade = 1;
     project.layers[0]!.closingFade = 1;
-    project.layers[0]!.opacity = 0.7;
-    project.layers[0]!.colour = {
-      ...NEUTRAL_COLOUR,
-      temperature: 0.8,
-      tint: -0.6,
-      exposure: 0.2,
-      brightness: 0.02,
-      hue: -30,
-      blacks: 0.2,
-    };
-    project.layers[1]!.colour = { ...NEUTRAL_COLOUR, temperature: -0.7, tint: 0.9 };
-    project.layers[1]!.keyframes = [point(0, { opacity: 0.2 }), point(4, { opacity: 0.9 }, 'hold')];
+    faded(project.layers[0]!, 0.7);
+    // Both dissolve sources of the lower track share one grade; the overlay has its own.
+    for (const clip of [project.clips[0]!, right])
+      clip.grade.colour = {
+        ...NEUTRAL_COLOUR,
+        temperature: 0.8,
+        tint: -0.6,
+        exposure: 0.2,
+        brightness: 0.02,
+        hue: -30,
+        blacks: 0.2,
+      };
+    project.clips[1]!.grade.colour = { ...NEUTRAL_COLOUR, temperature: -0.7, tint: 0.9 };
+    project.layers[1]!.transform.keyframes = [opacityKey(0, 0.2), opacityKey(4, 0.9, 'hold')];
     expect(
       sampleTimeline(project, 1)
         .filter((sample) => sample.layerId === 'video-1')
@@ -1293,17 +1354,14 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     project.layers[0]!.transitions = [{ leftId: 'base', rightId: 'right', type: 'fade-through-black', duration: 5 }];
     project.layers[0]!.openingFade = 1;
     project.layers[0]!.closingFade = 1;
-    project.layers[0]!.keyframes = [
-      point(0, { brightness: 0.05, blacks: 0.5 }),
-      point(3, { exposure: -0.2 }),
-      point(6, { brightness: 0.1, exposure: 0.5, hue: 25, blacks: 0.3 }, 'hold'),
+    // Animated grading in project time: an adjustment over the whole film.
+    project.adjustments = [
+      wholeFilm(project, { ...NEUTRAL_COLOUR, brightness: 0.1, exposure: 0.4, whites: -0.2 }, [
+        gradePoint(0, { brightness: 0.05, blacks: 0.5 }),
+        gradePoint(3, { exposure: -0.2 }),
+        gradePoint(6, { brightness: 0.1, exposure: 0.5, hue: 25, blacks: 0.3 }, 'hold'),
+      ]),
     ];
-    project.layers.find((row) => row.id === project.clips[2]!.layerId)!.colour = {
-      ...NEUTRAL_COLOUR,
-      brightness: 0.1,
-      exposure: 0.4,
-      whites: -0.2,
-    };
     const spawnOffset = vi.mocked(spawn).mock.calls.length;
     const result = await complete(project);
     bounds(result.receipt);
@@ -1322,7 +1380,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
 
   it('renders a black pause timeslot as track-owned coverage over lower footage', async () => {
     const project = createProject('native-pause', 'Black pause between overlay clips');
-    project.layers.push({ ...layer('video-2'), opacity: 0.5 });
+    project.layers.push(faded(layer('video-2'), 0.5));
     project.clips = [
       createClip('base', assets[0]!.id, 0, 12),
       { ...createClip('up-a', assets[1]!.id, 2, 6), layerId: 'video-2', start: 1 },
@@ -1347,10 +1405,14 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     const clip = createClip('animated', assets[0]!.id, 5, 9);
     project.clips = [clip];
     clip.speed = { mode: 'constant', rate: 0.5 };
-    project.layers[0]!.keyframes = [
-      point(0, { exposure: -1, hue: -20, brightness: 0, saturation: 1, opacity: 0.2 }, 'smooth'),
-      point(4, { exposure: 0.1, hue: 10, brightness: 0.03, saturation: 0.9 }),
-      point(7, { opacity: 0.9, exposure: 0.7, hue: 40, brightness: 0.06, saturation: 0.8 }, 'hold'),
+    project.layers[0]!.transform.keyframes = [opacityKey(0, 0.2, 'smooth'), opacityKey(7, 0.9, 'hold')];
+    // The grade animates in project time, over the clip's held source frames.
+    project.adjustments = [
+      wholeFilm(project, NEUTRAL_COLOUR, [
+        gradePoint(0, { exposure: -1, hue: -20, brightness: 0, saturation: 1 }, 'smooth'),
+        gradePoint(4, { exposure: 0.1, hue: 10, brightness: 0.03, saturation: 0.9 }),
+        gradePoint(7, { exposure: 0.7, hue: 40, brightness: 0.06, saturation: 0.8 }, 'hold'),
+      ]),
     ];
     expect(needsLayeredExport(project)).toBe(true);
     const spawnOffset = vi.mocked(spawn).mock.calls.length;
@@ -1369,7 +1431,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
   it('supports overlay-only projects, hidden primary footage and final opaque-black empty holds', async () => {
     for (const hiddenPrimary of [false, true]) {
       const project = createProject(`native-no-primary-${hiddenPrimary}`, 'Overlay only / hidden primary');
-      project.layers.push({ ...layer('video-2'), opacity: 0.7 });
+      project.layers.push(faded(layer('video-2'), 0.7));
       project.clips = [{ ...createClip('overlay', assets[1]!.id, 5, 7), layerId: 'video-2', start: 2 }];
       if (hiddenPrimary) {
         project.layers[0]!.enabled = false;
@@ -1444,14 +1506,14 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
     const project = simple(3);
     project.layers.push(layer('video-3'));
     project.clips[0]!.mediaId = uhd.id;
-    project.layers[0]!.opacity = 0.8;
-    project.layers[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.15, blacks: 0.25 };
-    project.layers[1]!.keyframes = [point(1, { opacity: 0.7 }), point(2, { opacity: 0.3 }, 'hold')];
-    project.layers[2]!.opacity = 0.6;
+    faded(project.layers[0]!, 0.8);
+    project.clips[0]!.grade.colour = { ...NEUTRAL_COLOUR, exposure: 0.15, blacks: 0.25 };
+    project.layers[1]!.transform.keyframes = [opacityKey(1, 0.7), opacityKey(2, 0.3, 'hold')];
+    faded(project.layers[2]!, 0.6);
     const top = { ...createClip('uhd-top', assets[1]!.id, 4, 5), layerId: 'video-3', start: 2 };
-    project.layers[2]!.keyframes = [
-      point(3, { ...scalarColourValues(NEUTRAL_COLOUR), brightness: 0.08, hue: -30 }),
-      point(6, { ...scalarColourValues(NEUTRAL_COLOUR), exposure: -0.3, saturation: 0.6 }, 'hold'),
+    top.grade.keyframes = [
+      gradePoint(3, { ...scalarColourValues(NEUTRAL_COLOUR), brightness: 0.08, hue: -30 }),
+      gradePoint(6, { ...scalarColourValues(NEUTRAL_COLOUR), exposure: -0.3, saturation: 0.6 }, 'hold'),
     ];
     project.clips.push(top);
     const started = performance.now();
@@ -1477,19 +1539,18 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
   it('exports all eight video tracks without multiplying decoder or raw-buffer peaks', async () => {
     const project = createProject('native-eight-layers', 'Eight synthetic video tracks');
     for (let index = 1; index < 8; index++) project.layers.push(layer(`video-${index + 1}`));
-    project.layers.forEach((row, index) => {
-      row.opacity = 0.4 + index * 0.06;
-      row.colour = {
+    project.layers.forEach((row, index) => faded(row, 0.4 + index * 0.06));
+    // Each track's one clip carries its own grade.
+    project.clips = project.layers.map((row, index) => {
+      const clip = { ...createClip(`eight-${index}`, assets[index % 2]!.id, index + 1, index + 3), layerId: row.id };
+      clip.grade.colour = {
         ...NEUTRAL_COLOUR,
         exposure: index * 0.025,
         brightness: index * 0.003,
         saturation: 0.8 + index * 0.02,
       };
+      return clip;
     });
-    project.clips = project.layers.map((row, index) => ({
-      ...createClip(`eight-${index}`, assets[index % 2]!.id, index + 1, index + 3),
-      layerId: row.id,
-    }));
     const result = await complete(project);
     bounds(result.receipt);
     const maximumMae = await parity(project, result.filename);
@@ -1539,7 +1600,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
 
   it('owns the queued immutable snapshot without modifying originals or saved user edits', async () => {
     const project = simple(4);
-    project.layers[1]!.keyframes = [point(8, { opacity: 0.4 }, 'hold')];
+    project.layers[1]!.transform.keyframes = [opacityKey(8, 0.4, 'hold')];
     const captured = structuredClone(project);
     let release = (): void => {};
     const gate = new Promise<void>((resolve) => {
@@ -1552,8 +1613,8 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
       id = job.id;
       expect(job.state).toBe('queued');
       project.title = 'Later user edit';
-      project.layers[1]!.opacity = 0;
-      project.layers[1]!.keyframes[0]!.values.opacity = 1;
+      project.layers[1]!.transform.base.opacity = 0;
+      project.layers[1]!.transform.keyframes[0]!.values.opacity = 1;
       release();
       await jobs.wait(busy.id);
       const result = await jobs.wait(id);
@@ -1563,7 +1624,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
       ) as ExportReceipt;
       expect(receipt.snapshot).toEqual(captured);
       expect(project.title).toBe('Later user edit');
-      expect(project.layers[1]!.opacity).toBe(0);
+      expect(project.layers[1]!.transform.base.opacity).toBe(0);
       await unchanged();
     } finally {
       release();

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
@@ -29,14 +30,16 @@ function markersFor(project: ProjectDocument) {
 }
 
 describe('clip-owned timeline speed keyframe markers', () => {
-  it('creates no synthetic keys for constant speed, track Transform or shared track keys', () => {
+  it('creates no synthetic speed keys for constant speed, track Transform, clip grade or adjustment keys', () => {
     const project = fixture();
     expect(markersFor(project).markers).toEqual([]);
     project.layers[0]!.transform.base.scale = 2;
     project.layers[0]!.transform.keyframes = [
       { ...uniformKeyframe(30, { ...NEUTRAL_SPATIAL_POSE }, 'linear'), reset: false },
     ];
-    project.layers[0]!.keyframes = [layerKeyframe(30, { ...EMPTY_KEY_VALUES, exposure: 1 }, 'linear')];
+    const exposure = layerKeyAsGradeKey(layerKeyframe(30, { ...EMPTY_KEY_VALUES, exposure: 1 }, 'linear'));
+    project.clips[0]!.grade.keyframes = [exposure];
+    project.adjustments = [{ ...createAdjustment('look', 0, 200), keyframes: [exposure] }];
     expect(markersFor(project).markers).toEqual([]);
   });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import { needsLayeredExport, planExport, planLayeredExport } from '../../src/shared/export.js';
+import { createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import {
   createClip,
@@ -30,10 +31,10 @@ function key(frame: number, values: SpatialPose, curve: 'smooth' | 'hold' | 'lin
 
 function settings(): SpatialSettings {
   return {
-    base: { ...NEUTRAL_SPATIAL_POSE, cropTop: 0.125, translateY: -0.25 },
+    base: { ...NEUTRAL_SPATIAL_POSE, cropTop: 0.125, translateY: -0.25, opacity: 0.75 },
     keyframes: [
-      key(0, { ...NEUTRAL_SPATIAL_POSE, rotation: -90 }, 'smooth'),
-      key(100, { ...NEUTRAL_SPATIAL_POSE, scale: 2, translateX: 0.5 }, 'hold'),
+      key(0, { ...NEUTRAL_SPATIAL_POSE, rotation: -90, opacity: 0.5 }, 'smooth'),
+      key(100, { ...NEUTRAL_SPATIAL_POSE, scale: 2, translateX: 0.5, opacity: 0.5 }, 'hold'),
     ],
   };
 }
@@ -41,8 +42,12 @@ function settings(): SpatialSettings {
 function fixture(): ProjectDocument {
   const document = createProject('spatial-commands', 'Spatial commands');
   document.layers[0]!.ripple = false;
-  document.layers[0]!.opacity = 0.75;
-  document.layers[0]!.keyframes = [layerKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.25, opacity: 0.5 }, 'linear')];
+  document.adjustments = [
+    {
+      ...createAdjustment('look', 0, 1_000_000),
+      keyframes: [layerKeyAsGradeKey(layerKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.25 }, 'linear'))],
+    },
+  ];
   document.layers[0]!.transform = settings();
   document.layers.push(createLayer('other', 'Other', false));
   document.clips = [{ ...createClip('clip', 'original', 20, 80), start: 10 }];
@@ -105,7 +110,7 @@ describe('strict current-schema track Transform persistence', () => {
     { name: 'missing key array', change: (value) => Reflect.deleteProperty(value, 'keyframes') },
     { name: 'missing pose field', change: (value) => Reflect.deleteProperty(value.base, 'scale') },
     { name: 'unknown settings', change: (value) => Object.assign(value, { migration: true }) },
-    { name: 'unknown pose', change: (value) => Object.assign(value.base, { opacity: 1 }) },
+    { name: 'unknown pose', change: (value) => Object.assign(value.base, { skew: 0 }) },
     {
       name: 'nonfinite base',
       change: (value) => {
@@ -259,6 +264,7 @@ describe('atomic track Transform replacement', () => {
       expect(next.layers.map(({ transitions: _transitions, ...layer }) => layer)).toEqual(
         document.layers.map(({ transitions: _transitions, ...layer }) => layer),
       );
+      expect(next.adjustments).toEqual(document.adjustments);
       for (const clip of next.clips) expect(clip).not.toHaveProperty('spatial');
       expect(document).toEqual(fixture());
     },
@@ -294,6 +300,7 @@ describe('project-time Transform sampling and export dispatch', () => {
       const sample = sampleTimeline(document, placed.start + 1, layout)[0]!;
       expect(sample.spatial).toEqual(evaluateSpatial(document.layers[0]!.transform, placed.start + 1));
       expect(sample.colour.exposure).toBe(0.25);
+      expect(sample.spatial.opacity).toBe(0.5);
       expect(sample.opacity).toBe(0.5);
     },
   );
@@ -315,20 +322,21 @@ describe('project-time Transform sampling and export dispatch', () => {
     expect(samples.map((sample) => sample.blendWeight)).toEqual([0.9, 0.1]);
   });
 
-  it.each(['base', 'neutral-key', 'off-duration-key'] as const)(
+  it.each(['base', 'opacity', 'neutral-key', 'off-duration-key'] as const)(
     'requires layered export for %s without changing the document',
     (kind) => {
       const document = createProject('export-spatial', 'Export spatial');
       document.clips = [createClip('clip', 'original', 20, 80)];
       expect(needsLayeredExport(document)).toBe(false);
       if (kind === 'base') document.layers[0]!.transform.base.translateX = Number.EPSILON;
+      else if (kind === 'opacity') document.layers[0]!.transform.base.opacity = 0.99;
       else
         document.layers[0]!.transform.keyframes = [
           key(kind === 'neutral-key' ? 20 : 1000, { ...NEUTRAL_SPATIAL_POSE }, 'hold'),
         ];
       const before = structuredClone(document);
       expect(needsLayeredExport(document)).toBe(true);
-      expect(() => planExport(document)).toThrow('spatial edits');
+      expect(() => planExport(document)).toThrow('Transform or Opacity edits');
       expect(planLayeredExport(document).duration).toBe(60);
       expect(document).toEqual(before);
     },

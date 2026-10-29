@@ -16,6 +16,7 @@ import {
   type ColourSettings,
 } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
+import { gradeChainPixel, sourceGrades } from '../../src/shared/grade.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
@@ -160,7 +161,7 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
       });
       document = applyCommand(document, {
         type: 'colour',
-        layerId: document.layers[0]!.id,
+        clipIds: ['clip-a', 'clip-b'],
         colour: { ...NEUTRAL_COLOUR, brightness: 0.05, blacks: 0.1 },
       });
       document = applyCommand(document, { type: 'fades', layerId: document.layers[0]!.id, opening: 6, closing: 6 });
@@ -189,9 +190,9 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
             source.metadata.colourRange,
           );
           for (let index = 0; index < pixels.length; index += 3) {
-            const graded = gradePixel(
+            const graded = gradeChainPixel(
               [pixels[index]! / 255, pixels[index + 1]! / 255, pixels[index + 2]! / 255],
-              layer.colour,
+              sourceGrades(layer.grade, layer.colour).stages,
             );
             for (let channel = 0; channel < 3; channel++)
               expected[index + channel]! += graded[channel]! * 255 * layer.weight;

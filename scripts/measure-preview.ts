@@ -126,15 +126,17 @@ try {
   const colour: { grade: ColourSettings; latencyMs: PreviewDiagnostics['colourLatencyMs'] }[] = [];
   await page.evaluate(() => window.pascapLab!.engine.seek(45));
   await forEachSerial(grades, async (grade) => {
+    // Each grade replaces both clips' own static grades: an appearance-only update, without saving.
+    const graded = applyCommand(original, { type: 'colour', clipIds: clips.map((clip) => clip.id), colour: grade });
     colour.push(
       await page.evaluate(
-        async ({ settings, layerId }) => {
+        async ({ settings, document }) => {
           const engine = window.pascapLab!.engine;
-          engine.updateColour(layerId, settings);
+          engine.updateProjectAppearance(document);
           await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
           return { grade: settings, latencyMs: engine.diagnostics().colourLatencyMs };
         },
-        { settings: grade, layerId: clips[0]!.layerId },
+        { settings: grade, document: graded },
       ),
     );
   });
@@ -223,7 +225,7 @@ try {
   if (process.argv.includes('--reference')) {
     const snapshot = applyCommand(original, {
       type: 'colour',
-      layerId: original.layers[0]!.id,
+      clipIds: original.clips.map((clip) => clip.id),
       colour: grades.at(-1)!,
     });
     console.log('Rendering an immutable graded reference for browser/native comparison.');

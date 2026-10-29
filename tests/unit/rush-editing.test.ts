@@ -1,13 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
-import {
-  EMPTY_KEY_VALUES,
-  type Interpolation,
-  type LayerKeyframe,
-  type LayerKeyValues,
-  layerKeyframe,
-} from '../../src/shared/keyframes.js';
+import { createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
+import { EMPTY_KEY_VALUES, type Interpolation, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import {
   BASE_LAYER_ID,
   createClip,
@@ -25,6 +20,12 @@ import {
   type TimelineRange,
 } from '../../src/shared/rush-editing.js';
 import { trimOnTimeline, validateSourceRanges } from '../../src/shared/source-range.js';
+import {
+  SPATIAL_CHANNELS,
+  type SpatialChannel,
+  type SpatialKeyframe,
+  type SpatialPose,
+} from '../../src/shared/spatial.js';
 import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
 import { calculateLayout, layerClips, sampleTimeline } from '../../src/shared/timeline.js';
 import { singleClipLane } from '../music-lanes.js';
@@ -61,11 +62,17 @@ const SPEEDS: { name: string; speed: SpeedSettings }[] = [
   },
 ];
 
-function point(frame: number, values: Partial<LayerKeyValues>, interpolation: Interpolation = 'linear'): LayerKeyframe {
-  return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
+const NO_SETTINGS = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<
+  SpatialChannel,
+  null
+>;
+/** A Transform keyframe of a track, at a project frame. */
+function point(frame: number, values: Partial<SpatialPose>, interpolation: Interpolation = 'linear'): SpatialKeyframe {
+  return { ...uniformKeyframe(frame, { ...NO_SETTINGS, ...values }, interpolation), reset: false };
 }
-function row(id: string, keyframes: LayerKeyframe[]): VideoLayer {
-  return { ...createLayer(id, id, false), keyframes };
+function row(id: string, keyframes: SpatialKeyframe[]): VideoLayer {
+  const layer = createLayer(id, id, false);
+  return { ...layer, transform: { ...layer.transform, keyframes } };
 }
 function rushClip(id: string, layerId: string, start: number, speed: SpeedSettings): VideoClip {
   return {
@@ -77,25 +84,30 @@ function rushClip(id: string, layerId: string, start: number, speed: SpeedSettin
 }
 function primaryProject(
   speed: SpeedSettings = { mode: 'constant', rate: 1 },
-  keys: LayerKeyframe[] = [],
+  keys: SpatialKeyframe[] = [],
 ): ProjectDocument {
   const document = createProject('rush', 'Rush editing');
-  document.layers[0]!.opacity = 0.65;
-  document.layers[0]!.colour = {
-    ...NEUTRAL_COLOUR,
-    temperature: 0.2,
-    tint: -0.3,
-    exposure: 0.6,
-    brightness: 0.08,
-    contrast: 1.2,
-    hue: 25,
-    saturation: 0.75,
-    highlights: 0.2,
-    shadows: -0.15,
-  };
-  document.layers[0]!.keyframes = keys;
+  document.layers[0]!.transform.base.opacity = 0.65;
+  document.adjustments = [
+    {
+      ...createAdjustment('look', 0, 1_000_000),
+      colour: {
+        ...NEUTRAL_COLOUR,
+        temperature: 0.2,
+        tint: -0.3,
+        exposure: 0.6,
+        brightness: 0.08,
+        contrast: 1.2,
+        hue: 25,
+        saturation: 0.75,
+        highlights: 0.2,
+        shadows: -0.15,
+      },
+    },
+  ];
+  document.layers[0]!.transform.keyframes = keys;
   document.layers.push(
-    row('upper', [point(10, { opacity: 0.6, exposure: 0.25 }), point(500, { opacity: 0.4, hue: 45 }, 'hold')]),
+    row('upper', [point(10, { opacity: 0.6, scale: 1.25 }), point(500, { opacity: 0.4, rotation: 45 }, 'hold')]),
   );
   // Deliberately interleave an overlay with the primary array order.
   document.clips = [
@@ -116,12 +128,20 @@ function primaryProject(
 }
 function overlayProject(
   speed: SpeedSettings = { mode: 'constant', rate: 1 },
-  keys: LayerKeyframe[] = [],
+  keys: SpatialKeyframe[] = [],
 ): ProjectDocument {
   const document = createProject('overlay-rush', 'Positioned rush editing');
-  document.layers[0]!.keyframes = [point(15, { exposure: 0.5 }), point(1_000, { saturation: 1.2 })];
+  document.adjustments = [
+    {
+      ...createAdjustment('look', 0, 1_000_000),
+      keyframes: [
+        layerKeyframe(15, { ...EMPTY_KEY_VALUES, exposure: 0.5 }, 'linear'),
+        layerKeyframe(1_000, { ...EMPTY_KEY_VALUES, saturation: 1.2 }, 'linear'),
+      ].map(layerKeyAsGradeKey),
+    },
+  ];
   const upper = row('upper', keys);
-  upper.opacity = 0.65;
+  upper.transform.base.opacity = 0.65;
   document.layers.push(upper, row('other-row', [point(50, { opacity: 0.4 })]));
   const selected = rushClip('top', upper.id, 50, speed);
   const end = selected.start + compileRetiming(selected).duration;
@@ -215,6 +235,7 @@ function expectUnchangedOthers(before: ProjectDocument, next: ProjectDocument, s
       }),
     );
   }
+  expect(next.adjustments).toEqual(before.adjustments);
   expect(next.music).toEqual(before.music);
 }
 function withDissolves(): ProjectDocument {
@@ -383,10 +404,10 @@ describe('atomic source removal on the primary ripple row', () => {
         speed: original.speed,
       });
       expect(excerpt).not.toHaveProperty('opacity');
-      expect(next.layers[0]!.opacity).toBe(document.layers[0]!.opacity);
+      expect(next.layers[0]!.transform).toEqual(document.layers[0]!.transform);
       expect(Object.keys(excerpt)).toEqual(Object.keys(original));
     }
-    expect(next.layers[0]!.colour).toEqual(document.layers[0]!.colour);
+    expect(next.adjustments).toEqual(document.adjustments);
     expect(left.speed).not.toBe(right.speed);
     if (left.speed.mode === 'constant') left.speed.rate = 1.5;
     expect(right).not.toHaveProperty('correction');
@@ -452,7 +473,7 @@ describe('atomic source removal on the primary ripple row', () => {
     const document = projectSchema.parse({
       ...createProject('tiny', 'Tiny'),
       clips: [createClip('tiny', 'recording', 219, 220)],
-      layers: [row(BASE_LAYER_ID, [point(500, { exposure: 0.5 })])],
+      layers: [row(BASE_LAYER_ID, [point(500, { translateX: 0.5 })])],
     });
     const next = singleCommit(document, removal('tiny', 219, 220));
     expect(next.clips).toEqual([]);
@@ -588,8 +609,8 @@ describe('atomic source removal on the primary ripple row', () => {
     'preserves static settings/source curve anchors and rephases valid excerpt durations: $name',
     ({ speed }) => {
       const document = primaryProject(speed, [
-        point(15, { exposure: 0.25, opacity: 0.4 }),
-        point(900, { hue: 100 }, 'smooth'),
+        point(15, { scale: 1.25, opacity: 0.4 }),
+        point(900, { rotation: 100 }, 'smooth'),
       ]);
       const next = singleCommit(document, removal('rush', 140, 170));
       expectUnchangedOthers(document, next, 'rush');
@@ -600,9 +621,9 @@ describe('atomic source removal on the primary ripple row', () => {
       expect(placed(next, 'after').duration).toBe(placed(document, 'after').duration);
       for (const excerpt of [left, right]) {
         expect(excerpt.clip.speed).toEqual(speed);
-        expect(next.layers.map((layer) => layer.colour)).toEqual(document.layers.map((layer) => layer.colour));
+        expect(next.adjustments).toEqual(document.adjustments);
         expect(excerpt.clip).not.toHaveProperty('opacity');
-        expect(next.layers[0]!.opacity).toBe(0.65);
+        expect(next.layers[0]!.transform.base.opacity).toBe(0.65);
         expect(excerpt.duration).toBe(compileRetiming(excerpt.clip).duration);
         const samples = Array.from({ length: excerpt.duration }, (_, frame) => excerpt.retiming.sourceAt(frame));
         expect(
@@ -661,7 +682,7 @@ describe('positioned overlay removal without neighbour ripple', () => {
   });
 
   it.each(SPEEDS)('anchors the right overlay at the original contextual output boundary: $name', ({ speed }) => {
-    const document = overlayProject(speed, [point(0, { exposure: -0.5 }), point(1_000, { hue: 90 })]);
+    const document = overlayProject(speed, [point(0, { translateX: -0.5 }), point(1_000, { rotation: 90 })]);
     const original = placed(document, 'top');
     const next = singleCommit(document, removal('top', 140, 170));
     expect(placed(next, 'top').start).toBe(original.start);
@@ -755,7 +776,7 @@ describe('quick trims retain the displayed original frame', () => {
   it.each(['in', 'out'] as const)(
     'keeps overlay neighbours fixed for quick %s trim and preserves OUT on IN trim',
     (edge) => {
-      const keys = [point(0, { exposure: 0.5 }), point(100, { opacity: 0.4 }), point(1_000, { hue: 60 })];
+      const keys = [point(0, { translateX: 0.5 }), point(100, { opacity: 0.4 }), point(1_000, { rotation: 60 })];
       const document = overlayProject({ mode: 'constant', rate: 2 }, keys);
       const selected = placed(document, 'top');
       const next = singleCommit(document, trimAtPlayhead(document, 'top', 70, edge));
@@ -815,7 +836,12 @@ describe('quick trims retain the displayed original frame', () => {
   it('does not discard a redo branch for an endpoint quick-trim no-op', () => {
     const document = primaryProject();
     const history = new EditHistory(document);
-    const changed = history.commit({ type: 'opacity', layerId: BASE_LAYER_ID, opacity: 0.8 });
+    const changed = history.commit({
+      type: 'transform-setting',
+      layerId: BASE_LAYER_ID,
+      setting: 'opacity',
+      value: 0.8,
+    });
     history.undo();
     expect(history.commit(trimAtPlayhead(history.current, 'rush', placed(document, 'rush').start, 'in'))).toEqual(
       document,

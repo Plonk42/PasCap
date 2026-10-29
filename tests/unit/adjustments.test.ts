@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createColourSettings, NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
+import { createColourSettings, NEUTRAL_COLOUR, type RGB, type ScalarColourSetting } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { adjustmentColour, compositePixel } from '../../src/shared/composition.js';
 import { editedFrame } from '../../src/shared/edited-frame.js';
@@ -7,6 +7,7 @@ import { needsLayeredExport } from '../../src/shared/export.js';
 import {
   adjustmentAt,
   createAdjustment,
+  GRADE_SETTINGS,
   gradeChainPixel,
   MAX_ADJUSTMENTS,
   type Adjustment,
@@ -106,9 +107,9 @@ describe('adjustments', () => {
     expect(() => applyCommand(history.current, { type: 'adjustment-remove', adjustmentId: 'gone' })).toThrow(
       'Adjustment no longer exists',
     );
-    expect(() => applyCommand(history.current, { type: 'adjustment-add', adjustmentId: 'z', start: 0, duration: 0 })).toThrow(
-      'at least one frame',
-    );
+    expect(() =>
+      applyCommand(history.current, { type: 'adjustment-add', adjustmentId: 'z', start: 0, duration: 0 }),
+    ).toThrow('at least one frame');
   });
 
   it('carry their keyframes when moved and keep their project frames when trimmed', () => {
@@ -227,12 +228,9 @@ describe('Transform Opacity', () => {
   });
 });
 
-function nullValues() {
-  return Object.fromEntries(Object.keys(NEUTRAL_COLOUR).filter(isScalar).map((key) => [key, null])) as never;
+function nullValues(): Record<ScalarColourSetting, null> {
+  return Object.fromEntries(GRADE_SETTINGS.map((key) => [key, null])) as Record<ScalarColourSetting, null>;
 }
-function nullEasing() {
+function nullEasing(): Record<ScalarColourSetting, null> {
   return nullValues();
-}
-function isScalar(key: string): boolean {
-  return !['hsl', 'curves'].includes(key);
 }

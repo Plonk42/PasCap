@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_VIDEO_DECODERS } from '../../src/preview/compositor.js';
-import { gradePixel, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { createColourSettings, gradePixel, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import { compositePixel } from '../../src/shared/composition.js';
 import {
@@ -9,8 +9,15 @@ import {
   planExport,
   planLayeredExport,
 } from '../../src/shared/export.js';
-import { EMPTY_KEY_VALUES, type LayerKeyframe, layerKeyframe } from '../../src/shared/keyframes.js';
-import { createSpatialSettings } from '../../src/shared/spatial.js';
+import { createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
+import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
+import {
+  createSpatialSettings,
+  SPATIAL_CHANNELS,
+  type SpatialChannel,
+  type SpatialKeyframe,
+  type SpatialSettings,
+} from '../../src/shared/spatial.js';
 import {
   BASE_LAYER_ID,
   createClip,
@@ -32,8 +39,14 @@ import { EARLIER_SCHEMA_VERSIONS, unsupportedProject } from './project-fixtures.
 const TRACK_IDS = ['ground', 'middle', 'sky'];
 const cases = TRACK_IDS.flatMap((layerId) => [false, true].map((ripple) => ({ layerId, ripple })));
 const cut = (leftId: string, rightId: string): Transition => ({ leftId, rightId, type: 'cut', duration: 0 });
-const point = (frame: number): LayerKeyframe =>
-  layerKeyframe(frame, { ...EMPTY_KEY_VALUES, exposure: 0.123456789 }, 'hold');
+const NO_SETTINGS = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<
+  SpatialChannel,
+  null
+>;
+const point = (frame: number): SpatialKeyframe => ({
+  ...uniformKeyframe(frame, { ...NO_SETTINGS, translateX: 0.123456789 }, 'hold'),
+  reset: false,
+});
 
 function fixture(selectedId = 'middle', ripple = false): ProjectDocument {
   const document = createProject('parity', 'Uniform tracks');
@@ -47,6 +60,13 @@ function fixture(selectedId = 'middle', ripple = false): ProjectDocument {
   );
   for (const layer of document.layers)
     layer.transitions = [cut(`${layer.id}-a`, `${layer.id}-b`), cut(`${layer.id}-b`, `${layer.id}-c`)];
+  document.adjustments = [
+    {
+      ...createAdjustment('look', 150, 50),
+      colour: { ...createColourSettings(), saturation: 1.25 },
+      keyframes: [layerKeyAsGradeKey(layerKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.123456789 }, 'hold'))],
+    },
+  ];
   document.music = [
     singleClipLane({
       id: 'song-instance',
@@ -72,7 +92,7 @@ function expectOtherTracks(
   before: ProjectDocument,
   next: ProjectDocument,
   layerId: string,
-  expectedKeys = before.layers.find((layer) => layer.id === layerId)!.keyframes,
+  expectedTransform: SpatialSettings = before.layers.find((layer) => layer.id === layerId)!.transform,
 ): void {
   expect(next.layers.filter((layer) => layer.id !== layerId)).toEqual(
     before.layers.filter((layer) => layer.id !== layerId),
@@ -82,7 +102,8 @@ function expectOtherTracks(
   );
   expect(next.music).toEqual(before.music);
   expect(next.media).toEqual(before.media);
-  expect(next.layers.find((layer) => layer.id === layerId)!.keyframes).toEqual(expectedKeys);
+  expect(next.adjustments).toEqual(before.adjustments);
+  expect(next.layers.find((layer) => layer.id === layerId)!.transform).toEqual(expectedTransform);
   for (const placed of calculateLayout(next).clips) expect(placed.clip.start).toBe(placed.start);
 }
 function oneStep(document: ProjectDocument, command: EditCommand): ProjectDocument {
@@ -118,9 +139,6 @@ describe('strict uniform current-schema tracks', () => {
         id,
         name: 'Track',
         enabled: true,
-        opacity: 1,
-        colour: { ...NEUTRAL_COLOUR },
-        keyframes: [],
         transform: createSpatialSettings(),
         ripple: true,
         transitions: [],
@@ -136,20 +154,19 @@ describe('strict uniform current-schema tracks', () => {
   it('requires every new track field, rejects old global fields and never injects fallbacks', () => {
     const document = fixture();
     expect(projectSchema.parse(document)).toEqual(document);
-    for (const field of [
-      'colour',
-      'opacity',
-      'transform',
-      'ripple',
-      'transitions',
-      'openingFade',
-      'closingFade',
-    ] as const) {
+    for (const field of ['transform', 'ripple', 'transitions', 'openingFade', 'closingFade'] as const) {
       const { [field]: _missing, ...incomplete } = document.layers[0]!;
       expect(projectSchema.safeParse({ ...document, layers: [incomplete, ...document.layers.slice(1)] }).success).toBe(
         false,
       );
     }
+    for (const removed of [{ colour: createColourSettings() }, { opacity: 1 }, { keyframes: [] }])
+      expect(
+        projectSchema.safeParse({
+          ...document,
+          layers: [{ ...document.layers[0]!, ...removed }, ...document.layers.slice(1)],
+        }).success,
+      ).toBe(false);
     for (const extra of [{ transitions: [] }, { openingFade: 0 }, { closingFade: 0 }])
       expect(projectSchema.safeParse({ ...document, ...extra }).success).toBe(false);
     for (const schemaVersion of EARLIER_SCHEMA_VERSIONS)
@@ -228,22 +245,28 @@ describe('independent Ripple toggles and packed placements', () => {
         TRACK_IDS.filter((id) => id !== layerId),
       );
       expectOtherTracks(document, hidden, layerId);
-      const translucent = oneStep(document, { type: 'opacity', layerId, opacity: 0.23456789 });
-      expect(translucent.layers.find((item) => item.id === layerId)).toEqual({ ...layer, opacity: 0.23456789 });
+      const translucent = oneStep(document, {
+        type: 'transform-setting',
+        layerId,
+        setting: 'opacity',
+        value: 0.23456789,
+      });
+      const transform = { ...layer.transform, base: { ...layer.transform.base, opacity: 0.23456789 } };
+      expect(translucent.layers.find((item) => item.id === layerId)).toEqual({ ...layer, transform });
       expect(translucent.clips).toEqual(document.clips);
       expect(starts(translucent, layerId)).toEqual(starts(document, layerId));
       expect(calculateLayout(translucent).duration).toBe(calculateLayout(document).duration);
       expect(sampleTimeline(translucent, 20).map((sample) => [sample.layerId, sample.opacity])).toEqual(
         TRACK_IDS.map((id) => [id, id === layerId ? 0.23456789 : 1]),
       );
-      expectOtherTracks(document, translucent, layerId);
+      expectOtherTracks(document, translucent, layerId, transform);
     },
   );
 
   it.each(TRACK_IDS)('enabling %s closes gaps from its existing anchor in exactly one Undo', (layerId) => {
     const document = fixture(layerId, false);
     const layer = document.layers.find((item) => item.id === layerId)!;
-    layer.keyframes = [point(0), point(600)];
+    layer.transform.keyframes = [point(0), point(600)];
     layer.openingFade = 2;
     layer.closingFade = 3;
     // Chronological order must be captured rather than the interleaved flat order.
@@ -377,17 +400,17 @@ describe('independent Ripple toggles and packed placements', () => {
   );
 
   it.each(cases)(
-    'a move from $layerId keeps source bases/row points while each affected track follows its own Ripple setting',
+    'a move from $layerId keeps source bases/track keyframes while each affected track follows its own Ripple setting',
     ({ layerId, ripple }) => {
       const document = fixture(layerId, ripple);
       const targetId = TRACK_IDS[(TRACK_IDS.indexOf(layerId) + 1) % TRACK_IDS.length]!;
       const selected = document.clips.find((clip) => clip.id === `${layerId}-a`)!;
       document.layers.forEach((layer) => {
-        layer.keyframes = [point(0), point(600)];
+        layer.transform.keyframes = [point(0), point(600)];
       });
-      document.layers.find((layer) => layer.id === layerId)!.colour.exposure = 0.123456789;
-      document.layers.find((layer) => layer.id === layerId)!.opacity = 0.654321;
-      document.layers.find((layer) => layer.id === targetId)!.opacity = 0.345678;
+      selected.grade.colour.exposure = 0.123456789;
+      document.layers.find((layer) => layer.id === layerId)!.transform.base.opacity = 0.654321;
+      document.layers.find((layer) => layer.id === targetId)!.transform.base.opacity = 0.345678;
       const plan = planTimelineDrop(
         document,
         { kind: 'clip', clipId: selected.id, grabFrame: 0 },
@@ -412,11 +435,14 @@ describe('independent Ripple toggles and packed placements', () => {
         start: plan.start,
       });
       expect(next.clips.find((clip) => clip.id === selected.id)).not.toHaveProperty('opacity');
-      expect(sampleTimeline(next, plan.start).find((sample) => sample.clipId === selected.id)!.opacity).toBe(0.345678);
+      const moved = sampleTimeline(next, plan.start).find((sample) => sample.clipId === selected.id)!;
+      expect(moved.opacity).toBe(0.345678);
+      expect(moved.grade.exposure).toBe(0.123456789);
       for (const layer of next.layers) {
         const original = document.layers.find((item) => item.id === layer.id)!;
         expect({ ...layer, transitions: original.transitions }).toEqual(original);
       }
+      expect(next.adjustments).toEqual(document.adjustments);
       expect(next.music).toEqual(document.music);
       const unaffectedId = TRACK_IDS.find((id) => id !== layerId && id !== targetId)!;
       expect(next.clips.filter((clip) => clip.layerId === unaffectedId)).toEqual(
@@ -525,11 +551,11 @@ describe('track-owned transitions, fades, gaps and group composition', () => {
   );
 
   it.each(cases)(
-    'empty $layerId retains dormant fades/row points with Ripple=$ripple; invalid repopulation is atomic',
+    'empty $layerId retains dormant fades/track keyframes with Ripple=$ripple; invalid repopulation is atomic',
     ({ layerId, ripple }) => {
       const document = fixture(layerId, ripple);
       const layer = document.layers.find((item) => item.id === layerId)!;
-      layer.keyframes = [point(600)];
+      layer.transform.keyframes = [point(600)];
       layer.openingFade = 3;
       layer.closingFade = 4;
       let empty = document;

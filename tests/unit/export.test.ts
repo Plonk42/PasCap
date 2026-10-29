@@ -17,6 +17,7 @@ import {
   planExportMusic,
   planLayeredExport,
 } from '../../src/shared/export.js';
+import { createAdjustment } from '../../src/shared/grade.js';
 import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
 import {
   createClip,
@@ -215,19 +216,23 @@ describe('strict production export request and immutable validation', () => {
       loop: true,
     };
     document.music = [singleClipLane(captured), singleClipLane({ ...captured, id: 'second', start: 50 })];
+    document.adjustments = [createAdjustment('look', 0, 10)];
     const snapshot = validateExport(document, fakeLibrary());
     document.title = 'Later edit';
     document.clips[0]!.sourceIn = 10;
-    document.layers[0]!.colour.brightness = 0.2;
+    document.clips[0]!.grade.colour.brightness = 0.2;
+    document.adjustments[0]!.colour.brightness = 0.2;
     document.music[0]!.gainDb = 12;
     document.music[0]!.clips[0]!.start = 9;
     document.music.splice(1, 1);
     expect(snapshot.title).toBe('Export unit');
     expect(snapshot.clips[0]!.sourceIn).toBe(7);
-    expect(snapshot.layers[0]!.colour.brightness).toBe(0);
+    expect(snapshot.clips[0]!.grade.colour.brightness).toBe(0);
+    expect(snapshot.adjustments[0]!.colour.brightness).toBe(0);
     expect(Object.isFrozen(snapshot)).toBe(true);
     expect(Object.isFrozen(snapshot.clips[0]!.speed)).toBe(true);
-    expect(Object.isFrozen(snapshot.layers[0]!.colour)).toBe(true);
+    expect(Object.isFrozen(snapshot.clips[0]!.grade.colour)).toBe(true);
+    expect(Object.isFrozen(snapshot.adjustments[0]!.colour)).toBe(true);
     expect(snapshot.music).toHaveLength(2);
     expect(snapshot.music[0]!.gainDb).toBe(-6);
     expect(snapshot.music[0]!.clips[0]!.start).toBe(3);
