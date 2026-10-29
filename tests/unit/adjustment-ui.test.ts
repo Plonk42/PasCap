@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { applyCommand } from '../../src/shared/commands.js';
-import { createAdjustment, type Adjustment } from '../../src/shared/grade.js';
+import { createAdjustment, MAX_ADJUSTMENTS, type Adjustment } from '../../src/shared/grade.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { snapPoints } from '../../src/shared/snap.js';
+import { calculateLayout } from '../../src/shared/timeline.js';
 import {
+  addAdjustmentReason,
   adjustmentKeyframeKind,
   adjustmentKeyframeTargets,
   adjustmentLabel,
+  adjustmentSpan,
+  planAdjustmentCreation,
   planAdjustmentGesture,
   planAdjustmentKeyframeMove,
+  splitAdjustmentReason,
 } from '../../src/web/adjustment-ui.js';
 import { placementSnapPoints } from '../../src/web/timeline-placement.js';
 
@@ -79,6 +84,37 @@ describe('adjustment timeline gestures', () => {
   it('makes no command for an unchanged range', () => {
     const plan = planAdjustmentGesture(keyed(), 'a', 'move', 0);
     expect(plan).toMatchObject({ command: null, error: '' });
+  });
+
+  it('draws a new adjustment in either direction, refusing overlaps and empty ranges', () => {
+    const document = keyed();
+    const forward = planAdjustmentCreation(document, 'new', 75, 90);
+    expect(forward.command).toEqual({ type: 'adjustment-add', adjustmentId: 'new', start: 75, duration: 15 });
+    expect(planAdjustmentCreation(document, 'new', 90, 75).command).toEqual(forward.command);
+    expect(planAdjustmentCreation(document, 'new', 60, 110).error).toMatch(/cannot overlap/);
+    expect(planAdjustmentCreation(document, 'new', 80, 80).error).toBe('An adjustment lasts at least one frame.');
+  });
+
+  it('adds over the ruler range, else the selected clip, with the reason when it cannot', () => {
+    const document = keyed();
+    const clip = calculateLayout(document).clips[0]!;
+    expect(adjustmentSpan({ inFrame: 75, outFrame: 90 }, clip)).toEqual({ start: 75, end: 90 });
+    expect(adjustmentSpan(null, clip)).toEqual({ start: 0, end: 300 });
+    expect(adjustmentSpan(null, undefined)).toBeNull();
+    expect(addAdjustmentReason(document, { start: 75, end: 90 })).toBeNull();
+    expect(addAdjustmentReason(document, { start: 0, end: 300 })).toMatch(/cannot overlap/);
+    expect(addAdjustmentReason(document, null)).toMatch(/Select a range on the time ruler or a clip/);
+    const full = projectSchema.parse({
+      ...document,
+      adjustments: Array.from({ length: MAX_ADJUSTMENTS }, (_, index) => createAdjustment(`x${index}`, index, 1)),
+    });
+    expect(addAdjustmentReason(full, { start: 200, end: 210 })).toMatch(`at most ${MAX_ADJUSTMENTS}`);
+  });
+
+  it('splits only after an adjustment’s first frame and before its end', () => {
+    const a = item(keyed(), 'a');
+    expect(splitAdjustmentReason(a, 31)).toBeNull();
+    for (const frame of [30, 70, 5]) expect(splitAdjustmentReason(a, frame)).toMatch(/inside the selected adjustment/);
   });
 
   it('snaps to other adjustments, never to the moving one', () => {

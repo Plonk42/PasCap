@@ -7,6 +7,8 @@
   min-width: 100%;
   background: #121a15;
   border-bottom: 1px solid #2b3e31;
+  cursor: crosshair;
+  touch-action: none;
 }
 
 .adjustment-item {
@@ -200,4 +202,31 @@
   color: #e9d6a8;
   background: #121a15;
   border-bottom: 1px solid #2b3e31;
+}
+
+.layer-sidebar-adjustments .layer-sidebar-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer-sidebar-adjustments .layer-add {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: 24px;
+  padding: 0 6px;
+}
+
+.layer-sidebar-adjustments .layer-add[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Empty stretches of the track draw a new adjustment. */
+.adjustment-item.drawing {
+  border-style: dashed;
+  pointer-events: none;
 }

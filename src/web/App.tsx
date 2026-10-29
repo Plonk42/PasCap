@@ -42,6 +42,7 @@ import {
   type ProjectSummary,
 } from '../shared/projects.js';
 import { removeSelectedRange, splitSourceFrame, trimAtPlayhead, type TimelineRange } from '../shared/rush-editing.js';
+import { splitAdjustmentReason } from './adjustment-ui.js';
 import { activeSelectIndex, appliedSelections, applySelectRange } from '../shared/selects.js';
 import { forEachSerial } from '../shared/serial.js';
 import { validateSourceRanges } from '../shared/source-range.js';
@@ -248,6 +249,24 @@ interface ConnectionState {
 
 function previewIsLoading(connection: ConnectionState, ready: boolean, error: string): boolean {
   return connection.state === 'connecting' || (!ready && !error);
+}
+
+/** Splits an adjustment at the playhead; the second piece becomes the selected one. */
+function splitAdjustmentAt(
+  document: ProjectDocument,
+  adjustmentId: string,
+  frame: number,
+): { next: ProjectDocument; id: string } | string {
+  const item = document.adjustments.find((entry) => entry.id === adjustmentId);
+  if (!item) return 'The selected adjustment no longer exists.';
+  const reason = splitAdjustmentReason(item, frame);
+  if (reason) return reason;
+  const id = crypto.randomUUID();
+  try {
+    return { next: applyCommand(document, { type: 'adjustment-split', adjustmentId, frame, newAdjustmentId: id }), id };
+  } catch (cause) {
+    return message(cause, 'Cannot split this adjustment.');
+  }
 }
 
 function handOffBlocked(save: SaveState, drafting: boolean): string | null {
@@ -693,7 +712,22 @@ export function App() {
     seek(placed.start);
   };
   const split = useCallback(() => {
-    if (!current.current || !selection.current || drafting.current) return;
+    if (!current.current || drafting.current) return;
+    if (!selection.current && adjustmentSelection.current) {
+      const result = splitAdjustmentAt(
+        current.current,
+        adjustmentSelection.current,
+        engine.current?.diagnostics().frame ?? 0,
+      );
+      if (typeof result === 'string') setError(result);
+      else if (commit(result.next)) {
+        adjustmentSelection.current = result.id;
+        setSelectedAdjustmentId(result.id);
+        setError('');
+      }
+      return;
+    }
+    if (!selection.current) return;
     const placed = calculateLayout(current.current).clips.find((item) => item.clip.id === selection.current);
     if (!placed) return;
     const frame = engine.current?.diagnostics().frame ?? 0;

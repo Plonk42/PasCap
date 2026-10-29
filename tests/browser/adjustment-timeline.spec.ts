@@ -183,3 +183,112 @@ test('an adjustment keyframe slides within its adjustment', async ({ page }) => 
   await page.keyboard.press('Delete');
   await expect.poll(async () => (await current(page)).adjustments[0]!.keyframes).toEqual([]);
 });
+
+/** Presses the empty adjustment track at `from` and drags to `to`, in project frames, with Alt. */
+async function draw(page: Page, from: number, to: number): Promise<() => Promise<void>> {
+  const lane = (await page.locator('.adjustment-lane').boundingBox())!;
+  const scale = await pixelsPerFrame(page);
+  const leading = Number(await page.locator('.timeline-surface').getAttribute('data-leading'));
+  const y = lane.y + 4;
+  await page.keyboard.down('Alt');
+  await page.mouse.move(lane.x + leading + from * scale, y);
+  await page.mouse.down();
+  await page.mouse.move(lane.x + leading + ((from + to) / 2) * scale, y, { steps: 3 });
+  await page.mouse.move(lane.x + leading + to * scale, y, { steps: 3 });
+  return async () => {
+    await page.mouse.up();
+    await page.keyboard.up('Alt');
+  };
+}
+
+test('drawing on the empty track creates a selected adjustment; an overlap is refused', async ({ page }) => {
+  const blocked = await draw(page, 32, 55);
+  await expect(page.locator('[data-adjustment-draft]')).toHaveAttribute('data-adjustment-valid', 'false');
+  await expect(page.locator('.timeline-bottom')).toContainText('Adjustments cannot overlap');
+  await blocked();
+  await expect(page.locator('[data-adjustment-draft]')).toHaveCount(0);
+  expect(await ranges(page)).toHaveLength(2);
+
+  const release = await draw(page, 45, 32);
+  await expect(page.locator('[data-adjustment-draft]')).toHaveAttribute('data-adjustment-start', '32');
+  await expect(page.locator('.timeline-bottom')).toContainText('New adjustment 00:01:02 – 00:01:15');
+  await release();
+  await expect
+    .poll(async () => (await ranges(page)).map(({ start, duration }) => [start, duration]))
+    .toEqual([
+      [10, 20],
+      [32, 13],
+      [50, 10],
+    ]);
+  const created = (await current(page)).adjustments[1]!;
+  await expect(body(page, created.id)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#inspector-pane .colour-target strong')).toHaveText('Adjustment 00:01:02 – 00:01:15');
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => ranges(page)).toHaveLength(2);
+
+  // A click on the empty track only moves the playhead.
+  const click = await draw(page, 40, 40);
+  await click();
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
+  expect(await ranges(page)).toHaveLength(2);
+});
+
+test('Add adjustment covers the ruler range or the selected clip, with the reason when it cannot', async ({ page }) => {
+  const add = page.getByRole('button', { name: 'Add adjustment', exact: true });
+  // Selecting an adjustment leaves no clip selected.
+  await body(page, 'b').press('Enter');
+  await expect(add).toHaveAttribute('aria-disabled', 'true');
+  await expect(add).toHaveAttribute('title', /Select a range on the time ruler or a clip first/);
+  await page.locator('[data-clip-id="one"] .timeline-clip-body').click();
+  await expect(add).toHaveAttribute('title', /Adjustments cannot overlap/);
+  await add.dispatchEvent('click');
+  expect(await ranges(page)).toHaveLength(2);
+
+  const ruler = (await page.locator('.timeline-ruler').boundingBox())!;
+  const scale = await pixelsPerFrame(page);
+  const leading = Number(await page.locator('.timeline-surface').getAttribute('data-leading'));
+  await page.keyboard.down('Alt');
+  await page.mouse.move(ruler.x + leading + 62 * scale, ruler.y + 24);
+  await page.mouse.down();
+  await page.mouse.move(ruler.x + leading + 75 * scale, ruler.y + 24, { steps: 4 });
+  await page.mouse.up();
+  await page.keyboard.up('Alt');
+  await expect(add).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(add).toHaveAttribute('title', 'Add an adjustment over the selected range, 00:02:02 – 00:02:15');
+  await add.click();
+  await expect.poll(() => ranges(page)).toContainEqual(expect.objectContaining({ start: 62, duration: 13 }));
+  await expect(page.locator('#inspector-pane .colour-target strong')).toHaveText('Adjustment 00:02:02 – 00:02:15');
+});
+
+test('Split and Delete act on the selected adjustment, keeping its grade and keyframes', async ({ page }) => {
+  await body(page, 'a').focus();
+  await body(page, 'a').press('Enter');
+  await seek(page, 10);
+  const split = page.getByRole('button', { name: 'Split at playhead', exact: true });
+  await expect(split).toBeDisabled();
+  await expect(split).toHaveAttribute('title', /Place the playhead inside the selected adjustment/);
+  await seek(page, 20);
+  await page.locator('.timeline-panel').focus();
+  await page.keyboard.press('s');
+  await expect
+    .poll(async () => (await ranges(page)).map(({ start, duration }) => [start, duration]))
+    .toEqual([
+      [10, 10],
+      [20, 10],
+      [50, 10],
+    ]);
+  const pieces = (await current(page)).adjustments;
+  expect(pieces[0]!.keyframes.map((key) => key.frame)).toEqual([5]);
+  expect(pieces[1]!.keyframes.map((key) => key.frame)).toEqual([-5]);
+  await expect(body(page, pieces[1]!.id)).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Delete selected adjustment', exact: true }).click();
+  await expect.poll(() => ranges(page)).toHaveLength(2);
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('Control+z');
+  await expect
+    .poll(() => ranges(page))
+    .toEqual([
+      { id: 'a', start: 10, duration: 20 },
+      { id: 'b', start: 50, duration: 10 },
+    ]);
+});
