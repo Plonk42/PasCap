@@ -13,11 +13,12 @@ import { compositePixel } from '../../src/shared/composition.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { needsLayeredExport } from '../../src/shared/export.js';
 import { runners } from '../../src/server/operations/index.js';
-import { applyCommand } from '../../src/shared/commands.js';
+import { applyCommand, editCommandSchema, type EditCommand } from '../../src/shared/commands.js';
 import { copyGradeBlocked, pasteGradeCommands, pasteTargets } from '../../src/web/grade-clipboard.js';
 import {
   clipGradeSchema,
   compileGradeChain,
+  createAdjustment,
   createClipGrade,
   gradeChainPixel,
   gradeColourAt,
@@ -186,7 +187,7 @@ describe('source grades', () => {
       gradeKey(10, { exposure: 1 }),
     ];
     const placed = calculateLayout(document).clips[0]!;
-    const owner = clipColourOwner(document.layers[0]!, clip, 'clip 1');
+    const owner = clipColourOwner(clip, 'clip 1');
     // Project frame 3 holds source frame 1 at position 1.5: no key there, so the controls show the image.
     expect(gradeValuePosition(placed, 3)).toBe(1.5);
     const between = displayedColour(owner, 1, gradeValuePosition(placed, 3));
@@ -202,7 +203,7 @@ describe('source grades', () => {
 });
 
 describe('clip grade commands', () => {
-  it('sets Colour on a track, or on clips keeping their keyframes', () => {
+  it('sets Colour on clips keeping their keyframes, naming its target once', () => {
     const colour = { ...createColourSettings(), exposure: 0.3 };
     const keyed = applyCommand(project(), {
       type: 'layer-key-set',
@@ -213,12 +214,13 @@ describe('clip grade commands', () => {
     const next = applyCommand(keyed, { type: 'colour', clipIds: ['a', 'b'], colour });
     expect(next.clips.map((clip) => clip.grade.colour.exposure)).toEqual([0.3, 0.3]);
     expect(next.clips[0]!.grade.keyframes).toHaveLength(1);
-    expect(next.layers[0]!.colour).toEqual(NEUTRAL_COLOUR);
+    expect(next.layers).toEqual(keyed.layers);
+    expect(next.adjustments).toEqual([]);
     expect(() => applyCommand(keyed, { type: 'colour', clipIds: ['a', 'a'], colour })).toThrow('each clip once');
     expect(() => applyCommand(keyed, { type: 'colour', clipIds: ['gone'], colour })).toThrow('gone no longer exists');
-    expect(() => applyCommand(keyed, { type: 'colour', colour })).toThrow('Give either layerId');
-    expect(() => applyCommand(keyed, { type: 'colour', layerId: 'video-1', clipIds: ['a'], colour })).toThrow(
-      'Give either layerId',
+    expect(() => applyCommand(keyed, { type: 'colour', colour })).toThrow('Give either clipIds');
+    expect(() => applyCommand(keyed, { type: 'colour', adjustmentId: 'look', clipIds: ['a'], colour })).toThrow(
+      'Give either clipIds',
     );
   });
 
@@ -231,15 +233,16 @@ describe('clip grade commands', () => {
       value: 1,
     });
     expect(next.clips[1]!.grade.keyframes).toEqual([gradeKey(120, { exposure: 1 })]);
-    expect(next.layers[0]!.keyframes).toEqual([]);
+    expect(next.layers).toEqual(project().layers);
     expect(() => applyCommand(next, { type: 'colour-setting', clipId: 'b', setting: 'exposure', value: 0 })).toThrow(
       'follows 1 clip keyframe on clip b',
     );
     next = applyCommand(next, { type: 'colour-setting', clipId: 'b', setting: 'contrast', value: 1.5 });
     expect(next.clips[1]!.grade.colour.contrast).toBe(1.5);
-    expect(() =>
-      applyCommand(next, { type: 'layer-key-toggle', clipId: 'b', frame: 120, setting: 'opacity', value: 0.5 }),
-    ).toThrow('Opacity belongs to the track');
+    // Opacity belongs to the track Transform: no grade keyframe can hold it.
+    const opacityKey = { type: 'layer-key-toggle', clipId: 'b', frame: 120, setting: 'opacity', value: 0.5 };
+    expect(editCommandSchema.safeParse(opacityKey).success).toBe(false);
+    expect(() => applyCommand(next, opacityKey as unknown as EditCommand)).toThrow('Unknown keyframe setting');
     next = applyCommand(next, { type: 'layer-key-move', clipId: 'b', frame: 120, nextFrame: 130 });
     next = applyCommand(next, {
       type: 'layer-key-easing',
@@ -282,7 +285,7 @@ describe('clip grade commands', () => {
     });
     expect(next.clips[0]!.grade.colour.hsl.blue).toEqual({ hue: 5, saturation: 0.1, lightness: 0 });
     expect(next.clips[0]!.grade.colour.curves.master).toHaveLength(2);
-    expect(next.layers[0]!.colour).toEqual(NEUTRAL_COLOUR);
+    expect(next.layers).toEqual(project().layers);
   });
 
   it('keeps the grade with the footage through trims, moves, splits and duplicates', () => {
@@ -301,9 +304,13 @@ describe('clip grade commands', () => {
 });
 
 describe('clip grades for the assistant', () => {
-  it('reads each clip grade on its track and the grade shown at a frame', async () => {
+  it('reads each clip grade on its track, the grade shown at a frame and the adjustment there', async () => {
     let document = applyCommand(project(), { type: 'colour-setting', clipId: 'a', setting: 'saturation', value: 1.3 });
     document = applyCommand(document, { type: 'layer-key-set', clipId: 'a', frame: 10, values: { tint: 0.2 } });
+    document = projectSchema.parse({
+      ...document,
+      adjustments: [{ ...createAdjustment('look', 60, 40), colour: { ...NEUTRAL_COLOUR, saturation: 1.2 } }],
+    });
     const context = { projects: { load: async () => document } } as unknown as Parameters<
       typeof runners.describe_track
     >[0];
@@ -327,11 +334,15 @@ describe('clip grades for the assistant', () => {
       {
         frame: 10,
         timecode: '00:00:10',
-        values: { tint: 0, saturation: 1 },
         transform: {},
         clipGrades: [{ clipId: 'a', sourceFrame: 10, values: { tint: 0.2, saturation: 1.3 } }],
       },
-      { frame: 70, timecode: '00:02:10', values: { tint: 0, saturation: 1 }, transform: {} },
+      {
+        frame: 70,
+        timecode: '00:02:10',
+        adjustment: { adjustmentId: 'look', values: { tint: 0, saturation: 1.2 } },
+        transform: {},
+      },
     ]);
   });
 });
@@ -380,7 +391,7 @@ describe('clip grades in composited export', () => {
     }
     return rgb;
   };
-  const track = { ...createColourSettings(), contrast: 1.3, saturation: 1.2 };
+  const adjustment = { ...createColourSettings(), contrast: 1.3, saturation: 1.2 };
   const warm = { ...createColourSettings(), temperature: 0.6, exposure: 0.3 };
   const ranged = {
     ...createColourSettings(),
@@ -392,9 +403,9 @@ describe('clip grades in composited export', () => {
     ['scalar clip grades through one LUT each', warm, createColourSettings()],
     ['an HSL clip grade exactly', ranged, warm],
   ] as const)
-    it(`grades each dissolve source by its clip, then its track: ${name}`, async () => {
+    it(`grades each dissolve source by its clip, then the adjustment: ${name}`, async () => {
       const buffer = Buffer.alloc(pixels * 8);
-      const samples = [sample('left', left, track, 0.4), sample('right', right, track, 0.6)];
+      const samples = [sample('left', left, adjustment, 0.4), sample('right', right, adjustment, 0.6)];
       const input = new Map(samples.map((current, index) => [current.clipId, frame(index)]));
       await composeLayerFrame(
         buffer,
@@ -415,8 +426,8 @@ describe('clip grades in composited export', () => {
       }
       expect(error / (pixels * 3)).toBeLessThan(name.startsWith('an HSL') ? 0.05 : 1);
       // The clip grade really changes the picture.
-      const trackOnly = compositePixel([{ ...samples[0]!, grade: createColourSettings() }], () => [0.5, 0.3, 0.2]);
-      expect(compositePixel([samples[0]!], () => [0.5, 0.3, 0.2])).not.toEqual(trackOnly);
+      const adjustmentOnly = compositePixel([{ ...samples[0]!, grade: createColourSettings() }], () => [0.5, 0.3, 0.2]);
+      expect(compositePixel([samples[0]!], () => [0.5, 0.3, 0.2])).not.toEqual(adjustmentOnly);
     });
 
   it('bakes unkeyed scalar clip grades into the static export, and sends the rest to composited export', () => {
@@ -441,9 +452,10 @@ describe('clip grades in composited export', () => {
         clips: [{ ...document.clips[0]!, grade: { colour: warm, keyframes: [gradeKey(4, { tint: 0.1 })] } }],
       }),
     ).toBe(true);
-    const cube = generateCube([warm, track], 3).split('\n');
+    expect(needsLayeredExport({ ...document, adjustments: [createAdjustment('look', 0, 10)] })).toBe(true);
+    const cube = generateCube([warm, adjustment], 3).split('\n');
     expect(cube.at(-2)).toBe(
-      gradePixel(gradePixel([1, 1, 1], warm), track)
+      gradePixel(gradePixel([1, 1, 1], warm), adjustment)
         .map((value) => value.toFixed(9))
         .join(' '),
     );

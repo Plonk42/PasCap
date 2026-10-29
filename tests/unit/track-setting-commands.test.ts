@@ -1,28 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import { applyCommand, type EditCommand } from '../../src/shared/commands.js';
-import { createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
+import { createAdjustment, type ClipGrade } from '../../src/shared/grade.js';
+import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
 
-/** A track with every kind of appearance away from neutral, and Exposure and Scale keyed. */
+/**
+ * A track with a clip and an adjustment whose grades have every kind of appearance away from neutral, with Exposure
+ * keyed on both, and a rotated Transform with Scale keyed.
+ */
 function graded(): ProjectDocument {
   const project = createProject('settings', 'Settings');
   const layer = project.layers[0]!;
-  layer.colour = {
-    ...layer.colour,
-    contrast: 1.2,
-    shadows: 0.3,
-    hsl: { ...layer.colour.hsl, blue: { hue: -10, saturation: 0.2, lightness: 0 } },
-    curves: {
-      ...layer.colour.curves,
-      red: [
-        { x: 0, y: 0.1 },
-        { x: 1, y: 1 },
-      ],
-    },
-  };
+  project.clips = [createClip('shot', 'rec', 0, 100)];
+  project.adjustments = [createAdjustment('look', 0, 100)];
+  for (const grade of [project.clips[0]!.grade, project.adjustments[0]!]) {
+    grade.colour = {
+      ...grade.colour,
+      contrast: 1.2,
+      shadows: 0.3,
+      hsl: { ...grade.colour.hsl, blue: { hue: -10, saturation: 0.2, lightness: 0 } },
+      curves: {
+        ...grade.colour.curves,
+        red: [
+          { x: 0, y: 0.1 },
+          { x: 1, y: 1 },
+        ],
+      },
+    };
+  }
   layer.transform.base = { ...layer.transform.base, rotation: 5 };
   let next = project;
   for (const command of [
-    { type: 'layer-key-toggle', layerId: layer.id, frame: 10, setting: 'exposure', value: 0.5 },
+    { type: 'layer-key-toggle', clipId: 'shot', frame: 10, setting: 'exposure', value: 0.5 },
+    { type: 'layer-key-toggle', adjustmentId: 'look', frame: 10, setting: 'exposure', value: 0.5 },
     {
       type: 'transform',
       layerId: layer.id,
@@ -53,30 +62,46 @@ function nulls() {
     translateX: null,
     translateY: null,
     rotation: null,
+    opacity: null,
   };
 }
 
-/** The project with only `change` applied to its first track, by hand. */
-function expected(project: ProjectDocument, change: (layer: ProjectDocument['layers'][number]) => void) {
+/** The project with only `change` applied to a copy, by hand. */
+function expected(project: ProjectDocument, change: (copy: ProjectDocument) => void) {
   const copy = structuredClone(project);
-  change(copy.layers[0]!);
+  change(copy);
   return copy;
 }
 
-describe('partial track appearance commands', () => {
+const OWNERS = [
+  {
+    owner: 'an adjustment',
+    target: { adjustmentId: 'look' },
+    grade: (project: ProjectDocument): ClipGrade => project.adjustments[0]!,
+    keyed: 'exposure follows 1 adjustment keyframe on adjustment look',
+  },
+  {
+    owner: 'a clip grade',
+    target: { clipId: 'shot' },
+    grade: (project: ProjectDocument): ClipGrade => project.clips[0]!.grade,
+    keyed: 'exposure follows 1 clip keyframe on clip shot',
+  },
+] as const;
+
+describe('partial appearance commands', () => {
   const project = graded();
   const layerId = project.layers[0]!.id;
 
-  it('change one setting and keep every other saved value', () => {
-    expect(applyCommand(project, { type: 'colour-setting', layerId, setting: 'contrast', value: 1.4 })).toEqual(
-      expected(project, (layer) => {
-        layer.colour.contrast = 1.4;
+  it.each(OWNERS)('change one setting of $owner and keep every other saved value', ({ target, grade }) => {
+    expect(applyCommand(project, { type: 'colour-setting', ...target, setting: 'contrast', value: 1.4 })).toEqual(
+      expected(project, (copy) => {
+        grade(copy).colour.contrast = 1.4;
       }),
     );
     const band = { hue: 4, saturation: -0.5, lightness: 0.1 };
-    expect(applyCommand(project, { type: 'hsl-band', layerId, band: 'green', values: band })).toEqual(
-      expected(project, (layer) => {
-        layer.colour.hsl.green = band;
+    expect(applyCommand(project, { type: 'hsl-band', ...target, band: 'green', values: band })).toEqual(
+      expected(project, (copy) => {
+        grade(copy).colour.hsl.green = band;
       }),
     );
     const points = [
@@ -84,33 +109,41 @@ describe('partial track appearance commands', () => {
       { x: 0.4, y: 0.5 },
       { x: 1, y: 1 },
     ];
-    expect(applyCommand(project, { type: 'colour-curve', layerId, channel: 'master', points })).toEqual(
-      expected(project, (layer) => {
-        layer.colour.curves.master = points;
-      }),
-    );
-    expect(applyCommand(project, { type: 'transform-setting', layerId, setting: 'translateX', value: 0.25 })).toEqual(
-      expected(project, (layer) => {
-        layer.transform.base.translateX = 0.25;
+    expect(applyCommand(project, { type: 'colour-curve', ...target, channel: 'master', points })).toEqual(
+      expected(project, (copy) => {
+        grade(copy).colour.curves.master = points;
       }),
     );
   });
 
-  it('refuse a setting that follows keyframes, naming them', () => {
-    expect(() => applyCommand(project, { type: 'colour-setting', layerId, setting: 'exposure', value: 1 })).toThrow(
-      'exposure follows 1 track keyframe on Track 1, so its base value is not used; change that keyframe instead.',
+  it('change one Transform setting and keep every other saved value', () => {
+    expect(applyCommand(project, { type: 'transform-setting', layerId, setting: 'translateX', value: 0.25 })).toEqual(
+      expected(project, (copy) => {
+        copy.layers[0]!.transform.base.translateX = 0.25;
+      }),
+    );
+  });
+
+  it.each(OWNERS)('refuse a setting of $owner that follows keyframes, naming them', ({ target, keyed }) => {
+    expect(() => applyCommand(project, { type: 'colour-setting', ...target, setting: 'exposure', value: 1 })).toThrow(
+      `${keyed}, so its base value is not used; change that keyframe instead.`,
     );
     expect(() => applyCommand(project, { type: 'transform-setting', layerId, setting: 'scale', value: 2 })).toThrow(
       /scale follows 1 Transform keyframe/,
     );
   });
 
-  it('refuse out-of-bounds values, invalid curves and unknown tracks without changing anything', () => {
-    expect(() => applyCommand(project, { type: 'colour-setting', layerId, setting: 'tint', value: 3 })).toThrow();
+  it('refuse out-of-bounds values, invalid curves and unknown owners or tracks without changing anything', () => {
+    expect(() =>
+      applyCommand(project, { type: 'colour-setting', adjustmentId: 'look', setting: 'tint', value: 3 }),
+    ).toThrow();
+    expect(() =>
+      applyCommand(project, { type: 'colour-setting', clipId: 'shot', setting: 'tint', value: 3 }),
+    ).toThrow();
     expect(() =>
       applyCommand(project, {
         type: 'colour-curve',
-        layerId,
+        adjustmentId: 'look',
         channel: 'blue',
         points: [
           { x: 0.2, y: 0 },
@@ -118,6 +151,12 @@ describe('partial track appearance commands', () => {
         ],
       }),
     ).toThrow(/ascend from 0 to 1/);
+    expect(() =>
+      applyCommand(project, { type: 'colour-setting', adjustmentId: 'gone', setting: 'tint', value: 0 }),
+    ).toThrow('Adjustment no longer exists.');
+    expect(() => applyCommand(project, { type: 'colour-setting', clipId: 'gone', setting: 'tint', value: 0 })).toThrow(
+      'Clip no longer exists.',
+    );
     expect(() =>
       applyCommand(project, { type: 'transform-setting', layerId: 'video-9', setting: 'rotation', value: 0 }),
     ).toThrow('Track no longer exists.');

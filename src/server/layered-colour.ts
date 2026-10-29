@@ -65,7 +65,7 @@ export class ColourLutCache {
       generationMs: this.#generationMs,
     };
   }
-  /** One grade, or grades applied one after another (a clip's, then its track's). */
+  /** One grade, or grades applied one after another (a clip's, then its adjustment's). */
   async get(
     settings: ColourSettings | readonly ColourSettings[],
     signal: AbortSignal,

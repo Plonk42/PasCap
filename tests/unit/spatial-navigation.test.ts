@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { EditHistory } from '../../src/shared/commands.js';
-import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
+import { uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { previewClipSource } from '../../src/web/clip-speed-geometry.js';
-import { inspectKeyframe } from '../../src/web/keyframe-navigation.js';
+import type { KeyframeInspection } from '../../src/web/keyframe-navigation.js';
 import { removeSpatialKey, replaceSpatialKey } from '../../src/web/spatial-editor.js';
 import {
   clipSpeedKeyframes,
@@ -111,11 +111,18 @@ describe('track-local Transform stored-keyframe cursor', () => {
     expect(reconcile(cleared, project)).toBeNull();
   });
 
-  it('clears immediately when playback starts or a central track inspection interrupts it', () => {
+  it('clears immediately when playback starts or a central keyframe inspection interrupts it', () => {
     const project = fixture();
     expect(reconcileSpatialInspection(inspect(project, 2), context(project), stored(project), 17, true)).toBeNull();
-    project.layers[0]!.keyframes = [layerKeyframe(100, { ...EMPTY_KEY_VALUES, opacity: 0 }, 'linear')];
-    const central = inspectKeyframe(project.id, project.layers[0]!, 100, 17, 77)!;
+    // The Transform controls are interrupted by any inspection held by the editor's navigation.
+    const central: KeyframeInspection = {
+      projectId: project.id,
+      layerId: project.layers[0]!.id,
+      frame: 100,
+      frames: [100],
+      observedFrame: 17,
+      expectedFrame: 77,
+    };
     const cursor = inspect(project, 2);
     expect(reconcileSpatialInspection(cursor, context(project), stored(project), 17, central !== null)).toBeNull();
     expect(cursor.frame).toBe(2);

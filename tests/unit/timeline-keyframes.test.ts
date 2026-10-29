@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { NEUTRAL_COLOUR, scalarColourValues } from '../../src/shared/colour.js';
 import { EditHistory } from '../../src/shared/commands.js';
-import { EMPTY_KEY_VALUES, type LayerKeyframe, layerKeyframe } from '../../src/shared/keyframes.js';
+import { uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject } from '../../src/shared/model.js';
-import { defaultSpatialKeyframe } from '../../src/shared/spatial.js';
-import { calculateLayout } from '../../src/shared/timeline.js';
+import {
+  NEUTRAL_SPATIAL_POSE,
+  SPATIAL_CHANNELS,
+  type SpatialChannel,
+  type SpatialKeyframe,
+} from '../../src/shared/spatial.js';
 import { slideTravel } from '../../src/web/keyframe-slide.js';
 import {
-  planKeyframeDrag,
+  planTransformKeyframeMove,
   trackKeyframeFrame,
-  trackKeyframeKind,
   transformKeyframeKind,
 } from '../../src/web/timeline-keyframes.js';
 
@@ -22,16 +24,20 @@ const keyframeFrameAtPointer = (
   scale: number,
 ): number => trackKeyframeFrame(frame, slideTravel(startX, clientX, startScroll, scrollLeft, scale));
 
+const NO_SETTINGS = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<
+  SpatialChannel,
+  null
+>;
+
 function fixture() {
-  const project = createProject('keyframe-drag', 'Shared points');
+  const project = createProject('keyframe-drag', 'Transform keyframes');
   project.clips = [createClip('first', 'video', 10, 110)];
-  const point: LayerKeyframe = layerKeyframe(
-    20,
-    { ...EMPTY_KEY_VALUES, ...scalarColourValues(NEUTRAL_COLOUR), opacity: 0.7 },
-    'ease-in',
-  );
-  const other: LayerKeyframe = layerKeyframe(80, { ...EMPTY_KEY_VALUES, exposure: 0.5 }, 'hold');
-  project.layers[0]!.keyframes = [point, other];
+  const point: SpatialKeyframe = {
+    ...uniformKeyframe(20, { ...NEUTRAL_SPATIAL_POSE, opacity: 0.7 }, 'ease-in'),
+    reset: false,
+  };
+  const other: SpatialKeyframe = { ...uniformKeyframe(80, { ...NO_SETTINGS, scale: 2 }, 'hold'), reset: false };
+  project.layers[0]!.transform.keyframes = [point, other];
   return { project, point, other };
 }
 
@@ -51,19 +57,18 @@ describe('capture-relative marker geometry', () => {
   });
 });
 
-describe('shared-point drag planning', () => {
-  it('moves all fifteen participants/easing across another point atomically and changes no other project data', () => {
+describe('Transform keyframe drag planning', () => {
+  it('moves all nine settings and their Easing across another keyframe atomically, changing no other data', () => {
     const { project, point, other } = fixture();
     const bytes = JSON.stringify(project);
-    const plan = planKeyframeDrag(project, 'video-1', 20, 90, [], 0);
-    expect(plan).toMatchObject({
-      frame: 90,
-      guide: null,
-      error: '',
-      command: { type: 'layer-key-move', layerId: 'video-1', frame: 20, nextFrame: 90 },
+    const plan = planTransformKeyframeMove(project, 'video-1', 20, 90);
+    expect(plan).toMatchObject({ frame: 90, error: '', command: { type: 'transform', layerId: 'video-1' } });
+    expect(plan.document.layers[0]!.transform).toEqual({
+      base: project.layers[0]!.transform.base,
+      keyframes: [other, { ...point, frame: 90 }],
     });
-    expect(plan.document.layers[0]!.keyframes).toEqual([other, { ...point, frame: 90 }]);
     expect({ ...plan.document, layers: project.layers }).toEqual(project);
+    expect({ ...plan.document.layers[0]!, transform: project.layers[0]!.transform }).toEqual(project.layers[0]);
     expect(JSON.stringify(project)).toBe(bytes);
     const history = new EditHistory(project);
     history.commit(plan.command!);
@@ -71,67 +76,32 @@ describe('shared-point drag planning', () => {
     expect(history.canUndo).toBe(false);
     expect(history.redo()).toEqual(plan.document);
   });
-  it('treats unchanged/click-only movement as navigation, without a command or history step', () => {
-    const { project } = fixture();
-    const plan = planKeyframeDrag(project, 'video-1', 20, 20, [], 0);
-    expect(plan.command).toBeNull();
-    expect(plan.error).toBe('');
-    expect(plan.document).toEqual(project);
-  });
-  it('never merges or overwrites an occupied point, even with different participating channels', () => {
-    const { project } = fixture();
-    const plan = planKeyframeDrag(project, 'video-1', 20, 80, [], 0);
-    expect(plan.error).toContain('already exists');
-    expect(plan.command).toBeNull();
-    expect(plan.document).toBe(project);
-  });
-  it('snaps to stationary boundaries/playhead and no targets means Alt/no-snap bypass', () => {
-    const { project } = fixture();
-    expect(planKeyframeDrag(project, 'video-1', 20, 57, [0, 60, 100], 5)).toMatchObject({
-      frame: 60,
-      guide: 60,
-      error: '',
-    });
-    expect(planKeyframeDrag(project, 'video-1', 20, 57, [], 5)).toMatchObject({ frame: 57, guide: null, error: '' });
-  });
-  it('retains an off-duration point without extending the project or source', () => {
-    const { project, point } = fixture();
-    const plan = planKeyframeDrag(project, 'video-1', 20, 200, [], 0);
-    expect(plan.document.layers[0]!.keyframes.at(-1)).toEqual({ ...point, frame: 200 });
-    expect(calculateLayout(plan.document).duration).toBe(calculateLayout(project).duration);
-    expect(plan.document.clips).toEqual(project.clips);
-  });
   it.each([-1, 0.5, NaN, Infinity, 2_147_483_648])(
     'rejects destination frame %s without altering the snapshot',
     (frame) => {
       const { project } = fixture();
-      const plan = planKeyframeDrag(project, 'video-1', 20, frame, [], 0);
+      const plan = planTransformKeyframeMove(project, 'video-1', 20, frame);
       expect(plan.error).not.toBe('');
       expect(plan.command).toBeNull();
       expect(plan.document).toBe(project);
     },
   );
-  it('rejects a deleted point or row instead of creating a replacement', () => {
+  it('rejects a deleted keyframe or track instead of creating a replacement', () => {
     const { project } = fixture();
-    expect(planKeyframeDrag(project, 'missing-row', 20, 30, [], 0).error).toContain('Track no longer exists');
-    expect(planKeyframeDrag(project, 'video-1', 21, 30, [], 0).error).toContain('Track keyframe no longer exists');
+    expect(planTransformKeyframeMove(project, 'missing-row', 20, 30).error).toContain('Track no longer exists');
+    expect(planTransformKeyframeMove(project, 'video-1', 21, 30).error).toContain(
+      'Transform keyframe no longer exists',
+    );
   });
-  it('removes a focused Colour or Transform marker’s keyframe on a track without clips, in one Undo step each', () => {
+  it('removes a focused Transform marker’s keyframe on a track without clips, in one Undo step', () => {
     const { project } = fixture();
     project.clips = [];
-    project.layers[0]!.transform.keyframes = [defaultSpatialKeyframe(40)];
-    const target = (origin: number) => ({ scope: 'video-1', origin });
-    const options = { onSelectLayer: () => {}, onOpenSection: () => {} };
-    const colour = trackKeyframeKind({ ...options, onSeekKeyframe: () => {} });
-    const transform = transformKeyframeKind({ ...options, onSeek: () => {} });
+    const transform = transformKeyframeKind({ onSelectLayer: () => {}, onOpenSection: () => {}, onSeek: () => {} });
     const history = new EditHistory(project);
-    history.commit(colour.remove!(history.current, target(80)));
-    history.commit(transform.remove!(history.current, target(40)));
-    expect(history.current.layers[0]!.keyframes.map((point) => point.frame)).toEqual([20]);
-    expect(history.current.layers[0]!.transform.keyframes).toEqual([]);
-    history.undo();
-    expect(history.current.layers[0]!.transform).toEqual(project.layers[0]!.transform);
+    history.commit(transform.remove!(history.current, { scope: 'video-1', origin: 80 }));
+    expect(history.current.layers[0]!.transform.keyframes.map((key) => key.frame)).toEqual([20]);
     history.undo();
     expect(history.current).toEqual(project);
+    expect(history.canUndo).toBe(false);
   });
 });

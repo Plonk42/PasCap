@@ -14,6 +14,7 @@ import {
   type RGB,
 } from '../../src/shared/colour.js';
 import { LAYERED_EXPORT_RESOURCES, planLayeredExport } from '../../src/shared/export.js';
+import { createAdjustment } from '../../src/shared/grade.js';
 import { mediaAssetSchema } from '../../src/shared/media.js';
 import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
@@ -645,9 +646,17 @@ describe('layered renderer metadata and continuous retiming ownership with memor
     expect(await progressAtFirstComposedFrame(() => {})).toBeCloseTo(0.04 + (0.78 * 5) / 8, 12);
     const detailed = await progressAtFirstComposedFrame((document) => {
       document.clips[0]!.detail.sharpen = 0.3;
-      document.layers[0]!.colour.hdr = 0.27;
+      const look = createAdjustment('look', 0, timeline.calculateLayout(document).duration);
+      look.colour.hdr = 0.27;
+      document.adjustments = [look];
     });
     expect(detailed).toBeCloseTo(0.04 + (0.78 * (4 + 20.2)) / (4 + 4 * 20.2), 12);
+    // The same HDR on the clip's own grade costs the same.
+    const graded = await progressAtFirstComposedFrame((document) => {
+      document.clips[0]!.detail.sharpen = 0.3;
+      document.clips[0]!.grade.colour.hdr = 0.27;
+    });
+    expect(graded).toBeCloseTo(detailed, 12);
   });
 
   it.each([7.25, NaN, Infinity, -Infinity])(

@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import type { AudioAsset } from '../../src/shared/audio.js';
 import type { ExportPreflight } from '../../src/shared/export-space.js';
+import { createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaJob } from '../../src/shared/media.js';
 import { createClip, createProject, PROJECT_SCHEMA_VERSION } from '../../src/shared/model.js';
+import { SPATIAL_CHANNELS, type SpatialChannel } from '../../src/shared/spatial.js';
 import { api, ApiError, request, type ServiceHealth } from '../../src/web/api.js';
 import { unsupportedProject } from './project-fixtures.js';
 
@@ -17,6 +19,10 @@ const health: ServiceHealth = {
 };
 const project = createProject('flight', 'Flight');
 const saved = { ...project, revision: 1 };
+const NO_TRANSFORM = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<
+  SpatialChannel,
+  null
+>;
 const space: ExportPreflight = {
   directory: '/fixtures/cache/renders',
   availableBytes: 10 * 1024 ** 3,
@@ -391,7 +397,8 @@ describe('registered API methods', () => {
 
   it('uses complete current-schema project mocks and rejects a version-8 response without changing it', async () => {
     expect(project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-    expect(project.layers[0]!.keyframes).toEqual([]);
+    expect(project.layers[0]!.transform.keyframes).toEqual([]);
+    expect(project.adjustments).toEqual([]);
     const unsupported = unsupportedProject(8, project.id, project.title);
     const before = JSON.stringify(unsupported);
     fetchMock.mockResolvedValueOnce(jsonResponse({ document: unsupported }));
@@ -400,42 +407,57 @@ describe('registered API methods', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('validates all fifteen required nullable members in a shared row point, including zero participation', async () => {
-    const point = layerKeyframe(100, { ...EMPTY_KEY_VALUES, exposure: 0, opacity: 0 }, 'linear');
-    const document = { ...project, layers: [{ ...project.layers[0]!, keyframes: [point] }] };
+  it('validates every required nullable member of adjustment and Transform keyframes, including zero participation', async () => {
+    const point = layerKeyAsGradeKey(layerKeyframe(100, { ...EMPTY_KEY_VALUES, exposure: 0 }, 'linear'));
+    const pose = { ...uniformKeyframe(100, { ...NO_TRANSFORM, opacity: 0 }, 'linear'), reset: false };
+    const layer = project.layers[0]!;
+    const document = {
+      ...project,
+      layers: [{ ...layer, transform: { ...layer.transform, keyframes: [pose] } }],
+      adjustments: [{ ...createAdjustment('look', 0, 200), keyframes: [point] }],
+    };
     fetchMock.mockResolvedValueOnce(jsonResponse({ document }));
     expect(await api.load(project.id)).toEqual({ document });
     const { shadows: _shadows, ...incomplete } = point.values;
     fetchMock.mockResolvedValueOnce(
       jsonResponse({
-        document: { ...document, layers: [{ ...document.layers[0], keyframes: [{ ...point, values: incomplete }] }] },
+        document: {
+          ...document,
+          adjustments: [{ ...document.adjustments[0]!, keyframes: [{ ...point, values: incomplete }] }],
+        },
       }),
     );
     await expect(api.load(project.id)).rejects.toMatchObject({ status: 200, kind: 'response', retryable: false });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const { rotation: _rotation, ...unposed } = pose.values;
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({
+        document: {
+          ...document,
+          layers: [{ ...layer, transform: { ...layer.transform, keyframes: [{ ...pose, values: unposed }] } }],
+        },
+      }),
+    );
+    await expect(api.load(project.id)).rejects.toMatchObject({ status: 200, kind: 'response', retryable: false });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it.each(['clip opacity', 'layerOpacity', 'clipOpacity', 'speed'])(
+  it.each(['clip opacity', 'layerOpacity', 'clipOpacity', 'opacity', 'speed'])(
     'rejects a removed %s in a current-schema response without dropping it or retrying',
     async (removed) => {
-      const layer = project.layers[0]!;
-      const legacyLayer =
-        removed === 'clip opacity'
-          ? layer
-          : {
-              ...layer,
-              keyframes: [
-                {
-                  ...uniformKeyframe(0, { ...EMPTY_KEY_VALUES, opacity: 0.5, [removed]: null }, 'linear'),
-                  reset: false,
-                },
-              ],
-            };
+      const point = layerKeyAsGradeKey(layerKeyframe(0, { ...EMPTY_KEY_VALUES, exposure: 0.5 }, 'linear'));
       const response = {
         document: {
           ...project,
-          layers: [legacyLayer],
+          adjustments:
+            removed === 'clip opacity'
+              ? []
+              : [
+                  {
+                    ...createAdjustment('look', 0, 100),
+                    keyframes: [{ ...point, values: { ...point.values, [removed]: null } }],
+                  },
+                ],
           clips: removed === 'clip opacity' ? [{ ...createClip('legacy', 'video', 0, 10), opacity: 1 }] : project.clips,
         },
       };

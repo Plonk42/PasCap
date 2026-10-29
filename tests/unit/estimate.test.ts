@@ -162,15 +162,19 @@ describe('estimate operation', () => {
     expect(result.analysed).toEqual({ description: 'the whole clip a', frames: 16 });
     expect(result.revision).toBe(project.revision);
     expect(result.unchanged).toEqual([]);
+    expect(result.commands).toEqual([{ type: 'colour', clipIds: ['a'], colour: expect.any(Object) }]);
     const edited = applyCommand(project, result.commands[0]!);
-    expect(edited.layers[0]!.colour).toMatchObject(expected);
+    expect(edited.clips[0]!.grade.colour).toMatchObject(expected);
+    expect(edited.clips[1]!.grade).toEqual(project.clips[1]!.grade);
+    expect(edited.layers).toEqual(project.layers);
 
     const half = await runners.estimate(context, { ...input, kind: 'auto-adjust', clipId: 'a', intensity: 40 });
     expect(half.correction!['tint']).toBeCloseTo(expected.tint / 2, 2);
     const valuesOnly = await runners.estimate(context, { ...input, kind: 'auto-adjust', clipId: 'a', commands: false });
     expect(valuesOnly).toMatchObject({ correction: expected, commands: [] });
 
-    // A keyframe at a frame analyses the second around it and keys the eleven settings there.
+    // A keyframe at a frame analyses the second around it and keys the eleven settings of the clip grade at the
+    // source frame shown there.
     const keyed = await runners.estimate(context, {
       ...input,
       kind: 'auto-adjust',
@@ -181,12 +185,23 @@ describe('estimate operation', () => {
     expect(keyed.analysed.frames).toBe(16);
     let next = project;
     for (const command of keyed.commands) next = applyCommand(next, command);
-    expect(next.layers[0]!.keyframes).toHaveLength(1);
-    expect(next.layers[0]!.keyframes[0]).toMatchObject({
+    expect(next.clips[0]!.grade.keyframes).toHaveLength(1);
+    expect(next.clips[0]!.grade.keyframes[0]).toMatchObject({
       frame: 100,
       values: { exposure: keyed.correction!['exposure'] },
     });
-    expect(next.layers[0]!.colour).toEqual(project.layers[0]!.colour);
+    expect(next.clips[0]!.grade.colour).toEqual(project.clips[0]!.grade.colour);
+    expect(next.layers).toEqual(project.layers);
+    const later = await runners.estimate(context, {
+      ...input,
+      kind: 'auto-adjust',
+      clipId: 'b',
+      frame: 310,
+      applyAs: 'keyframe',
+    });
+    for (const command of later.commands) next = applyCommand(next, command);
+    // Clip b starts at frame 300 on source frame 100.
+    expect(next.clips[1]!.grade.keyframes.map((key) => key.frame)).toEqual([110]);
   });
 
   it('estimates Temperature and Tint like Auto white balance, from each project frame of the window', async () => {
@@ -197,16 +212,17 @@ describe('estimate operation', () => {
     const expected = poolWhiteBalance(sourceFrames.map((frame) => frameIlluminant(patches(frame / 30))))!;
     expect(result.whiteBalance).toEqual(expected);
     expect(result.commands).toEqual([
-      { type: 'colour', layerId, colour: { ...project.layers[0]!.colour, ...expected } },
+      { type: 'colour', clipIds: ['b'], colour: { ...project.clips[1]!.grade.colour, ...expected } },
     ]);
   });
 
-  it('analyses every clip of a track by duration, and a recording range without commands', async () => {
+  it('analyses every clip of a track by duration for one compromise, and a recording range, without commands', async () => {
     reads.length = 0;
-    const track = await runners.estimate(context, { ...input, kind: 'auto-adjust', layerId });
+    const track = await runners.estimate(context, { ...input, kind: 'auto-adjust', layerId, commands: false });
     expect(reads.map((read) => read.mediaId)).toEqual(['rec-1', 'rec-2']);
     expect(reads[0]!.frames.length).toBeGreaterThan(reads[1]!.frames.length);
-    expect(track.commands).toHaveLength(1);
+    expect(track.correction).toBeDefined();
+    expect(track.commands).toEqual([]);
     const range = await runners.estimate(context, {
       ...input,
       kind: 'white-balance',
@@ -264,8 +280,8 @@ describe('estimate operation', () => {
     );
     let graded = dissolved;
     for (const command of result.commands) graded = applyCommand(graded, command);
-    expect(graded.layers[0]!.keyframes).toEqual([]);
-    expect(graded.layers[0]!.colour).toEqual(NEUTRAL_COLOUR);
+    expect(graded.layers).toEqual(dissolved.layers);
+    expect(graded.adjustments).toEqual([]);
     expect(graded.clips.map((clip) => clip.grade.colour.exposure)).toEqual(
       result.clips!.map((clip) => clip.correction!.exposure),
     );
@@ -299,6 +315,8 @@ describe('estimate operation', () => {
       ).rejects.toMatchObject({ statusCode });
     await rejects({}, 422);
     await rejects({ clipId: 'a', layerId }, 422);
+    // A track has no Colour of its own to write.
+    await rejects({ layerId }, 422);
     await rejects({ clipId: 'a', clipIds: ['b'] }, 422);
     await rejects({ clipId: 'a', frame: 400 }, 422);
     await rejects({ layerId, frame: 10 }, 422);

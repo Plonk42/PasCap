@@ -14,11 +14,12 @@ export function previewFrameFor(time: number, duration: number): number {
   return Math.max(0, Math.min(time, Math.max(0, duration - 1)));
 }
 
-export function keySeekHint(time: number, duration: number): string {
-  if (duration === 0) return `Stored timeline frame ${time}; the timeline is empty, so there is no frame to preview.`;
+/** `noun` names what `time` counts: timeline frames, or source frames of a clip, or frames of an adjustment. */
+export function keySeekHint(time: number, duration: number, noun = 'timeline frame'): string {
+  if (duration === 0) return `Stored ${noun} ${time}; the timeline is empty, so there is no frame to preview.`;
   if (time >= duration)
-    return `Stored timeline frame ${time}; preview the nearest available frame ${previewFrameFor(time, duration)}. The keyframe stays in place.`;
-  return `Go to timeline frame ${time}.`;
+    return `Stored ${noun} ${time}; preview the nearest available frame ${previewFrameFor(time, duration)}. The keyframe stays in place.`;
+  return `Go to ${noun} ${time}.`;
 }
 
 export function keyframeNavigationFrame(
@@ -32,6 +33,8 @@ export function keyframeNavigationFrame(
 export interface KeyframeNavigation {
   inspection: KeyframeInspection | null;
   duration: number;
+  /** What keyframe frames count, for hints: "timeline frame" unless a grade's navigation says otherwise. */
+  frameNoun?: string;
   disabled: boolean;
   playing?: boolean;
   sourceEpoch?: number;

@@ -230,7 +230,9 @@ describe.skipIf(!enabled)('clip speed curves · exact native maps on disposable 
       { ...createClip('base', assets[0]!.id, 2, 22), speed },
       { ...createClip('upper', assets[1]!.id, 10, 20), layerId: 'upper', start: 3, speed: upperSpeed },
     ];
-    document.layers.push({ ...createLayer('upper', 'Upper', false), opacity: 0.6 });
+    const upper = createLayer('upper', 'Upper', false);
+    upper.transform.base.opacity = 0.6;
+    document.layers.push(upper);
     const receipt = await completed(document);
     const report = receipt.settings.layered!;
     expect(receipt.settings.pipeline).toBe('sequential-layered');

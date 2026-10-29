@@ -2,10 +2,13 @@ import { Children, isValidElement, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
-import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, layerKeyframe } from '../../src/shared/keyframes.js';
+import { layerKeyAsGradeKey } from '../../src/shared/grade.js';
+import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject } from '../../src/shared/model.js';
+import { SPATIAL_CHANNELS, type SpatialChannel } from '../../src/shared/spatial.js';
 import { validateNumberDraft } from '../../src/web/NumberField.js';
 import { RangeSettingControl } from '../../src/web/SettingValueControl.js';
+import { editSpatialPose } from '../../src/web/spatial-editor.js';
 import {
   createValueControlState,
   syncValueControlState,
@@ -34,6 +37,10 @@ const change = (state: ValueControlState, value: number, validate?: (value: numb
   transitionValueControl(state, { type: 'change', value }, validate);
 const finish = (state: ValueControlState, validate?: (value: number) => string | null) =>
   transitionValueControl(state, { type: 'finish', pointerId: 7 }, validate);
+const NO_TRANSFORM = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<
+  SpatialChannel,
+  null
+>;
 
 describe('locally drafted native value controls', () => {
   it('keeps every pointer movement local and publishes only the final value once', () => {
@@ -345,7 +352,8 @@ describe('shared exact values and contextual validation', () => {
     expect(rejected.state.error).toBeTruthy();
     expect(project).toEqual(before);
     expect(history.canUndo).toBe(false);
-    expect(project.layers[0]!.keyframes).toEqual([]);
+    expect(project.clips[0]!.grade.keyframes).toEqual([]);
+    expect(project.layers[0]!.transform.keyframes).toEqual([]);
     const valid = change(begin(rejected.state).state, 1.75, validate);
     const accepted = finish(valid.state, validate);
     expect(accepted.commit).toBe(1.75);
@@ -356,26 +364,52 @@ describe('shared exact values and contextual validation', () => {
     expect(history.canUndo).toBe(false);
   });
 
-  it('updates only an existing row participant when its slider release emits a command', () => {
+  it('updates only an existing Transform Opacity keyframe when its slider release emits a command', () => {
     const project = createProject('row', 'Row');
     const layer = project.layers[0]!;
-    layer.opacity = 0.75;
-    layer.keyframes = [layerKeyframe(10, { ...EMPTY_KEY_VALUES, opacity: 0.25 }, 'smooth')];
+    layer.transform.base.opacity = 0.75;
+    layer.transform.keyframes = [
+      { ...uniformKeyframe(10, { ...NO_TRANSFORM, opacity: 0.25 }, 'smooth'), reset: false },
+    ];
     const captured = begin(createValueControlState(context({ value: 0.25, min: 0, max: 1, step: 0.01 })));
     const moved = change(captured.state, 0.137123456789);
     expect(moved.commit).toBeNull();
     const released = finish(moved.state);
     const next = applyCommand(project, {
-      type: 'layer-key-value',
+      type: 'transform',
       layerId: layer.id,
+      transform: editSpatialPose(layer.transform, 10, 'opacity', released.commit!),
+    });
+    expect(next.layers[0]!.transform.base.opacity).toBe(0.75);
+    expect(next.layers[0]!.transform.keyframes).toEqual([
+      { ...layer.transform.keyframes[0], values: { ...layer.transform.keyframes[0]!.values, opacity: 0.137123456789 } },
+    ]);
+    expect(project.layers[0]!.transform.keyframes[0]!.values.opacity).toBe(0.25);
+  });
+
+  it('updates only an existing clip grade keyframe setting when its slider release emits a command', () => {
+    const project = createProject('grade', 'Grade');
+    const clip = createClip('clip', 'source', 0, 120);
+    clip.grade.colour.exposure = 0.75;
+    clip.grade.keyframes = [layerKeyAsGradeKey(layerKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.25 }, 'smooth'))];
+    project.clips = [clip];
+    const released = finish(
+      change(
+        begin(createValueControlState(context({ value: 0.25, min: -3, max: 3, step: 0.01 }))).state,
+        0.137123456789,
+      ).state,
+    );
+    const next = applyCommand(project, {
+      type: 'layer-key-value',
+      clipId: clip.id,
       frame: 10,
-      setting: 'opacity',
+      setting: 'exposure',
       value: released.commit!,
     });
-    expect(next.layers[0]!.opacity).toBe(0.75);
-    expect(next.layers[0]!.keyframes).toEqual([
-      { ...layer.keyframes[0], values: { ...layer.keyframes[0]!.values, opacity: 0.137123456789 } },
+    expect(next.clips[0]!.grade.colour.exposure).toBe(0.75);
+    expect(next.clips[0]!.grade.keyframes).toEqual([
+      { ...clip.grade.keyframes[0], values: { ...clip.grade.keyframes[0]!.values, exposure: 0.137123456789 } },
     ]);
-    expect(project.layers[0]!.keyframes[0]!.values.opacity).toBe(0.25);
+    expect(project.clips[0]!.grade.keyframes[0]!.values.exposure).toBe(0.25);
   });
 });
