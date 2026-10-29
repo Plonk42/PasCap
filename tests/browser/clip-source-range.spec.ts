@@ -4,7 +4,7 @@ import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { formatTimecode } from '../../src/shared/timing.js';
-import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
+import { adjustmentFrom0, expandedInspectorPreferences, gradePoint, inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { uniformKeyframe } from '../../src/shared/keyframes.js';
 
@@ -64,7 +64,9 @@ function sequence(ripple = true, retimed = false): ProjectDocument {
   const document = createProject(PROJECT_ID, 'Clip Source range · memory-only');
   document.media.videoIds = assets.map((asset) => asset.id);
   document.layers[0]!.ripple = ripple;
-  document.layers[0]!.keyframes = [sharedPoint(12, { exposure: 0.25 }), sharedPoint(500, { tint: 0.1 }, 'hold')];
+  document.adjustments = [
+    adjustmentFrom0(300, [gradePoint(12, { exposure: 0.25 }), gradePoint(500, { tint: 0.1 }, 'hold')]),
+  ];
   const first = { ...createClip('a', assets[0]!.id, 15, 105), start: 30 };
   if (retimed) first.speed = { mode: 'constant', rate: 0.5 };
   const track = document.layers[0]!.transform;
@@ -236,6 +238,7 @@ for (const ripple of [true, false]) {
     expect(next.clips[0]!.start).toBe(30);
     expect(next.clips[1]!.start).toBe(ripple ? 180 : 230);
     expect(next.layers).toEqual(before.layers);
+    expect(next.adjustments).toEqual(before.adjustments);
     expect(next.clips[0]!.speed).toEqual(before.clips[0]!.speed);
     await expect(page.locator('.clip-source-bar')).toHaveAttribute('data-range-draft', 'false');
     await flush(page);
@@ -355,6 +358,7 @@ for (const ripple of [true, false]) {
       expect(await current(page)).toEqual(next);
       expect(next.clips[0]!.start).toBe(30);
       expect(next.layers).toEqual(before.layers);
+      expect(next.adjustments).toEqual(before.adjustments);
       await undo(page).click();
       expect(await current(page)).toEqual(before);
       await expect(undo(page)).toBeDisabled();

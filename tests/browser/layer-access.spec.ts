@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { openOptions, sharedPoint } from './editor-helpers.js';
+import { openOptions, transformPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 // Headless Chrome hides scrollbars by default. These cases exercise the real thumb
@@ -47,7 +47,7 @@ test.beforeEach(async ({ page, request }) => {
   const document = createProject('layer-access-memory', 'Layer access · memory-only');
   document.media.videoIds = assets.map((asset) => asset.id);
   for (let index = 2; index <= 8; index++) document.layers.push(createLayer(`row-${index}`, `Track ${index}`, false));
-  document.layers[6]!.keyframes = [sharedPoint(10, { exposure: 0.2 })];
+  document.layers[6]!.transform.keyframes = [transformPoint(10, { opacity: 0.8 })];
   document.clips = [
     createClip('base', assets[0]!.id, 0, 120),
     { ...createClip('overlay', assets[1]!.id, 15, 45), layerId: 'row-4', start: 30 },
@@ -328,11 +328,11 @@ test('overlay raise, lower and delete each keep other data unchanged and require
   await alignedRows(page);
 });
 
-test('active shared-point capture still blocks layer mutations and Escape restores its complete unsaved draft', async ({
+test('active Transform keyframe capture still blocks layer mutations and Escape restores its complete unsaved draft', async ({
   page,
 }) => {
   const before = await current(page);
-  const marker = page.getByRole('button', { name: 'Track keyframe 10 on Track 7', exact: true });
+  const marker = page.getByRole('button', { name: /^Transform keyframe 10 on Track 7 \(/ });
   await marker.scrollIntoViewIfNeeded();
   const bounds = (await marker.boundingBox())!;
   await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);

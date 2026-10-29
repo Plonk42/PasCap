@@ -4,7 +4,7 @@ import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
+import { adjustmentFrom0, expandedInspectorPreferences, gradePoint, inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let memory: MemoryProjects;
@@ -36,6 +36,7 @@ test.beforeEach(async ({ page, request }) => {
   document.media.videoIds = [asset.id];
   document = applyCommand(document, { type: 'insert', clip: createClip('first', asset.id, 0, 40), index: 0 });
   document = applyCommand(document, { type: 'insert', clip: createClip('second', asset.id, 40, 80), index: 1 });
+  document.adjustments = [adjustmentFrom0(80)];
   memory = await memoryProjects(page, document);
   await expandedInspectorPreferences(page);
   await page.goto(`/?project=${document.id}`);
@@ -73,7 +74,7 @@ test('a Colour slider drag previews the value without a document, history or sav
   page,
 }) => {
   await page.evaluate(() => window.pascapLab!.engine.seek(10));
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Adjustment');
   const before = await current(page);
   const graded = await checksum(page);
   await dragSlider(page, 'Exposure', 0.9);
@@ -91,7 +92,7 @@ test('a Colour slider drag previews the value without a document, history or sav
 
 test('releasing the drag commits one Undo step and the preview stays on the committed value', async ({ page }) => {
   await page.evaluate(() => window.pascapLab!.engine.seek(10));
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Adjustment');
   const before = await current(page);
   const graded = await checksum(page);
   await dragSlider(page, 'Exposure', 0.9);
@@ -99,8 +100,9 @@ test('releasing the drag commits one Undo step and the preview stays on the comm
   const previewed = await checksum(page);
   await page.mouse.up();
   const after = await current(page);
-  expect(after.layers[0]!.colour.exposure).toBeGreaterThan(0);
-  expect(after.layers[0]!.keyframes).toEqual(before.layers[0]!.keyframes);
+  expect(after.adjustments[0]!.colour.exposure).toBeGreaterThan(0);
+  expect(after.adjustments[0]!.keyframes).toEqual(before.adjustments[0]!.keyframes);
+  expect(after.clips).toEqual(before.clips);
   await expect.poll(() => checksum(page)).toBe(previewed);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(before);
@@ -109,12 +111,12 @@ test('releasing the drag commits one Undo step and the preview stays on the comm
 
 test('a locked animated slider neither previews nor creates a keyframe', async ({ page }) => {
   const document = await current(page);
-  document.layers[0]!.keyframes = [sharedPoint(30, { exposure: 0 })];
+  document.adjustments[0]!.keyframes = [gradePoint(30, { exposure: 0 })];
   memory.seed(document);
   await page.reload();
   await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
   await page.evaluate(() => window.pascapLab!.engine.seek(10));
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Adjustment');
   const graded = await checksum(page);
   const slider = page.getByRole('slider', { name: 'Exposure', exact: true });
   await expect(slider).toBeDisabled();

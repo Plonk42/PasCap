@@ -7,12 +7,15 @@ import { createClip, createLayer, createProject, projectSchema, type ProjectDocu
 import { calculateLayout } from '../../src/shared/timeline.js';
 import {
   addMusicTrack,
-  editLayerPoint,
+  adjustmentFrom0,
+  adjustmentKeyframes,
+  editAdjustmentPoint,
+  editTransformKeyframe,
   expandedInspectorPreferences,
+  gradePoint,
   inspectorTab,
-  layerKeyframes,
   resetSetting,
-  sharedPoint,
+  transformPoint,
 } from './editor-helpers.js';
 import { memoryProjects } from './memory-projects.js';
 
@@ -37,6 +40,7 @@ test.beforeEach(async ({ page, request }) => {
     type: 'transition',
     transition: { leftId: 'clip-a', rightId: 'clip-b', type: 'cross-dissolve', duration: 18 },
   });
+  document.adjustments = [adjustmentFrom0(calculateLayout(document).duration)];
 
   // Exercise real editor history/autosave without writing even the fixture's project store.
   await memoryProjects(page, document);
@@ -45,7 +49,7 @@ test.beforeEach(async ({ page, request }) => {
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
 });
 
-/** Colour's keyframe line visits every stored track keyframe. */
+/** Colour's keyframe line visits every stored adjustment keyframe. */
 function colourStep(page: Page, direction: 'Previous' | 'Next'): Locator {
   return page.getByRole('button', { name: `${direction} Colour keyframe`, exact: true });
 }
@@ -63,15 +67,16 @@ async function setProject(page: Page, document: ProjectDocument): Promise<void> 
 }
 
 async function commitNumber(page: Page, name: string, value: string): Promise<void> {
-  if (name.includes('keyframe')) await inspectorTab(page, 'Track keyframes');
+  if (/^(Transform|Opacity) keyframe/.test(name)) await inspectorTab(page, 'Track');
+  else if (name.includes('keyframe')) await inspectorTab(page, 'Adjustment');
   else if (name.startsWith('Music')) await inspectorTab(page, 'Audio');
   else if (/Opening|Closing|Transition/.test(name)) await inspectorTab(page, 'Sequence');
   else if (
-    /^(Opacity|Temperature|Tint|Exposure|Brightness|Contrast|Hue|Saturation|Vibrance|Highlights|Shadows|Whites|Blacks)$/.test(
+    /^(Temperature|Tint|Exposure|Brightness|Contrast|Hue|Saturation|Vibrance|Highlights|Shadows|Whites|Blacks)$/.test(
       name,
     )
   )
-    await inspectorTab(page, 'Track colour');
+    await inspectorTab(page, 'Adjustment');
   else await inspectorTab(page, 'Clip');
   const field = page.getByRole('spinbutton', { name, exact: true });
   await field.fill(value);
@@ -167,165 +172,149 @@ test('undo and external document updates replace stale drafts without moving inp
   expect((await currentProject(page)).clips[0]?.speed).toEqual({ mode: 'constant', rate: 2 });
 });
 
-test('the shared list labels time/value/easing, retains reordered input focus, and rejects point collisions', async ({
+test('the adjustment list labels time/value/easing, retains reordered input focus, and rejects keyframe collisions', async ({
   page,
 }) => {
   let document = await currentProject(page);
-  document = applyCommand(document, {
-    type: 'layer-update',
-    layer: {
-      ...document.layers[0]!,
-      keyframes: [
-        sharedPoint(20, { opacity: 0.2, exposure: -0.5 }, 'hold'),
-        sharedPoint(70, { opacity: 0.8, exposure: 0.5 }, 'smooth'),
-      ],
-    },
-  });
-  document = applyCommand(document, {
-    type: 'layer-add',
-    layer: { ...createLayer('upper', 'Track 2', false), keyframes: [sharedPoint(80, { opacity: 0.4 }, 'hold')] },
-  });
+  document.adjustments[0]!.keyframes = [
+    gradePoint(20, { saturation: 0.2, exposure: -0.5 }, 'hold'),
+    gradePoint(70, { saturation: 0.8, exposure: 0.5 }, 'smooth'),
+  ];
+  document = applyCommand(document, { type: 'layer-add', layer: createLayer('upper', 'Track 2', false) });
   document = applyCommand(document, {
     type: 'insert',
     clip: { ...createClip('other-row', document.clips[1]!.mediaId, 0, 30), layerId: 'upper', start: 90 },
     index: 2,
   });
+  // Another owner with a keyframe at the same frame: the clip's own grade.
+  document.clips[2]!.grade.keyframes = [gradePoint(80, { saturation: 0.6 }, 'hold')];
   await setProject(page, document);
-  await inspectorTab(page, 'Track keyframes');
-  const keys = layerKeyframes(page, 'Track 1');
+  await inspectorTab(page, 'Adjustment');
+  const keys = adjustmentKeyframes(page);
   await colourStep(page, 'Next').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
   await colourStep(page, 'Next').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(70);
   await colourStep(page, 'Previous').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
-  const row = await editLayerPoint(page, 'Track 1', 20);
-  await expect(keys.getByRole('list')).toHaveAccessibleName('Edit track keyframes');
-  await expect(row.locator('.layer-keyframe-dependencies .layer-keyframe-chip')).toHaveText(['Opacity', 'Exposure']);
-  const draft = row.getByRole('spinbutton', { name: 'Opacity keyframe value 20', exact: true });
-  await draft.fill('40');
-  expect((await currentProject(page)).layers[0]?.keyframes[0]?.values.opacity).toBe(0.2);
+  const row = await editAdjustmentPoint(page, 20);
+  await expect(keys.getByRole('list')).toHaveAccessibleName('Edit adjustment keyframes');
+  await expect(row.locator('.layer-keyframe-dependencies .layer-keyframe-chip')).toHaveText(['Exposure', 'Saturation']);
+  const draft = row.getByRole('spinbutton', { name: 'Saturation keyframe value 20', exact: true });
+  await draft.fill('0.4');
+  expect((await currentProject(page)).adjustments[0]?.keyframes[0]?.values.saturation).toBe(0.2);
   await draft.press('Enter');
-  const time = row.getByRole('spinbutton', { name: 'Track keyframe frame 20', exact: true });
+  const time = row.getByRole('spinbutton', { name: 'Adjustment keyframe frame 20', exact: true });
   await time.fill('80');
   await time.press('Enter');
-  const moved = keys.getByRole('spinbutton', { name: 'Track keyframe frame 80', exact: true });
+  const moved = keys.getByRole('spinbutton', { name: 'Adjustment keyframe frame 80', exact: true });
   await expect(moved).toBeFocused();
-  expect((await currentProject(page)).layers[0]?.keyframes).toEqual([
-    sharedPoint(70, { opacity: 0.8, exposure: 0.5 }, 'smooth'),
-    sharedPoint(80, { opacity: 0.4, exposure: -0.5 }, 'hold'),
+  expect((await currentProject(page)).adjustments[0]?.keyframes).toEqual([
+    gradePoint(70, { saturation: 0.8, exposure: 0.5 }, 'smooth'),
+    gradePoint(80, { saturation: 0.4, exposure: -0.5 }, 'hold'),
   ]);
   await moved.fill('70');
   await moved.press('Enter');
   await expect(moved).toBeFocused();
   await expect(moved).toHaveValue('70');
   await expect(moved).toHaveAttribute('aria-invalid', 'true');
-  await expect(moved.locator('..').getByRole('alert')).toContainText('already has a shared keyframe');
-  expect((await currentProject(page)).layers[0]?.keyframes.map((point) => point.frame)).toEqual([70, 80]);
+  await expect(moved.locator('..').getByRole('alert')).toContainText('already has a keyframe');
+  expect((await currentProject(page)).adjustments[0]?.keyframes.map((point) => point.frame)).toEqual([70, 80]);
   await moved.press('Escape');
   await expect(moved).toHaveValue('80');
-  const remove = keys.getByRole('button', { name: 'Delete track keyframe 70', exact: true });
+  const remove = keys.getByRole('button', { name: 'Delete adjustment keyframe 70', exact: true });
   await remove.focus();
   await remove.press('Enter');
-  expect((await currentProject(page)).layers[0]?.keyframes).toEqual([
-    sharedPoint(80, { opacity: 0.4, exposure: -0.5 }, 'hold'),
+  expect((await currentProject(page)).adjustments[0]?.keyframes).toEqual([
+    gradePoint(80, { saturation: 0.4, exposure: -0.5 }, 'hold'),
   ]);
-  const value = keys.getByRole('spinbutton', { name: 'Opacity keyframe value 80', exact: true });
-  await value.fill('90');
+  const value = keys.getByRole('spinbutton', { name: 'Saturation keyframe value 80', exact: true });
+  await value.fill('1.9');
+  // Switching to another owner never applies the stale draft.
   await page
     .locator('[data-clip-id="other-row"] .timeline-clip-body')
     .evaluate((button) => (button as HTMLButtonElement).click());
-  const otherKeys = layerKeyframes(page, 'Track 2');
-  const otherValue = otherKeys.getByRole('spinbutton', { name: 'Opacity keyframe value 80', exact: true });
-  await expect(otherKeys.getByRole('list', { name: 'Edit track keyframes', exact: true })).toBeVisible();
-  await expect(otherValue).toHaveValue('40');
-  await expect(otherValue).toBeFocused();
-  expect((await currentProject(page)).layers[0]?.keyframes[0]?.values.opacity).toBe(0.4);
-  expect((await currentProject(page)).layers[1]?.keyframes[0]?.values.opacity).toBe(0.4);
+  await inspectorTab(page, 'Clip grade');
+  const otherKeys = page.getByRole('group', { name: /^Clip keyframes / });
+  const otherValue = otherKeys.getByRole('spinbutton', { name: 'Saturation keyframe value 80', exact: true });
+  await expect(otherKeys.getByRole('list', { name: 'Edit clip keyframes', exact: true })).toBeVisible();
+  if ((await otherKeys.locator('.layer-keyframe-point-details').getAttribute('open')) === null)
+    await otherKeys.getByLabel('Edit clip keyframe 80', { exact: true }).click();
+  await expect(otherValue).toHaveValue('0.6');
+  expect((await currentProject(page)).adjustments[0]?.keyframes[0]?.values.saturation).toBe(0.4);
+  expect((await currentProject(page)).clips[2]?.grade.keyframes[0]?.values.saturation).toBe(0.6);
   await page.evaluate(() => window.pascapLab!.flush());
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  await inspectorTab(page, 'Track keyframes');
+  await inspectorTab(page, 'Adjustment');
   await expect(
-    layerKeyframes(page, 'Track 1').getByRole('list', { name: 'Edit track keyframes', exact: true }),
+    adjustmentKeyframes(page).getByRole('list', { name: 'Edit adjustment keyframes', exact: true }),
   ).toBeVisible();
 });
 
-test('track keyframe navigation reaches project points and previews outside-duration points at the nearest frame', async ({
+test('adjustment keyframe navigation reaches its keyframes and previews one after its range at the nearest frame', async ({
   page,
 }) => {
   let document = await currentProject(page);
-  document = applyCommand(document, {
-    type: 'layer-update',
-    layer: {
-      ...document.layers[0]!,
-      keyframes: [
-        sharedPoint(5, { exposure: 0.2 }, 'hold'),
-        sharedPoint(35, { exposure: 0.2 }, 'smooth'),
-        sharedPoint(40, { exposure: 0.2 }),
-        sharedPoint(110, { exposure: 0.2 }, 'hold'),
-      ],
-    },
-  });
   document = applyCommand(document, { type: 'trim', clipId: 'clip-a', sourceIn: 30, sourceOut: 90 });
-  // Both clips' own 2× speed keep the last point outside the timeline.
+  // Both clips' own 2× speed keep the last keyframe after the timeline and the adjustment covering it.
   for (const clipId of ['clip-a', 'clip-b'])
     document = applyCommand(document, { type: 'speed', clipId, speed: { mode: 'constant', rate: 2 } });
+  const last = calculateLayout(document).duration - 1;
+  document.adjustments = [
+    adjustmentFrom0(last + 1, [
+      gradePoint(5, { exposure: 0.2 }, 'hold'),
+      gradePoint(35, { exposure: 0.2 }, 'smooth'),
+      gradePoint(40, { exposure: 0.2 }),
+      gradePoint(110, { exposure: 0.2 }, 'hold'),
+    ]),
+  ];
   await setProject(page, document);
-  expect(document.layers[0]?.keyframes.map((point) => point.frame)).toEqual([5, 35, 40, 110]);
-  expect(calculateLayout(document).duration).toBeLessThan(110);
-  await inspectorTab(page, 'Track keyframes');
-  const keys = layerKeyframes(page, 'Track 1');
-  for (const frame of [5, 35, 40, calculateLayout(document).duration - 1]) {
+  expect(last).toBeLessThan(110);
+  await inspectorTab(page, 'Adjustment');
+  const keys = adjustmentKeyframes(page);
+  for (const frame of [5, 35, 40, last]) {
     await colourStep(page, 'Next').click();
     await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
   }
-  await expect(colourStep(page, 'Next')).toBeDisabled();
   await expect(colourStep(page, 'Previous')).toBeEnabled();
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText(
-    'Stored keyframe · timeline frame 110 · outside current duration',
-  );
-  const outside = await editLayerPoint(page, 'Track 1', 110);
+  const outside = await editAdjustmentPoint(page, 110);
   await expect(outside.locator('.keyframe-row-skipped')).toHaveText('Outside duration');
-  await expect(outside.getByRole('button', { name: 'Go to track keyframe 110', exact: true })).toHaveAttribute(
+  await expect(outside.getByRole('button', { name: 'Go to adjustment keyframe 110', exact: true })).toHaveAttribute(
     'title',
-    `Stored timeline frame 110; preview the nearest available frame ${calculateLayout(document).duration - 1}. The keyframe stays in place.`,
+    `Stored frame in adjustment 110; preview the nearest available frame ${last}. The keyframe stays in place.`,
   );
   await expect(keys.locator('.keyframe-row-skipped')).toHaveCount(1);
   await colourStep(page, 'Previous').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Adjustment');
   const main = page.locator('.keyframe-setting-navigation').filter({
     has: page.getByRole('button', { name: 'Keyframe Exposure', exact: true }),
   });
   await expect(main.getByRole('button')).toHaveCount(3);
   const previous = main.getByRole('button', { name: 'Previous Exposure keyframe', exact: true });
   const next = main.getByRole('button', { name: 'Next Exposure keyframe', exact: true });
-  await expect(previous).toHaveAttribute('title', 'Go to timeline frame 35.');
+  await expect(previous).toHaveAttribute('title', 'Go to frame in adjustment 35.');
   await expect(next).toHaveAttribute(
     'title',
-    `Stored timeline frame 110; preview the nearest available frame ${calculateLayout(document).duration - 1}. The keyframe stays in place.`,
+    `Stored frame in adjustment 110; preview the nearest available frame ${last}. The keyframe stays in place.`,
   );
   await next.focus();
   await next.press('Enter');
-  await expect
-    .poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame))
-    .toBe(calculateLayout(document).duration - 1);
+  await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(last);
   await expect(next).toBeFocused();
-  await expect(next).toHaveAttribute('aria-disabled', 'true');
-  await expect(next).toHaveAttribute('tabindex', '-1');
-  await expect(previous).toHaveAttribute('title', 'Go to timeline frame 40.');
+  await expect(previous).toHaveAttribute('title', 'Go to frame in adjustment 40.');
   await previous.press('Space');
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
   await expect(previous).toBeFocused();
   expect(await currentProject(page)).toEqual(document);
-  const row = await editLayerPoint(page, 'Track 1', 35);
+  const row = await editAdjustmentPoint(page, 35);
   const value = row.getByRole('spinbutton', { name: 'Exposure keyframe value 35', exact: true });
   await value.fill('0.3');
-  expect((await currentProject(page)).layers[0]?.keyframes).toEqual(document.layers[0]?.keyframes);
+  expect((await currentProject(page)).adjustments[0]?.keyframes).toEqual(document.adjustments[0]?.keyframes);
   await value.press('Enter');
   await page.evaluate(() => window.pascapLab!.engine.seek(0));
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Adjustment');
   const exposure = page.getByRole('spinbutton', { name: 'Exposure', exact: true });
   await expect(exposure).toBeDisabled();
   const diamond = page
@@ -335,19 +324,19 @@ test('track keyframe navigation reaches project points and previews outside-dura
   await expect(diamond).toHaveAttribute('aria-pressed', 'false');
   await diamond.click();
   await commitNumber(page, 'Exposure', '1.5');
-  const points = (await currentProject(page)).layers[0]!.keyframes;
+  const points = (await currentProject(page)).adjustments[0]!.keyframes;
   expect(points.map((point) => point.frame)).toEqual([0, 5, 35, 40, 110]);
-  expect(points.find((point) => point.frame === 35)).toEqual(sharedPoint(35, { exposure: 0.3 }, 'smooth'));
-  expect(points.find((point) => point.frame === 0)).toEqual(sharedPoint(0, { exposure: 1.5 }));
+  expect(points.find((point) => point.frame === 35)).toEqual(gradePoint(35, { exposure: 0.3 }, 'smooth'));
+  expect(points.find((point) => point.frame === 0)).toEqual(gradePoint(0, { exposure: 1.5 }));
   expect((await currentProject(page)).clips.map((clip) => clip.speed)).toEqual(
     document.clips.map((clip) => clip.speed),
   );
   await page.getByRole('button', { name: 'Reset colour', exact: true }).click();
-  expect((await currentProject(page)).layers[0]?.keyframes[0]).toEqual(sharedPoint(0, { exposure: 0 }));
+  expect((await currentProject(page)).adjustments[0]?.keyframes[0]).toEqual(gradePoint(0, { exposure: 0 }));
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect((await currentProject(page)).layers[0]?.keyframes).toEqual(points);
-  await inspectorTab(page, 'Track keyframes');
-  await expect(keys.getByRole('list', { name: 'Edit track keyframes', exact: true })).toBeVisible();
+  expect((await currentProject(page)).adjustments[0]?.keyframes).toEqual(points);
+  await inspectorTab(page, 'Adjustment');
+  await expect(keys.getByRole('list', { name: 'Edit adjustment keyframes', exact: true })).toBeVisible();
 });
 
 test('speed numbers commit explicitly and reset to 1× changes only speed in one undo step', async ({ page }) => {
@@ -419,7 +408,7 @@ test('music commits preserve source/timeline units and validate range, duration,
   expect((await currentProject(page)).music[0]?.openingFade).toBe(10);
 });
 
-test('per-track fade/transition timing and positioned track key numbers use the same explicit commits', async ({
+test('per-track fade/transition timing and positioned Transform key numbers use the same explicit commits', async ({
   page,
 }) => {
   await commitNumber(page, 'Opening fade', '12');
@@ -436,13 +425,12 @@ test('per-track fade/transition timing and positioned track key numbers use the 
   await opening.press('Escape');
 
   let document = await currentProject(page);
-  document = applyCommand(document, {
-    type: 'layer-add',
-    layer: {
-      ...createLayer('upper', 'Track 2', false),
-      keyframes: [sharedPoint(5, { opacity: 0.5 }, 'hold'), sharedPoint(10, { opacity: 0.8 }, 'smooth')],
-    },
-  });
+  const upper = createLayer('upper', 'Track 2', false);
+  upper.transform.keyframes = [
+    transformPoint(5, { opacity: 0.5 }, 'hold'),
+    transformPoint(10, { opacity: 0.8 }, 'smooth'),
+  ];
+  document = applyCommand(document, { type: 'layer-add', layer: upper });
   document = applyCommand(document, {
     type: 'insert',
     clip: { ...createClip('overlay', document.clips[1]!.mediaId, 0, 30), layerId: 'upper', start: 5 },
@@ -455,76 +443,65 @@ test('per-track fade/transition timing and positioned track key numbers use the 
   await start.fill('80');
   expect((await currentProject(page)).clips[2]?.start).toBe(5);
   await start.press('Enter');
-  await editLayerPoint(page, 'Track 2', 10);
+  await editTransformKeyframe(page, 10, 'Track 2');
   await commitNumber(page, 'Opacity keyframe value 10', '60');
-  await commitNumber(page, 'Track keyframe frame 10', '25');
+  await commitNumber(page, 'Transform keyframe frame 10', '25');
   const edited = await currentProject(page);
   expect(edited.clips[2]).toMatchObject({ start: 80, sourceIn: 0, sourceOut: 30 });
   expect(edited.clips[2]).not.toHaveProperty('opacity');
-  expect(edited.layers[1]!.opacity).toBe(1);
+  expect(edited.layers[1]!.transform.base.opacity).toBe(1);
   expect(edited.clips[2]).not.toHaveProperty('animation');
-  expect(edited.layers[1]?.keyframes).toEqual([
-    sharedPoint(5, { opacity: 0.5 }, 'hold'),
-    sharedPoint(25, { opacity: 0.6 }, 'smooth'),
+  expect(edited.layers[1]!.transform.keyframes).toEqual([
+    transformPoint(5, { opacity: 0.5 }, 'hold'),
+    transformPoint(25, { opacity: 0.6 }, 'smooth'),
   ]);
 });
 
-test('Colour resets target clip colour and row opacity or only participating Colour settings at the active point', async ({
+test('Colour resets target the adjustment colour or only participating settings at the active keyframe', async ({
   page,
 }) => {
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Adjustment');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.3');
   await resetSetting(page, 'Exposure');
   let document = await currentProject(page);
-  expect(document.layers[0]?.colour).toMatchObject({ exposure: 0, saturation: 1.3 });
-  expect(document.layers[0]?.keyframes).toEqual([]);
+  expect(document.adjustments[0]?.colour).toMatchObject({ exposure: 0, saturation: 1.3 });
+  expect(document.adjustments[0]?.keyframes).toEqual([]);
   await page.getByRole('slider', { name: 'Contrast', exact: true }).fill('1.2');
   document = await currentProject(page);
-  const base = { ...document.layers[0]!.colour };
-  const other = sharedPoint(110, { exposure: 1, saturation: 1.4 }, 'smooth');
-  document = applyCommand(document, {
-    type: 'layer-update',
-    layer: {
-      ...document.layers[0]!,
-      keyframes: [sharedPoint(5, { exposure: -0.5, saturation: 0.6, opacity: 0.4 }, 'hold'), other],
-    },
-  });
+  const base = { ...document.adjustments[0]!.colour };
+  const other = gradePoint(110, { exposure: 1, saturation: 1.4 }, 'smooth');
+  document.adjustments[0]!.keyframes = [gradePoint(5, { exposure: -0.5, saturation: 0.6 }, 'hold'), other];
   await setProject(page, document);
-  const keys = layerKeyframes(page, 'Track 1');
-  await editLayerPoint(page, 'Track 1', 5);
-  await keys.getByRole('button', { name: 'Go to track keyframe 5', exact: true }).click();
+  const keys = adjustmentKeyframes(page);
+  await editAdjustmentPoint(page, 5);
+  await keys.getByRole('button', { name: 'Go to adjustment keyframe 5', exact: true }).click();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('-0.5');
   await resetSetting(page, 'Exposure');
   document = await currentProject(page);
-  expect(document.layers[0]?.keyframes[0]).toEqual(
-    sharedPoint(5, { exposure: 0, saturation: 0.6, opacity: 0.4 }, 'hold'),
-  );
-  expect(document.layers[0]?.keyframes[1]).toEqual(other);
-  await commitNumber(page, 'Track keyframe frame 5', '8');
+  expect(document.adjustments[0]?.keyframes[0]).toEqual(gradePoint(5, { exposure: 0, saturation: 0.6 }, 'hold'));
+  expect(document.adjustments[0]?.keyframes[1]).toEqual(other);
+  await commitNumber(page, 'Adjustment keyframe frame 5', '8');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(keys.locator('[data-keyframe-frame="5"]')).toHaveAttribute('aria-current', 'true');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect(keys.locator('[data-keyframe-frame="8"]')).toBeVisible();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeDisabled();
-  await keys.getByRole('button', { name: 'Go to track keyframe 8', exact: true }).click();
+  await keys.getByRole('button', { name: 'Go to adjustment keyframe 8', exact: true }).click();
   await resetSetting(page, 'Saturation');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.25');
   document = await currentProject(page);
-  expect(document.layers[0]?.colour).toEqual(base);
-  expect(document.layers[0]?.keyframes).toEqual([
-    sharedPoint(8, { exposure: 0.25, saturation: 1, opacity: 0.4 }, 'hold'),
-    other,
-  ]);
+  expect(document.adjustments[0]?.colour).toEqual(base);
+  expect(document.adjustments[0]?.keyframes).toEqual([gradePoint(8, { exposure: 0.25, saturation: 1 }, 'hold'), other]);
   await page.getByRole('button', { name: 'Reset colour', exact: true }).click();
   const reset = await currentProject(page);
-  expect(reset.layers[0]?.colour).toEqual(base);
-  expect(reset.layers[0]?.keyframes).toEqual([
-    sharedPoint(8, { exposure: NEUTRAL_COLOUR.exposure, saturation: NEUTRAL_COLOUR.saturation, opacity: 1 }, 'hold'),
+  expect(reset.adjustments[0]?.colour).toEqual(base);
+  expect(reset.adjustments[0]?.keyframes).toEqual([
+    gradePoint(8, { exposure: NEUTRAL_COLOUR.exposure, saturation: NEUTRAL_COLOUR.saturation }, 'hold'),
     other,
   ]);
   await expect(page.getByRole('slider', { name: 'Contrast', exact: true })).toHaveValue('1.2');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect((await currentProject(page)).layers[0]?.keyframes).toEqual(document.layers[0]?.keyframes);
+  expect((await currentProject(page)).adjustments[0]?.keyframes).toEqual(document.adjustments[0]?.keyframes);
 });

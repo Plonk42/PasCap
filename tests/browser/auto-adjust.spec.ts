@@ -22,7 +22,7 @@ import { autoAdjustCommand } from '../../src/shared/auto-colour.js';
 import { layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { autoAdjustCommands, autoAdjustTarget, type AutoAdjustContext } from '../../src/web/auto-adjust.js';
 import { gradeOwnerOf } from '../../src/web/colour-owner.js';
-import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
+import { adjustmentFrom0, expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 /**
@@ -593,10 +593,15 @@ test('the Track source grades each clip of the track on its own in one Undo step
 });
 
 test('explains when it cannot run, and a cancelled or failed analysis leaves no edit', async ({ page }) => {
+  memory.seed({ ...(await current(page)), adjustments: [adjustmentFrom0(120)] });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
+  await seek(page, 45);
   const before = await current(page);
   const graded = await checksum(page);
-  // Auto writes clip grades only.
-  await inspectorTab(page, 'Track colour');
+  // Auto writes clip grades only: the adjustment at the playhead has no Auto.
+  await inspectorTab(page, 'Adjustment');
+  await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeVisible();
   await expect(auto(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Auto adjust', exact: true })).toHaveCount(0);
   await inspectorTab(page, 'Clip grade');

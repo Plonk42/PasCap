@@ -1,7 +1,13 @@
 import { expect, test } from '@playwright/test';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject } from '../../src/shared/model.js';
-import { expandedInspectorPreferences, inspectorTab, openOptions, sharedPoint } from './editor-helpers.js';
+import {
+  adjustmentFrom0,
+  expandedInspectorPreferences,
+  gradePoint,
+  inspectorTab,
+  openOptions,
+} from './editor-helpers.js';
 import { memoryProjects } from './memory-projects.js';
 
 for (const viewport of [
@@ -22,7 +28,7 @@ for (const viewport of [
     const project = createProject('preview-lab', 'Editor vocabulary · memory-only');
     project.media.videoIds = [recording.id];
     project.clips = [createClip('clip', recording.id, 0, 90)];
-    project.layers[0]!.keyframes = [sharedPoint(0, { exposure: 0 }), sharedPoint(30, { exposure: 0.5 })];
+    project.adjustments = [adjustmentFrom0(90, [gradePoint(0, { exposure: 0 }), gradePoint(30, { exposure: 0.5 })])];
     const unexpected: string[] = [];
     await page.route('**/api/**', async (route) => {
       const pathname = new URL(route.request().url()).pathname;
@@ -62,12 +68,14 @@ for (const viewport of [
     await openOptions(page, 'Track options Track 1');
     await expect(page.getByRole('textbox', { name: 'Rename track Track 1', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
-    await inspectorTab(page, 'Track colour');
-    await expect(page.getByRole('group', { name: 'Track keyframes Track 1', exact: true })).toBeAttached();
-    await expect(page.getByRole('button', { name: 'Delete track keyframe 30', exact: true })).toBeAttached();
+    await inspectorTab(page, 'Adjustment');
+    await expect(
+      page.getByRole('group', { name: 'Adjustment keyframes adjustment 00:00:00 – 00:03:00', exact: true }),
+    ).toBeAttached();
+    await expect(page.getByRole('button', { name: 'Delete adjustment keyframe 30', exact: true })).toBeAttached();
     await page.getByRole('button', { name: 'Colour animation help', exact: true }).focus();
     await page.keyboard.press('Enter');
-    await expect(page.locator('.editor-help-content:popover-open')).toContainText('track');
+    await expect(page.locator('.editor-help-content:popover-open')).toContainText('every video track');
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Colour curves section', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Colour curve control node 1', exact: true })).toBeVisible();

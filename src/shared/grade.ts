@@ -129,9 +129,12 @@ export const adjustmentSchema = z
   .refine((item) => item.start + item.duration <= LAST_FRAME, {
     message: 'Adjustment OUT exceeds the supported integer project-frame range.',
   })
-  .refine((item) => item.keyframes.every((key) => item.start + key.frame >= 0 && item.start + key.frame <= LAST_FRAME), {
-    message: 'Adjustment keyframes exceed the supported integer project-frame range.',
-  });
+  .refine(
+    (item) => item.keyframes.every((key) => item.start + key.frame >= 0 && item.start + key.frame <= LAST_FRAME),
+    {
+      message: 'Adjustment keyframes exceed the supported integer project-frame range.',
+    },
+  );
 export type Adjustment = z.infer<typeof adjustmentSchema>;
 
 /** In timeline order, never overlapping, with unique IDs. */

@@ -19,7 +19,7 @@ import {
 } from '../../src/shared/white-balance.js';
 import { whiteBalanceCommands } from '../../src/shared/auto-colour.js';
 import { gradeOwnerOf } from '../../src/web/colour-owner.js';
-import { expandedInspectorPreferences, inspectorTab } from './editor-helpers.js';
+import { adjustmentFrom0, expandedInspectorPreferences, inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 /**
@@ -305,9 +305,13 @@ test('follows changing light between two runs and reruns update only their two v
 });
 
 test('explains when it cannot run, and a cancelled or failed analysis leaves no edit', async ({ page }) => {
+  memory.seed({ ...(await current(page)), adjustments: [adjustmentFrom0(120)] });
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
   const before = await current(page);
-  // Auto white balance keys clip grades only.
-  await inspectorTab(page, 'Track colour');
+  // Auto white balance keys clip grades only: the adjustment at the playhead has no Auto white balance.
+  await inspectorTab(page, 'Adjustment');
+  await expect(page.getByRole('slider', { name: 'Tint', exact: true })).toBeVisible();
   await expect(autoButton(page)).toHaveCount(0);
   await inspectorTab(page, 'Clip grade');
   // The plain clip is at frames 120–180.

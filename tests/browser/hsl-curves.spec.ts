@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import path from 'node:path';
 import type { MediaAsset } from '../../src/shared/media.js';
-import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
-import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
+import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
+import { adjustmentFrom0, expandedInspectorPreferences, gradePoint, inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let memory: MemoryProjects;
@@ -24,10 +24,11 @@ test.beforeEach(async ({ page, request }) => {
   const document = createProject('advanced-memory', 'Advanced colour · memory only');
   document.media.videoIds = [asset.id];
   document.clips = [createClip('one', asset.id, 0, 120)];
+  document.adjustments = [adjustmentFrom0(120)];
   memory = await memoryProjects(page, document);
   await expandedInspectorPreferences(page);
   await page.goto(`/?project=${document.id}`);
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Adjustment');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeEnabled();
 });
 test.afterEach(() => expect(unexpected).toEqual([]));
@@ -36,7 +37,7 @@ const openSection = (page: Page, title: 'HSL ranges' | 'Colour curves') =>
 
 test('static HSL exact entry, invalid drafts, keyboard, range reset and Undo', async ({ page }) => {
   await expect(page.getByRole('radiogroup', { name: 'HSL range' })).toBeHidden();
-  await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeVisible();
+  await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeVisible();
   await openSection(page, 'HSL ranges');
   // Each HSL slider track follows the selected range's own hue (cyan's centre is 180°).
   const track = (name: string) =>
@@ -61,19 +62,19 @@ test('static HSL exact entry, invalid drafts, keyboard, range reset and Undo', a
   const field = page.getByRole('spinbutton', { name: 'HSL hue', exact: true });
   await field.fill('12.3456789');
   await field.press('Enter');
-  await expect.poll(async () => (await current(page)).layers[0]!.colour.hsl.cyan.hue).toBe(12.3456789);
+  await expect.poll(async () => (await current(page)).adjustments[0]!.colour.hsl.cyan.hue).toBe(12.3456789);
   await field.fill('31');
   await field.press('Enter');
   await expect(field).toHaveValue('31');
-  expect((await current(page)).layers[0]!.colour.hsl.cyan.hue).toBe(12.3456789);
+  expect((await current(page)).adjustments[0]!.colour.hsl.cyan.hue).toBe(12.3456789);
   await field.press('Escape');
   await expect(field).toHaveValue('12.3456789');
   await page.getByRole('button', { name: 'Reset cyan HSL range', exact: true }).click();
-  await expect.poll(async () => (await current(page)).layers[0]!.colour.hsl.cyan.hue).toBe(0);
+  await expect.poll(async () => (await current(page)).adjustments[0]!.colour.hsl.cyan.hue).toBe(0);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(field).toHaveValue('12.3456789');
   await page.getByRole('slider', { name: 'HSL saturation', exact: true }).press('ArrowRight');
-  await expect.poll(async () => (await current(page)).layers[0]!.colour.hsl.cyan.saturation).toBe(0.01);
+  await expect.poll(async () => (await current(page)).adjustments[0]!.colour.hsl.cyan.saturation).toBe(0.01);
 });
 
 test('curve endpoints, exact collisions, nonmonotonic values, maximum points and reset', async ({ page }) => {
@@ -90,15 +91,15 @@ test('curve endpoints, exact collisions, nonmonotonic values, maximum points and
   await input.fill('1');
   await input.press('Enter');
   await expect(input).toHaveValue('1');
-  expect((await current(page)).layers[0]!.colour.curves.master[1]!.x).toBe(0.25);
+  expect((await current(page)).adjustments[0]!.colour.curves.master[1]!.x).toBe(0.25);
   await input.press('Escape');
   for (let i = 4; i < 16; i++)
     await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Add colour curve control node', exact: true })).toBeDisabled();
-  expect((await current(page)).layers[0]!.colour.curves.master).toHaveLength(16);
+  expect((await current(page)).adjustments[0]!.colour.curves.master).toHaveLength(16);
   await page.getByRole('button', { name: 'Reset master curve', exact: true }).click();
   await expect
-    .poll(async () => (await current(page)).layers[0]!.colour.curves.master)
+    .poll(async () => (await current(page)).adjustments[0]!.colour.curves.master)
     .toEqual([
       { x: 0, y: 0 },
       { x: 0.5, y: 0.5 },
@@ -119,8 +120,8 @@ test('all four curves share one graph and the channel swatches choose the editab
   const output = page.getByRole('spinbutton', { name: 'Colour curve output', exact: true });
   await output.fill('0.2');
   await output.press('Enter');
-  await expect.poll(async () => (await current(page)).layers[0]!.colour.curves.red[0]!.y).toBe(0.2);
-  expect((await current(page)).layers[0]!.colour.curves.master[0]!.y).toBe(0);
+  await expect.poll(async () => (await current(page)).adjustments[0]!.colour.curves.red[0]!.y).toBe(0.2);
+  expect((await current(page)).adjustments[0]!.colour.curves.master[0]!.y).toBe(0);
   const red = await plot.locator('path.colour-curve-selected').getAttribute('d');
   await channels.getByRole('radio', { name: 'red', exact: true }).press('ArrowRight');
   const green = channels.getByRole('radio', { name: 'green', exact: true });
@@ -150,7 +151,7 @@ test('releasing a curve drag far outside the plot commits a node clamped between
   await page.mouse.move(x + 600, y + 600, { steps: 4 });
   await page.mouse.up();
   await expect.poll(() => memory.saves).toBe(2);
-  const [, node] = (await current(page)).layers[0]!.colour.curves.master;
+  const [, node] = (await current(page)).adjustments[0]!.colour.curves.master;
   expect(node!.x).toBeGreaterThan(0.49);
   expect(node!.x).toBeLessThan(0.5);
   expect(node!.y).toBe(0);
@@ -162,7 +163,7 @@ test('captured curve drafts cancel, stay inside the plot between neighbours and 
   await openSection(page, 'Colour curves');
   await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
   await expect.poll(() => memory.saves).toBe(1);
-  const original = (await current(page)).layers[0]!.colour.curves.master;
+  const original = (await current(page)).adjustments[0]!.colour.curves.master;
   const point = page.getByRole('button', { name: 'Colour curve control node 2', exact: true });
   const box = await point.boundingBox();
   if (!box) throw new Error('Curve point not visible.');
@@ -174,7 +175,7 @@ test('captured curve drafts cancel, stay inside the plot between neighbours and 
   expect(memory.saves).toBe(1);
   await page.keyboard.press('Escape');
   await page.mouse.up();
-  expect((await current(page)).layers[0]!.colour.curves.master).toEqual(original);
+  expect((await current(page)).adjustments[0]!.colour.curves.master).toEqual(original);
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.move(x + 10, y - 10);
@@ -186,34 +187,36 @@ test('captured curve drafts cancel, stay inside the plot between neighbours and 
   await expect(page.locator('.colour-curve-plot')).not.toHaveClass(/invalid/);
   await page.keyboard.press('Escape');
   await page.mouse.up();
-  expect((await current(page)).layers[0]!.colour.curves.master).toEqual(original);
+  expect((await current(page)).adjustments[0]!.colour.curves.master).toEqual(original);
   expect(memory.saves).toBe(1);
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.move(x + 15, y - 15);
   await page.mouse.up();
   await expect.poll(() => memory.saves).toBe(2);
-  expect((await current(page)).layers[0]!.colour.curves.master).not.toEqual(original);
+  expect((await current(page)).adjustments[0]!.colour.curves.master).not.toEqual(original);
   await point.focus();
   await page.keyboard.press('Control+z');
-  await expect.poll(async () => (await current(page)).layers[0]!.colour.curves.master).toEqual(original);
+  await expect.poll(async () => (await current(page)).adjustments[0]!.colour.curves.master).toEqual(original);
   await expect(point).toBeFocused();
 });
 
-test('scalar keys do not disable static HSL or curves and Reset keys preserves their row base', async ({ page }) => {
+test('scalar keys do not disable static HSL or curves and Reset keys preserves their adjustment base', async ({
+  page,
+}) => {
   const document = memory.snapshot();
-  document.layers[0]!.keyframes = [sharedPoint(0, { exposure: 0.4 })];
-  document.layers[0]!.colour.hsl.red.hue = 7;
-  document.layers[0]!.colour.curves.master[0]!.y = 0.05;
+  document.adjustments[0]!.keyframes = [gradePoint(0, { exposure: 0.4 })];
+  document.adjustments[0]!.colour.hsl.red.hue = 7;
+  document.adjustments[0]!.colour.curves.master[0]!.y = 0.05;
   memory.seed(document);
   await page.reload();
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Adjustment');
   await openSection(page, 'HSL ranges');
   await expect(page.getByRole('slider', { name: 'HSL hue', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Reset colour', exact: true }).click();
-  await expect.poll(async () => (await current(page)).layers[0]!.keyframes[0]!.values.exposure).toBe(0);
-  expect((await current(page)).layers[0]!.colour.hsl.red.hue).toBe(7);
-  expect((await current(page)).layers[0]!.colour.curves.master[0]!.y).toBe(0.05);
+  await expect.poll(async () => (await current(page)).adjustments[0]!.keyframes[0]!.values.exposure).toBe(0);
+  expect((await current(page)).adjustments[0]!.colour.hsl.red.hue).toBe(7);
+  expect((await current(page)).adjustments[0]!.colour.curves.master[0]!.y).toBe(0.05);
 });
 
 for (const cancellation of ['pointercancel', 'lostcapture', 'windowblur'] as const) {
@@ -221,7 +224,7 @@ for (const cancellation of ['pointercancel', 'lostcapture', 'windowblur'] as con
     await openSection(page, 'Colour curves');
     await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
     await expect.poll(() => memory.saves).toBe(1);
-    const original = (await current(page)).layers[0]!.colour.curves.master;
+    const original = (await current(page)).adjustments[0]!.colour.curves.master;
     const point = page.getByRole('button', { name: 'Colour curve control node 2', exact: true });
     const box = await point.boundingBox();
     if (!box) throw new Error('Visible point required.');
@@ -244,23 +247,23 @@ for (const cancellation of ['pointercancel', 'lostcapture', 'windowblur'] as con
       );
     else await point.dispatchEvent('pointercancel');
     await page.mouse.up();
-    expect((await current(page)).layers[0]!.colour.curves.master).toEqual(original);
+    expect((await current(page)).adjustments[0]!.colour.curves.master).toEqual(original);
     expect(memory.saves).toBe(1);
     await expect(page.getByRole('button', { name: 'Add colour curve control node', exact: true })).toBeEnabled();
   });
 }
 
-test('advanced row settings survive same-row clip selection; empty-row selection cannot apply an old invalid draft', async ({
+test('advanced adjustment settings survive clip selection; a clip grade target cannot apply an old invalid draft', async ({
   page,
 }) => {
   const document = memory.snapshot();
   const second = { ...createClip('two', document.clips[0]!.mediaId, 0, 120), start: 120 };
   document.clips.push(second);
   document.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cut', duration: 0 }];
-  document.layers.push(createLayer('empty', 'Empty advanced row'));
+  document.adjustments = [adjustmentFrom0(240)];
   memory.seed(document);
   await page.reload();
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Adjustment');
   await openSection(page, 'HSL ranges');
   const field = page.getByRole('spinbutton', { name: 'HSL hue', exact: true });
   await field.fill('7.123456789');
@@ -269,13 +272,13 @@ test('advanced row settings survive same-row clip selection; empty-row selection
   await expect(field).toHaveValue('7.123456789');
   await field.fill('31');
   await field.press('Enter');
-  await page.getByRole('button', { name: 'Select track Empty advanced row', exact: true }).click();
+  await inspectorTab(page, 'Clip grade');
   await expect(field).toHaveValue('0');
   await expect(field).toBeEnabled();
   await field.fill('-4.23456789');
   await field.press('Enter');
   const changed = await current(page);
-  expect(changed.layers[0]!.colour.hsl.red.hue).toBe(7.123456789);
-  expect(changed.layers[1]!.colour.hsl.red.hue).toBe(-4.23456789);
-  expect(changed.clips).toEqual(document.clips);
+  expect(changed.adjustments[0]!.colour.hsl.red.hue).toBe(7.123456789);
+  expect(changed.clips[1]!.grade.colour.hsl.red.hue).toBe(-4.23456789);
+  expect(changed.clips[0]).toEqual(document.clips[0]);
 });

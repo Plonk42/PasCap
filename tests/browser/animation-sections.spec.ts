@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import path from 'node:path';
+import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
 import { KEYFRAME_SETTINGS, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import {
@@ -13,21 +14,23 @@ import {
 import { createSpatialSettings, evaluateSpatial, NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout, type PlacedClip } from '../../src/shared/timeline.js';
 import {
+  adjustmentFrom0,
+  adjustmentKeyframes,
   currentKeyframeRow,
-  editLayerPoint,
+  editAdjustmentPoint,
   editTransformKeyframe,
+  gradePoint,
   inspectorTab,
-  layerKeyframes,
   settingTab,
-  sharedPoint,
   transformKeyframes,
+  transformPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 type Section = 'Colour' | 'Speed' | 'Transform';
 const TRACK = 'Track 1';
 const CLIP = 'animated-clip';
-const colourSettings = KEYFRAME_SETTINGS;
+const colourSettings = COLOUR_CONTROLS;
 
 function inspector(page: Page): Locator {
   return page.getByRole('complementary', { name: 'Properties', exact: true });
@@ -214,7 +217,10 @@ for (const viewport of [
       const document = createProject('animation-sections-memory', 'Animation sections · memory-only');
       document.media.videoIds = [asset.id];
       document.layers[0]!.name = TRACK;
-      document.layers[0]!.keyframes = [sharedPoint(0, { opacity: 0.65 }), sharedPoint(40, { exposure: 0.6 })];
+      // The adjustment covers the 90-frame timeline, so its keyframe frames are project frames.
+      document.adjustments = [
+        adjustmentFrom0(90, [gradePoint(0, { temperature: 0.2 }), gradePoint(40, { exposure: 0.6 })]),
+      ];
       const clip = createClip(CLIP, asset.id, 10, 100);
       clip.speed = {
         mode: 'curve',
@@ -278,12 +284,12 @@ for (const viewport of [
       page,
     }, testInfo) => {
       const document = await fixture(page, (document) => {
-        document.layers[0]!.keyframes = [];
+        document.adjustments[0]!.keyframes = [];
         document.clips[0]!.speed = { mode: 'constant', rate: 1 };
         document.layers[0]!.transform = createSpatialSettings();
       });
       expect(document.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-      await inspectorTab(page, 'Track colour');
+      await inspectorTab(page, 'Adjustment');
       await expect(inspector(page).getByRole('button', { name: /^Animate / })).toHaveCount(0);
       await expect(line(page, 'Colour')).toContainText('0 keyframes');
       await expect(line(page, 'Colour').getByRole('button', { name: 'Reset colour', exact: true })).toBeVisible();
@@ -312,8 +318,9 @@ for (const viewport of [
       await expect(line(page, 'Transform')).toContainText('0 keyframes');
       for (const direction of ['Previous', 'Next'] as const)
         await expect(navigation(page, 'Transform', direction)).toBeDisabled();
-      await expect(transformDiamonds(page)).toHaveCount(8);
+      await expect(transformDiamonds(page)).toHaveCount(9);
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toBeEnabled();
+      await expect(page.getByRole('spinbutton', { name: 'Transform Opacity', exact: true })).toBeEnabled();
       await inspectorTab(page, 'Clip');
       await expect(inspector(page).getByRole('button', { name: /^Animate / })).toHaveCount(0);
       await expect(line(page, 'Speed')).toContainText('0 keyframes');
@@ -335,18 +342,18 @@ for (const viewport of [
       expect(graded).toHaveLength(1280 * 720 * 4);
       expect(graded.rgbSum).toBeGreaterThan(0);
       expect(await pixels(page, true)).not.toEqual(graded);
-      await inspectorTab(page, 'Track colour');
+      await inspectorTab(page, 'Adjustment');
       await expect(line(page, 'Colour')).toContainText('2 keyframes');
       await expect(diamond(page, 'Exposure')).toHaveAttribute('aria-pressed', 'false');
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toHaveValue('0.6');
-      await expect(page.getByRole('spinbutton', { name: 'Opacity', exact: true })).toHaveValue('65');
+      await expect(page.getByRole('spinbutton', { name: 'Temperature', exact: true })).toHaveValue('0.2');
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toBeDisabled();
-      await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeDisabled();
-      await expect(layerKeyframes(page, TRACK).locator('.keyframe-row')).toHaveCount(2);
+      await expect(page.getByRole('slider', { name: 'Temperature', exact: true })).toBeDisabled();
+      await expect(adjustmentKeyframes(page).locator('.keyframe-row')).toHaveCount(2);
       await inspectorTab(page, 'Track');
       // Every stored Transform keyframe (5) is counted, including those after the duration.
       await expect(line(page, 'Transform')).toContainText('5 keyframes');
-      await expect(transformDiamonds(page)).toHaveCount(8);
+      await expect(transformDiamonds(page)).toHaveCount(9);
       const pose = evaluateSpatial(document.layers[0]!.transform, 15);
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toHaveValue(
         String(pose.scale),
@@ -368,11 +375,11 @@ for (const viewport of [
       await inspectorTab(page, 'Track');
       await seek(page, document, 10);
       await expect(page.getByRole('spinbutton', { name: 'Transform Scale', exact: true })).toBeEnabled();
-      await inspectorTab(page, 'Track colour');
+      await inspectorTab(page, 'Adjustment');
       await seek(page, document, 40);
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toBeEnabled();
       await seek(page, document, 0);
-      await expect(page.getByRole('spinbutton', { name: 'Opacity', exact: true })).toBeEnabled();
+      await expect(page.getByRole('spinbutton', { name: 'Temperature', exact: true })).toBeEnabled();
       // Collapsing a section hides its keyframe line; the title row stays.
       const colour = page.getByRole('button', { name: 'Colour section', exact: true });
       await colour.click();
@@ -392,15 +399,15 @@ for (const viewport of [
       await unchanged(page, document);
     });
 
-    test('Colour header visits Opacity, all twelve scalar settings, HDR and Local contrast and retains main arrows', async ({
+    test('Colour header visits all twelve scalar settings, HDR and Local contrast and retains main arrows', async ({
       page,
     }) => {
       const document = await fixture(page, (document) => {
-        document.layers[0]!.keyframes = colourSettings.map(({ key }, index) =>
-          sharedPoint(index * 5, { [key]: key === 'opacity' ? 1 : 0 }),
+        document.adjustments[0]!.keyframes = colourSettings.map(({ key }, index) =>
+          gradePoint(index * 5, { [key]: 0 }),
         );
       });
-      await inspectorTab(page, 'Track colour');
+      await inspectorTab(page, 'Adjustment');
       await expect(
         inspector(page)
           .locator('.colour-controls')
@@ -414,29 +421,37 @@ for (const viewport of [
       const next = navigation(page, 'Colour', 'Next');
       const previous = navigation(page, 'Colour', 'Previous');
       await expect(previous).toBeDisabled();
-      for (const frame of [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70]) {
+      for (const frame of [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65]) {
         await next.click();
         await previewAt(page, document, frame);
-        await expect(layerKeyframes(page, TRACK).locator('.keyframe-row[aria-current="true"]')).toHaveAttribute(
+        await expect(adjustmentKeyframes(page).locator('.keyframe-row[aria-current="true"]')).toHaveAttribute(
           'data-keyframe-frame',
           String(frame),
         );
       }
       await expect(next).toBeDisabled();
       await previous.click();
-      await previewAt(page, document, 65);
+      await previewAt(page, document, 60);
       await unchanged(page, document);
     });
 
     for (const { key, label } of KEYFRAME_SETTINGS) {
       test(`main ${label} arrows skip null settings and retain guarded native focus at endpoints`, async ({ page }) => {
-        const value = 0;
+        // Opacity is the track's Transform setting; the others grade the adjustment.
+        const value = key === 'opacity' ? 0.5 : 0;
         const document = await fixture(page, (document) => {
-          document.layers[0]!.keyframes = [
-            sharedPoint(10, { [key]: value }),
-            sharedPoint(20, { [key === 'exposure' ? 'tint' : 'exposure']: 0.5 }),
-            sharedPoint(30, { [key]: value }),
-          ];
+          if (key === 'opacity')
+            document.layers[0]!.transform.keyframes = [
+              transformPoint(10, { opacity: value }),
+              transformPoint(20, { scale: 1.5 }),
+              transformPoint(30, { opacity: value }),
+            ];
+          else
+            document.adjustments[0]!.keyframes = [
+              gradePoint(10, { [key]: value }),
+              gradePoint(20, { [key === 'exposure' ? 'tint' : 'exposure']: 0.5 }),
+              gradePoint(30, { [key]: value }),
+            ];
         });
         await settingTab(page, label);
         await seek(page, document, 0);
@@ -447,9 +462,14 @@ for (const viewport of [
           await expect(button).toHaveJSProperty('tagName', 'BUTTON');
         const previous = channelNavigation(page, label, 'Previous');
         const next = channelNavigation(page, label, 'Next');
-        const frames = document.layers[0]!.keyframes.filter((point) => point.values[key] !== null).map(
-          ({ frame }) => frame,
-        );
+        const keys = key === 'opacity' ? document.layers[0]!.transform.keyframes : document.adjustments[0]!.keyframes;
+        const frames = keys
+          .filter((point) => (point.values as Record<string, number | null>)[key] !== null)
+          .map(({ frame }) => frame);
+        const field = page.getByRole('spinbutton', {
+          name: key === 'opacity' ? 'Transform Opacity' : label,
+          exact: true,
+        });
         await expect(previous).toHaveAttribute('aria-disabled', 'true');
         await next.focus();
         for (const frame of frames) {
@@ -458,7 +478,7 @@ for (const viewport of [
           await previewAt(page, document, frame);
           await expect(next).toBeFocused();
           await expect(diamond(page, label)).toHaveAttribute('aria-pressed', 'true');
-          await expect(page.getByRole('spinbutton', { name: label, exact: true })).toHaveValue(String(value));
+          await expect(field).toHaveValue(String(key === 'opacity' ? value * 100 : value));
         }
         await expect(next).toHaveAttribute('aria-disabled', 'true');
         await expect(next).toHaveJSProperty('disabled', false);
@@ -486,35 +506,33 @@ for (const viewport of [
       });
     }
 
-    test('enabled-row chip navigation skips other channels and captures the real frame during off-duration inspection', async ({
+    test('enabled-row chip navigation skips other channels and captures the real frame at a clamped preview', async ({
       page,
     }) => {
       const document = await fixture(page, (document) => {
-        document.layers[0]!.keyframes = [
-          sharedPoint(0, { exposure: 0, opacity: 0.65 }),
-          sharedPoint(10, { tint: 0 }),
-          sharedPoint(30, { exposure: 1 }),
-          sharedPoint(40, { opacity: 0.5 }),
-          sharedPoint(140, { exposure: 2 }),
+        document.adjustments[0]!.keyframes = [
+          gradePoint(0, { exposure: 0, saturation: 0.65 }),
+          gradePoint(10, { tint: 0 }),
+          gradePoint(30, { exposure: 1 }),
+          gradePoint(40, { saturation: 0.5 }),
+          gradePoint(140, { exposure: 2 }),
         ];
       });
-      await inspectorTab(page, 'Track colour');
-      const row = layerKeyframes(page, TRACK).locator('[data-keyframe-frame="0"]');
-      const nextExposure = row
-        .locator('.layer-keyframe-chip')
-        .getByRole('button', { name: 'Next Exposure keyframe', exact: true });
-      await expect(
-        row.locator('.layer-keyframe-chip').getByRole('button', { name: 'Next Tint keyframe', exact: true }),
-      ).toHaveCount(0);
-      await nextExposure.focus();
-      await nextExposure.press('Enter');
+      await inspectorTab(page, 'Adjustment');
+      const chip = (frame: number, name: string) =>
+        adjustmentKeyframes(page)
+          .locator(`[data-keyframe-frame="${frame}"] .layer-keyframe-chip`)
+          .getByRole('button', { name, exact: true });
+      await expect(chip(0, 'Next Tint keyframe')).toHaveCount(0);
+      await chip(0, 'Next Exposure keyframe').focus();
+      await chip(0, 'Next Exposure keyframe').press('Enter');
       await previewAt(page, document, 30);
-      await expect(nextExposure).toBeFocused();
-      await nextExposure.press('Space');
+      await expect(chip(0, 'Next Exposure keyframe')).toBeFocused();
+      // The keyframe after the adjustment's range previews its last frame and stays in place.
+      await expect(adjustmentKeyframes(page).locator('[data-keyframe-frame="140"]')).toContainText('Outside duration');
+      await chip(30, 'Next Exposure keyframe').focus();
+      await chip(30, 'Next Exposure keyframe').press('Space');
       await previewAt(page, document, 89);
-      await expect(layerKeyframes(page, TRACK).locator('.layer-keyframe-inspected')).toContainText(
-        'Stored keyframe · timeline frame 140',
-      );
       await expect(diamond(page, 'Exposure')).toHaveAttribute('aria-pressed', 'false');
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toBeDisabled();
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toHaveValue(String(1 + 59 / 110));
@@ -522,7 +540,7 @@ for (const viewport of [
       await diamond(page, 'Exposure').focus();
       await diamond(page, 'Exposure').press('Enter');
       const expected = structuredClone(document);
-      expected.layers[0]!.keyframes.splice(4, 0, sharedPoint(89, { exposure: 1 + 59 / 110 }));
+      expected.adjustments[0]!.keyframes.splice(4, 0, gradePoint(89, { exposure: 1 + 59 / 110 }));
       expect(await current(page)).toEqual(expected);
       await page.evaluate(() => window.pascapLab!.flush());
       expect(memory.saves).toBe(1);
@@ -621,7 +639,7 @@ for (const viewport of [
       await expect(row(50)).not.toContainText('Outside duration');
       await expect(row(90)).toContainText('Outside duration');
       await expect(row(110)).toContainText('Outside duration');
-      await expect(transformDiamonds(page)).toHaveCount(8);
+      await expect(transformDiamonds(page)).toHaveCount(9);
       await expect(transformDiamond(page)).toHaveCount(1);
       for (const frame of [10, 50, 90, 110]) {
         await navigation(page, 'Transform', 'Next').click();
@@ -660,6 +678,7 @@ for (const viewport of [
             translateX: null,
             translateY: null,
             rotation: null,
+            opacity: null,
           },
           'linear',
         ),
@@ -782,14 +801,14 @@ for (const viewport of [
       await unchanged(page, document);
     });
 
-    test('shared, Transform and custom-speed selectors visibly read Easing with contextual accessible names', async ({
+    test('adjustment, Transform and custom-speed selectors visibly read Easing with contextual accessible names', async ({
       page,
     }) => {
       const document = await fixture(page, (document) => {
-        document.layers[0]!.keyframes = [sharedPoint(0, { exposure: 0 }), sharedPoint(40, { tint: 0 })];
+        document.adjustments[0]!.keyframes = [gradePoint(0, { exposure: 0 }), gradePoint(40, { tint: 0 })];
       });
-      await editLayerPoint(page, TRACK, 0);
-      await easing(page, 'Track keyframe easing 0');
+      await editAdjustmentPoint(page, 0);
+      await easing(page, 'Adjustment keyframe easing 0');
       await editTransformKeyframe(page, 0, TRACK);
       await easing(page, 'Transform keyframe easing 0');
       await inspectorTab(page, 'Clip');
@@ -804,9 +823,11 @@ for (const viewport of [
       page,
     }) => {
       const document = await fixture(page, (document) => {
-        document.layers[0]!.keyframes = [sharedPoint(0, { exposure: 0 }), sharedPoint(40, { exposure: 0.6 })];
+        document.adjustments[0]!.keyframes = [gradePoint(0, { exposure: 0 }), gradePoint(40, { exposure: 0.6 })];
       });
       await seek(page, document, 15);
+      // The Colour tab keeps the adjustment as its target while the clip stays selected.
+      await inspectorTab(page, 'Adjustment');
       await inspectorTab(page, 'Clip');
       const point = page.getByRole('button', { name: 'Clip speed keyframe 30', exact: true });
       await point.scrollIntoViewIfNeeded();
@@ -824,15 +845,16 @@ for (const viewport of [
       await expect(marker(page, 'speed', 80)).toBeDisabled();
       await expect(marker(page, 'transform', 50)).toBeDisabled();
       // A synthetic tab click cannot end or move the captured real pointer gesture.
-      await settingTab(page, 'Exposure');
+      await settingTab(page, 'Transform');
       await expect(navigation(page, 'Transform', 'Next')).toBeDisabled();
       await expect(transformDiamond(page)).toBeDisabled();
+      await settingTab(page, 'Exposure');
       await expect(navigation(page, 'Colour', 'Next')).toBeDisabled();
       await expect(diamond(page, 'Exposure')).toBeDisabled();
       for (const direction of ['Previous', 'Next'] as const)
         await expect(channelNavigation(page, 'Exposure', direction)).toHaveAttribute('aria-disabled', 'true');
       await expect(
-        layerKeyframes(page, TRACK)
+        adjustmentKeyframes(page)
           .locator('[data-keyframe-frame="0"] .layer-keyframe-chip')
           .getByRole('button', { name: 'Next Exposure keyframe', exact: true }),
       ).toBeDisabled();
