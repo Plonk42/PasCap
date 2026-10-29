@@ -34,7 +34,13 @@ import { clipDuration } from '../shared/speed.js';
 import { calculateLayout, transitionOffset, type PlacedClip } from '../shared/timeline.js';
 import { formatTimecode, framesToSeconds, secondsToFrames } from '../shared/timing.js';
 import { AdjustmentLane, type AdjustmentGesture } from './AdjustmentLane.js';
-import { adjustmentKeyframeKind, adjustmentLabel, type AdjustmentKeyframeTarget } from './adjustment-ui.js';
+import {
+  addAdjustmentReason,
+  adjustmentKeyframeKind,
+  adjustmentLabel,
+  adjustmentSpan,
+  type AdjustmentKeyframeTarget,
+} from './adjustment-ui.js';
 import { clipKeyframeMarkers, gradeKeyframeMarkers, type ClipKeyframeMarker } from './clip-keyframe-markers.js';
 import { clipKeyframeKind, clipKeyframeSlideTarget, type ClipKeyframeTarget } from './clip-keyframe-drag.js';
 import type { ColourTarget, InspectorSectionTarget } from './InspectorSection.js';
@@ -264,9 +270,23 @@ function laneGestureMessage(music: MusicTimelineGesture | null, adjustment: Adju
   if (adjustment)
     return (
       adjustment.error ||
-      `Adjustment ${adjustmentLabel(adjustment.range)} · release to apply · Alt bypasses snapping · Esc cancels`
+      `${adjustment.creating ? 'New adjustment' : 'Adjustment'} ${adjustmentLabel(adjustment.range)} · release to apply · Alt bypasses snapping · Esc cancels`
     );
   return null;
+}
+
+/** Add adjustment covers the ruler range, else the selected clip. */
+function addAdjustmentState(project: ProjectDocument, range: TimelineRange | null, clip: PlacedClip | undefined) {
+  const span = adjustmentSpan(range, clip);
+  const reason = addAdjustmentReason(project, span);
+  const source = range ? 'the selected range' : 'the selected clip';
+  return {
+    span: reason === null ? span : null,
+    available: reason === null,
+    title:
+      reason ??
+      `Add an adjustment over ${source}, ${adjustmentLabel({ start: span!.start, duration: span!.end - span!.start })}`,
+  };
 }
 
 /** The adjustment grading the selected clip where the playhead is. */
@@ -1398,6 +1418,7 @@ export function Timeline(props: Readonly<Props>) {
   });
 
   const groupDrag = movement.current?.payload.kind === 'group' ? movement.current.payload : null;
+  const addAdjustment = addAdjustmentState(project, props.timeRange, selected);
   const interactionStatus =
     laneGestureMessage(musicGesture, adjustmentGesture) ??
     timelineInteractionMessage(
@@ -1450,6 +1471,9 @@ export function Timeline(props: Readonly<Props>) {
           disabled={interactionBlocked}
           timeRange={props.timeRange}
           selectedCount={selectedClipIds.length}
+          adjustment={
+            selected ? null : (project.adjustments.find((item) => item.id === props.selectedAdjustmentId) ?? null)
+          }
           onSplit={onSplit}
           onDelete={onDelete}
           onQuickTrim={props.onQuickTrim}
@@ -1512,6 +1536,14 @@ export function Timeline(props: Readonly<Props>) {
             const id = crypto.randomUUID();
             onEdit({ type: 'layer-add', layer: createLayer(id, nextLayerName(project)) });
             onSelectLayer(id);
+          }}
+          addAdjustment={addAdjustment}
+          onAddAdjustment={() => {
+            const span = addAdjustment.span!;
+            const id = crypto.randomUUID();
+            onEdit({ type: 'adjustment-add', adjustmentId: id, start: span.start, duration: span.end - span.start });
+            props.onSelectAdjustment(id);
+            if (frame < span.start || frame >= span.end) onSeek(span.start);
           }}
         />
         <div
@@ -1612,6 +1644,7 @@ export function Timeline(props: Readonly<Props>) {
               width={width}
               viewport={scroll}
               frame={frame}
+              duration={layout.duration}
               snapping={snapping}
               beats={beats}
               disabled={adjustmentLaneDisabled(interactionBlocked, adjustmentGesture, dropPlan)}

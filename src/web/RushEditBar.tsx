@@ -1,7 +1,9 @@
+import type { Adjustment } from '../shared/grade.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { sourceRangeForCut, type TimelineRange } from '../shared/rush-editing.js';
 import type { PlacedClip } from '../shared/timeline.js';
 import { formatTimecode } from '../shared/timing.js';
+import { splitAdjustmentReason } from './adjustment-ui.js';
 import { Icon } from './icons.js';
 import './rush-editing.css';
 
@@ -13,6 +15,8 @@ interface Props {
   timeRange: TimelineRange | null;
   /** Clips selected together; deleting removes them all. */
   selectedCount: number;
+  /** The selected adjustment, when no clip is selected: Split and Delete act on it. */
+  adjustment?: Adjustment | null;
   onSplit: () => void;
   onDelete: () => void;
   onQuickTrim: (edge: 'in' | 'out') => void;
@@ -83,6 +87,31 @@ export function RulerRange({
   );
 }
 
+/** What Delete removes: `rangeError` is undefined without a ruler range, else its error or null. */
+function deleteAction(rangeError: string | null | undefined, selectedCount: number, adjustment: boolean) {
+  if (rangeError !== undefined)
+    return {
+      deleteName: 'Delete selected range',
+      deleteTitle:
+        rangeError ??
+        'Remove the selected range from the selected clip in one Undo step; this track’s Ripple setting controls gap closure · Delete',
+    };
+  if (selectedCount > 1)
+    return {
+      deleteName: 'Delete selected clips',
+      deleteTitle: `Remove the ${selectedCount} selected clips in one Undo step; originals remain recoverable · Delete`,
+    };
+  if (adjustment)
+    return {
+      deleteName: 'Delete selected adjustment',
+      deleteTitle: 'Remove this adjustment and its keyframes · Delete',
+    };
+  return {
+    deleteName: 'Delete selected clip',
+    deleteTitle: 'Remove this clip only; originals remain recoverable · Delete',
+  };
+}
+
 /** Frequently used derushing actions stay visible, not inside the rare-actions menu. */
 export function RushEditBar({
   project,
@@ -91,6 +120,7 @@ export function RushEditBar({
   disabled,
   timeRange,
   selectedCount,
+  adjustment,
   onSplit,
   onDelete,
   onQuickTrim,
@@ -100,20 +130,15 @@ export function RushEditBar({
   const sourceFrame = inClip ? selected.retiming.sourceAt(frame - selected.start) : null;
   const canSplit =
     sourceFrame !== null && selected !== undefined && frame > selected.start && sourceFrame > selected.clip.sourceIn;
+  const splitReason = adjustment ? splitAdjustmentReason(adjustment, frame) : null;
   const canTrimIn = sourceFrame !== null && selected !== undefined && sourceFrame > selected.clip.sourceIn;
   const canTrimOut = sourceFrame !== null && selected !== undefined && sourceFrame + 1 < selected.clip.sourceOut;
   const error = cutRangeError(project, selected, timeRange);
-  let deleteName = 'Delete selected clip';
-  let deleteTitle = 'Remove this clip only; originals remain recoverable · Delete';
-  if (timeRange) {
-    deleteName = 'Delete selected range';
-    deleteTitle =
-      error ||
-      'Remove the selected range from the selected clip in one Undo step; this track’s Ripple setting controls gap closure · Delete';
-  } else if (selectedCount > 1) {
-    deleteName = 'Delete selected clips';
-    deleteTitle = `Remove the ${selectedCount} selected clips in one Undo step; originals remain recoverable · Delete`;
-  }
+  const { deleteName, deleteTitle } = deleteAction(
+    timeRange ? error || null : undefined,
+    selectedCount,
+    !selected && !!adjustment,
+  );
 
   return (
     <div className="rush-edit-bar" aria-label="Clip editing actions">
@@ -123,8 +148,12 @@ export function RushEditBar({
           type="button"
           className="secondary-button small"
           aria-label="Split at playhead"
-          title="Split into independent clips; select the right clip · S"
-          disabled={disabled || !canSplit}
+          title={
+            adjustment
+              ? (splitReason ?? 'Split the selected adjustment in two, each with its whole grade · S')
+              : 'Split into independent clips; select the right clip · S'
+          }
+          disabled={disabled || (adjustment ? splitReason !== null : !canSplit)}
           onClick={onSplit}
         >
           <Icon name="split" size={15} />
@@ -157,7 +186,7 @@ export function RushEditBar({
           className={`secondary-button small ${timeRange ? 'range-accent' : ''}`}
           aria-label={deleteName}
           title={deleteTitle}
-          disabled={disabled || (timeRange ? !!error : !selected)}
+          disabled={disabled || (timeRange ? !!error : !selected && !adjustment)}
           onClick={timeRange ? onCutRange : onDelete}
         >
           <Icon name="trash" size={15} />

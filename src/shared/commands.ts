@@ -736,13 +736,41 @@ function overlappingAdjustment(items: readonly Adjustment[], start: number, dura
   );
 }
 
+/** Both pieces keep the whole grade and every keyframe; the second's are rebased onto its start. */
+function splitAdjustment(next: ProjectDocument, command: Extract<EditCommand, { type: 'adjustment-split' }>): void {
+  const item = requiredAdjustment(next, command.adjustmentId);
+  if (command.frame <= item.start || command.frame >= item.start + item.duration)
+    throw new Error('Split an adjustment at a frame inside it, after its first frame.');
+  if (next.adjustments.some((other) => other.id === command.newAdjustmentId))
+    throw new Error('An adjustment with this ID already exists.');
+  if (next.adjustments.length >= MAX_ADJUSTMENTS)
+    throw new Error(`A project has at most ${MAX_ADJUSTMENTS} adjustments. Remove one first.`);
+  const offset = command.frame - item.start;
+  next.adjustments.push({
+    ...structuredClone(item),
+    id: command.newAdjustmentId,
+    start: command.frame,
+    duration: item.duration - offset,
+    keyframes: item.keyframes.map((key) => ({ ...structuredClone(key), frame: key.frame - offset })),
+  });
+  item.duration = offset;
+  next.adjustments.sort((left, right) => left.start - right.start);
+}
+
 function editAdjustment(
   next: ProjectDocument,
-  command: Extract<EditCommand, { type: 'adjustment-add' | 'adjustment-remove' | 'adjustment-range' }>,
+  command: Extract<
+    EditCommand,
+    { type: 'adjustment-add' | 'adjustment-remove' | 'adjustment-range' | 'adjustment-split' }
+  >,
 ): void {
   if (command.type === 'adjustment-remove') {
     requiredAdjustment(next, command.adjustmentId);
     next.adjustments = next.adjustments.filter((item) => item.id !== command.adjustmentId);
+    return;
+  }
+  if (command.type === 'adjustment-split') {
+    splitAdjustment(next, command);
     return;
   }
   adjustmentRange(command.start, command.duration);
@@ -849,6 +877,7 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'adjustment-add':
     case 'adjustment-remove':
     case 'adjustment-range':
+    case 'adjustment-split':
       editAdjustment(next, command);
       // Adjustments never move clips or extend the project.
       return projectSchema.parse(next);
