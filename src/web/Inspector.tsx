@@ -994,18 +994,26 @@ function InspectorPanel({
     if (!sectionRequest) return;
     const { section: target } = sectionRequest;
     setOpen(target, true);
-    // Wait for the tab switch and expansion to lay out, then bring the whole section to the top.
-    let frameId = requestAnimationFrame(() => {
-      frameId = requestAnimationFrame(() => {
-        const element = globalThis.document
-          .querySelector<HTMLElement>(`.inspector-panel [aria-label="${SECTION_TITLES[target]} section"]`)
-          ?.closest('.inspector-section');
-        // Colour starts from the header naming the clip or adjustment it edits.
-        const top =
-          target === 'colour' ? (element?.parentElement?.querySelector(':scope > .colour-target') ?? element) : element;
-        if (element && top) revealInPanel(top, element.querySelector('[data-selected="true"]'));
-      });
-    });
+    // Bring the whole section to the top once the tab switch and expansion are laid out, which a busy page can
+    // commit several frames later.
+    let frameId = 0;
+    let frames = 0;
+    const reveal = (): void => {
+      const title = globalThis.document.querySelector<HTMLElement>(
+        `.inspector-panel [aria-label="${SECTION_TITLES[target]} section"]`,
+      );
+      if (title?.getAttribute('aria-expanded') !== 'true' || !title.checkVisibility()) {
+        frames += 1;
+        if (frames < 60) frameId = requestAnimationFrame(reveal);
+        return;
+      }
+      const element = title.closest('.inspector-section');
+      // Colour starts from the header naming the clip or adjustment it edits.
+      const top =
+        target === 'colour' ? (element?.parentElement?.querySelector(':scope > .colour-target') ?? element) : element;
+      if (element && top) revealInPanel(top, element.querySelector('[data-selected="true"]'));
+    };
+    frameId = requestAnimationFrame(reveal);
     return () => cancelAnimationFrame(frameId);
   }, [sectionRequest]);
   const sourceFrame =
