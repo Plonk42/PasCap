@@ -19,7 +19,7 @@ constant in `AUTO_ADJUST`), [white balance](../../src/shared/white-balance.ts),
 
 **Auto** (accessible name **Auto adjust**, wand icon) ends the Colour keyframe line of a
 **clip grade** (Colour tab, **Clip** target), after **Reset** and the default keyframe toggle;
-track Colour has no Auto. When that line is narrower than 280 px, as with the Properties panel
+adjustments have no Auto. When that line is narrower than 280 px, as with the Properties panel
 at its 270 px minimum, Auto takes its own row at the right so the keyframe count stays
 readable. It is unavailable, with the reason in its tooltip and description, when Colour
 cannot be edited or the clip's recording has no verified proxy. It analyses the selected clip,
@@ -63,7 +63,7 @@ source starts its own analysis; changing Apply as reuses it. While it runs the p
   a line also counts the clips keeping some animated settings (**1 of 3 clips keep their
   animated settings.**), and Apply names its reach: **Apply to 3 clips**.
 - **Apply** commits one Undo step and closes the popover. Hue, HDR, Local contrast, HSL,
-  curves, the tracks, Detail and other clips are untouched.
+  curves, adjustments, the tracks, Detail and other clips are untouched.
   - Grade values: one `colour` edit per analysed clip (`clipIds` of one clip), the scaled
     correction replacing its grade's Temperature, Tint, Saturation, Vibrance, Exposure,
     Brightness, Contrast, Highlights, Shadows, Whites and Blacks, except the ones that grade

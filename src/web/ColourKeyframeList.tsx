@@ -1,11 +1,6 @@
 import { useId } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
-import {
-  continuingSettings,
-  keyframeNeighbors,
-  keySettings,
-  type LayerKeyframe,
-} from '../shared/keyframes.js';
+import { continuingSettings, keyframeNeighbors, keySettings, type LayerKeyframe } from '../shared/keyframes.js';
 import { COLOUR_CONTROLS, type ScalarColourSetting } from '../shared/colour.js';
 import type { ProjectDocument } from '../shared/model.js';
 import type { ColourOwner } from './colour-owner.js';
@@ -32,7 +27,7 @@ interface Props {
 
 function AnimationHelp({ id, clip }: Readonly<{ id: string; clip: boolean }>) {
   return (
-    <HelpPopover label="Animation" className="animation-help" guide="opt-in-to-shared-video-track-animation">
+    <HelpPopover label="Animation" className="animation-help" guide="animate-colour-with-keyframes">
       <p id={id}>
         Each diamond adds a keyframe for that setting on the whole {clip ? 'clip, on the footage shown' : 'adjustment'},
         at the playhead. Settings keyed together share one keyframe; each can have its own easing.

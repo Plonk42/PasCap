@@ -16,7 +16,7 @@
   flex-wrap: nowrap;
 }
 
-/* Speed keys are salmon ◆ boxes slightly shorter than the Colour track markers (which overlap the clip's
+/* Speed keys are salmon ◆ boxes slightly shorter than the clip grade markers (which overlap the clip's
  * bottom edge by 19px), between the clip label and those markers.
  */
 .timeline-clip-key {

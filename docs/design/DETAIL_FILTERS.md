@@ -1,9 +1,9 @@
-# Clip Sharpen, Clarity and Denoise, and track local tone
+# Clip Sharpen, Clarity and Denoise, and local tone
 
 Current contract for [#123](https://github.com/Plonk42/PasCap/issues/123): three
 static, clip-owned detail filters applied identically in preview and native export,
-plus the keyframable track Colour **Shadows**, **Highlights**, **HDR** and **Local contrast**
-settings that share their kernel (see [local Shadows and Highlights](#local-shadows-and-highlights),
+plus the keyframable Colour settings **Shadows**, **Highlights**, **HDR** and **Local contrast**
+of clip grades and adjustments, which share their kernel (see [local Shadows and Highlights](#local-shadows-and-highlights),
 [HDR look](#hdr-look) and [Local contrast](#local-contrast)).
 This describes the implementation contract, not hardware/long-run qualification,
 release approval or milestone closure. Usage is in [the user guide](../USER_GUIDE.md).
@@ -15,14 +15,14 @@ Implementation authorities: [settings and kernel](../../src/shared/detail.ts),
 
 ## Owner decisions
 
-| Question                | Decision                                                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| Settings                | All three: **Sharpen**, **Clarity** and **Denoise**                                                                       |
-| Ownership and animation | Clip-owned and static; no keyframes and no track channels                                                                 |
-| Pipeline position       | On source pixels **before** the Colour grade, around the inverse-mapped source point (so they follow the track Transform) |
-| Original                | Holding **Show original preview** bypasses Colour **and** Detail; geometry, Opacity, fades and music remain               |
-| Radius                  | A fraction of the image height, so the 720p preview predicts 720p and UHD exports                                         |
-| Denoise kind            | Spatial, edge-preserving (bilateral); no temporal or neighbouring-frame access                                            |
+| Question                | Decision                                                                                                                                              |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Settings                | All three: **Sharpen**, **Clarity** and **Denoise**                                                                                                   |
+| Ownership and animation | Clip-owned and static; no keyframes and no track channels                                                                                             |
+| Pipeline position       | On source pixels **before** the Colour grade, around the inverse-mapped source point (so they follow the track Transform)                             |
+| Original                | Holding **Show original preview** bypasses Colour **and** Detail (with Shift, clip grades and Detail only); geometry, Opacity, fades and music remain |
+| Radius                  | A fraction of the image height, so the 720p preview predicts 720p and UHD exports                                                                     |
+| Denoise kind            | Spatial, edge-preserving (bilateral); no temporal or neighbouring-frame access                                                                        |
 
 ## Required data
 
@@ -38,8 +38,8 @@ unknown fields, coercion, persisted defaults or load-time repair.
 Neutral values are creation values only, never defaults for missing saved data.
 Split, marked cuts and duplicate copy the clip's detail into each retained piece;
 trims, moves (including to another track) and Ripple leave it unchanged. Detail never
-changes timing, placement, speed, track Colour/Opacity or music. Projects with an older
-supported schema are upgraded on load; older projects and receipt snapshots are rejected and preserved.
+changes timing, placement, speed, grades, Opacity or music. Projects and receipt snapshots
+saved before the current schema, with track Colour, are rejected with the reason and left unchanged.
 
 ## Kernel
 
@@ -99,8 +99,8 @@ fringes. At most 41 taps per source pixel without local tone (65 with it), plus 
 centre above 720 lines; Sharpen alone
 needs 9, Clarity alone 25, local tone alone 25: Shadows, Highlights, HDR and Local contrast share one base.
 
-**Exact neutral settings are a bypass**: all three zero and track Shadows, Highlights, HDR and
-Local contrast exactly zero skip the kernel entirely, so neutral output is bit-identical to unfiltered
+**Exact neutral settings are a bypass**: all three zero and the source's summed Shadows,
+Highlights, HDR and Local contrast exactly zero skip the kernel entirely, so neutral output is bit-identical to unfiltered
 rendering in preview, static and composited export. Any nonzero value, however small, uses
 the kernel.
 
@@ -123,15 +123,17 @@ measured centre. With $y = Y(D)$:
 
 ## Local Shadows and Highlights
 
-**Shadows** and **Highlights** are track Colour settings in **−1…1**, neutral 0, keyframed
-like the other scalar Colour settings. Like Lightroom's sliders they are local: they
+**Shadows** and **Highlights** are Colour settings of clip grades and adjustments in **−1…1**,
+neutral 0, keyframed like the other scalar Colour settings. A source's clip grade and adjustment
+values are summed, within −1…1, for its one kernel pass. Like Lightroom's sliders they are local: they
 brighten or darken an area according to its base brightness, not each pixel by its own
 value, so dark texture in a bright area and bright texture in a dark area keep their
 contrast. The change is an exposure in linear light, in the manner of darktable's tone
 equaliser: it keeps black at black, colour ratios and local contrast.
 
 - **Base in stops**: $E = \log_2 \max(2^{-16}, \mathrm{EOTF}(B) \cdot 2^{\mathrm{exposure}})$, so
-  tones are chosen after the track's evaluated Exposure (which itself stays in the grade).
+  tones are chosen after the summed evaluated Exposure of both grades (which itself stays in
+  the grades): the exposure the two grades apply in sequence.
   Mid-grey is $E_g = \log_2 0.18$.
 - **Distance from mid-grey**: $r(x) = 0$ below 0, $x^3 - x^4/2$ in 0…1, $x - \tfrac12$ above 1 (a
   ramp with a one-stop smooth knee) and $d(x) = r(x) - r(x - 4)$, which follows the
@@ -158,11 +160,11 @@ local detail, preserving true black, mid-grey and white on flat areas. Its local
 boost is the separate [Local contrast](#local-contrast) setting; HDR 1 with Local contrast 1
 is the look HDR 1 alone used to give.
 
-- **Data**: required track `colour.hdr` in **0–1**, neutral 0 on new tracks, and the
-  fourteenth nullable track keyframe channel `hdr`, after `blacks`. It is keyframed,
-  interpolated, held and reset exactly like the other scalar Colour settings, at
-  absolute project time; both dissolve sources and every clip on the track use the
-  same evaluated value. Missing fields are invalid; earlier schema versions are rejected and preserved.
+- **Data**: required `colour.hdr` in every clip grade and adjustment, **0–1**, neutral 0 on new
+  ones, and the thirteenth nullable keyframe channel `hdr`, after `blacks`. It is keyframed,
+  interpolated, held and reset exactly like the other scalar Colour settings: a clip grade's at
+  its source position, an adjustment's at its own frames. A source's two values are summed
+  within 0–1, and both dissolve sources share the adjustment's. Missing fields are invalid.
 - **Not a grade stage**: it is excluded from the per-pixel grade, its LUTs and LUT
   identity, so animating HDR reuses one scalar LUT. It runs in this kernel, on source
   taps after Denoise, with the evaluated amount $h$.
@@ -178,7 +180,7 @@ is the look HDR 1 alone used to give.
 Any nonzero HDR base or HDR keyframe requires composited export (keyframes already do).
 In preview, HDR uses the detail program variants below; no texture, buffer, decoder,
 LUT or native process is added. The diagnostic two-clip reference and measurement
-helper reject HDR. **Colour → Track** lists HDR in its Effects group, above Local contrast, with the common slider/exact
+helper reject HDR. The **Colour** tab lists HDR in its Effects group, above Local contrast, with the common slider/exact
 field, capture diamond and Previous/Next arrows, live slider preview and one Undo
 per release. The Original preview bypasses it with the rest of Colour.
 
@@ -187,10 +189,11 @@ per release. The Original preview bypasses it with the rest of Colour.
 **Local contrast** is the local-detail boost split out of HDR, so HDR's tone compression and
 this boost can be judged and set separately.
 
-- **Data**: required track `colour.localContrast` in **−1…1**, neutral 0 on new tracks, and
-  the fifteenth nullable track keyframe channel `localContrast`, after `hdr`. It is keyframed,
+- **Data**: required `colour.localContrast` in every clip grade and adjustment, **−1…1**,
+  neutral 0 on new ones, and the fourteenth nullable keyframe channel `localContrast`, after
+  `hdr`. It is keyframed,
   interpolated, held and reset like the other scalar Colour settings; default keyframes set
-  it to 0. Missing fields are invalid; earlier schema versions are rejected and preserved.
+  it to 0. A source's two values are summed within −1…1. Missing fields are invalid.
 - **Tone**: with HDR $h$ and Local contrast $c$, HDR's target becomes
   $y' = B + h\,B(1-B)(1-2B) + (y-B)(1+c)$ on the shared [edge-aware base](#edge-aware-base)
   $B$, applied with HDR's hue-preserving colour step. With HDR 0 it is $y' = y + c\,(y-B)$:
@@ -201,14 +204,14 @@ this boost can be judged and set separately.
   export; the diagnostic two-clip reference and measurement helper reject it. Preview adds
   one `vec2 localContrast` uniform (one value per source) to the detail variants.
 
-**Colour → Track** lists Local contrast last, below HDR in its Effects group, with the common
+The **Colour** tab lists Local contrast last, below HDR in its Effects group, with the common
 slider/exact field, capture diamond, Previous/Next arrows, Reset icon, live slider preview and
 one Undo per release. The Original preview bypasses it with the rest of Colour.
 
 ## Pipeline order
 
-Inverse track Transform mapping → **Detail, HDR, Local contrast, Shadows and Highlights** on source taps → track Colour grade (Temperature/Tint
-… curves) → black fades → Opacity/spatial coverage and grouped source-over. Detail
+Inverse track Transform mapping → **Detail, HDR, Local contrast, Shadows and Highlights** on source taps → the clip grade,
+then the adjustment's grade (each Temperature/Tint … curves) → black fades → Opacity/spatial coverage and grouped source-over. Detail
 is not graded twice, does not change coverage and leaves the exact-neutral opaque
 letterbox path in place: with a neutral pose the filter runs at each fitted pixel
 centre, whose centre tap equals the byte-indexed sample. The Original preview bypasses
@@ -218,15 +221,15 @@ Colour and Detail, never geometry, Opacity, fades, stacking or music.
 
 The WebGL shader generates its tap tables from the same constants as the CPU kernel.
 The kernel lives only in three separate detail variants of the fixed programs, compiled
-when a loaded or edited project first contains nonneutral detail or nonzero track
-Shadows, Highlights, HDR or Local contrast, as a base or keyframe value (including a live slider draft),
+when a loaded or edited project first contains nonneutral detail or nonzero
+Shadows, Highlights, HDR or Local contrast in a clip grade or adjustment, as a base or keyframe value (including a live slider draft),
 before any draw uses them; uniforms are two `vec4` per source (settings; stride and the
 measurement shift from the texture height, negative in texture V since rows run bottom-up), one
-`vec4` per source of (Shadows, Highlights, HDR, Exposure) and one `vec2` of Local contrast
+`vec4` per source of the summed (Shadows, Highlights, HDR, Exposure) and one `vec2` of summed Local contrast
 (one value per source). Groups whose sources are all
 neutral with zero local tone (and the Original preview) keep the unchanged programs: software rasterizers can pay for
 texture taps behind an untaken uniform branch. No texture, framebuffer, decoder or
-pass is added; sources are still graded once.
+pass is added; each grade still grades a source once.
 
 Any nonneutral clip detail requires composited export; the static LUT fast path
 cannot represent a neighbourhood filter. The native compositor evaluates the shared
@@ -241,8 +244,9 @@ reference and the measurement helper reject nonneutral detail.
 
 When a hardware GPU is available, export renders every track group frame whose CPU path
 is per-pixel heavy with the **same WebGL programs as the preview**: nonneutral detail,
-Shadows, Highlights, HDR or Local contrast, nonneutral HSL ranges or colour curves, or a nonneutral evaluated track Transform pose on
-either source. It uses one headless Chrome page the service launches per
+or Shadows, Highlights, HDR, Local contrast, HSL ranges or colour curves in either grade (clip
+grade or adjustment) of a source, or nonneutral evaluated Transform geometry on
+either source; Opacity alone does not count. It uses one headless Chrome page the service launches per
 export ([service side](../../src/server/gpu-compositor.ts),
 [page](../../src/gpu-worker/main.ts)). Neutral, scalar-colour and Opacity/fade-only
 frames stay on the CPU compositor, which is exact there (neutral frames stay bit-identical),
@@ -357,7 +361,7 @@ noise, so Denoise is rarely suggested even when the 4K original shows grain.
   mid-grey, tone choice after Exposure and untouched dark texture in a bright area, commands,
   export routing, one reused LUT while local tone animates and the
   native compositor at 720p and UHD (≤ 0.01/255 before RGBA16 rounding).
-- GPU (SwiftShader in CI): every setting, track HDR, Local contrast, Shadows/Highlights with Exposure and
+- GPU (SwiftShader in CI): every setting, HDR, Local contrast, Shadows/Highlights with Exposure and
   rotated/scaled combinations against the
   CPU kernel on a 720p synthetic texture at 1280×720 and 3840×2160, max < 2/255 and
   mean < 0.6/255 per channel; each case must change the fixture by more than 8/255.

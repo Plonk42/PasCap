@@ -750,7 +750,7 @@ for (const viewport of [
       expect(transform.top).toBeLessThan(speed.top);
       expect(transform.colour).not.toBe(speed.colour);
       expect(transform.borderColour).not.toBe(speed.borderColour);
-      // Both are boxed buttons of the same family as the Colour track markers.
+      // Both are boxed buttons of the same family as the clip grade markers.
       expect([transform.border, speed.border]).toEqual(['solid', 'solid']);
       expect(speed.width).toBe(transform.width);
       for (const activation of [

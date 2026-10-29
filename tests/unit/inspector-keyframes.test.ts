@@ -73,7 +73,7 @@ describe('dedicated Inspector keyframe controls', () => {
     expect(colourPanel).toContain('aria-label="Colour target"');
     expect(target('Clip grade')).toContain('aria-disabled="true"');
     expect(target('Adjustment')).toContain('aria-checked="true"');
-    expect(colourPanel).toContain('No adjustment at the playhead');
+    expect(colourPanel).toContain('>No adjustment</strong><span>At the playhead</span>');
     expect(colourPanel).toContain('aria-label="New adjustment"');
     expect(colourPanel).not.toContain('aria-label="Colour section"');
     expect(colourPanel).not.toContain('Opacity');

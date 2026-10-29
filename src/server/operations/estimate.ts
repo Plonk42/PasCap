@@ -146,7 +146,7 @@ function targetOf(project: ProjectDocument, input: Input, context: ServiceContex
   if (input.layerId !== undefined) {
     if (input.kind !== 'detail' && input.commands)
       throw invalid(
-        'A track has no Colour of its own: write each clip\'s grade with applyAs shots, or give commands false for the values of one compromise.',
+        "A track has no Colour of its own: write each clip's grade with applyAs shots, or give commands false for the values of one compromise.",
       );
     return trackTarget(project, input);
   }

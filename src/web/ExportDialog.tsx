@@ -245,8 +245,8 @@ export function ExportDialog({
           <p>After submission, rendering continues in Activity and the editor remains available.</p>
         </section>
         <p className="activity-hint">
-          {settings.width} × {settings.height} · {summary.keys.settings} keyed colour values ·{' '}
-          {summary.keys.transform} Transform keyframes.
+          {settings.width} × {settings.height} · {summary.keys.settings} keyed colour values · {summary.keys.transform}{' '}
+          Transform keyframes.
         </p>
         {summary.layered ? (
           <aside className="activity-export-warning" aria-labelledby={`${id}-resources`}>

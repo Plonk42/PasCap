@@ -8,8 +8,9 @@ to analysed music and export a 720p draft or 4K final with native FFmpeg. An AI
 assistant connected through MCP can build a first cut for you to finish. Footage stays
 on your machine and is **referenced in place, never uploaded, copied or modified**.
 
-PasCap is pre-release, but its owner edits real projects with it: projects saved by
-earlier versions keep opening, upgraded on load. Synthetic tests in CI target
+PasCap is pre-release, but its owner edits real projects with it. Projects saved before clip
+grades and adjustments replaced track Colour cannot be opened and are left unchanged; a later
+format change upgrades projects when they open. Synthetic tests in CI target
 correctness; intended-GPU playback and a complete long-flight edit are still
 qualification work, not performance claims. PasCap runs natively as a local service;
 there is no container package, and GitHub Pages and cloud editing are not deployment
@@ -41,15 +42,17 @@ targets.
 
 **Look**
 
-- Track-owned Colour: Opacity, Temperature, Tint, Exposure, Brightness, Contrast,
-  Highlights, Shadows, Whites, Blacks, Hue, Saturation, Vibrance, an SDR **HDR** look and
-  Local contrast, each keyframable on its own; static HSL ranges and colour curves.
-- **Auto white balance** keyframes Temperature and Tint from the light around the playhead;
+- **Clip grades** and **adjustments**: each clip has its own Colour, which follows it, and an
+  adjustment grades every video track over a stretch of the film. Temperature, Tint, Exposure,
+  Brightness, Contrast, Highlights, Shadows, Whites, Blacks, Hue, Saturation, Vibrance, an SDR
+  **HDR** look and Local contrast, each keyframable on its own; static HSL ranges and colour curves.
+- **Auto white balance** keyframes a clip's Temperature and Tint from the light around the playhead;
   **Auto adjust** fits eleven Colour settings from the second around the playhead, a whole
-  clip or a whole track, as track values or a keyframe.
-- Track **Transform** (crop, scale, translate, rotate) with its own keyframes, and clip
+  clip or each clip of its track, into clip grades as values or a keyframe.
+- Track **Transform** (crop, scale, translate, rotate and Opacity) with its own keyframes, and clip
   **Sharpen**, **Clarity** and **Denoise**.
-- Hold **Original** to compare with the ungraded image.
+- Hold **Original** to compare with the ungraded image; with Shift or Alt, without only the clip
+  grades or only the adjustments.
 
 **Music**
 
@@ -114,9 +117,10 @@ directory, and do not expose the unauthenticated service to a network.
 The [user guide](docs/USER_GUIDE.md) covers the full workflow, keyboard shortcuts and
 recovery. The [editor control vocabulary](docs/design/EDITOR_CONTROLS.md#vocabulary)
 defines Recording (file), Clip (timeline instance of a recording), Track (video or
-music), Keyframe (animation value), Range (IN/OUT) and Kept range. Colour, Opacity and
-Transform belong to the video track and apply to every clip on it: put clips that need
-a different treatment on their own track. Filesystem file drops and browser upload
+music), Clip grade (a clip's own Colour), Adjustment (one grade for every video track over a
+range of the film), Keyframe (animation value), Range (IN/OUT) and Kept range. A clip's grade
+follows it through trims and moves; Transform and Opacity belong to the video track and apply
+to every clip on it. Filesystem file drops and browser upload
 pickers are intentionally disabled: no import flow duplicates your original footage.
 
 ### Edit with an assistant
@@ -156,10 +160,10 @@ session lease and checkpoint count (`PASCAP_ASSISTANT_*`) are described in the
 Missing mounts and symlinks fail explicitly. See [local deployment](docs/DEPLOYMENT.md)
 for storage, permissions, network and toolchain rules.
 
-**Saved data:** projects follow a strict schema. A project saved by an earlier
-supported version is upgraded when it opens, and its first save keeps the original
-file beside it; projects from early development versions stay unchanged on disk but
-cannot be opened. Nothing is default-filled or deleted automatically. The video and
+**Saved data:** projects follow a strict schema. Projects saved before the current schema, with
+track Colour, cannot be opened: PasCap names the reason and leaves them unchanged on disk. A
+later format change upgrades a project when it opens, and its first save keeps the original
+file beside it. Nothing is default-filled or deleted automatically. The video and
 music registries are version 2 (full-content checksums); export receipts keep a
 snapshot of the exported project. **Projects → Save file** keeps your own copy of a
 project; **Open project file…** opens one as a new project. Unsaved in-memory changes
@@ -201,7 +205,7 @@ qualification, feedback on the assistant and native toolchain setup. See
 - [Timeline editing and kept ranges](docs/TIMELINE_EDITING.md)
 - [Tracks and keyframes](docs/LAYERS_AND_KEYFRAMES.md)
 - [Speed, music analysis and audio](docs/SPEED_AND_AUDIO.md) · [multiple music tracks](docs/design/MULTIPLE_MUSIC.md)
-- [Timing and colour equations](docs/COLOUR_AND_TIMING.md) · [track appearance](docs/design/ROW_APPEARANCE.md) · [Temperature and Tint](docs/design/TEMPERATURE_AND_TINT.md) · [Auto adjust](docs/design/AUTO_ADJUST.md) · [HSL and curves](docs/design/HSL_AND_CURVES.md)
+- [Timing and colour equations](docs/COLOUR_AND_TIMING.md) · [clip grades and adjustments](docs/design/ROW_APPEARANCE.md) · [Temperature and Tint](docs/design/TEMPERATURE_AND_TINT.md) · [Auto adjust](docs/design/AUTO_ADJUST.md) · [HSL and curves](docs/design/HSL_AND_CURVES.md)
 - [Track Transform](docs/design/SPATIAL_TRANSFORMS.md) · [detail filters, HDR and Local contrast](docs/design/DETAIL_FILTERS.md)
 - [WebCodecs preview decoding](docs/design/WEBCODECS_PREVIEW.md) · [source relinking](docs/design/SOURCE_RELINK.md)
 - [Assistant rough cut through MCP](docs/design/ASSISTANT_MCP.md)

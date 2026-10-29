@@ -3,13 +3,15 @@
 Approved owner choices for [#25](https://github.com/Plonk42/PasCap/issues/25),
 related to [#17](https://github.com/Plonk42/PasCap/issues/17) and
 [#24](https://github.com/Plonk42/PasCap/issues/24).
-This record retains the accepted schema-6 decisions, not the current persistence
-or opacity contract. [#67](https://github.com/Plonk42/PasCap/issues/67) supersedes its
-two-opacity descriptions with the current sole video track contract: required numeric `VideoLayer.opacity`
-(1 on new tracks), no saved `clip.opacity`, and the sole track keyframe channel `opacity`
-overriding the track value on every source, without an additional group multiplier.
-The single **Opacity** control is in **Colour → Track**; **Placement** contains
-placement only. The accepted schema-6 body below remains historical. Track visibility,
+This record retains the accepted schema-6 decisions, not the current persistence,
+opacity or colour contract. [#67](https://github.com/Plonk42/PasCap/issues/67) and
+[#286](https://github.com/Plonk42/PasCap/issues/286) supersede its two-opacity descriptions:
+Opacity is now a setting of each video track's Transform (`transform.base.opacity`, 1 on new
+tracks, overridden by nullable `opacity` in Transform keyframes) on every source, without an
+additional group multiplier, and there is no saved `clip.opacity`. The **Opacity** control is
+in **Track → Transform**; **Placement** contains placement only. #286 also replaces the
+historical body's track Colour and shared track keyframes with
+[clip grades and adjustments](ROW_APPEARANCE.md). The accepted schema-6 body below remains historical. Track visibility,
 Ripple, transitions/fades, grouped dissolves and resource bounds retain their
 semantics. [#35's current contract](MULTIPLE_MUSIC.md) supersedes the
 historical body's video-only duration/single-music assumptions: music can extend
@@ -17,7 +19,7 @@ project OUT, with closing video fades at clip OUT then black through the music
 tail. [#89](https://github.com/Plonk42/PasCap/issues/89)'s current contract
 supersedes the historical body's track Speed and contextual track-Speed duration
 descriptions: speed is clip-only, a clip's duration never depends on its track or
-start, and shared track keyframes are appearance-only. Historical semantics and identifiers are unchanged; explanatory terminology follows
+start, and keyframes are appearance-only. Historical semantics and identifiers are unchanged; explanatory terminology follows
 [the control vocabulary](EDITOR_CONTROLS.md#vocabulary). Current usage belongs in
 [the track contract](../LAYERS_AND_KEYFRAMES.md), [editing guide](../TIMELINE_EDITING.md)
 and [retiming contract](../SPEED_AND_AUDIO.md). Publication, verification and remaining
