@@ -1084,7 +1084,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
       ),
     };
     right.grade = {
-      colour: { ...NEUTRAL_COLOUR, contrast: 1.2, blacks: 0.06 },
+      colour: { ...createColourSettings(), contrast: 1.2, blacks: 0.06 },
       keyframes: [layerKeyAsGradeKey(layerKeyframe(8, { ...EMPTY_KEY_VALUES, tint: 0.5 }, 'linear'))],
     };
     // HSL in one clip grade takes its source through the exact grade, in sequence with the track's.
