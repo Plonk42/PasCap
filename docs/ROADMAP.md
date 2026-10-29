@@ -58,7 +58,7 @@ sequence there, and turning it off retains actual placements. Video tracks displ
 bottom-to-top composition order without primary/overlay roles. The UI provides a
 pinned ruler, synchronized native track access, accessible action bounds and contextual
 heading help. Properties tabs are **Clip / Colour / Track / Audio**, split by ownership:
-**Colour** edits the selected clip's grade or the adjustment at the playhead; its
+**Colour** edits the grade of the selected clip or adjustment; its
 [keyframe list](https://github.com/Plonk42/PasCap/issues/26) sits at the
 end of the Colour section, under a small **Keyframes** heading with animation/timing help
 beside it, followed by HSL ranges and Colour curves. Nested keyframe details retain drafts and input

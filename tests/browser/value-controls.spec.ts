@@ -331,7 +331,10 @@ test('adjustment Colour captures its base and keeps precise release-only edits i
   await expect(base).toHaveValue('4');
   await unchanged(page, before);
   await base.press('Escape');
+  // Selecting a clip shows its own grade; the adjustment keeps its value for when it is selected again.
   await page.locator('[data-clip-id="two"] .timeline-clip-body').click();
+  await expect(base).toHaveValue('0');
+  await inspectorTab(page, 'Adjustment');
   await expect(base).toHaveValue('0.5');
   changed = await current(page);
   expect(changed.adjustments[0]!.colour.exposure).toBe(0.5);

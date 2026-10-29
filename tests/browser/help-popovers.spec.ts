@@ -227,14 +227,20 @@ test('Colour, Track and Audio bulk expansion change only their own sections', as
 test('bulk collapse retains invalid drafts, nested disclosure state and reachable heading help at the minimum viewport', async ({
   page,
 }) => {
+  // The selected clip's grade is keyed, so its Colour tab and Clip tab show together.
+  const keyed = await current(page);
+  keyed.clips[0]!.grade.keyframes = [gradePoint(10, { exposure: 0 }), gradePoint(90, { exposure: 0.8 })];
+  memory.seed(keyed);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
   const before = await current(page);
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true, includeHidden: true });
   await input.fill('0.5');
   await input.press('Enter');
-  await inspectorTab(page, 'Adjustment');
-  const list = page.getByRole('list', { name: 'Edit adjustment keyframes', exact: true, includeHidden: true });
+  await inspectorTab(page, 'Clip grade');
+  const list = page.getByRole('list', { name: 'Edit clip keyframes', exact: true, includeHidden: true });
   await expect(list).toBeVisible();
-  const point = page.getByLabel('Edit adjustment keyframe 10', { exact: true });
+  const point = page.getByLabel('Edit clip keyframe 10', { exact: true });
   // Edit details start closed; an opened one stays open across bulk collapse.
   await expect(point.locator('..')).not.toHaveAttribute('open');
   await point.click();

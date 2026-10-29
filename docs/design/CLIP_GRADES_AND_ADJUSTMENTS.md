@@ -4,10 +4,9 @@ Decision record for [#215](https://github.com/Plonk42/PasCap/issues/215), part o
 v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)). **Status: decided; the clip grade
 ([#273](https://github.com/Plonk42/PasCap/issues/273)), Auto writing it
 ([#285](https://github.com/Plonk42/PasCap/issues/285)) and adjustment items replacing track
-Colour ([#286](https://github.com/Plonk42/PasCap/issues/286)) are implemented on the v1.3 branch;
-items on the timeline (#287) are in progress (the pinned lane with selection, creation, move, trim,
-split, delete, keyframe markers, selection with clips and Copy / Paste grade is implemented); MCP
-(#288) and the UX evaluation (#289) are not.** The
+Colour ([#286](https://github.com/Plonk42/PasCap/issues/286)) and items on the timeline
+([#287](https://github.com/Plonk42/PasCap/issues/287), with the Colour tab following the
+selection) are implemented on the v1.3 branch; MCP (#288) and the UX evaluation (#289) are not.** The
 current contracts are [clip grades and adjustments](ROW_APPEARANCE.md),
 [spatial transforms](SPATIAL_TRANSFORMS.md) (with Opacity), [HSL and curves](HSL_AND_CURVES.md),
 [Temperature and Tint](TEMPERATURE_AND_TINT.md), [detail filters](DETAIL_FILTERS.md) and
@@ -184,16 +183,14 @@ Follows the requirements of #289: one settings panel, an unmistakable target.
   the Colour section (groups, keyframe line, Auto, stored keyframes), **HSL ranges** and
   **Colour curves**, with today's controls and behaviour. Its pinned header names the target:
   the clip ("Clip 3 · DJI_0468"), or the item by its range ("Adjustment 01:12:05 – 01:20:00").
-  Between #273 and #286 it served the selected clip or the selected track. With #286
-  implemented, a **Clip / Adjustment** switch chooses the selected clip's grade or the item at
-  the playhead, and the header says which.
-- **Target rules (owner).** Nothing is edited implicitly. With no clip or item selected, the tab
-  shows nothing to edit and a hint to select one. Clips and items can be selected together
-  (Ctrl/Cmd-click), so they can be dragged together; with several clips, or a clip and an item,
-  editing is disabled with the reason. Items are now selectable on the timeline: a selected item is
-  the Adjustment target; without one, the Adjustment target still edits the item at the playhead
-  and offers **New adjustment** over the selected ruler range or clip where there is none, until the
-  rest of #287 replaces the switch with the selection.
+  Between #273 and #286 it served the selected clip or the selected track; #286 added a temporary
+  **Clip / Adjustment** switch, which #287 replaced with the timeline selection.
+- **Target rules (owner, implemented).** Nothing is edited implicitly. The tab edits the selected
+  clip's grade or the selected item; with no clip or item selected, it shows nothing to edit and a
+  hint to select one. Clips and items can be selected together (Ctrl/Cmd-click), so they can be
+  dragged together; with several clips, or a clip and an item, editing is disabled with the reason.
+  Items are created on the adjustment track (drawn, or with its **Add adjustment** over the ruler
+  range or the selected clip).
 - **Track tab (owner, implemented).** It keeps **Transform**, which now includes an **Opacity** setting (UI
   0–100%) with its triangle and per-setting Previous/Next like the other eight, then Transitions
   and Fades. The section keeps its name for now.

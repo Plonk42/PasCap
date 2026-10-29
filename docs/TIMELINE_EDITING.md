@@ -501,9 +501,9 @@ ruler above the video tracks, so they stay in view however the tracks scroll. It
   unavailable, with the reason in its tooltip, without either, over another adjustment or at 64.
 - **Select:** a click selects the adjustment, puts the playhead where it was clicked and opens the
   Colour tab on it; Enter or Space selects it and moves the playhead into it when outside. A plain
-  click on a clip or selecting a track clears it. While an adjustment is selected the Colour tab edits it, even with the
-  playhead elsewhere (keyframes are then captured only on its own frames); otherwise the Adjustment
-  target edits the one at the playhead.
+  click on a clip or selecting a track clears it. The Colour tab edits the selected adjustment, even
+  with the playhead elsewhere (keyframes are then captured only on its own frames), as it edits a
+  selected clip's grade; with nothing selected it edits nothing.
 - **The selected clip's adjustment:** when a clip is selected and the playhead is on it, the
   adjustment grading it there has a dashed ring, distinct from the solid selection, and its name
   adds **(grades the selected clip)**.
@@ -999,7 +999,7 @@ Other integer source/placement frames, durations and fades retain exact native
 numeric steppers and existing timecode feedback, without arbitrary timing sliders.
 Source-review IN/OUT fields apply as a pair on Enter or when focus leaves both; Escape restores.
 **Clip / Colour / Track / Audio** separates clip-owned source/placement/speed/Detail, the
-selected clip's grade or the adjustment at the playhead, track-owned Transform (with
+the grade of the selected clip or adjustment, track-owned Transform (with
 Opacity)/transitions/fades, and music. The header directly exposes
 help; **Workspace options**
 holds layout reset and Diagnostics, while Media and the Properties panel collapse from their

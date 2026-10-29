@@ -369,21 +369,16 @@ and incompatible fades/transitions/overlaps reject the edit rather than being sh
 
 ### Grade a clip or a stretch of the film
 
-The **Colour** Properties tab edits one grade at a time. Its pinned header names it, beside the
-**Clip / Adjustment** switch (the arrow keys move between them); the choice stays while you
-select other clips.
+The **Colour** Properties tab edits the grade of what you select on the timeline. Its pinned
+header names it.
 
-- **Clip** edits the selected clip's **grade**: the header names the clip and says **This clip
-  only**. Without a selected clip the tab shows the adjustment instead. With several clips
-  selected, it asks you to select one.
-- **Adjustment** edits the **adjustment** at the playhead: one grade of every video track over a
-  stretch of the film, after each clip's own grade. The header names it by its range, such as
-  **Adjustment 01:12:05 – 01:20:00**, and says **Every track within this range**; its trash
-  deletes it with its keyframes. Without one at the playhead, the header reads **No
-  adjustment**: drag on the time ruler to select a range and choose **Over the selected range**,
-  or select a clip and choose **Over the selected clip**. Adjustments never overlap, so a choice
-  over another one is unavailable and says why; at most 64 exist. The playhead moves into the new
-  adjustment.
+- A selected **clip**: its own **grade**. The header names the clip and says **This clip only**.
+- A selected **adjustment**: one grade of every video track over a stretch of the film, after
+  each clip's own grade. The header names it by its range, such as **Adjustment 01:12:05 –
+  01:20:00**, and says **Every track within this range**; its trash deletes it with its
+  keyframes. Click an adjustment on the adjustment track to select it; to grade a stretch that
+  has none, draw one there first.
+- Nothing selected, or several clips or adjustments: the tab edits nothing and says why.
 
 A clip grade stays with the clip's footage: trimming, moving
 it (to another track too), Ripple, splitting, duplicating and Reverse keep it, and split or
@@ -398,7 +393,8 @@ An adjustment stays at its place in the film: trimming, moving, rippling or dele
 moves it, and it never makes the project longer. Its keyframes count from its start (the
 **Adjustment keyframes** list shows **Frame in adjustment**). Adjustments sit on the adjustment
 track, pinned under the time ruler: drag across an empty stretch to draw one, or use **+** in its
-header to cover the selected ruler range or clip; click one to edit it in the Colour tab, drag it
+header to cover the selected ruler range or clip (adjustments never overlap, and at most 64 exist;
+otherwise **+** is unavailable and says why); click one to edit it in the Colour tab, drag it
 to move it with its keyframes (amber ◆ markers inside it), drag its edges to trim it, press **S** to
 split it at the playhead and Delete to remove it. When a clip is selected, the adjustment grading it
 at the playhead has a dashed ring. Ctrl-click (Cmd-click) selects clips and adjustments together, to
@@ -890,7 +886,7 @@ assistant adds stay inside the ranges you kept in Source preview.
 ## Workspace and keyboard
 
 Use **Clip** for the selected clip's **Speed**, **Detail**, **Range** and **Placement**;
-**Colour** for the selected clip's grade or the adjustment at the playhead (Colour, HSL ranges,
+**Colour** for the grade of the selected clip or adjustment (Colour, HSL ranges,
 Colour curves and their keyframes); **Track** for what the whole video track owns (Transform
 with Opacity, transitions and fades); and **Audio** for music. Each tab names its scope at the top.
 Selecting a clip or a populated/empty video track preserves the chosen tab and updates
