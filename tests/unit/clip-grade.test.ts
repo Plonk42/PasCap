@@ -30,7 +30,8 @@ import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
-import { sampleTimeline, type PreviewLayer } from '../../src/shared/timeline.js';
+import { calculateLayout, sampleTimeline, type PreviewLayer } from '../../src/shared/timeline.js';
+import { clipColourOwner, displayedColour, gradeValuePosition } from '../../src/web/colour-owner.js';
 
 const gradeKey = (frame: number, values: Partial<typeof EMPTY_KEY_VALUES>, curve: 'linear' | 'hold' = 'linear') =>
   layerKeyAsGradeKey(layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, curve));
@@ -173,6 +174,30 @@ describe('source grades', () => {
     expect(held!.sourceFrame).toBe(0);
     expect(held!.grade.exposure).toBeCloseTo(0.05, 12);
     expect(sampleTimeline(document, 20)[0]!.grade.exposure).toBe(1);
+  });
+
+  it('shows the image’s value between keys, and a keyframe’s own value at its source frame', () => {
+    const document = project();
+    const clip = document.clips[0]!;
+    clip.speed = { mode: 'constant', rate: 0.5 };
+    clip.grade.keyframes = [
+      gradeKey(0, { exposure: 0 }),
+      gradeKey(5, { contrast: 1.5 }),
+      gradeKey(10, { exposure: 1 }),
+    ];
+    const placed = calculateLayout(document).clips[0]!;
+    const owner = clipColourOwner(document.layers[0]!, clip, 'clip 1');
+    // Project frame 3 holds source frame 1 at position 1.5: no key there, so the controls show the image.
+    expect(gradeValuePosition(placed, 3)).toBe(1.5);
+    const between = displayedColour(owner, 1, gradeValuePosition(placed, 3));
+    expect(between.exposure).toBeCloseTo(sampleTimeline(document, 3)[0]!.grade.exposure, 12);
+    expect(between.exposure).toBeCloseTo(0.15, 12);
+    expect(between.contrast).toBe(1.5);
+    // Project frame 1 holds source frame 0 at position 0.5: its Exposure keyframe shows its own value, to edit.
+    const keyed = displayedColour(owner, 0, gradeValuePosition(placed, 1));
+    expect(keyed.exposure).toBe(0);
+    expect(sampleTimeline(document, 1)[0]!.grade.exposure).toBeCloseTo(0.05, 12);
+    expect(keyed.contrast).toBe(1.5);
   });
 });
 
