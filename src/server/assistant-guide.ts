@@ -72,13 +72,16 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
 
 ## 6. Grade
 - Each clip has its own grade (a clipId on the colour commands), applied first and kept with
-  the clip when it moves. An adjustment (adjustment-add, then an adjustmentId on the colour
-  commands) grades every track over a stretch of the film, after the clip grades, for a shared
-  look; adjustments never overlap. describe_track reads the grades before you change them:
+  the clip when it moves. An adjustment grades every track over a stretch of the film, after the
+  clip grades, for a shared look, such as one per music section: adjustment-add with its
+  settings, then an adjustmentId on the colour commands; adjustment-range moves or trims it,
+  adjustment-split cuts it in two. Adjustments never overlap and stay at their project frames
+  when clips move. describe_project lists them with what they change; describe_track gives what
+  each clip's grade changes and the adjustments over it. Read them before changing a grade:
   settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve).
   Prefer static grades; animate only when the brief asks or the light changes within a shot
-  (clip keyframes are source frames, adjustment keyframes count from its start). Once you know
-  the track, include keyframes or at with the settings you changed rather than all of it.
+  (clip keyframes are source frames, adjustment keyframes count from its start). describe_track
+  with include keyframes lists them; with at and the settings you changed it reads far less.
 - Start from estimate: auto-adjust on a representative clip gives the editor's Auto correction
   and the edit applying it to its clip grade; white-balance only Temperature and Tint; detail
   suggests a clip's Denoise and Sharpen (clipIds or layerId: every clip in one call). For a

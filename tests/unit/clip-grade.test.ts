@@ -29,6 +29,7 @@ import {
 } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { gradeSummary } from '../../src/shared/operations/grade-summary.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout, sampleTimeline, type PreviewLayer } from '../../src/shared/timeline.js';
@@ -304,12 +305,34 @@ describe('clip grade commands', () => {
 });
 
 describe('clip grades for the assistant', () => {
+  it('summarises a grade by what differs from neutral: settings, HSL ranges, curves and a keyframe count', () => {
+    expect(gradeSummary(createClipGrade())).toEqual({ settings: {}, keyframes: 0 });
+    const colour = createColourSettings();
+    colour.contrast = 1.1;
+    colour.hsl.blue = { hue: -5, saturation: 0.2, lightness: 0 };
+    colour.curves.master = [
+      { x: 0, y: 0.05 },
+      { x: 1, y: 1 },
+    ];
+    expect(gradeSummary({ colour, keyframes: [{}, {}] })).toEqual({
+      settings: { contrast: 1.1 },
+      hsl: { blue: { hue: -5, saturation: 0.2, lightness: 0 } },
+      curves: { master: colour.curves.master },
+      keyframes: 2,
+    });
+  });
   it('reads each clip grade on its track, the grade shown at a frame and the adjustment there', async () => {
     let document = applyCommand(project(), { type: 'colour-setting', clipId: 'a', setting: 'saturation', value: 1.3 });
     document = applyCommand(document, { type: 'layer-key-set', clipId: 'a', frame: 10, values: { tint: 0.2 } });
     document = projectSchema.parse({
       ...document,
       adjustments: [{ ...createAdjustment('look', 60, 40), colour: { ...NEUTRAL_COLOUR, saturation: 1.2 } }],
+    });
+    document = applyCommand(document, {
+      type: 'layer-key-set',
+      adjustmentId: 'look',
+      frame: 5,
+      values: { exposure: 0.2 },
     });
     const context = { projects: { load: async () => document } } as unknown as Parameters<
       typeof runners.describe_track
@@ -318,18 +341,34 @@ describe('clip grades for the assistant', () => {
       projectId: document.id,
       layerId: 'video-1',
       frames: [10, 70],
-      include: ['grades', 'at'],
+      include: ['grades', 'keyframes', 'at'],
       settings: ['tint', 'saturation'],
     });
+    // Each clip compactly, with the adjustments over it; the keyframes on request.
     expect(described.grades).toEqual([
-      {
-        clipId: 'a',
-        colour: { ...NEUTRAL_COLOUR, saturation: 1.3 },
-        keyframes: [
-          { frame: 10, timecode: '00:00:10', values: { tint: 0.2 }, easing: { tint: 'linear' }, reset: false },
-        ],
-      },
+      { clipId: 'a', grade: { settings: { saturation: 1.3 }, keyframes: 1 }, adjustmentIds: [] },
+      { clipId: 'b', grade: { settings: {}, keyframes: 0 }, adjustmentIds: ['look'] },
     ]);
+    expect(described.keyframes).toEqual({
+      transform: [],
+      clips: [
+        {
+          clipId: 'a',
+          keyframes: [
+            { frame: 10, timecode: '00:00:10', values: { tint: 0.2 }, easing: { tint: 'linear' }, reset: false },
+          ],
+        },
+      ],
+      // Counted from the adjustment's start, with the timecode of its project frame.
+      adjustments: [
+        {
+          adjustmentId: 'look',
+          keyframes: [
+            { frame: 5, timecode: '00:02:05', values: { exposure: 0.2 }, easing: { exposure: 'linear' }, reset: false },
+          ],
+        },
+      ],
+    });
     expect(described.at).toEqual([
       {
         frame: 10,
