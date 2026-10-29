@@ -3,7 +3,7 @@
 Approved contract for [#68](https://github.com/Plonk42/PasCap/issues/68), with
 [automatic white balance](#automatic-white-balance) from [#218](https://github.com/Plonk42/PasCap/issues/218).
 These are normalized **SDR colour controls**, not Kelvin, HDR output or highlight
-recovery. [Auto adjust](AUTO_ADJUST.md) sets them, as bases or keyframes, with the same estimate. This
+recovery. [Auto adjust](AUTO_ADJUST.md) sets those of a clip grade, as values or keyframes, with the same estimate. This
 guide specifies behaviour and required validation, not completed tests or hardware
 qualification.
 
@@ -85,13 +85,11 @@ native process; existing frame/pixel/resource and A/V gates remain unchanged.
 
 ## Automatic white balance
 
-**Auto white balance**, a button under Tint in **Colour → Track**, estimates the light at
-the playhead and keyframes Temperature and Tint there. It only chooses values: no
+**Auto white balance**, a button under Tint in the Colour tab of a **clip grade** (track Colour has none, [#285](https://github.com/Plonk42/PasCap/issues/285)), estimates the light at the playhead and keyframes the grade's Temperature and Tint at the source frame shown there. It only chooses values: no
 schema, grade stage, render, export or decoder changes. Its constants live in one
 module, [white-balance.ts](../../src/shared/white-balance.ts), as starting values to tune on real flights.
 
-**Frames.** The clip of the selected track shown at the real playhead (in a dissolve,
-the selected clip when it is one of the two, else the one past its midpoint) supplies
+**Frames.** The graded clip, with the real playhead on it (in a dissolve too), supplies
 **16 project frames**: the playhead and up to **30 frames (1 s) on each side**, never
 across that clip's ends, the other fifteen shared between the two sides in proportion to
 their room and evenly spaced (the same window as [Auto adjust](AUTO_ADJUST.md)'s Playhead source, so both estimate
@@ -127,18 +125,12 @@ warm one, which viewers accept more readily (a sunset stays warm), and
 $I'=\mathrm{soft}(0.8kI,0.3)$, rounded to thousandths. No frame with an estimate is an
 explicit error.
 
-**Capture.** The result is captured at the real playhead exactly like the two capture
-diamonds: it creates the track keyframe there or joins the existing one, adopting the
+**Capture.** The result is captured at the source frame the clip shows at the real playhead, exactly like the two capture diamonds: it creates the grade keyframe there or joins the existing one, adopting the
 Easing that keyframe's settings agree on (else Linear), and overwrites only these two
 values when they are already enabled. Both are one transaction, one Undo step. Running
 it at two frames makes Temperature and Tint follow the light between them by ordinary
-keyframe interpolation; there is no automatic per-frame adaptation. It is unavailable,
-with the reason, when no clip of the track is at the playhead, its recording has no
-verified proxy, or the track holds 256 keyframes and none is at the playhead. Moving
-the playhead, changing track, clip or project, Escape or **Cancel** stop it without an
-edit. Analysis of the ungraded proxy makes the result absolute, not a change to the
-current grade. [Auto adjust](AUTO_ADJUST.md) reuses this estimate over 1 s around the playhead, a whole clip or
-all the track's clips for the track's Temperature and Tint bases, or over 1 s around the playhead for a keyframe of eleven settings.
+keyframe interpolation; there is no automatic per-frame adaptation. The keyframes stay with the clip's footage through trims and moves. It is unavailable, with the reason, when the playhead is off the clip, its recording has no verified proxy, or the grade holds 64 keyframes and none is at that source frame. Moving the playhead, selecting another clip, changing project, Escape or **Cancel** stop it without an edit. Analysis of the ungraded proxy makes the result absolute, not a change to the
+current grade. [Auto adjust](AUTO_ADJUST.md) reuses this estimate over 1 s around the playhead, a whole clip or each clip of its track for the grades' Temperature and Tint values, or over 1 s around the playhead for a keyframe of eleven settings.
 
 ## Strict preservation and validation
 

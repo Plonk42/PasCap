@@ -85,20 +85,10 @@ and technical paths stay unchanged; this glossary does not change the project sc
   slider/exact-field/reset pattern, capture diamonds,
   adjacent per-setting Previous/Next buttons, section navigation and stored-setting
   chip arrows. No Kelvin label.
-- **Auto white balance** is the secondary button under Tint: it keyframes Temperature and Tint at the
-  playhead from the light of a few frames around it, like their diamonds, in one Undo step. Unavailable
-  with its reason (`aria-disabled` and tooltip) without a prepared clip of the track at the playhead;
+- **Auto white balance** is the secondary button under Tint in a **clip grade** (track Colour has none): it keyframes the grade's Temperature and Tint at the source frame shown at the playhead, from the light of a few frames around it, like their diamonds, in one Undo step. Unavailable with its reason (`aria-disabled` and tooltip) with the playhead off the clip or its recording unprepared;
   **Analysing n/16…** with a **Cancel** icon (or Escape) appears only after 250 ms; failures stay inline.
   See [automatic white balance](TEMPERATURE_AND_TINT.md#automatic-white-balance).
-- **Auto adjust** is the **Auto** text button (wand icon) ending the Colour keyframe line; on its own
-  row at the right when the line is narrower than 280 px. It opens a popover with a **Source** choice,
-  **Playhead** (1 s around it), **Clip** (all of it) or **Track** (all its clips), and an **Apply as** choice,
-  **Track values** (whole track) or **Keyframe** (at playhead; Playhead source only, **needs Playhead** otherwise;
-  initial with Playhead once the track animates a
-  setting Auto sets), that analyses the clip at the playhead (**Analysing n/16 frames…**, **Cancel**), then
-  offers **Intensity** (0–100%, initially 80%, the correction as suggested; above it exaggerates), lists
-  each animated setting the track values leave unchanged and commits with **Apply**, one Undo step: a Colour
-  edit, or the eleven settings keyed at the playhead like their diamonds.
+- **Auto adjust** is the **Auto** text button (wand icon) ending the Colour keyframe line of a **clip grade** (track Colour has none); on its own row at the right when the line is narrower than 280 px. It opens a popover with a **Source** choice, **Playhead** (1 s around it), **Clip** (all of it) or **Track** (each clip on its own), and an **Apply as** choice, **Grade values** (whole clip, or each clip) or **Keyframe** (at playhead; Playhead source only, **needs Playhead** otherwise; initial with Playhead once the grade animates a setting Auto sets), that analyses the selected clip, or each clip of its track (**Analysing n/N frames…**, **Cancel**), then offers **Intensity** (0–100%, initially 80%, the correction as suggested; above it exaggerates), lists each animated setting the grade values leave unchanged and commits with **Apply**, one Undo step: one Colour edit per analysed clip's grade, or the eleven settings keyed at the playhead's source frame like their diamonds.
   The preview shows the result while the popover is open; Cancel, Escape or a click outside restore it.
   Unavailable with its reason like Auto white balance. See [Auto adjust](AUTO_ADJUST.md).
 - **Vibrance** is a track-owned −1…2 scalar Colour control, neutral 0, last in the **Colour**
@@ -126,8 +116,7 @@ and technical paths stay unchanged; this glossary does not change the project sc
   **Add default keyframe** in the Colour keyframe line, or **Add default Transform keyframe**
   in Transform's; filled marker and **Default** badge with the diamond-and-return-arrow icon.
 - **Keyframe line**: the first row of an expanded Colour, Speed or Transform section: **N keyframes**, one
-  **Previous/Next** pair over the same set and **Reset**; Colour's also holds **Auto** and its default keyframe
-  toggle. It is hidden while the section is collapsed.
+  **Previous/Next** pair over the same set and **Reset**; Colour's also holds its default keyframe toggle and, for a clip grade, **Auto**. It is hidden while the section is collapsed.
   There is no Animate toggle or stored preference; capture diamonds and per-setting arrows are always visible
   (Speed, a single setting, relies on its keyframe-line pair).
 - **Easing**: the visible label for track-keyframe, Transform and custom clip-speed
