@@ -389,8 +389,7 @@ duplicated pieces each get a copy. Its keyframes are frames of the recording: a 
 image shown at the playhead (move the playhead onto the clip first), slow motion eases between
 keyframes, and they appear as amber ◆ markers inside the clip on the timeline, which you can
 click, drag or move with the arrow keys and delete with Delete. The **Clip keyframes** list
-counts in source frames. The sliders show the grade of the source frame at the playhead: in slow
-motion the image keeps easing between two source frames, so it can differ slightly from them.
+counts in source frames. The sliders show the grade of the image, which eases between source frames in slow motion; a setting keyed on the source frame at the playhead shows that keyframe's value, which you edit, while the image may already be slightly past it.
 
 To give several clips the same look, right-click a clip whose grade has no keyframes and choose
 **Copy grade**, then right-click another and choose **Paste grade**: it replaces that clip's grade

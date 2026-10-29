@@ -1,6 +1,9 @@
+import { COLOUR_CONTROLS, type ColourSettings } from '../shared/colour.js';
+import { colourAt } from '../shared/composition.js';
 import { gradeKeyAsLayerKey } from '../shared/grade.js';
+import { activeLayerSetting } from '../shared/keyframes.js';
 import type { VideoClip, VideoLayer } from '../shared/model.js';
-import type { PlacedClip } from '../shared/timeline.js';
+import { gradePosition, type PlacedClip } from '../shared/timeline.js';
 import { nearestOutput } from './clip-keyframe-markers.js';
 
 /**
@@ -46,4 +49,21 @@ export function ownerNoun(owner: VideoLayer): 'track' | 'clip' {
 export function gradeSeekFrame(placed: PlacedClip, sourceFrame: number): number {
   const { sourceIn, sourceOut } = placed.clip;
   return placed.start + nearestOutput(placed, Math.min(Math.max(sourceFrame, sourceIn), sourceOut - 1));
+}
+
+/** Where the image evaluates a clip grade at a project frame: between source frames in slow motion. */
+export function gradeValuePosition(placed: PlacedClip, projectFrame: number): number {
+  return gradePosition(placed, projectFrame - placed.start);
+}
+
+/**
+ * The values the Colour controls show: a setting keyed at the playhead's source frame shows that keyframe, which is
+ * what it edits; the others show the image's own value at `position`.
+ */
+export function displayedColour(owner: VideoLayer, frame: number, position: number): ColourSettings {
+  const colour = colourAt(owner, position);
+  if (position === frame) return colour;
+  const keyed = colourAt(owner, frame);
+  for (const { key } of COLOUR_CONTROLS) if (activeLayerSetting(owner, key, frame)) colour[key] = keyed[key];
+  return colour;
 }
