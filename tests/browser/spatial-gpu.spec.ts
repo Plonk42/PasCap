@@ -631,6 +631,7 @@ test('synthetic orientation and dyadic half-open crop edges preserve lower cover
       translateX: 0,
       translateY: 0,
       rotation: 0,
+      opacity: 1,
     };
     const source = {
       slot: 0,

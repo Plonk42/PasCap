@@ -81,6 +81,7 @@ const NO_VALUES: SpatialKeyValues = {
   translateX: null,
   translateY: null,
   rotation: null,
+  opacity: null,
 };
 
 function key(frame: number, values: Partial<SpatialKeyValues>, curve: 'linear' | 'ease-in' | 'hold' | 'smooth') {
@@ -129,7 +130,7 @@ async function expectSelected(page: Page, frame: number): Promise<void> {
   await expect(currentKeyframeRow(transformKeyframes(page))).toHaveAttribute('data-keyframe-frame', String(frame));
 }
 
-test('Transform lives in Track and all eight exact fields edit only the track base with no implicit keys', async ({
+test('Transform lives in Track and all nine exact fields edit only the track base with no implicit keys', async ({
   page,
 }) => {
   await page.getByRole('tab', { name: 'Clip', exact: true }).click();
@@ -137,7 +138,20 @@ test('Transform lives in Track and all eight exact fields edit only the track ba
   await page.getByRole('tab', { name: 'Track', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Track Transform editor', exact: true })).toBeVisible();
   const before = await current(page);
-  const values = [0.1234567, 0.2, 0.3, 0.4, 1.234567, -0.1234567, 0.1234567, 17.1234567];
+  // Opacity's field shows percent: 12.5 % is stored as 0.125.
+  const values = [0.1234567, 0.2, 0.3, 0.4, 1.234567, -0.1234567, 0.1234567, 17.1234567, 12.5];
+  const stored = [...values.slice(0, 8), 0.125];
+  expect(SPATIAL_CONTROLS.map((control) => control.key)).toEqual([
+    'cropLeft',
+    'cropRight',
+    'cropTop',
+    'cropBottom',
+    'scale',
+    'translateX',
+    'translateY',
+    'rotation',
+    'opacity',
+  ]);
   for (const [index, control] of SPATIAL_CONTROLS.entries()) {
     const field = exact(page, control.label);
     const prior = await current(page);
@@ -146,15 +160,15 @@ test('Transform lives in Track and all eight exact fields edit only the track ba
     await field.press('Enter');
     await expect(field).toBeFocused();
     await expect(field).toHaveValue(String(values[index]));
-    expect(transform(await current(page)).base[control.key]).toBe(values[index]);
+    expect(transform(await current(page)).base[control.key]).toBe(stored[index]);
     expect(transform(await current(page)).keyframes).toEqual([]);
   }
   const after = await current(page);
   expect(after.clips).toEqual(before.clips);
-  expect(after.layers[0]!.colour).toEqual(before.layers[0]!.colour);
+  expect(after.adjustments).toEqual(before.adjustments);
   expect(calculateLayout(after).duration).toBe(calculateLayout(before).duration);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  expect(transform(await current(page)).base.rotation).toBe(0);
+  expect(transform(await current(page)).base).toEqual({ ...transform(after).base, opacity: 1 });
 });
 
 test('invalid crop drafts remain editable without clamping and Escape restores; crossing crops are accepted', async ({
@@ -478,9 +492,12 @@ test('stored keyframes keep frame input focus through move/Undo, reject collisio
   for (const control of SPATIAL_CONTROLS) {
     const field = exact(page, control.label, 0);
     const value = control.key === 'scale' ? 1.23456789 : 0.123456789;
-    await field.fill(String(value));
+    // Opacity's field shows percent: 12.5 % is stored as 0.125.
+    await field.fill(String(control.key === 'opacity' ? 12.5 : value));
     await field.press('Enter');
-    expect(transform(await current(page)).keyframes[0]!.values[control.key]).toBe(value);
+    expect(transform(await current(page)).keyframes[0]!.values[control.key]).toBe(
+      control.key === 'opacity' ? 0.125 : value,
+    );
   }
   const after = await current(page);
   expect(transform(after).base).toEqual(transform(before).base);
@@ -592,7 +609,7 @@ test('bulk expansion includes Transform in Track while heading help and tab navi
   const help = page.getByRole('button', { name: 'Transform animation help', exact: true });
   await help.click();
   await expect(
-    page.getByText('Crop, scale, move and rotate every clip on this track.', { exact: false }),
+    page.getByText('Crop, scale, move, rotate and fade every clip on this track.', { exact: false }),
   ).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Transform section', exact: true })).toHaveAttribute(

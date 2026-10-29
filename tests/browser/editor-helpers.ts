@@ -1,14 +1,23 @@
 import { expect, type APIRequestContext, type Locator, type Page, type Request } from '@playwright/test';
 import {
+  createAdjustment,
+  layerKeyAsGradeKey,
+  type Adjustment,
+  type GradeKeyframe,
+  type GradeKeyValues,
+} from '../../src/shared/grade.js';
+import {
   EMPTY_KEY_VALUES,
   type Interpolation,
   type LayerKeyframe,
   type LayerKeyValues,
   layerKeyframe,
+  uniformKeyframe,
 } from '../../src/shared/keyframes.js';
 import { jobSchema, type MediaJob } from '../../src/shared/media.js';
 import { operations } from '../../src/shared/operations/index.js';
 import { forEachSerial } from '../../src/shared/serial.js';
+import { SPATIAL_CHANNELS, type SpatialKeyframe, type SpatialKeyValues } from '../../src/shared/spatial.js';
 
 const readOperations = new Set(operations.filter((op) => op.access === 'read').map((op) => `/api/ops/${op.name}`));
 
@@ -48,44 +57,45 @@ export async function closeOptions(page: Page): Promise<void> {
 }
 
 type InspectorTab = 'Clip' | 'Colour' | 'Track' | 'Audio';
-// Colour holds a selected clip's grade or its track's Colour, chosen with the Clip/Track switch. Track keyframes
-// (inside Colour) and "Track colour" edit the track; Sequence lives in the Track tab.
-const TAB_FOR: Record<InspectorTab | 'Track colour' | 'Clip grade' | 'Track keyframes' | 'Sequence', InspectorTab> = {
+// Colour holds a selected clip's grade or the adjustment at the playhead, chosen with the Clip/Adjustment switch;
+// Sequence lives in the Track tab.
+const TAB_FOR: Record<InspectorTab | 'Adjustment' | 'Clip grade' | 'Sequence', InspectorTab> = {
   Clip: 'Clip',
   Colour: 'Colour',
   Track: 'Track',
   Audio: 'Audio',
-  'Track colour': 'Colour',
+  Adjustment: 'Colour',
   'Clip grade': 'Colour',
-  'Track keyframes': 'Colour',
   Sequence: 'Track',
 };
 
 export async function inspectorTab(page: Page, name: keyof typeof TAB_FOR): Promise<void> {
   const tab = page.getByRole('tab', { name: TAB_FOR[name], exact: true });
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
-  const target = { 'Track colour': 'Track', 'Track keyframes': 'Track', 'Clip grade': 'Clip' }[name as string];
-  if (target) await colourTarget(page, target as 'Clip' | 'Track');
+  if (name === 'Adjustment' || name === 'Clip grade') await colourTarget(page, name === 'Clip grade' ? 'Clip' : name);
 }
 
-/** The Colour tab edits the selected clip's grade or its track's Colour; without a clip there is no switch. */
-export async function colourTarget(page: Page, target: 'Clip' | 'Track'): Promise<void> {
-  // The pinned header appears once the project has loaded, with the switch when a clip is selected.
+/** The Colour tab edits the selected clip's grade or the adjustment at the playhead; without a clip, the adjustment. */
+export async function colourTarget(page: Page, target: 'Clip' | 'Adjustment'): Promise<void> {
+  // Until the project opens, the pinned header shows an unavailable Adjustment target.
+  await page.waitForFunction(() => window.pascapLab?.project() != null);
   await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .colour-target')).toBeVisible();
   const radio = page
     .getByRole('radiogroup', { name: 'Colour target' })
-    .getByRole('radio', { name: target === 'Clip' ? 'Clip grade' : 'Track Colour', exact: true });
-  if ((await radio.count()) && (await radio.getAttribute('aria-checked')) !== 'true')
-    await radio.dispatchEvent('click');
+    .getByRole('radio', { name: target === 'Clip' ? 'Clip grade' : 'Adjustment', exact: true });
+  // Choose even when it shows as checked: without a selected clip the Adjustment shows, and selecting a clip would then
+  // show its grade. A pointer draft disables the switch, keeping the target chosen before it.
+  if (await radio.isEnabled()) await radio.dispatchEvent('click');
+  await expect(radio).toHaveAttribute('aria-checked', 'true');
 }
 
-/** Speed is clip-owned (Clip tab); Transform is in the Track tab; Opacity and Colour are the track's (Colour tab). */
+/** Speed is clip-owned (Clip tab); Transform and Opacity are the track's (Track tab); Colour edits the adjustment. */
 export async function settingTab(page: Page, label: string): Promise<void> {
-  const name = { Speed: 'Clip', Transform: 'Track' }[label] ?? 'Colour';
+  const name = { Speed: 'Clip', Transform: 'Track', Opacity: 'Track' }[label] ?? 'Colour';
   const tab = page.getByRole('tab', { name, exact: true });
   // A synthetic click never moves the mouse, so it cannot end an active pointer draft.
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.dispatchEvent('click');
-  if (name === 'Colour') await colourTarget(page, 'Track');
+  if (name === 'Colour') await colourTarget(page, 'Adjustment');
 }
 
 /** Double-clicking a setting's name resets only that setting, like its Reset button. */
@@ -138,8 +148,34 @@ export function sharedPoint(
   return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 
-export function layerKeyframes(page: Page, name: string): Locator {
-  return page.getByRole('group', { name: `Track keyframes ${name}`, exact: true });
+/** A clip grade or adjustment keyframe: every Colour setting present, only the given ones keyed. */
+export function gradePoint(
+  frame: number,
+  values: Partial<GradeKeyValues>,
+  interpolation: Interpolation = 'linear',
+): GradeKeyframe {
+  return layerKeyAsGradeKey(sharedPoint(frame, values, interpolation));
+}
+
+/** An adjustment grading every track from frame 0, so its keyframe frames are project frames. */
+export function adjustmentFrom0(duration: number, keyframes: GradeKeyframe[] = []): Adjustment {
+  return { ...createAdjustment('adjustment', 0, duration), keyframes };
+}
+
+const NO_TRANSFORM_VALUES = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as SpatialKeyValues;
+
+/** A track Transform keyframe keying only the given settings, such as Opacity. */
+export function transformPoint(
+  frame: number,
+  values: Partial<SpatialKeyValues>,
+  interpolation: Interpolation = 'linear',
+): SpatialKeyframe {
+  return { ...uniformKeyframe(frame, { ...NO_TRANSFORM_VALUES, ...values }, interpolation), reset: false };
+}
+
+/** The Colour tab's stored keyframe list of the adjustment at the playhead. */
+export function adjustmentKeyframes(page: Page): Locator {
+  return page.getByRole('group', { name: /^Adjustment keyframes / });
 }
 
 /** Track → Transform's stored keyframe list, one row per keyframe. */
@@ -161,13 +197,12 @@ export async function editTransformKeyframe(page: Page, frame: number, name = 'T
   return row;
 }
 
-/** Shared points are directly visible; open only the selected point's nested details. */
-export async function editLayerPoint(page: Page, name: string, frame: number): Promise<Locator> {
-  await inspectorTab(page, 'Track keyframes');
-  const keys = layerKeyframes(page, name);
-  const row = keys.locator(`[data-keyframe-frame="${frame}"]`);
+/** Adjustment keyframes are directly visible; open only the selected keyframe's nested details. */
+export async function editAdjustmentPoint(page: Page, frame: number): Promise<Locator> {
+  await inspectorTab(page, 'Adjustment');
+  const row = adjustmentKeyframes(page).locator(`[data-keyframe-frame="${frame}"]`);
   if ((await row.locator('.layer-keyframe-point-details').getAttribute('open')) === null)
-    await row.getByLabel(`Edit track keyframe ${frame}`, { exact: true }).click();
+    await row.getByLabel(`Edit adjustment keyframe ${frame}`, { exact: true }).click();
   return row;
 }
 

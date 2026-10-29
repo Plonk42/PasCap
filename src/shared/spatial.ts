@@ -203,7 +203,9 @@ export function hasSpatialEdits(settings: SpatialSettings): boolean {
 export function hasGeometryEdits(settings: SpatialSettings): boolean {
   return (
     !isNeutralSpatial(settings.base) ||
-    settings.keyframes.some((key) => SPATIAL_CHANNELS.some((channel) => channel !== 'opacity' && key.values[channel] !== null))
+    settings.keyframes.some((key) =>
+      SPATIAL_CHANNELS.some((channel) => channel !== 'opacity' && key.values[channel] !== null),
+    )
   );
 }
 

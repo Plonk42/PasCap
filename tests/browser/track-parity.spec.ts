@@ -20,7 +20,7 @@ import {
   expandPanel,
   inspectorTab,
   openOptions,
-  sharedPoint,
+  transformPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { singleClipLane } from '../music-lanes.js';
@@ -198,7 +198,8 @@ test('the initial track and every newly added track default to Ripple on with in
 }) => {
   const before = await current(page);
   for (const layer of before.layers) {
-    expect(layer).toMatchObject({ opacity: 1, ripple: true, transitions: [], openingFade: 0, closingFade: 0 });
+    expect(layer).toMatchObject({ ripple: true, transitions: [], openingFade: 0, closingFade: 0 });
+    expect(layer.transform.base.opacity).toBe(1);
     await openOptions(page, `Track options ${layer.name}`);
     await expect(page.getByRole('checkbox', { name: `Ripple on track ${layer.name}`, exact: true })).toBeChecked();
     await expect(page.getByRole('textbox', { name: `Rename track ${layer.name}`, exact: true })).toBeEnabled();
@@ -230,7 +231,7 @@ for (const row of [0, 1]) {
       layer.ripple = false;
       layer.openingFade = 2;
       layer.closingFade = 3;
-      layer.keyframes = [sharedPoint(15, { exposure: 0.2 }), sharedPoint(500, { opacity: 0.8 }, 'hold')];
+      layer.transform.keyframes = [transformPoint(15, { opacity: 0.9 }), transformPoint(500, { opacity: 0.8 }, 'hold')];
       const anchor = index === 0 ? 40 : 200;
       document.clips.push(
         { ...createClip(`a-${index}`, assets[0]!.id, 0, 30, layer.id), start: anchor },
@@ -789,7 +790,7 @@ test('export discloses three timeline representations and four 22-byte-per-pixel
   await dialog.getByRole('radio', { name: '4K final', exact: true }).check();
   await expect(resources).toContainText('4 reusable raw buffers use 182.5 MB at 3840 × 2160; up to 2 LUTs add 6.6 MB.');
   await expect(dialog.locator('.activity-export-snapshot')).toContainText(
-    'each video track’s Colour, Ripple, transitions and fades, enabled video tracks, bottom-to-top composition order',
+    'clip speed and grades, adjustments, each video track’s Transform and Opacity, Ripple, transitions and fades, enabled video tracks, bottom-to-top composition order',
   );
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect(await current(page)).toEqual(before);

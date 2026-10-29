@@ -11,7 +11,14 @@ import {
   type VideoClip,
 } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { editLayerPoint, expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
+import {
+  adjustmentFrom0,
+  adjustmentKeyframes,
+  editAdjustmentPoint,
+  expandedInspectorPreferences,
+  gradePoint,
+  inspectorTab,
+} from './editor-helpers.js';
 import { memoryProjects } from './memory-projects.js';
 
 async function current(page: Page): Promise<ProjectDocument> {
@@ -85,10 +92,11 @@ test('a default keyframe returns settings to their defaults from its frame, in o
   request,
 }) => {
   const { unexpected } = await openMemoryProject(page, request, 'easing-default-keyframe', (document) => {
-    document.layers[0]!.colour.contrast = 1.4;
-    document.layers[0]!.keyframes = [sharedPoint(10, { exposure: 0.6 })];
+    const adjustment = adjustmentFrom0(120, [gradePoint(10, { exposure: 0.6 })]);
+    adjustment.colour.contrast = 1.4;
+    document.adjustments = [adjustment];
   });
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Adjustment');
   const contrast = page.getByRole('spinbutton', { name: 'Contrast', exact: true });
   await seek(page, 60);
   const before = await current(page);
@@ -98,10 +106,11 @@ test('a default keyframe returns settings to their defaults from its frame, in o
   const remove = page.getByRole('button', { name: 'Remove default keyframe', exact: true });
   await expect(remove).toHaveAttribute('aria-pressed', 'true');
   const added = await current(page);
-  expect(added.layers[0]!.keyframes[1]).toMatchObject({ frame: 60, reset: true, values: { contrast: 1, opacity: 1 } });
-  expect(new Set(Object.values(added.layers[0]!.keyframes[1]!.easing))).toEqual(new Set(['hold']));
-  const marker = page.getByRole('button', { name: 'Track keyframe 60 on Track 1 (default)', exact: true });
-  await expect(marker).toHaveClass(/\breset\b/);
+  expect(added.adjustments[0]!.keyframes[1]).toMatchObject({ frame: 60, reset: true, values: { contrast: 1 } });
+  expect(new Set(Object.values(added.adjustments[0]!.keyframes[1]!.easing))).toEqual(new Set(['hold']));
+  await expect(adjustmentKeyframes(page).locator('[data-keyframe-frame="60"] .keyframe-row-default')).toHaveText(
+    'Default',
+  );
   await expect(contrast).toHaveValue('1');
   // Earlier frames keep the saved Contrast.
   await seek(page, 30);
@@ -124,20 +133,22 @@ test('per-setting Easing appears only on request or when settings differ, each c
   request,
 }) => {
   const { unexpected } = await openMemoryProject(page, request, 'easing-per-setting', (document) => {
-    document.layers[0]!.keyframes = [
-      sharedPoint(10, { exposure: 0.2, opacity: 0.4 }),
-      sharedPoint(40, { exposure: 0.6, opacity: 0.8 }),
-      sharedPoint(70, { hue: 20 }),
+    document.adjustments = [
+      adjustmentFrom0(120, [
+        gradePoint(10, { exposure: 0.2, saturation: 0.4 }),
+        gradePoint(40, { exposure: 0.6, saturation: 0.8 }),
+        gradePoint(70, { hue: 20 }),
+      ]),
     ];
   });
-  await editLayerPoint(page, 'Track 1', 70);
+  await editAdjustmentPoint(page, 70);
   // A keyframe with one setting has nothing to split.
-  await expect(page.getByRole('button', { name: 'Easing per setting · Track keyframe easing 70' })).toHaveCount(0);
-  await editLayerPoint(page, 'Track 1', 10);
-  const all = page.getByRole('combobox', { name: 'Track keyframe easing 10', exact: true });
-  const toggle = page.getByRole('button', { name: 'Easing per setting · Track keyframe easing 10', exact: true });
-  const exposure = page.getByRole('combobox', { name: 'Exposure easing at track keyframe 10', exact: true });
-  const opacity = page.getByRole('combobox', { name: 'Opacity easing at track keyframe 10', exact: true });
+  await expect(page.getByRole('button', { name: 'Easing per setting · Adjustment keyframe easing 70' })).toHaveCount(0);
+  await editAdjustmentPoint(page, 10);
+  const all = page.getByRole('combobox', { name: 'Adjustment keyframe easing 10', exact: true });
+  const toggle = page.getByRole('button', { name: 'Easing per setting · Adjustment keyframe easing 10', exact: true });
+  const exposure = page.getByRole('combobox', { name: 'Exposure easing at adjustment keyframe 10', exact: true });
+  const saturation = page.getByRole('combobox', { name: 'Saturation easing at adjustment keyframe 10', exact: true });
   await expect(all).toHaveValue('linear');
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect(exposure).toHaveCount(0);
@@ -146,21 +157,21 @@ test('per-setting Easing appears only on request or when settings differ, each c
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await exposure.selectOption('hold');
   const mixed = await current(page);
-  expect(mixed.layers[0]!.keyframes[0]!.easing).toEqual({
-    ...before.layers[0]!.keyframes[0]!.easing,
+  expect(mixed.adjustments[0]!.keyframes[0]!.easing).toEqual({
+    ...before.adjustments[0]!.keyframes[0]!.easing,
     exposure: 'hold',
   });
-  expect(mixed.layers[0]!.keyframes.slice(1)).toEqual(before.layers[0]!.keyframes.slice(1));
+  expect(mixed.adjustments[0]!.keyframes.slice(1)).toEqual(before.adjustments[0]!.keyframes.slice(1));
   // Differing settings read Mixed and keep their choices visible.
   await expect(all).toHaveValue('');
   await expect(all.locator('option:checked')).toHaveText('Mixed');
   await expect(toggle).toHaveCount(0);
-  await expect(opacity).toHaveValue('linear');
+  await expect(saturation).toHaveValue('linear');
   await all.focus();
   await all.selectOption('smooth');
-  expect((await current(page)).layers[0]!.keyframes[0]!.easing).toMatchObject({
+  expect((await current(page)).adjustments[0]!.keyframes[0]!.easing).toMatchObject({
     exposure: 'smooth',
-    opacity: 'smooth',
+    saturation: 'smooth',
   });
   await expect(all).toBeFocused();
   // The list was opened explicitly, so it stays open until closed.
@@ -185,18 +196,18 @@ test('per-setting Easing appears only on request or when settings differ, each c
   expect(unexpected).toEqual([]);
 });
 
-for (const context of ['shared', 'clip'] as const) {
+for (const context of ['adjustment', 'clip'] as const) {
   test(`${context} easing graphs keep native selection, exact shapes and one-step Undo in the 270px Inspector`, async ({
     page,
     request,
   }) => {
     const { memory, unexpected } = await openMemoryProject(page, request, `easing-${context}`, (document, clip) => {
       if (context === 'clip') clip.speed = clipSpeedPreset(clip, 'flat');
-      document.layers[0]!.keyframes = [sharedPoint(10, { exposure: 0.2, opacity: 0.4 }, 'smooth')];
+      document.adjustments = [adjustmentFrom0(120, [gradePoint(10, { exposure: 0.2, saturation: 0.4 }, 'smooth')])];
     });
-    if (context === 'shared') await editLayerPoint(page, 'Track 1', 10);
+    if (context === 'adjustment') await editAdjustmentPoint(page, 10);
     else await inspectorTab(page, 'Clip');
-    const label = context === 'shared' ? 'Track keyframe easing 10' : 'Clip speed keyframe easing';
+    const label = context === 'adjustment' ? 'Adjustment keyframe easing 10' : 'Clip speed keyframe easing';
     const select = page.getByRole('combobox', { name: label, exact: true });
     const choice = select.locator('..');
     const graph = choice.locator('.easing-graph');
@@ -209,9 +220,9 @@ for (const context of ['shared', 'clip'] as const) {
     );
     const before = await current(page);
     expect(before.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-    expect(before.layers[0]!.opacity).toBe(1);
+    expect(before.layers[0]!.transform.base.opacity).toBe(1);
     expect(before.clips[0]).not.toHaveProperty('opacity');
-    expect(Object.keys(before.layers[0]!.keyframes[0]!.values)).toHaveLength(15);
+    expect(Object.keys(before.adjustments[0]!.keyframes[0]!.values)).toHaveLength(14);
     const initialValue = (await select.inputValue())!;
     expect(memory.saves).toBe(0);
     for (const value of interpolationSchema.options) {
@@ -224,8 +235,8 @@ for (const context of ['shared', 'clip'] as const) {
       await expect(choice).toHaveAttribute('data-easing', value);
       await expect(graph.locator('polyline')).toHaveAttribute('points', expectedPoints.join(' '));
       const expected = structuredClone(before);
-      if (context === 'shared') {
-        const point = expected.layers[0]!.keyframes[0]!;
+      if (context === 'adjustment') {
+        const point = expected.adjustments[0]!.keyframes[0]!;
         point.easing = uniformKeyframe(point.frame, point.values, value).easing;
       } else if (context === 'clip' && expected.clips[0]!.speed.mode === 'curve')
         expected.clips[0]!.speed.keyframes[0]!.interpolation = value;
