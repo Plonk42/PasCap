@@ -47,6 +47,23 @@ fix relevant new findings without suppressing them
    compositor code: land each one before branching the next from `main`. One CI
    problem in a stack blocks every PR above it.
 
+### Long-lived development branches
+
+When the owner asks for a dev branch that collects several issues and merges as a
+whole after evaluation (no auto-merge):
+
+- Split each issue into steps that keep the tests passing: add the new behaviour
+  beside the old, then remove the old in its own step.
+- Delete specs of removed behaviour rather than porting them; add focused specs for
+  the new behaviour.
+- Per step, run `npm run check` plus the specs you edited. At the end of each issue,
+  run the full suites on CI with `gh workflow run ci.yml --ref <branch>` instead of
+  locally: CI shards the Chrome suite across four runners.
+- Do the [live UI inspection](DEVELOPMENT.md#live-ui-inspection) once per issue, on
+  its final UI.
+- Stop and report at each step boundary and before any bulk test migration, so the
+  owner can redirect the work; never one multi-hour turn.
+
 ### CI failures
 
 A failure only on hosted runners is a real-condition signal, not flakiness. Group
