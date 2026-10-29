@@ -1,56 +1,22 @@
 import { keyframeLimitReason } from '../shared/auto-colour.js';
 import type { MediaAsset } from '../shared/media.js';
-import type { VideoLayer } from '../shared/model.js';
+import type { ProjectDocument } from '../shared/model.js';
 import type { PlacedClip, TimelineLayout } from '../shared/timeline.js';
 import { whiteBalanceWindow } from '../shared/white-balance.js';
+import { gradeOwnerOf, sourceFrameAt } from './colour-owner.js';
 import { mediaReady } from './display.js';
-
-/**
- * The track's clip shown at `frame`. In a dissolve, the selected clip when it is one of the two,
- * otherwise the outgoing clip until the midpoint and the incoming one from it.
- */
-export function clipAtPlayhead(
-  layout: TimelineLayout,
-  layerId: string,
-  frame: number,
-  preferredClipId: string | null,
-): PlacedClip | null {
-  const active = layout.clips.filter(
-    (item) => item.clip.layerId === layerId && frame >= item.start && frame < item.end,
-  );
-  if (active.length < 2) return active[0] ?? null;
-  const preferred = active.find((item) => item.clip.id === preferredClipId);
-  if (preferred) return preferred;
-  const [outgoing, incoming] = [...active].sort((left, right) => left.start - right.start) as [PlacedClip, PlacedClip];
-  return 2 * (frame - incoming.start) >= outgoing.end - incoming.start ? incoming : outgoing;
-}
 
 export interface WhiteBalanceTarget {
   clip: PlacedClip;
   asset: MediaAsset;
+  /** The source frame the clip shows at the playhead, where Temperature and Tint are keyed. */
+  frame: number;
   /** Project frames analysed around the playhead, and the source frame each one shows. */
   projectFrames: number[];
   sourceFrames: number[];
 }
 
 export type WhiteBalanceAvailability = { target: WhiteBalanceTarget; reason: null } | { target: null; reason: string };
-
-/** The track's clip at the playhead with its prepared recording, or why an analysis cannot read it. */
-export function readyClipAtPlayhead(
-  layer: VideoLayer,
-  layout: TimelineLayout,
-  assets: readonly MediaAsset[],
-  frame: number,
-  preferredClipId: string | null,
-  purpose: string,
-): { clip: PlacedClip; asset: MediaAsset; reason: null } | { clip: null; asset: null; reason: string } {
-  const clip = clipAtPlayhead(layout, layer.id, frame, preferredClipId);
-  if (!clip)
-    return { clip: null, asset: null, reason: `Move the playhead over a clip on ${layer.name} to ${purpose}.` };
-  const asset = readyAsset(assets, clip.clip.mediaId);
-  if (!asset) return { clip: null, asset: null, reason: 'Prepare the recording of the clip at the playhead first.' };
-  return { clip, asset, reason: null };
-}
 
 /** The recording with a verified proxy an analysis can read, or null. */
 export function readyAsset(assets: readonly MediaAsset[], mediaId: string): MediaAsset | null {
@@ -60,26 +26,24 @@ export function readyAsset(assets: readonly MediaAsset[], mediaId: string): Medi
     : null;
 }
 
-/** What Auto white balance would analyse at the playhead, or why it cannot run there. */
+/** What Auto white balance would analyse around the playhead in the graded clip, or why it cannot run there. */
 export function whiteBalanceTarget(
-  layer: VideoLayer,
+  project: ProjectDocument,
+  clipId: string,
   layout: TimelineLayout,
   assets: readonly MediaAsset[],
-  frame: number,
-  preferredClipId: string | null,
+  playhead: number,
 ): WhiteBalanceAvailability {
-  const { clip, asset, reason } = readyClipAtPlayhead(
-    layer,
-    layout,
-    assets,
-    frame,
-    preferredClipId,
-    'balance its light',
-  );
-  if (reason !== null) return { target: null, reason };
-  const full = keyframeLimitReason(layer, frame);
+  const clip = layout.clips.find((item) => item.clip.id === clipId);
+  const owner = gradeOwnerOf(project, clipId);
+  if (!clip || !owner) return { target: null, reason: 'This clip is no longer on the timeline.' };
+  const frame = sourceFrameAt(clip, playhead);
+  if (frame === null) return { target: null, reason: 'Move the playhead over this clip to balance its light.' };
+  const asset = readyAsset(assets, clip.clip.mediaId);
+  if (!asset) return { target: null, reason: 'Prepare the recording of this clip first.' };
+  const full = keyframeLimitReason(owner, frame, { kind: 'clip', clipId });
   if (full !== null) return { target: null, reason: full };
-  const projectFrames = whiteBalanceWindow(clip, frame);
+  const projectFrames = whiteBalanceWindow(clip, playhead);
   const sourceFrames = projectFrames.map((projectFrame) => clip.retiming.sourceAt(projectFrame - clip.start));
-  return { target: { clip, asset, projectFrames, sourceFrames }, reason: null };
+  return { target: { clip, asset, frame, projectFrames, sourceFrames }, reason: null };
 }

@@ -383,7 +383,7 @@ own grades; the choice stays while you select other clips. Without a selected cl
 track. With several clips selected, it asks you to select one, or offers the track.
 
 A clip grade has the same Colour, HSL ranges and Colour curves sections as the track, without
-Opacity, **Auto** and **Auto white balance**. It stays with the clip's footage: trimming, moving
+Opacity, and only a clip grade has **Auto** and **Auto white balance**. It stays with the clip's footage: trimming, moving
 it (to another track too), Ripple, splitting, duplicating and Reverse keep it, and split or
 duplicated pieces each get a copy. Its keyframes are frames of the recording: a diamond keys the
 image shown at the playhead (move the playhead onto the clip first), slow motion eases between
@@ -428,14 +428,14 @@ adds green. Nonzero settings intentionally colour greys. The common gain formula
 runs in linear RGB before Exposure; it preserves neutral-white linear luminance
 before clipping only, not final brightness or arbitrary coloured pixels.
 
-**Auto white balance**, under Tint, removes a colour cast at the playhead: it measures
-the light in sixteen frames around it (up to a second each side, within the clip
-there) and keyframes Temperature and Tint at the playhead, exactly as their diamonds
+**Auto white balance**, under Tint in a clip's grade, removes a colour cast at the playhead: it
+measures the light in sixteen frames around it (up to a second each side, within the clip) and
+keyframes the grade's Temperature and Tint at the image shown there, exactly as their diamonds
 would, in one Undo step. Where the light changes during a flight, run it again further
 on: Temperature and Tint then ease from one keyframe to the next. It removes cool casts
 more than warm ones, so a sunset stays warm, and large uniform areas such as sky or sea
-barely count. Rerun at a keyframe, it replaces only these two values. It needs a
-prepared clip of the track at the playhead; Escape cancels it.
+barely count. Rerun at a keyframe, it replaces only these two values. It needs the playhead on
+the clip and its recording prepared; Escape cancels it.
 
 Sliders, exact fields and the **Reset** icon beside each setting's name (or double-click the name) reset it to 0 and use the same main/stored
 control rules as other scalar Colour settings. Main diamonds come with adjacent per-setting Previous/Next buttons; its header visits the
@@ -459,33 +459,32 @@ all these Colour stages, retaining Opacity and geometry. Exact processing:
 
 ### Auto adjust
 
-**Auto**, at the end of the Colour keyframe line, suggests a balanced correction for the
-clip at the playhead: it balances white, exposure, contrast, black and white points and
+**Auto**, at the end of the Colour keyframe line of a clip's grade, suggests a balanced
+correction for the clip: it balances white, exposure, contrast, black and white points and
 colour, restoring footage shot flat, and opens dark shadow areas with Shadows. It raises
 colour with Saturation and Vibrance, which lifts muted colours more than strong ones; where
 strong colours such as a blue sky fill much of the frame, it relies on Vibrance so they stay
 close to how they were. It lowers only very colourful footage, with Saturation.
-First choose its **Source**, what it analyses: **Playhead** (the second around it), **Clip**
-(16 frames spread over the clip at the playhead) or **Track** (16 frames spread over all the
-track's clips, each in proportion to its duration). Then choose how to **Apply as**:
+First choose its **Source**, what it analyses: **Playhead** (the second around it, with the
+playhead on the clip), **Clip** (16 frames spread over the whole clip) or **Track** (each clip of
+the track on its own, so each gets its own correction). Then choose how to **Apply as**:
 
-- **Track values** sets Temperature, Tint, Saturation, Vibrance, Exposure, Brightness,
-  Contrast, Highlights, Shadows, Whites and Blacks for the whole track. Settings the track
-  animates are left unchanged, and the popover lists them.
-- **Keyframe** keys those eleven settings at the playhead, from the Playhead source only. Run
-  it again at other moments of a clip whose light changes: the keyframes follow the light
-  between them. Once the track animates any of the eleven, Auto starts with Playhead and
-  Keyframe.
+- **Grade values** sets Temperature, Tint, Saturation, Vibrance, Exposure, Brightness,
+  Contrast, Highlights, Shadows, Whites and Blacks of the clip's grade (with Track, of each
+  clip's grade). Settings a grade animates are left unchanged, and the popover lists them.
+- **Keyframe** keys those eleven settings at the image shown at the playhead, from the
+  Playhead source only. Run it again at other moments of a clip whose light changes: the
+  keyframes follow the light between them. Once the grade animates any of the eleven, Auto
+  starts with Playhead and Keyframe.
 
 The popover previews the result in the image. **Intensity** starts at 80%, the suggested
 correction: lower it for a lighter touch, or raise it towards 100% for a stronger,
-exaggerated look. Then **Apply** makes the change in one Undo step. **Cancel**, Escape or a
-click elsewhere leaves the track as it was. Reopening Auto on the same frames skips the
-analysis and starts at the intensity you last applied, so you can change it later. Track
-values are one look for the whole track: shots that need different corrections need their own
-clip grades, different tracks or keyframes. Keyframes stay at their timeline frames when you trim or move clips, and with
-Linear Easing a correction eases across a cut into the next shot: set **Hold** on a shot's
-last keyframe to keep shots apart. See [Auto adjust](design/AUTO_ADJUST.md).
+exaggerated look. Then **Apply** makes the change in one Undo step, even for every clip of a
+track. **Cancel**, Escape or a click elsewhere leaves the grades as they were. Reopening Auto on
+the same frames skips the analysis and starts at the intensity you last applied, so you can
+change it later. The correction belongs to the clip, so it follows the shot when you trim, move
+or reorder clips. Track Colour has no Auto: grade the whole track with its sliders. See
+[Auto adjust](design/AUTO_ADJUST.md).
 
 ### HDR
 

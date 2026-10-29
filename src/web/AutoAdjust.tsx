@@ -1,12 +1,13 @@
 import { useEffect, useId, useState, type KeyboardEvent } from 'react';
 import { AUTO_ADJUST, type AutoCorrection } from '../shared/auto-adjust.js';
-import { animatedSettings } from '../shared/auto-colour.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MediaAsset } from '../shared/media.js';
-import type { VideoLayer } from '../shared/model.js';
+import type { ProjectDocument } from '../shared/model.js';
 import type { TimelineLayout } from '../shared/timeline.js';
 import {
+  analysedFrames,
   analyseTarget,
+  animatedParts,
   autoAdjustCommands,
   autoAdjustTarget,
   cachedAnalysis,
@@ -16,6 +17,7 @@ import {
   settingLabel,
   type AutoAdjustApply,
   type AutoAdjustAvailability,
+  type AutoAdjustContext,
   type AutoAdjustSource,
   type AutoAdjustTarget,
 } from './auto-adjust.js';
@@ -28,42 +30,34 @@ import { ValueControl } from './ValueControl.js';
 import './auto-adjust.css';
 
 interface Props {
-  projectId: string;
-  layer: VideoLayer;
+  project: ProjectDocument;
+  /** The clip whose grade takes the correction. */
+  clipId: string;
   layout: TimelineLayout;
   assets: readonly MediaAsset[];
-  frame: number;
-  selectedClipId: string | null;
+  playhead: number;
   disabled: boolean;
   onEdit: (commands: readonly EditCommand[]) => void;
 }
 
-const TITLE = 'Analyse the clip at the playhead and suggest a balanced Colour correction for this track';
+const TITLE = 'Analyse this clip and suggest a balanced correction for its grade';
 /** The initial Intensity, in percent: the correction as suggested. */
 const BALANCED = Math.round(AUTO_ADJUST.balancedIntensity * 100);
 const SOURCES: readonly { source: AutoAdjustSource; label: string; hint: string }[] = [
   { source: 'playhead', label: 'Playhead', hint: '1 s around it' },
   { source: 'clip', label: 'Clip', hint: 'all of it' },
-  { source: 'track', label: 'Track', hint: 'all its clips' },
+  { source: 'track', label: 'Track', hint: 'each clip on its own' },
 ];
 const APPLIES: readonly { apply: AutoAdjustApply; label: string; name: string; hint: string }[] = [
-  { apply: 'values', label: 'Track values', name: 'Track values', hint: 'whole track' },
+  { apply: 'values', label: 'Grade values', name: 'Grade values', hint: 'whole clip' },
   { apply: 'keyframe', label: 'Keyframe', name: 'Keyframe at playhead', hint: 'at playhead' },
 ];
 
-/** Colour → Auto (track target): analyses the clip at the playhead and applies its correction to the track. */
-export function AutoAdjust({
-  projectId,
-  layer,
-  layout,
-  assets,
-  frame,
-  selectedClipId,
-  disabled,
-  onEdit,
-}: Readonly<Props>) {
+/** Colour → Auto (clip grade): analyses the graded clip, or each clip of its track, and writes their grades. */
+export function AutoAdjust({ project, clipId, layout, assets, playhead, disabled, onEdit }: Readonly<Props>) {
   const hintId = useId();
-  const availability = autoAdjustTarget(layer, layout, assets, frame, selectedClipId);
+  const context: AutoAdjustContext = { project, clipId, layout, assets, playhead };
+  const availability = autoAdjustTarget(context);
   const blocked = disabled ? 'Colour cannot be edited right now.' : availability.reason;
   if (blocked !== null || !availability.target)
     return (
@@ -87,39 +81,39 @@ export function AutoAdjust({
   // A new clip, range or track is a new analysis: remounting cancels the old one and its preview.
   return (
     <AutoAdjustPopover
-      key={`${projectId}:${layer.id}:${availability.target.key}`}
-      projectId={projectId}
-      layer={layer}
+      key={`${project.id}:${clipId}:${availability.target.key}`}
+      context={context}
       availabilities={{
-        playhead: autoAdjustTarget(layer, layout, assets, frame, selectedClipId, 'playhead'),
+        playhead: autoAdjustTarget(context, 'playhead'),
         clip: availability,
-        track: autoAdjustTarget(layer, layout, assets, frame, selectedClipId, 'track'),
+        track: autoAdjustTarget(context, 'track'),
       }}
-      frame={frame}
       onEdit={onEdit}
     />
   );
+}
+
+function applyHint(option: (typeof APPLIES)[number], source: AutoAdjustSource, unavailable: boolean): string {
+  if (unavailable) return 'needs Playhead';
+  return option.apply === 'values' && source === 'track' ? 'each clip' : option.hint;
 }
 
 type Phase =
   | { kind: 'idle' }
   | { kind: 'analysing'; key: string; done: number; total: number }
   | { kind: 'failed'; key: string; message: string }
-  | { kind: 'ready'; key: string; correction: AutoCorrection };
+  | { kind: 'ready'; key: string; corrections: ReadonlyMap<string, AutoCorrection> };
 
 function AutoAdjustPopover({
-  projectId,
-  layer,
+  context,
   availabilities,
-  frame,
   onEdit,
 }: Readonly<{
-  projectId: string;
-  layer: VideoLayer;
+  context: AutoAdjustContext;
   availabilities: Readonly<Record<AutoAdjustSource, AutoAdjustAvailability>>;
-  frame: number;
   onEdit: (commands: readonly EditCommand[]) => void;
 }>) {
+  const projectId = context.project.id;
   const id = useId();
   const [open, setOpen] = useState(false);
   const [source, setSource] = useState<AutoAdjustSource>('clip');
@@ -131,7 +125,7 @@ function AutoAdjustPopover({
   const [announcement, setAnnouncement] = useState('');
 
   const available = availabilities[source];
-  const reason = available.reason ?? (applyAs === 'keyframe' ? keyframeReason(layer, source, frame) : null);
+  const reason = available.reason ?? (applyAs === 'keyframe' ? keyframeReason(context, source) : null);
   const target: AutoAdjustTarget | null = reason === null ? available.target : null;
   const targetKey = target?.key ?? null;
   // A new source or, from the playhead, a new playhead is a new analysis; leaving it cancels the old one.
@@ -141,20 +135,20 @@ function AutoAdjustPopover({
     const cached = cachedAnalysis(projectId, target);
     if (cached) {
       setPercent(cached.percent);
-      setPhase({ kind: 'ready', key, correction: cached.correction });
+      setPhase({ kind: 'ready', key, corrections: cached.corrections });
       return;
     }
     const abort = new AbortController();
     setPercent(BALANCED);
-    const total = target.reads.reduce((sum, read) => sum + read.sourceFrames.length, 0);
+    const total = analysedFrames(target);
     setPhase({ kind: 'analysing', key, done: 0, total });
     analyseTarget(target, abort.signal, (done) => {
       if (!abort.signal.aborted) setPhase({ kind: 'analysing', key, done, total });
     }).then(
-      (correction) => {
+      (corrections) => {
         if (abort.signal.aborted) return;
-        rememberAnalysis(projectId, target, { correction, percent: BALANCED });
-        setPhase({ kind: 'ready', key, correction });
+        rememberAnalysis(projectId, target, { corrections, percent: BALANCED });
+        setPhase({ kind: 'ready', key, corrections });
         setAnnouncement('Auto adjust is ready: its correction is previewed. Choose an Intensity, then Apply.');
       },
       (cause: unknown) => {
@@ -167,17 +161,17 @@ function AutoAdjustPopover({
   }, [open, projectId, targetKey]);
 
   const current = phase.kind !== 'idle' && phase.key === targetKey ? phase : null;
-  const ready = current?.kind === 'ready' && target ? { correction: current.correction, target } : null;
-  const correction = current?.kind === 'ready' ? current.correction : null;
+  const ready = current?.kind === 'ready' && target ? { corrections: current.corrections, target } : null;
   const commandsAt = (value: number): EditCommand[] =>
-    ready ? autoAdjustCommands(layer, applyAs, frame, ready.correction, value / 100) : [];
+    ready ? autoAdjustCommands(context, ready.target, applyAs, ready.corrections, value / 100) : [];
   const previewing = open && ready !== null;
-  // Re-issued when the committed track changes too, since that replaces the preview, and on a new way to apply
+  // Re-issued when the committed project changes too, since that replaces the preview, and on a new way to apply
   // the same analysis.
+  const { project, playhead } = context;
   useEffect(() => {
-    if (previewing && correction)
-      livePreview(autoAdjustCommands(layer, applyAs, frame, correction, (draft ?? percent) / 100));
-  }, [previewing, targetKey, applyAs, frame, correction, layer, draft, percent]);
+    if (previewing && ready)
+      livePreview(autoAdjustCommands(context, ready.target, applyAs, ready.corrections, (draft ?? percent) / 100));
+  }, [previewing, targetKey, applyAs, playhead, current, project, draft, percent]);
   useEffect(() => (previewing ? () => livePreview(null) : undefined), [previewing]);
 
   const openChange = (next: boolean): void => {
@@ -185,7 +179,7 @@ function AutoAdjustPopover({
     setDraft(null);
     if (next) {
       setAnnouncement('');
-      const initial = initialChoice(layer);
+      const initial = initialChoice(context);
       setSource(initial.source);
       setApplyAs(initial.apply);
     } else setPhase({ kind: 'idle' });
@@ -195,7 +189,7 @@ function AutoAdjustPopover({
     if (!ready) return;
     const commands = commandsAt(percent);
     if (!commands.length) return;
-    rememberAnalysis(projectId, ready.target, { correction: ready.correction, percent });
+    rememberAnalysis(projectId, ready.target, { corrections: ready.corrections, percent });
     onEdit(commands);
     close();
     setAnnouncement(
@@ -203,7 +197,7 @@ function AutoAdjustPopover({
     );
   };
 
-  const animated = applyAs === 'keyframe' ? [] : animatedSettings(layer);
+  const animated = applyAs === 'keyframe' || !target ? [] : animatedParts(context.project, target);
   const nothing = ready !== null && commandsAt(percent).length === 0;
   const analysed = available.target?.label ?? availabilities.clip.target?.label ?? '';
   return (
@@ -275,7 +269,7 @@ function AutoAdjustPopover({
                       />
                       <span>
                         {option.label}
-                        <small>{unavailable ? 'needs Playhead' : option.hint}</small>
+                        <small>{applyHint(option, source, unavailable)}</small>
                       </span>
                     </label>
                   );
@@ -324,8 +318,10 @@ function AutoAdjustPopover({
                   </div>
                   {animated.length > 0 && (
                     <ul className="auto-adjust-animated">
-                      {animated.map((setting) => (
-                        <li key={setting}>{settingLabel(setting)} is animated: not changed</li>
+                      {animated.map(({ setting, clips }) => (
+                        <li key={setting}>
+                          {settingLabel(setting)} is animated{clips > 1 ? ` on ${clips} clips` : ''}: not changed
+                        </li>
                       ))}
                     </ul>
                   )}
@@ -338,7 +334,7 @@ function AutoAdjustPopover({
                     className="primary-button small"
                     aria-disabled={nothing || undefined}
                     title={
-                      nothing ? 'Every setting Auto sets is animated on this track: add a keyframe instead.' : undefined
+                      nothing ? 'Every setting Auto sets is animated in this grade: add a keyframe instead.' : undefined
                     }
                     onClick={() => apply(close)}
                   >

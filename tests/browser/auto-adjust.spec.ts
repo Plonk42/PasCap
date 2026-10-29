@@ -19,7 +19,9 @@ import { calculateLayout } from '../../src/shared/timeline.js';
 import { analysisSize, frameIlluminant, poolWhiteBalance, type AnalysisFrame } from '../../src/shared/white-balance.js';
 import { analysisFrameArgs } from '../../src/server/stills.js';
 import { autoAdjustCommand } from '../../src/shared/auto-colour.js';
-import { autoAdjustCommands, autoAdjustTarget } from '../../src/web/auto-adjust.js';
+import { layerKeyAsGradeKey } from '../../src/shared/grade.js';
+import { autoAdjustCommands, autoAdjustTarget, type AutoAdjustContext } from '../../src/web/auto-adjust.js';
+import { gradeOwnerOf } from '../../src/web/colour-owner.js';
 import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
@@ -152,7 +154,7 @@ test.beforeEach(async ({ page, request }) => {
   await expandedInspectorPreferences(page);
   await page.goto(`/?project=${document.id}`);
   await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Clip grade');
   await seek(page, 45);
 });
 
@@ -222,22 +224,33 @@ function keyframeFrames(document: ProjectDocument, frame: number): number[] {
   return autoAdjustWindow(clip, frame).map((projectFrame) => clip.retiming.sourceAt(projectFrame - clip.start));
 }
 
+/** Auto on the flat clip's grade, with the playhead at `playhead`. */
+function context(document: ProjectDocument, playhead: number, clipId = 'flat'): AutoAdjustContext {
+  return { project: document, clipId, layout: calculateLayout(document), assets, playhead };
+}
+
+/** The flat clip's grade keyed at the source frame shown at project frame `frame`, at the initial intensity. */
 function keyframed(document: ProjectDocument, frame: number, correction: AutoCorrection): ProjectDocument {
-  let next = document;
-  for (const command of autoAdjustCommands(next.layers[0]!, 'keyframe', frame, correction, 0.8))
-    next = applyCommand(next, command);
-  return next;
+  const at = context(document, frame);
+  const target = autoAdjustTarget(at, 'playhead').target!;
+  const commands = autoAdjustCommands(at, target, 'keyframe', new Map([['flat', correction]]), 0.8);
+  return commands.reduce(applyCommand, document);
 }
 
 const auto = (page: Page) => page.locator('summary[aria-label="Auto adjust"]');
 const apply = (page: Page) => page.getByRole('button', { name: 'Apply', exact: true });
 const intensity = (page: Page) => page.getByRole('spinbutton', { name: 'Auto adjust intensity', exact: true });
-/** A Source (Playhead, Clip, Track) or Apply as (Track values, Keyframe at playhead) choice. */
-const choice = (page: Page, name: 'Playhead' | 'Clip' | 'Track' | 'Track values' | 'Keyframe at playhead') =>
+/** A Source (Playhead, Clip, Track) or Apply as (Grade values, Keyframe at playhead) choice. */
+const choice = (page: Page, name: 'Playhead' | 'Clip' | 'Track' | 'Grade values' | 'Keyframe at playhead') =>
   page.getByRole('radio', { name, exact: true });
+const flatGrade = (document: ProjectDocument) => document.clips.find((clip) => clip.id === 'flat')!.grade;
+const selectClip = (page: Page, clipId: string) =>
+  page.locator(`[data-clip-id="${clipId}"] .timeline-clip-body`).click();
 
+/** The flat clip's grade values set by Auto. */
 function applied(document: ProjectDocument, correction: AutoCorrection, intensity: number): ProjectDocument {
-  return applyCommand(document, autoAdjustCommand(document.layers[0]!, correction, intensity)!);
+  const owner = gradeOwnerOf(document, 'flat')!;
+  return applyCommand(document, autoAdjustCommand(owner, correction, intensity, { kind: 'clip', clipId: 'flat' })!);
 }
 
 test('the service reads the same pixels as the page for the estimate operation, and fits the same correction', async ({
@@ -342,7 +355,7 @@ test('previews the analysed correction, and Apply sets the eleven settings in on
   expect(memory.saves).toBe(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 
-  // Escape cancels: the preview returns to the track's grade and nothing is edited.
+  // Escape cancels: the preview returns to the clip's grade and nothing is edited.
   await intensity(page).focus();
   await page.keyboard.press('Escape');
   await expect(apply(page)).toHaveCount(0);
@@ -361,7 +374,8 @@ test('previews the analysed correction, and Apply sets the eleven settings in on
   // The initial 80% applies exactly the analysed correction.
   const expected = applied(before, correction, 0.8);
   await expect.poll(() => current(page)).toEqual(expected);
-  for (const setting of AUTO_ADJUST_SETTINGS) expect(expected.layers[0]!.colour[setting]).toBe(correction[setting]);
+  for (const setting of AUTO_ADJUST_SETTINGS) expect(flatGrade(expected).colour[setting]).toBe(correction[setting]);
+  expect(expected.layers).toEqual(before.layers);
   await expect.poll(() => checksum(page)).toBe(previewed);
   await page.evaluate(() => window.pascapLab!.flush());
   expect(memory.snapshot()).toEqual({ ...expected, revision: expected.revision + 1 });
@@ -391,7 +405,7 @@ test('Intensity scales the correction, exaggerates it above 80%, and a later App
   await apply(page).click();
   const half = applied(before, correction, 0.5);
   await expect.poll(() => current(page)).toEqual(half);
-  expect(half.layers[0]!.colour.contrast).toBe(scaleCorrection(correction, 0.5).contrast);
+  expect(flatGrade(half).colour.contrast).toBe(scaleCorrection(correction, 0.5).contrast);
 
   // Reopening shows the intensity last applied; Reset intensity returns to 80%.
   await auto(page).click();
@@ -406,42 +420,42 @@ test('Intensity scales the correction, exaggerates it above 80%, and a later App
   await apply(page).click();
   const strong = applied(half, correction, 1);
   await expect.poll(() => current(page)).toEqual(strong);
-  expect(strong.layers[0]!.colour.temperature).toBeGreaterThan(correction.temperature);
-  expect(strong.layers[0]!.colour.contrast).toBeGreaterThan(correction.contrast);
+  expect(flatGrade(strong).colour.temperature).toBeGreaterThan(correction.temperature);
+  expect(flatGrade(strong).colour.contrast).toBeGreaterThan(correction.contrast);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(half);
 });
 
 test('leaves animated settings and keyframes unchanged and says so', async ({ page }) => {
   const seeded = await current(page);
-  seeded.layers[0]!.colour = { ...seeded.layers[0]!.colour, exposure: 0.25, hue: 15, hdr: 0.3, vibrance: 0.4 };
-  seeded.layers[0]!.keyframes = [
-    sharedPoint(20, { exposure: 0.5, opacity: 0.8 }),
-    sharedPoint(80, { saturation: 1.3 }, 'smooth'),
+  flatGrade(seeded).colour = { ...flatGrade(seeded).colour, exposure: 0.25, hue: 15, hdr: 0.3, vibrance: 0.4 };
+  flatGrade(seeded).keyframes = [
+    layerKeyAsGradeKey(sharedPoint(50, { exposure: 0.5 })),
+    layerKeyAsGradeKey(sharedPoint(110, { saturation: 1.3 }, 'smooth')),
   ];
   memory.seed(seeded);
   await page.reload();
   await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Clip grade');
   await seek(page, 45);
   const correction = await expectedCorrection(page);
   await auto(page).click();
-  // The track animates Exposure and Saturation: Auto starts on a keyframe, the track values remain a choice.
+  // The grade animates Exposure and Saturation: Auto starts on a keyframe, the grade values remain a choice.
   await expect(choice(page, 'Playhead')).toBeChecked();
   await expect(choice(page, 'Keyframe at playhead')).toBeChecked();
   await choice(page, 'Clip').check();
-  await expect(choice(page, 'Track values')).toBeChecked();
+  await expect(choice(page, 'Grade values')).toBeChecked();
   await expect(page.getByText('Saturation is animated: not changed', { exact: true })).toBeVisible();
   await expect(page.getByText('Exposure is animated: not changed', { exact: true })).toBeVisible();
   await apply(page).click();
   const expected = applied(seeded, correction, 0.8);
   await expect.poll(() => current(page)).toEqual(expected);
-  const colour = expected.layers[0]!.colour;
+  const colour = flatGrade(expected).colour;
   expect([colour.exposure, colour.saturation, colour.hue, colour.hdr]).toEqual([0.25, 1, 15, 0.3]);
   expect(colour.blacks).toBe(correction.blacks);
   expect(colour.vibrance).toBe(correction.vibrance);
-  expect(expected.layers[0]!.keyframes).toEqual(seeded.layers[0]!.keyframes);
-  expect(expected.layers[0]!.opacity).toBe(seeded.layers[0]!.opacity);
+  expect(flatGrade(expected).keyframes).toEqual(flatGrade(seeded).keyframes);
+  expect(expected.layers).toEqual(seeded.layers);
 });
 
 test('Keyframe at playhead keys the eleven settings from the frames around it, one keyframe per run', async ({
@@ -452,7 +466,7 @@ test('Keyframe at playhead keys the eleven settings from the frames around it, o
   const graded = await checksum(page);
   await auto(page).click();
   await expect(choice(page, 'Clip')).toBeChecked();
-  await expect(choice(page, 'Track values')).toBeChecked();
+  await expect(choice(page, 'Grade values')).toBeChecked();
   // A keyframe takes the light at the playhead: it needs the Playhead source.
   await expect(choice(page, 'Keyframe at playhead')).toBeDisabled();
   await expect(apply(page)).toBeVisible();
@@ -468,10 +482,12 @@ test('Keyframe at playhead keys the eleven settings from the frames around it, o
   await expect(apply(page)).toHaveCount(0);
   const once = keyframed(before, 45, first);
   await expect.poll(() => current(page)).toEqual(once);
-  const key = once.layers[0]!.keyframes[0]!;
-  expect(key.frame).toBe(45);
+  // Project frame 45 shows source frame 75 of the flat clip.
+  const key = flatGrade(once).keyframes[0]!;
+  expect(key.frame).toBe(75);
   for (const setting of AUTO_ADJUST_SETTINGS) expect(key.values[setting]).toBe(first[setting]);
-  expect(once.layers[0]!.colour).toEqual(before.layers[0]!.colour);
+  expect(flatGrade(once).colour).toEqual(flatGrade(before).colour);
+  expect(once.layers).toEqual(before.layers);
 
   // Now animated, Auto starts on a keyframe; another frame is another analysis and another keyframe.
   await seek(page, 80);
@@ -482,7 +498,7 @@ test('Keyframe at playhead keys the eleven settings from the frames around it, o
   await apply(page).click();
   const twice = keyframed(once, 80, second);
   await expect.poll(() => current(page)).toEqual(twice);
-  expect(twice.layers[0]!.keyframes.map((point) => point.frame)).toEqual([45, 80]);
+  expect(flatGrade(twice).keyframes.map((point) => point.frame)).toEqual([75, 110]);
 
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(once);
@@ -490,7 +506,7 @@ test('Keyframe at playhead keys the eleven settings from the frames around it, o
   expect(await current(page)).toEqual(before);
 });
 
-test('Track values from the playhead set the whole track from the second around it, sharing the keyframe analysis', async ({
+test('Grade values from the playhead set the clip grade from the second around it, sharing the keyframe analysis', async ({
   page,
 }) => {
   const before = await current(page);
@@ -498,62 +514,100 @@ test('Track values from the playhead set the whole track from the second around 
   await auto(page).click();
   await expect(apply(page)).toBeVisible();
   await choice(page, 'Playhead').check();
-  await expect(choice(page, 'Track values')).toBeChecked();
+  await expect(choice(page, 'Grade values')).toBeChecked();
   await expect(apply(page)).toBeVisible();
   // A keyframe analyses the same frames: switching to it decodes nothing more.
   const reads = proxyReads;
   await choice(page, 'Keyframe at playhead').check();
   await expect(apply(page)).toBeVisible();
-  await choice(page, 'Track values').check();
+  await choice(page, 'Grade values').check();
   await expect(apply(page)).toBeVisible();
   expect(proxyReads).toBe(reads);
   await apply(page).click();
   await expect(apply(page)).toHaveCount(0);
   const expected = applied(before, correction, 0.8);
   await expect.poll(() => current(page)).toEqual(expected);
-  for (const setting of AUTO_ADJUST_SETTINGS) expect(expected.layers[0]!.colour[setting]).toBe(correction[setting]);
-  expect(expected.layers[0]!.keyframes).toEqual(before.layers[0]!.keyframes);
+  for (const setting of AUTO_ADJUST_SETTINGS) expect(flatGrade(expected).colour[setting]).toBe(correction[setting]);
+  expect(flatGrade(expected).keyframes).toEqual(flatGrade(before).keyframes);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(before);
 });
 
-test('the Track source analyses every clip of the track for its values, never a keyframe', async ({ page }) => {
+test('the Track source grades each clip of the track on its own in one Undo step, never a keyframe', async ({
+  page,
+}) => {
+  // A second flat range replaces the black clip, so that both clips can be analysed.
+  const seeded = await current(page);
+  seeded.clips[1] = { ...seeded.clips[1]!, id: 'later', sourceIn: 40, sourceOut: 120 };
+  seeded.layers[0]!.transitions = [{ leftId: 'flat', rightId: 'later', type: 'cut', duration: 0 }];
+  memory.seed(projectSchema.parse(seeded));
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
+  await inspectorTab(page, 'Clip grade');
+  await seek(page, 45);
   const before = await current(page);
-  const layout = calculateLayout(before);
-  const target = autoAdjustTarget(before.layers[0]!, layout, assets, 45, null, 'track').target!;
-  // Both clips use the flat recording: the black clip's frames count too, in proportion to its duration.
-  expect(target.reads.map(({ asset }) => asset.id)).toEqual([assets[0]!.id]);
-  const correction = await expectedCorrection(page, target.reads[0]!.sourceFrames);
+  const target = autoAdjustTarget(context(before, 45), 'track').target!;
+  expect(target.parts.map(({ clip, sourceFrames }) => [clip.clip.id, sourceFrames])).toEqual([
+    ['flat', autoAdjustFrames(30, 120)],
+    ['later', autoAdjustFrames(40, 120)],
+  ]);
+  const corrections = new Map([
+    ['flat', await expectedCorrection(page, autoAdjustFrames(30, 120))],
+    ['later', await expectedCorrection(page, autoAdjustFrames(40, 120))],
+  ]);
   await auto(page).click();
   await expect(apply(page)).toBeVisible();
   await choice(page, 'Playhead').check();
   await choice(page, 'Keyframe at playhead').check();
   await choice(page, 'Track').check();
-  await expect(choice(page, 'Track values')).toBeChecked();
+  await expect(choice(page, 'Grade values')).toBeChecked();
   await expect(choice(page, 'Keyframe at playhead')).toBeDisabled();
-  await expect(page.locator('.auto-adjust-source')).toHaveText('From 2 clips on Track 1');
+  await expect(page.locator('.auto-adjust-source')).toHaveText('From 2 clips on Track 1, each on its own');
   await expect(apply(page)).toBeVisible();
   await apply(page).click();
-  const expected = applied(before, correction, 0.8);
+  const expected = autoAdjustCommands(context(before, 45), target, 'values', corrections, 0.8).reduce(
+    applyCommand,
+    before,
+  );
   await expect.poll(() => current(page)).toEqual(expected);
-  expect(expected.layers[0]!.keyframes).toEqual(before.layers[0]!.keyframes);
+  expect(expected.clips.map((clip) => clip.grade.colour.temperature)).toEqual([
+    corrections.get('flat')!.temperature,
+    corrections.get('later')!.temperature,
+  ]);
+  expect(expected.layers).toEqual(before.layers);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(before);
 });
 
 test('explains when it cannot run, and a cancelled or failed analysis leaves no edit', async ({ page }) => {
   const before = await current(page);
   const graded = await checksum(page);
-  await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
-  const disabled = page.getByRole('button', { name: 'Auto adjust', exact: true });
-  await expect(disabled).toHaveAttribute('aria-disabled', 'true');
-  await expect(disabled).toHaveAttribute('title', 'Move the playhead over a clip on Empty row to analyse it.');
-  // Playwright never clicks an aria-disabled button; activate it from the keyboard instead.
-  await disabled.focus();
-  await page.keyboard.press('Enter');
+  // Auto writes clip grades only.
+  await inspectorTab(page, 'Track colour');
+  await expect(auto(page)).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Auto adjust', exact: true })).toHaveCount(0);
+  await inspectorTab(page, 'Clip grade');
+
+  // Off the clip, the Playhead source explains itself; the whole clip remains a choice.
+  await seek(page, 100);
+  await auto(page).click();
+  await choice(page, 'Playhead').check();
+  await expect(page.locator('.auto-adjust-panel')).toContainText(
+    'Move the playhead over this clip to analyse 1 s around it.',
+  );
   await expect(apply(page)).toHaveCount(0);
-  await page.getByRole('button', { name: 'Select track Track 1', exact: true }).click();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+
+  // Each clip of the track is analysed on its own, and the black one has nothing to measure.
+  await auto(page).click();
+  await choice(page, 'Track').check();
+  await expect(page.locator('.auto-adjust-panel').getByRole('alert')).toHaveText(
+    /^Clip 2 \(pattern-a\): These frames are too dark or too uniform to analyse\.$/,
+  );
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
 
   // The dark clip is black throughout: nothing to measure.
-  await seek(page, 100);
+  await selectClip(page, 'dark');
   await auto(page).click();
   await expect(page.locator('.auto-adjust-panel').getByRole('alert')).toHaveText(
     'These frames are too dark or too uniform to analyse.',
@@ -562,6 +616,7 @@ test('explains when it cannot run, and a cancelled or failed analysis leaves no 
   await expect(page.locator('.auto-adjust-panel').getByRole('alert')).toHaveCount(0);
 
   // Escape during the analysis cancels it.
+  await selectClip(page, 'flat');
   await seek(page, 45);
   hold();
   await auto(page).click();
@@ -570,13 +625,14 @@ test('explains when it cannot run, and a cancelled or failed analysis leaves no 
   await expect(page.locator('.auto-adjust-progress')).toHaveCount(0);
   release();
 
-  // So does changing track; an outside click closes a finished analysis like Cancel.
+  // So does selecting another clip; an outside click closes a finished analysis like Cancel.
   hold();
   await auto(page).click();
   await expect(page.locator('.auto-adjust-progress')).toBeVisible();
-  await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
+  await selectClip(page, 'dark');
   release();
-  await page.getByRole('button', { name: 'Select track Track 1', exact: true }).click();
+  await selectClip(page, 'flat');
+  await seek(page, 45);
   await auto(page).click();
   await expect(apply(page)).toBeVisible();
   await page.getByRole('heading', { level: 2, name: /^Media/ }).click();
