@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { applyCommand } from '../../src/shared/commands.js';
+import { layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
@@ -17,6 +18,7 @@ import {
   type WhiteBalance,
 } from '../../src/shared/white-balance.js';
 import { whiteBalanceCommands } from '../../src/shared/auto-colour.js';
+import { gradeOwnerOf } from '../../src/web/colour-owner.js';
 import { expandedInspectorPreferences, inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
@@ -134,7 +136,7 @@ test.beforeEach(async ({ page, request }) => {
   await expandedInspectorPreferences(page);
   await page.goto(`/?project=${document.id}`);
   await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Clip grade');
 });
 
 test.afterEach(() => {
@@ -190,6 +192,19 @@ function autoButton(page: Page) {
   return page.getByRole('button', { name: 'Auto white balance', exact: true });
 }
 
+/** The cast clip's grade keyed at source frame `frame` (the cast clip starts at frame 0 at 1×). */
+function balanced(document: ProjectDocument, frame: number, balance: WhiteBalance): ProjectDocument {
+  const commands = whiteBalanceCommands(gradeOwnerOf(document, 'cast')!, frame, balance, {
+    kind: 'clip',
+    clipId: 'cast',
+  });
+  return commands.reduce(applyCommand, document);
+}
+
+const castGrade = (document: ProjectDocument) => document.clips.find((clip) => clip.id === 'cast')!.grade;
+const selectClip = (page: Page, clipId: string) =>
+  page.locator(`[data-clip-id="${clipId}"] .timeline-clip-body`).click();
+
 async function captured(page: Page, expected: ProjectDocument): Promise<void> {
   await expect.poll(() => current(page)).toEqual(expected);
 }
@@ -233,7 +248,7 @@ test('analysed pixels are exactly the compositor input of the clip at the playhe
   expect(comparison.patch[2]! - comparison.patch[0]!).toBeGreaterThan(20);
 });
 
-test('keyframes the estimated Temperature and Tint at the playhead in one Undo step', async ({ page }) => {
+test('keyframes the clip grade’s estimated Temperature and Tint at the playhead in one Undo step', async ({ page }) => {
   await seek(page, 60);
   const before = await current(page);
   const balance = await expectedBalance(page, before, 60);
@@ -241,8 +256,9 @@ test('keyframes the estimated Temperature and Tint at the playhead in one Undo s
   expect(balance.temperature).toBeGreaterThan(0.1);
   await expect(autoButton(page)).not.toHaveAttribute('aria-disabled');
   await autoButton(page).click();
-  const expected = whiteBalanceCommands(before.layers[0]!, 60, balance).reduce(applyCommand, before);
+  const expected = balanced(before, 60, balance);
   await captured(page, expected);
+  expect(expected.layers).toEqual(before.layers);
   await expect(page.getByRole('button', { name: 'Keyframe Temperature', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
@@ -261,26 +277,28 @@ test('keyframes the estimated Temperature and Tint at the playhead in one Undo s
 
 test('follows changing light between two runs and reruns update only their two values', async ({ page }) => {
   const seeded = await current(page);
-  seeded.layers[0]!.keyframes = [
-    layerKeyframe(90, { ...EMPTY_KEY_VALUES, temperature: 1.5, tint: -0.8, exposure: 0.5 }, 'smooth'),
+  castGrade(seeded).keyframes = [
+    layerKeyAsGradeKey(
+      layerKeyframe(90, { ...EMPTY_KEY_VALUES, temperature: 1.5, tint: -0.8, exposure: 0.5 }, 'smooth'),
+    ),
   ];
   memory.seed(seeded);
   await page.reload();
   await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Clip grade');
   await seek(page, 90);
   const first = await expectedBalance(page, seeded, 90);
   await autoButton(page).click();
   const once = structuredClone(seeded);
-  once.layers[0]!.keyframes[0]!.values = { ...once.layers[0]!.keyframes[0]!.values, ...first };
+  castGrade(once).keyframes[0]!.values = { ...castGrade(once).keyframes[0]!.values, ...first };
   await captured(page, once);
 
-  await seek(page, 150);
-  const second = await expectedBalance(page, once, 150);
+  await seek(page, 110);
+  const second = await expectedBalance(page, once, 110);
   await autoButton(page).click();
-  const twice = whiteBalanceCommands(once.layers[0]!, 150, second).reduce(applyCommand, once);
+  const twice = balanced(once, 110, second);
   await captured(page, twice);
-  expect(twice.layers[0]!.keyframes.map((key) => key.frame)).toEqual([90, 150]);
+  expect(castGrade(twice).keyframes.map((key) => key.frame)).toEqual([90, 110]);
 
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(once);
@@ -288,15 +306,19 @@ test('follows changing light between two runs and reruns update only their two v
 
 test('explains when it cannot run, and a cancelled or failed analysis leaves no edit', async ({ page }) => {
   const before = await current(page);
-  await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
+  // Auto white balance keys clip grades only.
+  await inspectorTab(page, 'Track colour');
+  await expect(autoButton(page)).toHaveCount(0);
+  await inspectorTab(page, 'Clip grade');
+  // The plain clip is at frames 120–180.
+  await seek(page, 150);
   await expect(autoButton(page)).toHaveAttribute('aria-disabled', 'true');
-  await expect(autoButton(page)).toHaveAttribute('title', /Move the playhead over a clip on Empty row/);
+  await expect(autoButton(page)).toHaveAttribute('title', 'Move the playhead over this clip to balance its light.');
   // Playwright never clicks an aria-disabled button; activate it from the keyboard instead.
   await autoButton(page).focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('.auto-white-balance').getByRole('alert')).toHaveCount(0);
   expect(await current(page)).toEqual(before);
-  await page.getByRole('button', { name: 'Select track Track 1', exact: true }).click();
 
   // The first two seconds of the cast clip are black: nothing to measure within a second of frame 10.
   await seek(page, 10);
@@ -320,7 +342,7 @@ test('explains when it cannot run, and a cancelled or failed analysis leaves no 
   await expect(page.getByRole('button', { name: 'Cancel automatic white balance' })).toHaveCount(0);
   release();
 
-  // Changing track cancels too.
+  // Selecting another clip cancels too.
   held = new Promise((resolve) => {
     release = () => {
       held = null;
@@ -329,9 +351,10 @@ test('explains when it cannot run, and a cancelled or failed analysis leaves no 
   });
   await autoButton(page).click();
   await expect(page.getByRole('button', { name: 'Cancel automatic white balance' })).toBeVisible();
-  await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
+  await selectClip(page, 'plain');
   release();
-  await page.getByRole('button', { name: 'Select track Track 1', exact: true }).click();
+  await selectClip(page, 'cast');
+  await seek(page, 60);
   await expect(autoButton(page)).not.toHaveAttribute('aria-disabled');
   await page.evaluate(() => window.pascapLab!.flush());
   expect(await current(page)).toEqual(before);

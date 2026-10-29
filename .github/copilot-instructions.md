@@ -165,17 +165,18 @@ edits real projects with it, so saved data must keep working. Details are in
   curves → fades/coverage. CPU/reference/native/GPU use the same math and order.
   Nonzero settings intentionally colour greys; normalization preserves neutral-white
   linear luminance before clipping only, not arbitrary pixels or final output.
-  No Kelvin/HDR output. #218 **Auto white balance** (under Tint) estimates Temperature/Tint
-  from 7 proxy frames within ±15 of the playhead (its clip, mapped through retiming) on its
-  own temporary reader, and keyframes both at the playhead like their diamonds, one Undo
+  No Kelvin/HDR output. #285: both automatic tools write **clip grades only** (Colour tab, Clip
+  target; track Colour has neither). #218 **Auto white balance** (under Tint) estimates Temperature/Tint
+  from 16 proxy frames within ±30 of the playhead (on the graded clip, mapped through retiming) on its
+  own temporary reader, and keyframes both at the source frame shown there like their diamonds, one Undo
   step; no schema/render/export change. #167 Phase 1 **Auto** (Colour keyframe line)
   fits eleven scalar settings from 16 proxy frames through the real grade (#225: colour is raised with
   Saturation and Vibrance, Saturation giving way first on strong colours such as skies), previews them in a
   popover with Intensity (initially 80%, the fitted correction; 100% exaggerates it by a
-  quarter) and applies one Undo step. **Source**: Playhead (±30 frames), Clip (whole clip at the playhead)
-  or Track (all its clips by duration). **Apply as**: Track values edits the bases, leaving animated
-  settings and keyframes unchanged; Keyframe (Playhead source only) captures all eleven like their
-  diamonds (initial, with Playhead, once any is
+  quarter) and applies one Undo step. **Source**: Playhead (±30 frames), Clip (whole graded clip)
+  or Track (each clip of its track on its own, one `colour` edit per clip). **Apply as**: Grade values edits
+  the grades' values, leaving animated settings and keyframes unchanged; Keyframe (Playhead source only)
+  captures all eleven at the source frame like their diamonds (initial, with Playhead, once any is
   animated). Constants in `src/shared/auto-adjust.ts`, no schema/render change
   ([Auto adjust](../docs/design/AUTO_ADJUST.md)).
   Main/stored slider/exact-field/reset/diamond/navigation retain

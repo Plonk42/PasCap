@@ -1,96 +1,94 @@
 # Colour → Auto (Auto adjust)
 
-Current contract for Phase 1 of [#167](https://github.com/Plonk42/PasCap/issues/167):
-an **Auto** action that analyses the clip at the playhead and writes a balanced
-correction into eleven of the track's existing scalar Colour settings, either as the track's
-values or as a keyframe at the playhead. It only chooses values: no schema, grade stage,
-render, export or decoder changes, and it makes no CapCut parity claim. A clip-owned
-correction (Phase 2) is not implemented; the issue holds its plan. This
-guide describes the implementation, not real-footage qualification; the constants are
-starting values tuned on synthetic fixtures, then on real drone flights, kept in one module
-for that evaluation.
+Current contract for Phase 1 of [#167](https://github.com/Plonk42/PasCap/issues/167), writing
+clip grades since [#285](https://github.com/Plonk42/PasCap/issues/285): an **Auto** action that
+analyses a clip and writes a balanced correction into eleven scalar settings of its
+[clip grade](ROW_APPEARANCE.md#clip-grades), either as the grade's values or as a keyframe at the
+playhead. It only chooses values: no schema, grade stage, render, export or decoder changes, and
+it makes no CapCut parity claim. The clip grade replaces the clip-owned correction #167 planned
+for Phase 2. This guide describes the implementation, not real-footage qualification; the
+constants are starting values tuned on synthetic fixtures, then on real drone flights, kept in
+one module for that evaluation.
 
 Implementation authorities: [estimator](../../src/shared/auto-adjust.ts) (pure, every
 constant in `AUTO_ADJUST`), [white balance](../../src/shared/white-balance.ts),
-[frame sampler](../../src/preview/frame-sampler.ts), [editor helpers](../../src/web/auto-adjust.ts)
-and [popover](../../src/web/AutoAdjust.tsx).
+[frame sampler](../../src/preview/frame-sampler.ts), [edits](../../src/shared/auto-colour.ts),
+[editor helpers](../../src/web/auto-adjust.ts) and [popover](../../src/web/AutoAdjust.tsx).
 
 ## Editing
 
-**Auto** (accessible name **Auto adjust**, wand icon) ends the Colour keyframe line, after
-**Reset** and the default keyframe toggle. When that line is narrower than 280 px, as with
-the Properties panel at its 270 px minimum, Auto takes its own row at the right so the
-keyframe count stays readable. It is unavailable, with the reason in its tooltip and
-description, when Colour cannot be edited, no clip of the selected track is at the
-playhead, or that clip's recording has no verified proxy. In a dissolve it analyses the
-selected clip when it is one of the two, otherwise the one past the dissolve's midpoint,
-like [Auto white balance](TEMPERATURE_AND_TINT.md#automatic-white-balance).
+**Auto** (accessible name **Auto adjust**, wand icon) ends the Colour keyframe line of a
+**clip grade** (Colour tab, **Clip** target), after **Reset** and the default keyframe toggle;
+track Colour has no Auto. When that line is narrower than 280 px, as with the Properties panel
+at its 270 px minimum, Auto takes its own row at the right so the keyframe count stays
+readable. It is unavailable, with the reason in its tooltip and description, when Colour
+cannot be edited or the clip's recording has no verified proxy. It analyses the selected clip,
+wherever the playhead is, also in a dissolve.
 
 Choosing Auto opens a nonmodal popover naming what it analyses, with two choices. **Source**
 is what it analyses:
 
 - **Playhead** (1 s around it): 16 frames within 30 project frames of the playhead, never
-  across its clip's ends, mapped to source frames through `PlacedClip.retiming`;
-- **Clip** (all of it): 16 frames spread over the **whole source range** of the clip at the
-  playhead;
-- **Track** (all its clips): 16 frames spread over every clip of the selected track, laid end
-  to end in timeline order, so each clip counts in proportion to its duration on screen. It is
-  unavailable, with the reason, until every clip of the track has a verified proxy.
+  across the clip's ends, mapped to source frames through `PlacedClip.retiming`. It needs the
+  playhead on the clip, otherwise it explains so.
+- **Clip** (all of it): 16 frames spread over the clip's **whole source range**.
+- **Track** (each clip on its own): every clip of the clip's track, each analysed like the Clip
+  source and graded with its own correction, like `estimate` with `clipIds`. It is unavailable,
+  with the reason, until every clip of the track has a verified proxy.
 
 **Apply as** is what it changes:
 
-- **Track values** (whole track) replaces the track's values, from any source.
-- **Keyframe** (at playhead) keys the eleven settings at the playhead. A keyframe takes the
-  light at the playhead, so it needs the Playhead source: with Clip or Track it is unavailable
-  (**needs Playhead**), and choosing either of them returns Apply as to Track values. It is also
-  unavailable, with the reason, when the track holds 256 keyframes and none is at the playhead.
+- **Grade values** (whole clip; **each clip** for the Track source) replaces the values of each
+  analysed clip's grade, from any source.
+- **Keyframe** (at playhead) keys the eleven settings of the clip's grade at the source frame
+  shown at the playhead. A keyframe takes the light at the playhead, so it needs the Playhead
+  source: with Clip or Track it is unavailable (**needs Playhead**), and choosing either of them
+  returns Apply as to Grade values. It is also unavailable, with the reason, when the grade holds
+  64 keyframes and none is at that source frame.
 
-Auto opens on Clip and Track values while the track animates none of the eleven settings, on
-Playhead and Keyframe once it animates any of them. Changing the source starts its own
-analysis; changing Apply as reuses it. While it runs the popover shows **Analysing
-n/16 frames…** and **Cancel**. Then:
+Auto opens on Clip and Grade values while the grade animates none of the eleven settings, on
+Playhead and Keyframe once it animates any of them and the playhead is on the clip. Changing the
+source starts its own analysis; changing Apply as reuses it. While it runs the popover shows
+**Analysing n/N frames…** (16 per analysed clip) and **Cancel**. Then:
 
 - **Intensity**, a slider with an exact field (0–100%, initially 80%, Reset restores
   80%). 80% applies the correction as fitted; higher values exaggerate it, up to a quarter
-  more at 100%. The correction at the chosen intensity is previewed in the image while the
-  popover is open, the dragged value while dragging, through the live preview path:
-  no document, history or save change.
-- For Track values, a line per setting the track animates, such as **Exposure is animated:
-  not changed**.
+  more at 100%. One Intensity scales every analysed clip's correction. The result at the chosen
+  intensity is previewed in the image while the popover is open, the dragged value while
+  dragging, through the live preview path: no document, history or save change.
+- For Grade values, a line per setting a grade animates, such as **Exposure is animated: not
+  changed**, or **Exposure is animated on 2 clips: not changed** for the Track source.
 - **Apply** commits one Undo step and closes the popover. Hue, HDR, Local contrast, HSL,
-  curves, Opacity, Transform and clips are untouched.
-  - Track values: one `colour` edit, the scaled correction replacing the track's
-    Temperature, Tint, Saturation, Vibrance, Exposure, Brightness, Contrast, Highlights,
-    Shadows, Whites and Blacks, except animated ones; no keyframe changes. Apply is
-    unavailable when all eleven settings are animated.
-  - Keyframe: the eleven settings are captured at the playhead exactly like their
+  curves, the tracks, Detail and other clips are untouched.
+  - Grade values: one `colour` edit per analysed clip (`clipIds` of one clip), the scaled
+    correction replacing its grade's Temperature, Tint, Saturation, Vibrance, Exposure,
+    Brightness, Contrast, Highlights, Shadows, Whites and Blacks, except the ones that grade
+    animates; no keyframe changes. Apply is unavailable when nothing would change.
+  - Keyframe: the eleven settings are captured at the source frame exactly like their
     diamonds, in one transaction: a new keyframe gets Linear Easing; an existing one is
     joined (each joining setting adopts the Easing the keyframe's settings agree on, else
-    Linear) and its values of the eleven are overwritten. Track values and other keyframes
-    are untouched.
+    Linear) and its values of the eleven are overwritten. The grade's values and other
+    keyframes are untouched.
 - **Cancel**, Escape anywhere in the popover (a slider drag first cancels itself) or a
   click outside closes it and restores the preview, without an edit.
 
 Errors (an unreadable proxy, frames too dark or too uniform) stay in the popover with
-**Close**. Changing track, project or the clip at the playhead, or trimming that clip,
-closes the popover and cancels a running analysis. Moving the playhead within the clip
-does not; from the Playhead it starts the analysis around the new playhead.
+**Close**; with the Track source they name the clip (**Clip 2 (DJI_0468): These frames are too
+dark or too uniform to analyse.**), and nothing is applied. Selecting another clip, changing
+project or trimming the clip closes the popover and cancels a running analysis. Moving the
+playhead does not; from the Playhead it starts the analysis around the new playhead.
 
-Running Auto at several frames of a clip whose light changes keys a correction at each,
-and ordinary keyframe interpolation follows the light between them. The keyframes stay at
-their project frames, like every track keyframe: trimming, moving or rippling the clip
-does not move them. With Linear Easing a correction also eases across a cut into the next
-clip on the track; set **Hold** on the last keyframe of a shot, or key the next shot's first
-frame, to keep shots apart.
+The correction belongs to the clip: trims, moves (to another track too), Ripple, splits and
+duplicates keep it with its footage, and its keyframes stay on their source frames. Running Auto
+at several frames of a clip whose light changes keys a correction at each, and ordinary keyframe
+interpolation follows the light between them, within the clip only.
 
 The editor keeps each analysis in session memory, never saved or in history: one per
 clip, one per clip and playhead and one per track's clips as analysed. Reopening Auto on the
 same frames skips decoding and starts at the intensity last applied, so the user can
 lower it later; **Apply** then replaces the eleven settings again, including manual edits to
 them. The memory is dropped when a clip's source range or its proxy changes, on another
-project and on reload. Track values serve the whole track: tracks holding shots that need
-different corrections need one track each, or keyframes. The Track source finds one
-compromise for all its clips, which may suit none of very different shots.
+project and on reload.
 
 Intensity $p$ scales the fitted correction from neutral by $a=p/80\%$ (`balancedIntensity`):
 Temperature, Tint, Vibrance, Exposure, Brightness, Highlights, Shadows, Whites and Blacks by $a$,
@@ -101,13 +99,13 @@ Exposure are log-gains, so half the correction is the geometric midpoint of the 
 ## Analysis
 
 **Frames.** For the Clip source, the centres of up to **16** equal slices of the clip's
-`[sourceIn, sourceOut)`; for the Track source, of the track's clips laid end to end in output
-frames, each mapped to its source frame. For the Playhead, the playhead and up to 15 more project frames within
+`[sourceIn, sourceOut)`; for the Track source, the same for each clip of the track, each fitted on
+its own. For the Playhead, the playhead and up to 15 more project frames within
 **30** (1 s) of it inside its clip, shared between the two sides in proportion to their room
 and evenly spaced, exactly as Auto white balance's window (one shared constant), each mapped to the source frame shown there
 (repeated source frames of slow motion are read once). They are
 decoded from the verified proxy (never an original) on a temporary one-decoder reader, one
-recording at a time for the Track source,
+clip at a time for the Track source,
 separate from the timeline and source review lanes. Each is drawn into a canvas of at
 most 320 × 180 pixels, exactly the decoded frame the compositor uploads, read back and
 closed at once; the reader is released when done, failed or cancelled. The editor then
@@ -267,10 +265,9 @@ colour as with Saturation alone. No owner recording was analysed for this change
 
 ## Limits
 
-- Track values are one correction per track, from one moment, one clip or a compromise over
-  the track's clips. Keyframes adapt to light that
-  changes within a clip only where Auto is run, and stay at their project frames when the
-  clip is trimmed or moved; there is no per-clip correction or automatic per-frame adaptation.
+- Grade values are one correction per clip, from one moment or the whole clip. Keyframes adapt
+  to light that changes within a clip only where Auto is run; there is no automatic per-frame
+  adaptation. Analysing every clip of a long track decodes 16 frames per clip, serially.
 - Intensity above 80% exaggerates only what Auto corrects: footage it leaves nearly
   unchanged stays nearly unchanged at 100%.
 - Overexposed footage is darkened conservatively: its clipped highlights cap the key, but
@@ -309,13 +306,8 @@ outlier frame among 16; hazy, snow, night, sunset,
 sky and sea; a sky filling the frame whose strongest tenth rises by at most 0.05 and a sky
 over snow kept within 0.05 of its saturation, Saturation giving way first; muted colours
 raised by both settings, very
-colourful ones lowered by Saturation, monochrome ones untouched; intensity scaling, exaggeration within bounds and frame selection. Editor
-tests cover the target and the keyframe window (reversed and retimed), the single Colour
-edit, the keyframe capture (new, joined, 256-keyframe limit), the initial choice, animated
-settings and session memory. A
+colourful ones lowered by Saturation, monochrome ones untouched; intensity scaling, exaggeration within bounds and frame selection. Editor tests cover the target (the graded clip, wherever the playhead is, and each clip of its track) and the keyframe window (reversed and retimed), the clip grade edits (one per clip, one Undo step, kept through a trim), the keyframe capture at the source frame (new, joined, 64-keyframe limit), the initial choice, animated settings and session memory. A
 browser test checks, on a generated flat proxy, that Apply at the initial 80% writes
-exactly the estimator's result for the pixels the page decodes, as track values and as
-keyframes at two frames, previews without editing,
-Undo, intensity including 100%, reuse without decoding, animated settings, cancellation
-and failures. The analysed pixels equal the compositor input, as checked for Auto white
+exactly the estimator's result for the pixels the page decodes into the clip's grade, as values and as keyframes at two frames, and each clip's own correction for the Track source; it previews without editing and covers
+Undo, intensity including 100%, reuse without decoding, animated settings, cancellation, selecting another clip and failures, including a black clip named among the track's. The analysed pixels equal the compositor input, as checked for Auto white
 balance.

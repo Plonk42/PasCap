@@ -337,22 +337,23 @@ function ColourSection({
   duration,
   layout,
   assets,
-  selectedClipId,
   resetKey,
   disabled,
   onEdit,
   id,
   valueFrame = frame,
+  playhead = frame,
 }: Readonly<
   LayerControlProps & {
     project: ProjectDocument;
     duration: number;
     layout: TimelineLayout;
     assets: readonly MediaAsset[];
-    selectedClipId: string | null;
     id: string;
     /** Where the image evaluates the values, when it differs from the frame keyframes are captured at. */
     valueFrame?: number;
+    /** The project frame at the playhead, where Auto analyses a clip grade. */
+    playhead?: number;
   }
 >) {
   const colour = colourAt(layer, frame);
@@ -439,14 +440,13 @@ function ColourSection({
         >
           <Icon name="default-key" size={16} />
         </button>
-        {!clipGrade && (
+        {isClipOwner(layer) && (
           <AutoAdjust
-            projectId={project.id}
-            layer={layer}
+            project={project}
+            clipId={layer.gradeClipId}
             layout={layout}
             assets={assets}
-            frame={frame}
-            selectedClipId={selectedClipId}
+            playhead={playhead}
             disabled={disabled}
             onEdit={onEdit}
           />
@@ -465,14 +465,13 @@ function ColourSection({
             onEdit={onEdit}
             id={id}
             afterTint={
-              !clipGrade && (
+              isClipOwner(layer) && (
                 <AutoWhiteBalance
-                  projectId={project.id}
-                  layer={layer}
+                  project={project}
+                  clipId={layer.gradeClipId}
                   layout={layout}
                   assets={assets}
-                  frame={frame}
-                  selectedClipId={selectedClipId}
+                  playhead={playhead}
                   disabled={disabled}
                   onEdit={onEdit}
                 />
@@ -907,7 +906,6 @@ interface ColourTabProps {
   asset: MediaAsset | undefined;
   clipLabel: string;
   trackClipCount: number;
-  selectedClipId: string | null;
   selectedClipCount: number;
   frame: number;
   /** The source frame the selected clip shows at the playhead, or null off the clip. */
@@ -982,12 +980,12 @@ function ColourTab(props: Readonly<ColourTabProps>) {
           duration={gradeClip ? clipNavigation!.duration : props.layout.duration}
           layout={props.layout}
           assets={props.assets}
-          selectedClipId={props.selectedClipId}
           resetKey={resetKey}
           disabled={drafting}
           onEdit={onEdit}
           id={props.id}
           valueFrame={valueFrame}
+          playhead={props.frame}
         />
       </KeyframeNavigationContext.Provider>
       <HslRangesSection
@@ -1238,7 +1236,6 @@ function InspectorPanel({
             asset={asset}
             clipLabel={`clip ${trackPosition + 1}`}
             trackClipCount={trackClips.length}
-            selectedClipId={selectedClipId}
             selectedClipCount={selectedClipCount}
             frame={frame}
             sourceFrame={sourceFrame}

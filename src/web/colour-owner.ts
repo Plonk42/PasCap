@@ -2,7 +2,7 @@ import { COLOUR_CONTROLS, type ColourSettings } from '../shared/colour.js';
 import { colourAt } from '../shared/composition.js';
 import { gradeKeyAsLayerKey } from '../shared/grade.js';
 import { activeLayerSetting } from '../shared/keyframes.js';
-import type { VideoClip, VideoLayer } from '../shared/model.js';
+import type { ProjectDocument, VideoClip, VideoLayer } from '../shared/model.js';
 import { gradePosition, type PlacedClip } from '../shared/timeline.js';
 import { nearestOutput } from './clip-keyframe-markers.js';
 
@@ -22,6 +22,20 @@ export function clipColourOwner(layer: VideoLayer, clip: VideoClip, name: string
     keyframes: clip.grade.keyframes.map(gradeKeyAsLayerKey),
     gradeClipId: clip.id,
   };
+}
+
+/** A clip's grade in the track's shape; null when the clip or its track is gone. */
+export function gradeOwnerOf(project: ProjectDocument, clipId: string): (ColourOwner & { gradeClipId: string }) | null {
+  const clip = project.clips.find((item) => item.id === clipId);
+  const layer = clip && project.layers.find((item) => item.id === clip.layerId);
+  return clip && layer ? { ...clipColourOwner(layer, clip, ''), gradeClipId: clip.id } : null;
+}
+
+/** The source frame a placed clip shows at a project frame, or null off the clip. */
+export function sourceFrameAt(placed: PlacedClip, projectFrame: number): number | null {
+  return projectFrame >= placed.start && projectFrame < placed.end
+    ? placed.retiming.sourceAt(projectFrame - placed.start)
+    : null;
 }
 
 export function isClipOwner(owner: VideoLayer): owner is ColourOwner & { gradeClipId: string } {

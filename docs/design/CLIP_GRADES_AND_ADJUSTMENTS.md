@@ -2,7 +2,8 @@
 
 Decision record for [#215](https://github.com/Plonk42/PasCap/issues/215), part of milestone
 v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)). **Status: decided; the clip grade
-([#273](https://github.com/Plonk42/PasCap/issues/273)) is implemented on the v1.3 branch, the
+([#273](https://github.com/Plonk42/PasCap/issues/273)) and Auto writing it
+([#285](https://github.com/Plonk42/PasCap/issues/285)) are implemented on the v1.3 branch, the
 rest is not.** Until each implementation issue is delivered, the current contracts remain
 [track appearance](ROW_APPEARANCE.md), [HSL and curves](HSL_AND_CURVES.md),
 [Temperature and Tint](TEMPERATURE_AND_TINT.md), [detail filters](DETAIL_FILTERS.md) and

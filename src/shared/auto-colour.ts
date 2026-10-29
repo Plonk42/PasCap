@@ -7,6 +7,7 @@ import {
   type AutoCorrection,
 } from './auto-adjust.js';
 import type { EditCommand } from './commands.js';
+import { MAX_GRADE_KEYFRAMES } from './grade.js';
 import { activeLayerSetting, hasLayerKeys, type KeyframeSetting } from './keyframes.js';
 import { MAX_TRACK_KEYFRAMES, type VideoLayer } from './model.js';
 import type { PlacedClip } from './timeline.js';
@@ -14,11 +15,24 @@ import type { WhiteBalance } from './white-balance.js';
 
 /** The edits of Auto adjust and Auto white balance, shared by the editor and the `estimate` operation. */
 
-/** Why no keyframe can be captured at `frame`: the track is full and none is there to join. */
-export function keyframeLimitReason(layer: VideoLayer, frame: number): string | null {
-  return layer.keyframes.length >= MAX_TRACK_KEYFRAMES && !layer.keyframes.some((key) => key.frame === frame)
-    ? `This track already has ${MAX_TRACK_KEYFRAMES} keyframes. Move the playhead to one of them, or remove one.`
-    : null;
+/**
+ * What an edit changes: a track's Colour, or a clip's grade shown in the track's shape (its keyframes and frames are
+ * then source frames of the recording).
+ */
+export type AutoOwner = { kind: 'track'; layerId: string } | { kind: 'clip'; clipId: string };
+
+export const trackOwner = (layer: VideoLayer): AutoOwner => ({ kind: 'track', layerId: layer.id });
+
+const keyTarget = (owner: AutoOwner) =>
+  owner.kind === 'track' ? { layerId: owner.layerId } : { clipId: owner.clipId };
+
+/** Why no keyframe can be captured at `frame`: the track or clip grade is full and none is there to join. */
+export function keyframeLimitReason(layer: VideoLayer, frame: number, owner = trackOwner(layer)): string | null {
+  const limit = owner.kind === 'track' ? MAX_TRACK_KEYFRAMES : MAX_GRADE_KEYFRAMES;
+  if (layer.keyframes.length < limit || layer.keyframes.some((key) => key.frame === frame)) return null;
+  return owner.kind === 'track'
+    ? `This track already has ${limit} keyframes. Move the playhead to one of them, or remove one.`
+    : `This clip's grade already has ${limit} keyframes. Move the playhead to one of them, or remove one.`;
 }
 
 /** Captures each value at `frame` exactly like its diamond (joining or overwriting), in one transaction. */
@@ -26,9 +40,10 @@ export function captureCommands(
   layer: VideoLayer,
   frame: number,
   values: Readonly<Partial<Record<KeyframeSetting, number>>>,
+  owner = trackOwner(layer),
 ): EditCommand[] {
   return (Object.entries(values) as [KeyframeSetting, number][]).map(([setting, value]): EditCommand => {
-    const capture = { layerId: layer.id, frame, setting, value };
+    const capture = { ...keyTarget(owner), frame, setting, value };
     return activeLayerSetting(layer, setting, frame)
       ? { type: 'layer-key-value', ...capture }
       : { type: 'layer-key-toggle', ...capture };
@@ -36,8 +51,13 @@ export function captureCommands(
 }
 
 /** Captures both settings at the playhead exactly like their diamonds, in one transaction. */
-export function whiteBalanceCommands(layer: VideoLayer, frame: number, balance: WhiteBalance): EditCommand[] {
-  return captureCommands(layer, frame, { temperature: balance.temperature, tint: balance.tint });
+export function whiteBalanceCommands(
+  layer: VideoLayer,
+  frame: number,
+  balance: WhiteBalance,
+  owner = trackOwner(layer),
+): EditCommand[] {
+  return captureCommands(layer, frame, { temperature: balance.temperature, tint: balance.tint }, owner);
 }
 
 /** The settings Auto sets that this track animates: Auto leaves them unchanged. */
@@ -46,13 +66,14 @@ export function animatedSettings(layer: VideoLayer): AutoAdjustSetting[] {
 }
 
 /**
- * The one Colour edit Auto applies: the correction at `intensity` (0–1) replaces the track's values of the eleven
+ * The one Colour edit Auto applies: the correction at `intensity` (0–1) replaces the owner's values of the eleven
  * settings, except animated ones. Null when every one of them is animated.
  */
 export function autoAdjustCommand(
   layer: VideoLayer,
   correction: Readonly<AutoCorrection>,
   intensity: number,
+  owner = trackOwner(layer),
 ): EditCommand | null {
   const animated = new Set(animatedSettings(layer));
   const settings = AUTO_ADJUST_SETTINGS.filter((setting) => !animated.has(setting));
@@ -60,7 +81,9 @@ export function autoAdjustCommand(
   const scaled = scaleCorrection(correction, intensity);
   const colour = { ...layer.colour };
   for (const setting of settings) colour[setting] = scaled[setting];
-  return { type: 'colour', layerId: layer.id, colour };
+  return owner.kind === 'track'
+    ? { type: 'colour', layerId: owner.layerId, colour }
+    : { type: 'colour', clipIds: [owner.clipId], colour };
 }
 
 /** Source frames shown at the project frames within 1 s of `frame` in `clip`, each once. */

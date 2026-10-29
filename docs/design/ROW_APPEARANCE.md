@@ -114,8 +114,7 @@ pinned header names what it edits: with a clip selected, its grade (**This clip 
 the **Clip / Track** switch (arrow keys move between them), its track's Colour; without a selected
 clip, the track. The choice stays while other clips are selected; a timeline marker chooses its own target.
 With several clips selected, the clip's grade is not editable: the tab says why and offers the
-track. A clip grade shows the same sections without the Opacity group, **Auto** and **Auto white
-balance**; its diamonds key the source frame shown at the playhead (unavailable, with the reason,
+track. A clip grade shows the same sections without the Opacity group; only a clip grade has **Auto** and **Auto white balance** ([#285](https://github.com/Plonk42/PasCap/issues/285)); its diamonds key the source frame shown at the playhead (unavailable, with the reason,
 when the playhead is off the clip), its keyframe list is **Clip keyframes** with source frames, and
 its keyframes are amber ◆ markers inside the clip on the timeline. Its sliders show the grade the image uses, which eases between source frames in slow motion; only a setting keyed at the playhead's source frame shows that keyframe's own value, which it edits, while the image may already be slightly past it. **Copy grade** and **Paste grade**
 in a clip's context menu copy a grade without keyframes and replace the right-clicked clip's grade
@@ -149,11 +148,7 @@ An animated channel without an enabled setting at the real playhead remains
 read-only until explicitly captured. Capture never uses
 an inspected stored time. Sliders never create keyframes. Track-keyframe selectors
 visibly read **Easing**, retaining contextual accessible names; each enabled setting has its own Easing.
-**Auto** in the Colour keyframe line ([Auto adjust](AUTO_ADJUST.md)) analyses the clip at the
-playhead and, on **Apply**, either replaces eleven of the track's scalar bases in one Colour edit, from the
-second around the playhead, the whole clip or all the track's clips, leaving
-animated settings and every keyframe unchanged, or keys those eleven settings at the playhead from the
-frames around it: the correction stays track-owned like any grade.
+**Auto** in a clip grade's Colour keyframe line ([Auto adjust](AUTO_ADJUST.md)) analyses the selected clip and, on **Apply**, either replaces eleven of its grade's scalar values in one Colour edit, from the second around the playhead or the whole clip (or each clip of its track with its own correction, one edit per clip in one Undo step), leaving animated settings and every keyframe unchanged, or keys those eleven settings at the playhead's source frame from the frames around it: the correction stays with the clip like any clip grade. Track Colour has no Auto.
 The static **HSL ranges** and **Colour curves** Track sections share video track ownership, with no new diamonds.
 **Track → Transform** shares the same ownership, with its own project-frame keyframes;
 see [track Transform](SPATIAL_TRANSFORMS.md).
