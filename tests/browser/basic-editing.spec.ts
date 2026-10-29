@@ -3,7 +3,7 @@ import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { closeOptions, inspectorTab, openOptions, sharedPoint } from './editor-helpers.js';
+import { closeOptions, inspectorTab, openOptions, transformPoint } from './editor-helpers.js';
 
 let saved: ProjectDocument;
 let assets: MediaAsset[];
@@ -114,11 +114,14 @@ test('default editor keeps rare options, speed/layer details, track settings and
   await expect(page.getByRole('combobox', { name: 'Filter media' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('summary[aria-label="Media options"]')).toBeFocused();
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Clip grade');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeVisible();
-  await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeVisible();
-  await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toHaveValue('100');
+  // Opacity is the track's, with Transform, whose section starts collapsed.
+  await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toHaveCount(0);
   await inspectorTab(page, 'Track');
+  const opacity = page.getByRole('slider', { name: 'Transform Opacity', exact: true, includeHidden: true });
+  await expect(opacity).toBeHidden();
+  await expect(opacity).toHaveValue('100');
   await expect(page.getByRole('spinbutton', { name: 'Opening fade' })).toBeVisible();
   await expect(page.getByLabel('Placement section', { exact: true })).toBeHidden();
   await inspectorTab(page, 'Audio');
@@ -263,19 +266,16 @@ test('duplicate preserves static settings without copying row points, and overla
   let document = await current(page);
   document = applyCommand(document, {
     type: 'colour',
-    layerId: document.clips[1]!.layerId,
-    colour: {
-      ...document.layers.find((layer) => layer.id === document.clips[1]!.layerId)!.colour,
-      contrast: 1.3,
-      saturation: 0.7,
-    },
+    clipIds: ['moving'],
+    colour: { ...document.clips[1]!.grade.colour, contrast: 1.3, saturation: 0.7 },
   });
-  document = applyCommand(document, { type: 'opacity', layerId: document.clips[1]!.layerId, opacity: 0.6 });
+  document = applyCommand(document, { type: 'transform-setting', layerId: 'upper', setting: 'opacity', value: 0.6 });
   document = applyCommand(document, {
-    type: 'layer-update',
-    layer: {
-      ...document.layers[1]!,
-      keyframes: [sharedPoint(10, { exposure: -0.2 }), sharedPoint(70, { exposure: 0.4 }, 'smooth')],
+    type: 'transform',
+    layerId: 'upper',
+    transform: {
+      ...document.layers[1]!.transform,
+      keyframes: [transformPoint(10, { rotation: -5 }), transformPoint(70, { rotation: 5 }, 'smooth')],
     },
   });
   await page.evaluate((next) => window.pascapLab!.setDocument(next), document);
@@ -285,8 +285,9 @@ test('duplicate preserves static settings without copying row points, and overla
   const copy = duplicated.clips[2]!;
   expect(copy.id).not.toBe('moving');
   expect(copy).toEqual({ ...duplicated.clips[1]!, id: copy.id, start: 50 });
+  expect(copy.grade.colour).toMatchObject({ contrast: 1.3, saturation: 0.7 });
   expect(copy).not.toHaveProperty('animation');
-  expect(duplicated.layers[1]?.keyframes).toEqual(document.layers[1]?.keyframes);
+  expect(duplicated.layers[1]?.transform).toEqual(document.layers[1]?.transform);
   await page.getByRole('region', { name: 'Video timeline' }).focus();
   await page.keyboard.press('Alt+Shift+ArrowRight');
   expect((await current(page)).clips[2]?.start).toBe(60);
@@ -297,7 +298,7 @@ test('duplicate preserves static settings without copying row points, and overla
   expect((await current(page)).clips[2]?.start).toBe(50);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect((await current(page)).clips).toHaveLength(2);
-  expect((await current(page)).layers[1]?.keyframes).toEqual(document.layers[1]?.keyframes);
+  expect((await current(page)).layers[1]?.transform).toEqual(document.layers[1]?.transform);
 });
 
 test('layer rename drafts cancel or commit without affecting ranges/order, and restore with Undo', async ({ page }) => {

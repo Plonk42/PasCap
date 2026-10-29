@@ -11,13 +11,14 @@ import type { ExportProfile } from '../../src/shared/export.js';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import {
+  adjustmentFrom0,
+  adjustmentKeyframes,
   expectDecoders,
+  gradePoint,
   inspectorTab,
-  layerKeyframes,
   openOptions,
   collapsePanel,
   expandPanel,
-  sharedPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { singleClipLane } from '../music-lanes.js';
@@ -221,8 +222,8 @@ test('selected context precedes compact animation controls and adjusted sections
   const selection = page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .inspector-selection');
   await expect(selection).toContainText('pattern-a');
   await expect(selection).toContainText('Clip 1 of 1');
-  await inspectorTab(page, 'Track colour');
-  await expect(selection).toContainText('Applies to the clip on this track');
+  await inspectorTab(page, 'Clip grade');
+  await expect(selection).toContainText('This clip only');
   expect(
     await selection.evaluate((element) =>
       Boolean(
@@ -265,24 +266,24 @@ test('selected context precedes compact animation controls and adjusted sections
 
 test('animated visual feedback retains explicit capture, native navigation order, and one Undo', async ({ page }) => {
   const document = await current(page);
-  document.layers[0]!.keyframes = [sharedPoint(10, { exposure: 0 }), sharedPoint(90, { exposure: 0.8 })];
+  document.adjustments = [adjustmentFrom0(120, [gradePoint(10, { exposure: 0 }), gradePoint(90, { exposure: 0.8 })])];
   memory.seed(document);
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await seek(page, 30);
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Adjustment');
   const diamond = page.getByRole('button', { name: 'Keyframe Exposure', exact: true });
   await expect(diamond).toHaveAttribute('aria-pressed', 'false');
   await expect(diamond).toHaveCSS('border-style', 'dashed');
-  await expect(diamond).toHaveAccessibleDescription(/whole track/);
+  await expect(diamond).toHaveAccessibleDescription(/whole adjustment/);
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeDisabled();
   const main = diamond.locator('..');
   await expect(main).toHaveClass('keyframe-setting-navigation');
   await expect(main.getByRole('button')).toHaveCount(3);
   const mainPrevious = main.getByRole('button', { name: 'Previous Exposure keyframe', exact: true });
   const mainNext = main.getByRole('button', { name: 'Next Exposure keyframe', exact: true });
-  await expect(mainPrevious).toHaveAttribute('title', 'Go to timeline frame 10.');
-  await expect(mainNext).toHaveAttribute('title', 'Go to timeline frame 90.');
+  await expect(mainPrevious).toHaveAttribute('title', 'Go to frame in adjustment 10.');
+  await expect(mainNext).toHaveAttribute('title', 'Go to frame in adjustment 90.');
   await diamond.focus();
   await page.keyboard.press('Tab');
   await expect(mainPrevious).toBeFocused();
@@ -304,8 +305,8 @@ test('animated visual feedback retains explicit capture, native navigation order
   await expect(mainPrevious).toBeFocused();
   await expect(mainPrevious).toHaveAttribute('aria-disabled', 'true');
   await expect(mainPrevious).toHaveAttribute('tabindex', '-1');
-  await inspectorTab(page, 'Track keyframes');
-  const keys = layerKeyframes(page, 'Track 1');
+  await inspectorTab(page, 'Adjustment');
+  const keys = adjustmentKeyframes(page);
   const next = keys
     .locator('[data-keyframe-frame="10"] .layer-keyframe-chip')
     .getByRole('button', { name: 'Next Exposure keyframe', exact: true });
@@ -333,10 +334,10 @@ test('animated visual feedback retains explicit capture, native navigation order
   await diamond.scrollIntoViewIfNeeded();
   await diamond.click();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeEnabled();
-  expect((await current(page)).layers[0]!.keyframes).toEqual([
-    document.layers[0]!.keyframes[0],
-    sharedPoint(30, { exposure: 0.2 }),
-    document.layers[0]!.keyframes[1],
+  expect((await current(page)).adjustments[0]!.keyframes).toEqual([
+    document.adjustments[0]!.keyframes[0],
+    gradePoint(30, { exposure: 0.2 }),
+    document.adjustments[0]!.keyframes[1],
   ]);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(document);
@@ -546,7 +547,9 @@ test('a failed deferred preview keeps the editor usable and saves pending edits 
   await page.reload();
   await expect(page.getByRole('button', { name: 'Reload editor', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Play preview', exact: true })).toBeDisabled();
-  await inspectorTab(page, 'Track colour');
+  // Without the preview module there is no lab API: open the selected clip's grade directly.
+  await page.getByRole('tab', { name: 'Colour', exact: true }).click();
+  await expect(page.getByRole('radio', { name: 'Clip grade', exact: true })).toHaveAttribute('aria-checked', 'true');
   await expect(page.getByRole('button', { name: 'Keyframe Exposure', exact: true })).toBeDisabled();
   const main = page.locator('.keyframe-setting-navigation').filter({
     has: page.getByRole('button', { name: 'Keyframe Exposure', exact: true }),

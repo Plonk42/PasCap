@@ -1,5 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
+import { createColourSettings } from '../../src/shared/colour.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
 import {
@@ -24,13 +25,15 @@ import { removeSelectedRange } from '../../src/shared/rush-editing.js';
 import { durationLabel } from '../../src/web/display.js';
 import { calculateLayout, layerClips } from '../../src/shared/timeline.js';
 import {
+  adjustmentFrom0,
   clipAction,
   closeOptions,
   expandedInspectorPreferences,
+  gradePoint,
   inspectorTab,
   isWrite,
   openOptions,
-  sharedPoint,
+  transformPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { installVideoFrameGate } from './video-frame-gate.js';
@@ -152,7 +155,9 @@ function omittedHeadSequence(): ProjectDocument {
     { ...createClip('b', assets[1]!.id, 30, 60), start: 30 },
     { ...createClip('c', assets[0]!.id, 60, 90), start: 60 },
   ];
-  document.layers[0]!.keyframes = [sharedPoint(12, { exposure: 0.3 }), sharedPoint(500, { hue: 20 }, 'hold')];
+  document.adjustments = [
+    adjustmentFrom0(90, [gradePoint(12, { exposure: 0.3 }), gradePoint(500, { hue: 20 }, 'hold')]),
+  ];
   return projectSchema.parse(document);
 }
 
@@ -301,6 +306,8 @@ function unchangedOthers(
     before.layers.map((layer) => ({ ...layer, transitions: transitions[layer.id] ?? layer.transitions })),
   );
   expect(next.music).toEqual(before.music);
+  // Adjustments keep their project frames and keyframes through every clip edit.
+  expect(next.adjustments).toEqual(before.adjustments);
   const layout = calculateLayout(next);
   for (const original of before.clips.filter((item) => !editedIds.includes(item.id))) {
     const placed = layout.clips.find((item) => item.clip.id === original.id)!;
@@ -478,15 +485,16 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('50');
   await input.press('Enter');
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Clip grade');
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.2');
   const edited = await current(page);
   expect(edited.clips.slice(0, 2)).toEqual(added.clips.slice(0, 2));
   expect(edited.clips[2]).toEqual({
     ...added.clips[2]!,
     sourceIn: 50,
+    grade: { ...added.clips[2]!.grade, colour: { ...added.clips[2]!.grade.colour, saturation: 1.2 } },
   });
-  expect(edited.layers[0]!.colour).toEqual({ ...added.layers[0]!.colour, saturation: 1.2 });
+  expect(edited.layers).toEqual(added.layers);
   await flush(page);
   expect(memory.snapshot().clips).toEqual(edited.clips);
   await page.reload();
@@ -632,9 +640,14 @@ test('visible split then S selects each right piece, preserves boundaries and de
   page,
 }) => {
   const document = dissolvedSequence();
-  document.layers[0]!.colour = { ...document.layers[0]!.colour, contrast: 1.25, saturation: 0.7, hue: 20 };
-  document.layers[0]!.opacity = 0.65;
-  document.layers[0]!.keyframes = [sharedPoint(20, { exposure: 0.2 }), sharedPoint(400, { opacity: 0.8 }, 'hold')];
+  document.adjustments = [
+    {
+      ...adjustmentFrom0(200, [gradePoint(20, { exposure: 0.2 })]),
+      colour: { ...createColourSettings(), contrast: 1.25, saturation: 0.7, hue: 20 },
+    },
+  ];
+  document.layers[0]!.transform.base.opacity = 0.65;
+  document.layers[0]!.transform.keyframes = [transformPoint(400, { opacity: 0.8 }, 'hold')];
   await fixture(page, document);
   const before = await current(page);
   await seek(page, 30);
@@ -728,7 +741,9 @@ test('Q and W retain the mapped displayed frame, ripple dissolves and recover bo
   const document = dissolvedSequence();
   document.layers[0]!.openingFade = 5;
   document.clips[0]!.speed = { mode: 'constant', rate: 0.5 };
-  document.layers[0]!.keyframes = [sharedPoint(12, { exposure: 0.25 }), sharedPoint(500, { hue: 30 }, 'smooth')];
+  document.adjustments = [
+    adjustmentFrom0(300, [gradePoint(12, { exposure: 0.25 }), gradePoint(500, { hue: 30 }, 'smooth')]),
+  ];
   await fixture(page, document);
   const before = await current(page);
   expect(firstTrackGeometry(before)).toEqual([
@@ -809,43 +824,44 @@ test('Q and W retain the mapped displayed frame, ripple dissolves and recover bo
   await expect(page.getByRole('button', { name: 'Redo', exact: true })).toBeEnabled();
 });
 
-test('I/O middle removal is transient then one edit, preserving absolute fifteen-channel row points, music and overlays', async ({
+test('I/O middle removal is transient then one edit, preserving absolute adjustment and Transform keyframes, music and overlays', async ({
   page,
   request,
 }) => {
   const music = await fixtureMusic(request);
   const document = dissolvedSequence();
-  document.layers[0]!.keyframes = [
-    sharedPoint(
-      15,
-      {
-        opacity: 0.7,
-        temperature: 0.2,
-        tint: -0.3,
-        exposure: 0.3,
-        brightness: 0.04,
-        contrast: 1.1,
-        hue: 20,
-        saturation: 0.8,
-        highlights: 0.2,
-        shadows: -0.1,
-      },
-      'hold',
-    ),
-    sharedPoint(1_000, { exposure: 0.6 }, 'smooth'),
+  document.adjustments = [
+    {
+      ...adjustmentFrom0(250, [
+        gradePoint(
+          15,
+          {
+            temperature: 0.2,
+            tint: -0.3,
+            exposure: 0.3,
+            brightness: 0.04,
+            contrast: 1.1,
+            hue: 20,
+            saturation: 0.8,
+            highlights: 0.2,
+            shadows: -0.1,
+          },
+          'hold',
+        ),
+        gradePoint(1_000, { exposure: 0.6 }, 'smooth'),
+      ]),
+      colour: { ...createColourSettings(), exposure: -0.2, saturation: 0.6 },
+    },
   ];
-  document.layers.push({
-    ...createLayer('upper', 'Track 2', false),
-    opacity: 0.75,
-    keyframes: [sharedPoint(200, { opacity: 0.6, hue: 35 }, 'ease-in')],
-  });
-  document.layers[0]!.colour = { ...document.layers[0]!.colour, exposure: -0.2, saturation: 0.6 };
-  document.layers[0]!.opacity = 0.65;
-  document.clips.splice(1, 0, {
-    ...createClip('fixed-overlay', assets[1]!.id, 0, 20),
-    layerId: 'upper',
-    start: 230,
-  });
+  document.layers[0]!.transform.base.opacity = 0.65;
+  document.layers[0]!.transform.keyframes = [transformPoint(15, { opacity: 0.7 }, 'hold')];
+  const upper = createLayer('upper', 'Track 2', false);
+  upper.transform.base.opacity = 0.75;
+  upper.transform.keyframes = [transformPoint(200, { opacity: 0.6 }, 'ease-in')];
+  document.layers.push(upper);
+  const overlay = { ...createClip('fixed-overlay', assets[1]!.id, 0, 20), layerId: 'upper', start: 230 };
+  overlay.grade.keyframes = [gradePoint(5, { hue: 35 }, 'ease-in')];
+  document.clips.splice(1, 0, overlay);
   document.music = [
     singleClipLane({
       id: 'rush-music',
@@ -935,10 +951,14 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
   page,
 }) => {
   const document = sequence();
+  document.adjustments = [
+    adjustmentFrom0(200, [gradePoint(10, { exposure: 0.2 }), gradePoint(500, { hue: 25 }, 'hold')]),
+  ];
+  const upper = createLayer('upper', 'Track 2', false);
+  upper.transform.base.opacity = 0.8;
+  upper.transform.keyframes = [transformPoint(10, { scale: 1.2 }), transformPoint(500, { rotation: 6 }, 'hold')];
   document.layers.push({
-    ...createLayer('upper', 'Track 2', false),
-    opacity: 0.8,
-    keyframes: [sharedPoint(10, { exposure: 0.2 }), sharedPoint(500, { hue: 25 }, 'hold')],
+    ...upper,
     transitions: [
       { leftId: 'upper-before', rightId: 'top', type: 'cut', duration: 0 },
       { leftId: 'top', rightId: 'upper-after', type: 'cut', duration: 0 },
@@ -1036,7 +1056,8 @@ test('prefix, suffix and whole Ripple track cuts retain only necessary IDs and u
   page,
 }) => {
   const document = dissolvedSequence();
-  document.layers[0]!.keyframes = [sharedPoint(20, { opacity: 0.7 }), sharedPoint(800, { exposure: 0.5 }, 'hold')];
+  document.layers[0]!.transform.keyframes = [transformPoint(20, { opacity: 0.7 })];
+  document.adjustments = [adjustmentFrom0(200, [gradePoint(800, { exposure: 0.5 }, 'hold')])];
   const cases = [
     { name: 'prefix', inFrame: 0, outFrame: 20, sourceIn: 35, sourceOut: 105 },
     { name: 'suffix', inFrame: 70, outFrame: 90, sourceIn: 15, sourceOut: 85 },
@@ -1092,7 +1113,8 @@ test('prefix, suffix and whole Ripple track cuts retain only necessary IDs and u
   const only = createProject(PROJECT_ID, 'Only excerpt · memory-only');
   only.media.videoIds = assets.map((asset) => asset.id);
   only.clips = [createClip('a', assets[0]!.id, 15, 105)];
-  only.layers[0]!.keyframes = document.layers[0]!.keyframes;
+  only.layers[0]!.transform = structuredClone(document.layers[0]!.transform);
+  only.adjustments = structuredClone(document.adjustments);
   only.layers[0]!.openingFade = 8;
   only.layers[0]!.closingFade = 4;
   await fixture(page, only);
@@ -1104,6 +1126,7 @@ test('prefix, suffix and whole Ripple track cuts retain only necessary IDs and u
   expect(empty.layers[0]!.transitions).toEqual([]);
   expect([empty.layers[0]!.openingFade, empty.layers[0]!.closingFade]).toEqual([8, 4]);
   expect(empty.layers).toEqual(before.layers);
+  expect(empty.adjustments).toEqual(before.adjustments);
   await ready(page, empty);
   await expect(page.getByRole('button', { name: 'Delete selected clip', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
@@ -1348,7 +1371,7 @@ test('clear, Escape, timing, Undo and project switching invalidate only the tran
   const other = createProject('browser-rush-second', 'Other rush · memory-only');
   other.media.videoIds = assets.map((asset) => asset.id);
   other.clips = [createClip('other-a', assets[0]!.id, 0, 120)];
-  other.layers[0]!.keyframes = [sharedPoint(40, { exposure: 0.4 }, 'hold')];
+  other.adjustments = [adjustmentFrom0(120, [gradePoint(40, { exposure: 0.4 }, 'hold')])];
   memory.seed(other);
   await page.getByRole('button', { name: 'Open projects', exact: true }).click();
   await page.getByRole('button', { name: `Open ${other.title}`, exact: true }).click();
@@ -1534,7 +1557,9 @@ test('native reorder of a cut excerpt commits its post-removal ripple ghost and 
 }) => {
   let document = sequence();
   document.clips[0] = { ...document.clips[0]!, sourceIn: 0, sourceOut: 120 };
-  document.layers[0]!.keyframes = [sharedPoint(10, { exposure: 0.2 }), sharedPoint(500, { hue: 20 }, 'hold')];
+  document.adjustments = [
+    adjustmentFrom0(210, [gradePoint(10, { exposure: 0.2 }), gradePoint(500, { hue: 20 }, 'hold')]),
+  ];
   document = applyCommand(document, {
     type: 'transition',
     transition: { leftId: 'b', rightId: 'c', type: 'cross-dissolve', duration: 8 },
@@ -1627,9 +1652,10 @@ test('an overlapping source Add clears stale success feedback but keeps the sour
   page,
 }) => {
   const document = sequence();
+  const upper = createLayer('upper', 'Track 2', false);
+  upper.transform.keyframes = [transformPoint(10, { opacity: 0.8 }), transformPoint(500, { scale: 1.2 }, 'hold')];
   document.layers.push({
-    ...createLayer('upper', 'Track 2', false),
-    keyframes: [sharedPoint(10, { exposure: 0.25 }), sharedPoint(500, { hue: 20 }, 'hold')],
+    ...upper,
     transitions: [{ leftId: 'top', rightId: 'occupied', type: 'cut', duration: 0 }],
   });
   document.clips.push(

@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import path from 'node:path';
-import { joiningEasing, KEYFRAME_SETTINGS } from '../../src/shared/keyframes.js';
+import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
+import { joiningEasing } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import {
   createClip,
@@ -12,19 +13,15 @@ import {
 } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import {
-  editLayerPoint,
+  adjustmentFrom0,
+  adjustmentKeyframes,
+  editAdjustmentPoint,
   expandedInspectorPreferences,
-  layerKeyframes,
+  gradePoint,
+  inspectorTab,
   resetSetting,
-  inspectorTab as openTab,
-  sharedPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
-
-// Temperature/Tint are the track's Colour settings beside the keyframe list; "Clip" here means those playhead controls.
-async function inspectorTab(page: Page, name: 'Clip' | 'Track keyframes'): Promise<void> {
-  await openTab(page, name === 'Clip' ? 'Track colour' : name);
-}
 
 const channels = [
   { setting: 'temperature', label: 'Temperature', precise: 0.123456789, limit: 2 },
@@ -75,6 +72,8 @@ test.beforeEach(async ({ page, request }) => {
   document.clips = [createClip('one', assets[0]!.id, 0, 60), { ...createClip('two', assets[1]!.id, 0, 60), start: 60 }];
   document.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cut', duration: 0 }];
   document.layers.push(createLayer('empty', 'Empty row'));
+  // Temperature and Tint below grade this adjustment, whose frames equal project frames over the 120-frame timeline.
+  document.adjustments = [adjustmentFrom0(120)];
   memory = await memoryProjects(page, document);
   await expandedInspectorPreferences(page);
   await page.goto(`/?project=${document.id}`);
@@ -98,7 +97,7 @@ async function ready(page: Page, document: ProjectDocument): Promise<void> {
       }),
     )
     .toEqual({ status: 'paused', duration: calculateLayout(document).duration });
-  await inspectorTab(page, 'Clip');
+  await inspectorTab(page, 'Adjustment');
   await expect(page.getByRole('slider', { name: 'Temperature', exact: true })).toBeVisible();
 }
 
@@ -162,19 +161,19 @@ async function unchanged(page: Page, before: Awaited<ReturnType<typeof checkpoin
   await previewAt(page, before.frame);
 }
 
-/** Assert the entire document, including untouched rows, clips, points and easing, not only the edited number. */
-function edited(document: ProjectDocument, setting: Setting, value: number, layerId: string, frame?: number) {
+/** Assert the entire document, including untouched clips, keyframes and easing, not only the edited number. */
+function edited(document: ProjectDocument, setting: Setting, value: number, frame?: number) {
   const expected = structuredClone(document);
-  const row = expected.layers.find((layer) => layer.id === layerId)!;
-  if (frame === undefined) row.colour[setting] = value;
+  const adjustment = expected.adjustments[0]!;
+  if (frame === undefined) adjustment.colour[setting] = value;
   else {
-    const point = row.keyframes.find((item) => item.frame === frame)!;
+    const point = adjustment.keyframes.find((item) => item.frame === frame)!;
     // A capture that enables the setting adopts the Easing the keyframe's settings agree on.
     if (point.values[setting] === null)
       point.easing[setting] = joiningEasing(
-        row.keyframes,
+        adjustment.keyframes,
         point,
-        KEYFRAME_SETTINGS.map((item) => item.key),
+        COLOUR_CONTROLS.map((item) => item.key),
       );
     point.values[setting] = value;
   }
@@ -259,16 +258,19 @@ async function cancelDrag(
   }
 }
 
-test('empty-row native controls preserve exact precision, invalid drafts, individual resets and one-step history', async ({
+test('adjustment native controls preserve exact precision, invalid drafts, individual resets and one-step history', async ({
   page,
 }) => {
   const document = await current(page);
-  document.layers[0]!.colour.temperature = 0.4;
-  document.layers[0]!.colour.tint = -0.6;
+  for (const clip of document.clips) {
+    clip.grade.colour.temperature = 0.4;
+    clip.grade.colour.tint = -0.6;
+  }
   await fixture(page, document);
+  // Without a selected clip, the Colour tab edits the adjustment at the playhead.
   await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
   await expect(page.locator('[role="tabpanel"]:not([hidden]) .selected-clip-name')).toContainText(
-    'Applies to every clip added to this track',
+    'Every track within this range',
   );
   for (const { setting, label, precise, limit } of channels) {
     const { slider, exact, widget } = controls(page, label);
@@ -307,7 +309,7 @@ test('empty-row native controls preserve exact precision, invalid drafts, indivi
     await expect(exact).toBeFocused();
     await expect(exact).toHaveValue(String(precise));
     await exact.press('Tab');
-    const expected = edited(before.document, setting, precise, 'empty');
+    const expected = edited(before.document, setting, precise);
     await editAndUndo(page, before, expected);
     await page.getByRole('button', { name: 'Redo', exact: true }).click();
     expect(await current(page)).toEqual(expected);
@@ -338,25 +340,27 @@ test('empty-row native controls preserve exact precision, invalid drafts, indivi
     await unchanged(page, preciseState);
     await resetSetting(page, label);
     await expect(exact).toHaveValue('0');
-    await editAndUndo(page, preciseState, edited(preciseState.document, setting, 0, 'empty'));
+    await editAndUndo(page, preciseState, edited(preciseState.document, setting, 0));
     const keyboardBefore = await checkpoint(page);
     const initial = Number(await slider.inputValue());
     await slider.press('ArrowRight');
     const next = Number(await slider.inputValue());
     expect(next).toBeGreaterThan(initial);
-    await editAndUndo(page, keyboardBefore, edited(keyboardBefore.document, setting, next, 'empty'));
+    await editAndUndo(page, keyboardBefore, edited(keyboardBefore.document, setting, next));
   }
   const resetBefore = await checkpoint(page);
-  const neutral = edited(edited(resetBefore.document, 'temperature', 0, 'empty'), 'tint', 0, 'empty');
+  const neutral = edited(edited(resetBefore.document, 'temperature', 0), 'tint', 0);
   await page.getByRole('button', { name: 'Reset colour', exact: true }).click();
   for (const { label } of channels) await expect(controls(page, label).exact).toHaveValue('0');
   await editAndUndo(page, resetBefore, neutral);
   const finished = await current(page);
-  expect(finished.layers[0]).toEqual(document.layers[0]);
-  expect(finished.layers[1]!.keyframes).toEqual([]);
+  expect(finished.layers).toEqual(document.layers);
+  expect(finished.adjustments[0]!.keyframes).toEqual([]);
   expect(finished.clips).toEqual(document.clips);
+  // Each clip keeps its own grade.
   for (const clipId of ['one', 'two']) {
     await page.locator(`[data-clip-id="${clipId}"] .timeline-clip-body`).click();
+    await inspectorTab(page, 'Clip grade');
     await expect(controls(page, 'Temperature').exact).toHaveValue('0.4');
     await expect(controls(page, 'Tint').exact).toHaveValue('-0.6');
   }
@@ -374,10 +378,10 @@ test('main and stored native pointer drafts cancel safely, then release as one s
   for (const stored of [false, true]) {
     if (stored) {
       const document = await current(page);
-      document.layers[0]!.keyframes = [sharedPoint(30, { temperature: 0.25, tint: -0.3, exposure: 0.2 }, 'smooth')];
+      document.adjustments[0]!.keyframes = [gradePoint(30, { temperature: 0.25, tint: -0.3, exposure: 0.2 }, 'smooth')];
       await fixture(page, document);
     }
-    const scope = stored ? await editLayerPoint(page, 'Track 1', 30) : page;
+    const scope = stored ? await editAdjustmentPoint(page, 30) : page;
     for (const { setting, label } of channels) {
       const name = stored ? `${label} keyframe value 30` : label;
       const { slider, exact, widget } = controls(scope, name);
@@ -419,26 +423,26 @@ test('main and stored native pointer drafts cancel safely, then release as one s
       await expect(widget).toHaveAttribute('data-pointer-draft', 'false');
       await expect(exact).toBeEnabled();
       await expect(exact).toHaveValue(String(value));
-      await editAndUndo(page, before, edited(before.document, setting, value, 'video-1', stored ? 30 : undefined));
+      await editAndUndo(page, before, edited(before.document, setting, value, stored ? 30 : undefined));
       await expect(slider).toHaveValue(initialSlider);
     }
   }
 });
 
-test('animated missing participants stay read-only until explicit capture; removal restores independent row bases', async ({
+test('animated missing participants stay read-only until explicit capture; removal restores independent bases', async ({
   page,
 }) => {
   const document = await current(page);
-  document.layers[0]!.colour.temperature = 0.35;
-  document.layers[0]!.colour.tint = -0.25;
-  document.layers[0]!.keyframes = [
-    sharedPoint(10, { temperature: -0.5 }),
-    sharedPoint(20, { exposure: 0.4 }, 'smooth'),
-    sharedPoint(30, { temperature: 0.5 }),
+  document.adjustments[0]!.colour.temperature = 0.35;
+  document.adjustments[0]!.colour.tint = -0.25;
+  document.adjustments[0]!.keyframes = [
+    gradePoint(10, { temperature: -0.5 }),
+    gradePoint(20, { exposure: 0.4 }, 'smooth'),
+    gradePoint(30, { temperature: 0.5 }),
   ];
   await fixture(page, document);
   expect(document.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-  expect(Object.keys(document.layers[0]!.keyframes[0]!.values)).toHaveLength(15);
+  expect(Object.keys(document.adjustments[0]!.keyframes[0]!.values)).toHaveLength(14);
   await seek(page, 20);
   const temperature = controls(page, 'Temperature');
   const tint = controls(page, 'Tint');
@@ -449,30 +453,32 @@ test('animated missing participants stay read-only until explicit capture; remov
   await unchanged(page, readOnly);
   await expect(diamond(page, 'Temperature')).toBeEnabled();
   await expect(diamond(page, 'Temperature')).toHaveAttribute('aria-pressed', 'false');
-  await expect(temperature.slider).toHaveAccessibleDescription(/Read-only animated value at timeline frame 20/);
+  await expect(temperature.slider).toHaveAccessibleDescription(
+    /Read-only animated value at frame 20 of the adjustment/,
+  );
   const before = await checkpoint(page);
   await expect(tint.exact).toBeEnabled();
   await tint.exact.fill('-0.456789123');
   await tint.exact.press('Enter');
-  const staticChange = edited(before.document, 'tint', -0.456789123, 'video-1');
+  const staticChange = edited(before.document, 'tint', -0.456789123);
   expect(await current(page)).toEqual(staticChange);
-  expect((await current(page)).layers[0]!.keyframes).toEqual(document.layers[0]!.keyframes);
+  expect((await current(page)).adjustments[0]!.keyframes).toEqual(document.adjustments[0]!.keyframes);
 
   await diamond(page, 'Temperature').press('Space');
   await expect(temperature.exact).toBeEnabled();
   await expect(diamond(page, 'Temperature')).toHaveAttribute('aria-pressed', 'true');
-  const captured = edited(staticChange, 'temperature', 0, 'video-1', 20);
-  expect(captured.layers[0]!.keyframes.find((point) => point.frame === 20)!.easing.temperature).toBe('smooth');
+  const captured = edited(staticChange, 'temperature', 0, 20);
+  expect(captured.adjustments[0]!.keyframes.find((point) => point.frame === 20)!.easing.temperature).toBe('smooth');
   expect(await current(page)).toEqual(captured);
   await temperature.exact.fill('0.123456789');
   await temperature.exact.press('Enter');
-  const keyed = edited(captured, 'temperature', 0.123456789, 'video-1', 20);
+  const keyed = edited(captured, 'temperature', 0.123456789, 20);
   const keyedBefore = await checkpoint(page);
   expect(keyedBefore.document).toEqual(keyed);
   await resetSetting(page, 'Temperature');
   await editAndUndo(page, keyedBefore, captured);
   await diamond(page, 'Tint').click();
-  const both = edited(keyed, 'tint', -0.456789123, 'video-1', 20);
+  const both = edited(keyed, 'tint', -0.456789123, 20);
   expect(await current(page)).toEqual(both);
   await diamond(page, 'Temperature').click();
   await expect(temperature.exact).toBeDisabled();
@@ -488,29 +494,29 @@ test('animated missing participants stay read-only until explicit capture; remov
   await expect(temperature.exact).toBeEnabled();
   await expect(temperature.exact).toHaveValue('0.35');
   const remaining = structuredClone(staticChange);
-  remaining.layers[0]!.keyframes = [sharedPoint(20, { exposure: 0.4, tint: -0.456789123 }, 'smooth')];
+  remaining.adjustments[0]!.keyframes = [gradePoint(20, { exposure: 0.4, tint: -0.456789123 }, 'smooth')];
   expect(await current(page)).toEqual(remaining);
   await seek(page, 20);
   await diamond(page, 'Tint').click();
   await expect(tint.exact).toBeEnabled();
   await expect(tint.exact).toHaveValue('-0.456789123');
   const restored = structuredClone(staticChange);
-  restored.layers[0]!.keyframes = [sharedPoint(20, { exposure: 0.4 }, 'smooth')];
+  restored.adjustments[0]!.keyframes = [gradePoint(20, { exposure: 0.4 }, 'smooth')];
   expect(await current(page)).toEqual(restored);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(remaining);
 });
 
-test('main and off-duration stored resets edit only existing participants; exact invalid drafts never seek or join keys', async ({
+test('main and outside-range stored resets edit only existing participants; exact invalid drafts never seek or join keys', async ({
   page,
 }) => {
   const document = await current(page);
-  document.layers[0]!.colour.temperature = 0.3;
-  document.layers[0]!.colour.tint = -0.2;
-  document.layers[0]!.keyframes = [
-    sharedPoint(10, { temperature: -0.6, tint: 0.4, exposure: 0.25 }, 'smooth'),
-    sharedPoint(30, { tint: -0.8 }, 'hold'),
-    sharedPoint(180, { temperature: 0.7, tint: -0.5, opacity: 0.6 }, 'ease-out'),
+  document.adjustments[0]!.colour.temperature = 0.3;
+  document.adjustments[0]!.colour.tint = -0.2;
+  document.adjustments[0]!.keyframes = [
+    gradePoint(10, { temperature: -0.6, tint: 0.4, exposure: 0.25 }, 'smooth'),
+    gradePoint(30, { tint: -0.8 }, 'hold'),
+    gradePoint(180, { temperature: 0.7, tint: -0.5, saturation: 0.6 }, 'ease-out'),
   ];
   await fixture(page, document);
   await seek(page, 30);
@@ -519,12 +525,12 @@ test('main and off-duration stored resets edit only existing participants; exact
     const mainBefore = await checkpoint(page);
     if (action === 'Tint') await resetSetting(page, 'Tint');
     else await page.getByRole('button', { name: action, exact: true }).click();
-    await editAndUndo(page, mainBefore, edited(mainBefore.document, 'tint', 0, 'video-1', 30));
+    await editAndUndo(page, mainBefore, edited(mainBefore.document, 'tint', 0, 30));
   }
-  const row = await editLayerPoint(page, 'Track 1', 180);
+  const row = await editAdjustmentPoint(page, 180);
   await expect(row.locator('.layer-keyframe-point-values').getByRole('slider')).toHaveCount(3);
   await expect(row.getByRole('slider', { name: 'Exposure keyframe value 180', exact: true })).toHaveCount(0);
-  await expect(controls(row, 'Opacity keyframe value 180').widget).toHaveAttribute('data-tone', 'opacity');
+  await expect(controls(row, 'Saturation keyframe value 180').widget).toHaveAttribute('data-tone', 'saturation');
   await expect(controls(page, 'Exposure').widget).not.toHaveAttribute('data-tone');
   for (const { setting, label, precise, limit } of channels) {
     const name = `${label} keyframe value 180`;
@@ -539,7 +545,7 @@ test('main and off-duration stored resets edit only existing participants; exact
     await exact.press('Enter');
     await expect(exact).toHaveValue(String(precise));
     await exact.press('Tab');
-    await editAndUndo(page, before, edited(before.document, setting, precise, 'video-1', 180));
+    await editAndUndo(page, before, edited(before.document, setting, precise, 180));
     await expect(exact).toHaveValue(initial);
     const restored = await checkpoint(page);
     for (const invalid of ['', `-${limit}.01`, `${limit}.01`]) {
@@ -554,30 +560,24 @@ test('main and off-duration stored resets edit only existing participants; exact
     }
     await resetSetting(row, name);
     await expect(exact).toHaveValue('0');
-    await editAndUndo(page, restored, edited(restored.document, setting, 0, 'video-1', 180));
+    await editAndUndo(page, restored, edited(restored.document, setting, 0, 180));
   }
   expect(await current(page)).toEqual(document);
   await previewAt(page, 30);
 });
 
-test('channel navigation skips unrelated keys and shares an off-duration cursor without editing the real playhead', async ({
+test('channel navigation skips unrelated keys and previews a key after the adjustment without editing the real playhead', async ({
   page,
 }) => {
   const document = await current(page);
-  document.layers[0]!.keyframes = [
-    sharedPoint(10, { temperature: 0 }),
-    sharedPoint(20, { tint: -0.2 }),
-    sharedPoint(30, { exposure: 0.5 }),
-    sharedPoint(40, { temperature: 0.4 }),
-    sharedPoint(50, { tint: 0 }),
-    sharedPoint(130, { temperature: 0.6 }),
-    sharedPoint(140, { tint: 0.4 }),
-    sharedPoint(150, { opacity: 0.5 }),
-    sharedPoint(180, { temperature: 0.8 }),
-    sharedPoint(190, { tint: 0.6 }),
-    sharedPoint(240, { temperature: 1 }),
-    sharedPoint(250, { tint: 1 }),
-    sharedPoint(260, { temperature: 0.9 }),
+  document.adjustments[0]!.keyframes = [
+    gradePoint(10, { temperature: 0 }),
+    gradePoint(20, { tint: -0.2 }),
+    gradePoint(30, { exposure: 0.5 }),
+    gradePoint(40, { temperature: 0.4 }),
+    gradePoint(50, { tint: 0 }),
+    gradePoint(130, { temperature: 0.6 }),
+    gradePoint(140, { tint: 0.4 }),
   ];
   await fixture(page, document);
   const before = await checkpoint(page);
@@ -598,68 +598,27 @@ test('channel navigation skips unrelated keys and shares an off-duration cursor 
   await page.keyboard.press('Tab');
   await expect(controls(page, 'Temperature').slider).toBeFocused();
   await page.keyboard.press('Shift+Tab');
-  const keys = layerKeyframes(page, 'Track 1');
-  for (const frame of [130, 180, 240]) {
-    await next.press('Enter');
-    await previewAt(page, 119);
-    await expect(next).toBeFocused();
-    await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
-    await expect(diamond(page, 'Temperature')).toHaveAttribute('aria-pressed', 'false');
-    await expect(diamond(page, 'Temperature')).toHaveAttribute('title', /timeline frame 119\./);
-    await expect(controls(page, 'Temperature').exact).toBeDisabled();
-    await inspectorTab(page, 'Track keyframes');
-    await expect(keys.locator('.layer-keyframe-inspected')).toContainText(
-      `Stored keyframe · timeline frame ${frame} · outside current duration`,
-    );
-    await expect(keys.locator('.layer-keyframe-inspected')).toContainText(
-      'Preview is at frame 119, not at this stored keyframe.',
-    );
-    await expect(keys.locator('.keyframe-row[aria-current="true"]')).toHaveAttribute(
-      'data-keyframe-frame',
-      String(frame),
-    );
-    await inspectorTab(page, 'Clip');
-  }
-  // Terminal arrows remain native buttons: aria-disabled guards activation
-  // and removes them from Tab order without discarding the activated focus.
+  // A keyframe after the adjustment's range previews its last frame; the diamond still captures at the playhead.
   await next.press('Enter');
   await previewAt(page, 119);
   await expect(next).toBeFocused();
-  await expect(next).toHaveAttribute('aria-disabled', 'true');
-  await expect(next).toHaveJSProperty('disabled', false);
-  await expect(next).toHaveAttribute('tabindex', '-1');
-  for (const activation of ['Enter', 'Space']) {
-    await next.press(activation);
-    await expect(next).toBeFocused();
-    await previewAt(page, 119);
-    await expect(keys.locator('.keyframe-row[aria-current="true"]')).toHaveAttribute('data-keyframe-frame', '260');
-  }
-  await previous.press('Space');
-  await inspectorTab(page, 'Track keyframes');
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 240');
-  await inspectorTab(page, 'Clip');
-  await previous.press('Space');
-  await inspectorTab(page, 'Track keyframes');
-  await expect(keys.locator('.layer-keyframe-inspected')).toContainText('Stored keyframe · timeline frame 180');
-  await inspectorTab(page, 'Clip');
+  await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(diamond(page, 'Temperature')).toHaveAttribute('aria-pressed', 'false');
+  await expect(diamond(page, 'Temperature')).toHaveAttribute('title', /at frame 119 of adjustment /);
+  await expect(controls(page, 'Temperature').exact).toBeDisabled();
+  const keys = adjustmentKeyframes(page);
+  await expect(keys.locator('[data-keyframe-frame="130"]')).toContainText('Outside duration');
+  await expect(keys.locator('.keyframe-row[aria-current="true"]')).toHaveCount(0);
+  // Terminal arrows remain native buttons: aria-disabled guards activation
+  // and removes them from Tab order without discarding the activated focus.
   const tintNext = navigation(page, 'Tint', 'Next');
-  for (const frame of [190, 250]) {
-    await tintNext.press('Space');
-    await previewAt(page, 119);
-    await expect(tintNext).toBeFocused();
-    await inspectorTab(page, 'Track keyframes');
-    await expect(keys.locator('.layer-keyframe-inspected')).toContainText(`Stored keyframe · timeline frame ${frame}`);
-    await inspectorTab(page, 'Clip');
-  }
-  await expect(tintNext).toHaveAttribute('aria-disabled', 'true');
-  await expect(tintNext).toHaveJSProperty('disabled', false);
-  await expect(tintNext).toHaveAttribute('tabindex', '-1');
-  await tintNext.press('Enter');
+  await tintNext.press('Space');
+  await previewAt(page, 119);
   await expect(tintNext).toBeFocused();
-  await expect(keys.locator('.keyframe-row[aria-current="true"]')).toHaveAttribute('data-keyframe-frame', '250');
-  for (const frame of [190, 140, 50, 20]) {
+  await expect(tintNext).toHaveAttribute('aria-disabled', 'false');
+  for (const frame of [50, 20]) {
     await navigation(page, 'Tint', 'Previous').click();
-    await previewAt(page, Math.min(frame, 119));
+    await previewAt(page, frame);
     if (frame === 50) {
       await expect(controls(page, 'Tint').exact).toHaveValue('0');
       await expect(diamond(page, 'Tint')).toHaveAttribute('aria-pressed', 'true');

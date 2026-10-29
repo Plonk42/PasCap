@@ -726,7 +726,8 @@ function setClipsDetail(next: ProjectDocument, clipIds: readonly string[], value
 function adjustmentRange(start: number, duration: number): void {
   frameSchema.parse(start);
   if (!Number.isInteger(duration) || duration < 1) throw new Error('An adjustment lasts at least one frame.');
-  if (start + duration > MAX_FRAME) throw new Error('Adjustment OUT exceeds the supported integer project-frame range.');
+  if (start + duration > MAX_FRAME)
+    throw new Error('Adjustment OUT exceeds the supported integer project-frame range.');
 }
 
 function overlappingAdjustment(items: readonly Adjustment[], start: number, duration: number, except?: string) {

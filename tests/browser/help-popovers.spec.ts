@@ -5,7 +5,7 @@ import { estimateExportSpace } from '../../src/shared/export-space.js';
 import type { ExportProfile } from '../../src/shared/export.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
+import { adjustmentFrom0, expandedInspectorPreferences, gradePoint, inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 import { singleClipLane } from '../music-lanes.js';
 
@@ -77,7 +77,7 @@ test.beforeEach(async ({ page, request }) => {
     { ...createClip('help-right', assets[1]!.id, 0, 120), start: 120 },
   ];
   document.layers[0]!.transitions = [{ leftId: 'help-left', rightId: 'help-right', type: 'cut', duration: 0 }];
-  document.layers[0]!.keyframes = [sharedPoint(10, { exposure: 0 }), sharedPoint(90, { exposure: 0.8 })];
+  document.adjustments = [adjustmentFrom0(240, [gradePoint(10, { exposure: 0 }), gradePoint(90, { exposure: 0.8 })])];
   const track = audio[0];
   if (!track) throw new Error('Help checks require the dedicated prepared synthetic audio fixture.');
   document.media.audioIds = [track.id];
@@ -231,10 +231,10 @@ test('bulk collapse retains invalid drafts, nested disclosure state and reachabl
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true, includeHidden: true });
   await input.fill('0.5');
   await input.press('Enter');
-  await inspectorTab(page, 'Track keyframes');
-  const list = page.getByRole('list', { name: 'Edit track keyframes', exact: true, includeHidden: true });
+  await inspectorTab(page, 'Adjustment');
+  const list = page.getByRole('list', { name: 'Edit adjustment keyframes', exact: true, includeHidden: true });
   await expect(list).toBeVisible();
-  const point = page.getByLabel('Edit track keyframe 10', { exact: true });
+  const point = page.getByLabel('Edit adjustment keyframe 10', { exact: true });
   // Edit details start closed; an opened one stays open across bulk collapse.
   await expect(point.locator('..')).not.toHaveAttribute('open');
   await point.click();
@@ -287,7 +287,7 @@ test('hover help preserves focus, stays readable across the gap, and leaves with
   page,
 }) => {
   const before = await current(page);
-  await inspectorTab(page, 'Track keyframes');
+  await inspectorTab(page, 'Adjustment');
   const title = page.getByRole('textbox', { name: 'Project title', exact: true });
   await title.focus();
   const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
@@ -314,7 +314,7 @@ test('click pins an already-hovered panel until an outside click, without steali
   page,
 }) => {
   const before = await current(page);
-  await inspectorTab(page, 'Track keyframes');
+  await inspectorTab(page, 'Adjustment');
   const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
   const panel = await panelFor(page, trigger);
   await trigger.hover();
@@ -333,7 +333,7 @@ test('click pins an already-hovered panel until an outside click, without steali
 
 test('keyboard focus previews, Enter and Space pin, and help keys never fire timeline shortcuts', async ({ page }) => {
   const before = await current(page);
-  await inspectorTab(page, 'Track keyframes');
+  await inspectorTab(page, 'Adjustment');
   const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
   const panel = await panelFor(page, trigger);
   await trigger.focus();
@@ -417,7 +417,7 @@ test('an outside pointer gesture dismisses pinned help before capture so Escape 
   page,
 }) => {
   const before = await current(page);
-  await inspectorTab(page, 'Track keyframes');
+  await inspectorTab(page, 'Adjustment');
   const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
   const panel = await panelFor(page, trigger);
   await trigger.click();
@@ -445,13 +445,27 @@ const HELP_CONTEXTS = [
     tab: 'Clip',
     text: 'The bar shows the whole recording; drag IN and OUT to keep only the part you want.',
   },
-  { label: 'Placement timing', tab: 'Clip', text: 'Tip: Opacity is in the Colour tab, with Track chosen.' },
-  { label: 'Colour animation', tab: 'Track colour', text: 'These settings grade every clip on this track' },
+  { label: 'Placement timing', tab: 'Clip', text: 'Tip: Opacity is in the Track tab, with Transform.' },
+  {
+    label: 'Colour animation',
+    tab: 'Clip grade',
+    text: 'These settings grade this clip only, before any adjustment',
+  },
+  {
+    label: 'Colour animation',
+    tab: 'Adjustment',
+    text: 'These settings grade every video track within this adjustment’s range, after each clip’s own grade',
+  },
   { label: 'Speed timing', tab: 'Clip', text: 'A keyframe ○ changes the speed over the length of this clip.' },
   {
     label: 'Animation',
-    tab: 'Track keyframes',
-    text: 'Each diamond adds a keyframe for that setting on the whole track',
+    tab: 'Clip grade',
+    text: 'Each diamond adds a keyframe for that setting on the whole clip, on the footage shown',
+  },
+  {
+    label: 'Animation',
+    tab: 'Adjustment',
+    text: 'Each diamond adds a keyframe for that setting on the whole adjustment',
   },
   {
     label: 'Transition timing',
@@ -466,7 +480,7 @@ const INSPECTOR_HELP_HEADINGS = [
   { title: 'Range', help: 'Source timing', tab: 'Clip' },
   { title: 'Placement', help: 'Placement timing', tab: 'Clip' },
   { title: 'Speed', help: 'Speed timing', tab: 'Clip' },
-  { title: 'Colour', help: 'Colour animation', tab: 'Track colour' },
+  { title: 'Colour', help: 'Colour animation', tab: 'Adjustment' },
   { title: 'Transitions', help: 'Transition timing', tab: 'Track' },
   { title: 'Fades', help: 'Fade timing', tab: 'Track' },
 ] as const;
@@ -567,7 +581,7 @@ test('collapsing and restoring a section keeps the same invalid field draft and 
 });
 
 for (const context of HELP_CONTEXTS) {
-  test(`${context.label} uses a compact hover/pinned question mark and retains its complete explanation`, async ({
+  test(`${context.label}${context.tab === 'Adjustment' ? ' of an adjustment' : ''} uses a compact hover/pinned question mark and retains its complete explanation`, async ({
     page,
   }) => {
     const before = await current(page);
@@ -706,12 +720,19 @@ test('hover keeps a valid numeric draft unapplied; clicking help keeps the ordin
 });
 
 test('direct point list keeps timing help available and nested drafts mounted across tabs', async ({ page }) => {
-  await inspectorTab(page, 'Track keyframes');
-  const list = page.getByRole('list', { name: 'Edit track keyframes', exact: true });
+  await inspectorTab(page, 'Adjustment');
+  const list = page.getByRole('list', { name: 'Edit adjustment keyframes', exact: true });
   await expect(list).toBeVisible();
-  await page.getByLabel('Edit track keyframe 10', { exact: true }).click();
-  await expect(page.getByLabel('Edit track keyframe 10', { exact: true }).locator('..')).toHaveAttribute('open', '');
-  const field = page.getByRole('spinbutton', { name: 'Track keyframe frame 10', exact: true, includeHidden: true });
+  await page.getByLabel('Edit adjustment keyframe 10', { exact: true }).click();
+  await expect(page.getByLabel('Edit adjustment keyframe 10', { exact: true }).locator('..')).toHaveAttribute(
+    'open',
+    '',
+  );
+  const field = page.getByRole('spinbutton', {
+    name: 'Adjustment keyframe frame 10',
+    exact: true,
+    includeHidden: true,
+  });
   await field.fill('0.5');
   await field.press('Enter');
   const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
@@ -723,7 +744,7 @@ test('direct point list keeps timing help available and nested drafts mounted ac
   await expect(panel).toBeHidden();
   await expect(field).toBeAttached();
   await expect(field).toBeHidden();
-  await inspectorTab(page, 'Track keyframes');
+  await inspectorTab(page, 'Adjustment');
   await expect(field).toHaveValue('0.5');
   await expect(field).toHaveAttribute('aria-invalid', 'true');
   await trigger.click();
@@ -910,7 +931,7 @@ test.describe('touch help', () => {
   test.use({ hasTouch: true });
   test('a tap pins help and an outside tap dismisses it without an unavailable hover step', async ({ page }) => {
     const before = await current(page);
-    await inspectorTab(page, 'Track keyframes');
+    await inspectorTab(page, 'Adjustment');
     const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
     const panel = await panelFor(page, trigger);
     await trigger.tap();

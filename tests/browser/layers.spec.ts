@@ -11,15 +11,17 @@ import {
 import { sourceRateAt } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import {
+  adjustmentFrom0,
+  adjustmentKeyframes,
   closeOptions,
-  editLayerPoint,
+  editAdjustmentPoint,
   expandedInspectorPreferences,
   freshExportLinks,
+  gradePoint,
   inspectorTab,
-  layerKeyframes,
   openOptions,
-  sharedPoint,
   submitExport,
+  transformPoint,
 } from './editor-helpers.js';
 import { memoryProjects } from './memory-projects.js';
 import { singleClipLane } from '../music-lanes.js';
@@ -90,7 +92,7 @@ test('adds a recording from Media to a new track in one undoable step', async ({
   expect(await page.evaluate(() => window.pascapLab!.project()!.clips.length)).toBe(1);
 });
 
-test('adds layered clips, adjusts row opacity, hides/shows and releases unused decoders on undo/delete', async ({
+test('adds layered clips, adjusts track opacity, hides/shows and releases unused decoders on undo/delete', async ({
   page,
 }) => {
   await seek(page, 0);
@@ -102,14 +104,14 @@ test('adds layered clips, adjusts row opacity, hides/shows and releases unused d
   await openOptions(page, 'Track options Track 2');
   await expect(page.getByRole('slider', { name: 'Opacity of track Track 2', exact: true })).toHaveCount(0);
   await closeOptions(page);
-  await inspectorTab(page, 'Track colour');
-  await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('50');
+  await inspectorTab(page, 'Track');
+  await page.getByRole('slider', { name: 'Transform Opacity', exact: true }).fill('50');
   await seek(page, 30);
   const half = await page.evaluate(() => Array.from(window.pascapLab!.engine.capturePixels().slice(100_000, 100_012)));
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(sampleTimeline(project, 30).map((layer) => layer.opacity)).toEqual([1, 0.5]);
-  expect(project.layers[1]!.opacity).toBe(0.5);
-  expect(project.layers[0]!.opacity).toBe(1);
+  expect(project.layers[1]!.transform.base.opacity).toBe(0.5);
+  expect(project.layers[0]!.transform.base.opacity).toBe(1);
   expect(project.clips.every((clip) => !('opacity' in clip))).toBe(true);
   await page.getByRole('button', { name: 'Hide track Track 2', exact: true }).click();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
@@ -198,19 +200,24 @@ test('reorders independently positioned video tracks without altering source ran
   ]);
 });
 
-test('shares row opacity and individual colour channels at project points and keeps their anchors through trim/reload', async ({
+test('keys track opacity in Transform and colour in an adjustment at project frames, keeping their anchors through trim/reload', async ({
   page,
 }) => {
   const id = await addOverlay(page);
+  let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
+  project.adjustments = [adjustmentFrom0(120)];
+  await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
   await seek(page, 0);
   const inspector = page.getByRole('complementary', { name: 'Properties' });
-  await inspectorTab(page, 'Track colour');
-  await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('0');
+  await inspectorTab(page, 'Track');
+  const opacity = page.getByRole('slider', { name: 'Transform Opacity', exact: true });
+  await opacity.fill('0');
   await inspector.getByRole('button', { name: 'Keyframe Opacity', exact: true }).click();
   await seek(page, 60);
-  await expect(page.getByRole('slider', { name: 'Opacity', exact: true })).toBeDisabled();
+  await expect(opacity).toBeDisabled();
   await inspector.getByRole('button', { name: 'Keyframe Opacity', exact: true }).click();
-  await page.getByRole('slider', { name: 'Opacity', exact: true }).fill('100');
+  await opacity.fill('100');
+  await inspectorTab(page, 'Adjustment');
   await inspector.getByRole('button', { name: 'Keyframe Exposure', exact: true }).click();
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('1');
   await seek(page, 0);
@@ -218,34 +225,41 @@ test('shares row opacity and individual colour channels at project points and ke
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('-1');
   await expect(inspector.getByRole('button', { name: 'Keyframe Track opacity', exact: true })).toHaveCount(0);
   await seek(page, 30);
-  let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
+  project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   const sample = sampleTimeline(project, 30).find((layer) => layer.clipId === id)!;
   expect(sample.opacity).toBeCloseTo(0.5);
   expect(sample.colour.exposure).toBeCloseTo(0);
-  const points = [sharedPoint(0, { opacity: 0, exposure: -1 }), sharedPoint(60, { opacity: 1, exposure: 1 })];
-  expect(project.layers[1]?.keyframes).toEqual(points);
+  const opacityKeys = [transformPoint(0, { opacity: 0 }), transformPoint(60, { opacity: 1 })];
+  const exposureKeys = [gradePoint(0, { exposure: -1 }), gradePoint(60, { exposure: 1 })];
+  expect(project.layers[1]?.transform.keyframes).toEqual(opacityKeys);
+  expect(project.adjustments[0]?.keyframes).toEqual(exposureKeys);
   expect(project.clips[1]).not.toHaveProperty('correction');
-  expect(project.layers[1]!.colour.exposure).toBe(0);
+  expect(project.adjustments[0]!.colour.exposure).toBe(0);
   expect(project.clips[1]).not.toHaveProperty('opacity');
-  expect(project.layers[1]!.opacity).toBe(0);
+  expect(project.layers[1]!.transform.base.opacity).toBe(0);
   await expect(page.getByRole('checkbox', { name: 'Animate colour adjustments', exact: true })).toHaveCount(0);
   await inspectorTab(page, 'Clip');
   await page.getByRole('textbox', { name: 'Source IN frame', exact: true }).fill('15');
   await page.getByRole('textbox', { name: 'Source IN frame', exact: true }).press('Enter');
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(project.layers[1]?.keyframes).toEqual(points);
+  expect(project.layers[1]?.transform.keyframes).toEqual(opacityKeys);
+  expect(project.adjustments[0]?.keyframes).toEqual(exposureKeys);
   expect(project.clips.find((clip) => clip.id === id)).not.toHaveProperty('animation');
   await page.evaluate(() => window.pascapLab!.flush());
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(project.layers[1]?.keyframes).toEqual(points);
-  expect(project.layers[0]?.keyframes).toEqual([]);
+  expect(project.layers[1]?.transform.keyframes).toEqual(opacityKeys);
+  expect(project.adjustments[0]?.keyframes).toEqual(exposureKeys);
+  expect(project.layers[0]?.transform.keyframes).toEqual([]);
 });
 
-test('clip speed keys support easing, removal and their own duration while shared points stay put', async ({
+test('clip speed keys support easing, removal and their own duration while adjustment and Transform keyframes stay put', async ({
   page,
 }) => {
+  const initial = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
+  initial.adjustments = [adjustmentFrom0(120)];
+  await page.evaluate((document) => window.pascapLab!.setDocument(document), initial);
   await expect(
     page.getByRole('combobox', { name: 'Speed mode', exact: true }).locator('option[value="keyframes"]'),
   ).toHaveCount(0);
@@ -256,7 +270,7 @@ test('clip speed keys support easing, removal and their own duration while share
   const duration = async () =>
     calculateLayout(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()))).duration;
   await seek(page, 0);
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Adjustment');
   await inspector.getByRole('button', { name: 'Keyframe Exposure', exact: true }).click();
   await inspectorTab(page, 'Clip');
   await diamond.click();
@@ -269,7 +283,7 @@ test('clip speed keys support easing, removal and their own duration while share
   await rate.fill('2');
   await rate.press('Enter');
   let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(project.layers[0]?.keyframes).toEqual([sharedPoint(0, { exposure: 0 })]);
+  expect(project.adjustments[0]?.keyframes).toEqual([gradePoint(0, { exposure: 0 })]);
   expect(project.clips[0]?.speed).toEqual({
     mode: 'curve',
     keyframes: [
@@ -294,7 +308,7 @@ test('clip speed keys support easing, removal and their own duration while share
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await speedOf()).toEqual(smooth);
   await seek(page, 20);
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Track');
   await inspector.getByRole('button', { name: 'Keyframe Opacity', exact: true }).click();
   const state = await page.evaluate(() => {
     window.pascapLab!.engine.capturePixels();
@@ -307,7 +321,8 @@ test('clip speed keys support easing, removal and their own duration while share
     .selectOption({ label: 'Keyframe 2 · source 15' });
   await page.getByRole('button', { name: 'Delete clip speed keyframe', exact: true }).click();
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(project.layers[0]?.keyframes).toEqual([sharedPoint(0, { exposure: 0 }), sharedPoint(20, { opacity: 1 })]);
+  expect(project.adjustments[0]?.keyframes).toEqual([gradePoint(0, { exposure: 0 })]);
+  expect(project.layers[0]?.transform.keyframes).toEqual([transformPoint(20, { opacity: 1 })]);
   expect(project.clips[0]?.speed).toEqual({
     mode: 'curve',
     keyframes: [{ frame: 0, rate: 0.5, interpolation: 'smooth' }],
@@ -317,13 +332,13 @@ test('clip speed keys support easing, removal and their own duration while share
 });
 
 test('collapses/expands Inspector sections and remembers the choice across reloads', async ({ page }) => {
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Clip grade');
   const summary = page.getByLabel('Colour section', { exact: true });
   await summary.click();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeHidden();
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Clip grade');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeHidden();
   await page.getByLabel('Colour section', { exact: true }).click();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeVisible();
@@ -351,26 +366,26 @@ test('hover scrubs a single source decoder while the project playhead stays unch
 });
 
 test('pre-trims media and carries the recoverable range into plus, reload and drag insertion', async ({ page }) => {
-  let keyed = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  const anchors = [sharedPoint(10, { exposure: -0.2 }), sharedPoint(90, { exposure: 0.2 }, 'smooth')];
-  keyed = applyCommand(keyed, { type: 'layer-update', layer: { ...keyed.layers[0]!, keyframes: anchors } });
+  const keyed = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
+  const anchors = [gradePoint(10, { exposure: -0.2 }), gradePoint(90, { exposure: 0.2 }, 'smooth')];
+  keyed.adjustments = [{ ...adjustmentFrom0(120), keyframes: anchors }];
   await page.evaluate((document) => window.pascapLab!.setDocument(document), keyed);
   await sourceAtPointer(page, 'pattern-b.mp4', 0.4);
   await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('20');
   await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).fill('95');
   await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).press('Enter');
   expect(await page.evaluate(() => window.pascapLab!.project()!.clips.length)).toBe(1);
-  expect(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).layers[0]?.keyframes).toEqual(
+  expect(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).adjustments[0]?.keyframes).toEqual(
     anchors,
   );
   await page.getByRole('button', { name: 'Add pattern-b.mp4 to timeline', exact: true }).click();
   let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(project.clips.at(-1)).toMatchObject({ sourceIn: 20, sourceOut: 95 });
-  expect(project.layers[0]?.keyframes).toEqual(anchors);
+  expect(project.adjustments[0]?.keyframes).toEqual(anchors);
   await page.evaluate(() => window.pascapLab!.flush());
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  expect(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).layers[0]?.keyframes).toEqual(
+  expect(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).adjustments[0]?.keyframes).toEqual(
     anchors,
   );
   await sourceAtPointer(page, 'pattern-b.mp4', 0.4);
@@ -385,13 +400,13 @@ test('pre-trims media and carries the recoverable range into plus, reload and dr
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(project.clips).toHaveLength(3);
   expect(project.clips.filter((clip) => clip.sourceIn === 20 && clip.sourceOut === 95)).toHaveLength(2);
-  expect(project.layers[0]?.keyframes).toEqual(anchors);
+  expect(project.adjustments[0]?.keyframes).toEqual(anchors);
   await page.getByRole('tab', { name: 'Source preview', exact: true }).click();
   await page.getByRole('button', { name: 'Close source review' }).click();
   await page.getByRole('button', { name: /Select pattern-b.mp4, clip 2/ }).click();
   await page.getByRole('button', { name: 'Restore full recording' }).click();
   expect(await page.evaluate(() => window.pascapLab!.project()!.clips[1]!.sourceOut)).toBe(120);
-  expect(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).layers[0]?.keyframes).toEqual(
+  expect(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).adjustments[0]?.keyframes).toEqual(
     anchors,
   );
 });
@@ -424,17 +439,14 @@ test('layered native UI export includes keyed opacity and colour in an immutable
   let document = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   for (const clip of document.clips)
     document = applyCommand(document, { type: 'trim', clipId: clip.id, sourceIn: 0, sourceOut: 12 });
-  const upper = document.clips[1]!;
-  document = applyCommand(document, {
-    type: 'layer-update',
-    layer: {
-      ...document.layers.find((layer) => layer.id === upper.layerId)!,
-      keyframes: [
-        sharedPoint(0, { opacity: 0, exposure: -0.2 }),
-        sharedPoint(11, { opacity: 0.8, exposure: 0.2 }, 'smooth'),
-      ],
+  const upper = document.layers.find((layer) => layer.id === document.clips[1]!.layerId)!;
+  upper.transform.keyframes = [transformPoint(0, { opacity: 0 }), transformPoint(11, { opacity: 0.8 }, 'smooth')];
+  document.adjustments = [
+    {
+      ...adjustmentFrom0(12),
+      keyframes: [gradePoint(0, { exposure: -0.2 }), gradePoint(11, { exposure: 0.2 }, 'smooth')],
     },
-  });
+  ];
   await page.evaluate((project) => window.pascapLab!.setDocument(project), document);
   await page.getByRole('button', { name: 'Export video', exact: true }).click();
   const accepted = await submitExport(page);
@@ -443,7 +455,8 @@ test('layered native UI export includes keyed opacity and colour in an immutable
   const snapshot = projectSchema.parse(receipt.snapshot);
   expect(snapshot.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
   expect(snapshot.layers).toHaveLength(2);
-  expect(snapshot.layers[1]?.keyframes).toEqual(document.layers[1]?.keyframes);
+  expect(snapshot.layers[1]?.transform.keyframes).toEqual(document.layers[1]?.transform.keyframes);
+  expect(snapshot.adjustments).toEqual(document.adjustments);
   expect(snapshot.clips[1]).not.toHaveProperty('animation');
   expect(receipt.settings.pipeline).toBe('sequential-layered');
   expect(receipt.musicSources).toEqual([]);
@@ -451,13 +464,13 @@ test('layered native UI export includes keyed opacity and colour in an immutable
   expect(receipt.verification.audio).toBeNull();
   expect(receipt.verification.frameCount).toBe(calculateLayout(document).duration);
   await seek(page, 0);
-  await inspectorTab(page, 'Track colour');
+  await inspectorTab(page, 'Adjustment');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   const again = (await (await request.get(receiptUrl)).json()) as { snapshot: unknown };
   expect(projectSchema.parse(again.snapshot)).toEqual(snapshot);
 });
 
-test('plays three simultaneous sources through row-wide rate/grade curves, a track dissolve and repeated music wraps', async ({
+test('plays three simultaneous sources through rate, grade and opacity curves, a track dissolve and repeated music wraps', async ({
   page,
   request,
 }, testInfo) => {
@@ -478,33 +491,31 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
     type: 'transition',
     transition: { leftId: 'first', rightId: 'second', type: 'cross-dissolve', duration: 15 },
   });
-  project = applyCommand(project, {
-    type: 'layer-update',
-    layer: {
-      ...project.layers[0]!,
-      keyframes: [
-        sharedPoint(0, { exposure: -0.4, opacity: 0.6 }),
-        sharedPoint(24, { exposure: 0.4, opacity: 1 }, 'smooth'),
-      ],
+  // One adjustment grades every track; each track's Transform keys its own opacity.
+  project.adjustments = [
+    {
+      ...adjustmentFrom0(300),
+      keyframes: [gradePoint(0, { exposure: -0.4 }), gradePoint(24, { exposure: 0.4 }, 'smooth')],
     },
-  });
+  ];
+  project.layers[0]!.transform.keyframes = [
+    transformPoint(0, { opacity: 0.6 }),
+    transformPoint(24, { opacity: 1 }, 'smooth'),
+  ];
   project = applyCommand(project, {
     type: 'layer-add',
     layer: createLayer('upper', 'Track 2', false),
   });
   const clip = { ...createClip('upper-clip', blue, 0, 80), layerId: 'upper', start: 5 };
-  project.layers.find((layer) => layer.id === 'upper')!.opacity = 0.8;
+  // The upper clip's own grade follows its footage, at source frames.
+  clip.grade.keyframes = [
+    gradePoint(0, { exposure: -0.4, saturation: 1 }, 'smooth'),
+    gradePoint(79, { exposure: 0.4, saturation: 0.6 }),
+  ];
+  const upper = project.layers.find((layer) => layer.id === 'upper')!;
+  upper.transform.base.opacity = 0.8;
+  upper.transform.keyframes = [transformPoint(0, { opacity: 0 }, 'smooth'), transformPoint(79, { opacity: 1 })];
   project = applyCommand(project, { type: 'insert', clip, index: 2 });
-  project = applyCommand(project, {
-    type: 'layer-update',
-    layer: {
-      ...project.layers[1]!,
-      keyframes: [
-        sharedPoint(0, { opacity: 0, exposure: -0.4, saturation: 1 }, 'smooth'),
-        sharedPoint(79, { opacity: 1, exposure: 0.4, saturation: 0.6 }),
-      ],
-    },
-  });
   // Each clip's own speed curve selects its decoded source frames.
   const curves: Record<string, [number, number, 'linear' | 'smooth', number]> = {
     first: [0.5, 2, 'linear', 45],
@@ -608,51 +619,50 @@ test('plays three simultaneous sources through row-wide rate/grade curves, a tra
   }
 });
 
-test('edits shared values outside the source excerpt and duration without moving unrelated points or bases', async ({
+test('edits adjustment values outside the source excerpt and the adjustment without moving unrelated keyframes or bases', async ({
   page,
 }) => {
   let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   const original = project.clips[0]!;
-  project = applyCommand(project, {
-    type: 'layer-update',
-    layer: {
-      ...project.layers[0]!,
-      keyframes: [sharedPoint(5, { opacity: 0.2, exposure: -0.5 }, 'smooth'), sharedPoint(110, { exposure: 2 })],
+  project.adjustments = [
+    {
+      ...adjustmentFrom0(60),
+      keyframes: [gradePoint(5, { saturation: 0.2, exposure: -0.5 }, 'smooth'), gradePoint(110, { exposure: 2 })],
     },
-  });
+  ];
   project = applyCommand(project, { type: 'trim', clipId: original.id, sourceIn: 30, sourceOut: 90 });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  const row = await editLayerPoint(page, 'Track 1', 5);
-  await row.getByRole('spinbutton', { name: 'Opacity keyframe value 5', exact: true }).fill('80');
-  const opacityFrame = row.getByRole('spinbutton', { name: 'Track keyframe frame 5', exact: true });
-  await opacityFrame.fill('8');
-  expect(await page.evaluate(() => window.pascapLab!.project()!.layers[0]!.keyframes[0]!.frame)).toBe(5);
-  await opacityFrame.press('Enter');
-  const outside = await editLayerPoint(page, 'Track 1', 110);
+  const row = await editAdjustmentPoint(page, 5);
+  await row.getByRole('spinbutton', { name: 'Saturation keyframe value 5', exact: true }).fill('0.8');
+  const keyFrame = row.getByRole('spinbutton', { name: 'Adjustment keyframe frame 5', exact: true });
+  await keyFrame.fill('8');
+  expect(await page.evaluate(() => window.pascapLab!.project()!.adjustments[0]!.keyframes[0]!.frame)).toBe(5);
+  await keyFrame.press('Enter');
+  const outside = await editAdjustmentPoint(page, 110);
   await expect(outside.locator('.keyframe-row-skipped')).toHaveText('Outside duration');
   await outside.getByRole('spinbutton', { name: 'Exposure keyframe value 110', exact: true }).fill('3');
-  await layerKeyframes(page, 'Track 1').getByRole('button', { name: 'Go to track keyframe 8', exact: true }).click();
+  await adjustmentKeyframes(page).getByRole('button', { name: 'Go to adjustment keyframe 8', exact: true }).click();
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
   const edited = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(edited.layers[0]?.keyframes).toEqual([
-    sharedPoint(8, { opacity: 0.8, exposure: 0.7 }, 'smooth'),
-    sharedPoint(110, { exposure: 3 }),
+  expect(edited.adjustments[0]?.keyframes).toEqual([
+    gradePoint(8, { saturation: 0.8, exposure: 0.7 }, 'smooth'),
+    gradePoint(110, { exposure: 3 }),
   ]);
   expect(edited.clips[0]).toEqual({ ...original, sourceIn: 30, sourceOut: 90 });
 });
 
 test('source-range choices are per project and do not alter already inserted excerpts', async ({ page }) => {
-  let keyed = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  const anchors = [sharedPoint(20, { exposure: 0.3 }), sharedPoint(70, { opacity: 0.6 }, 'smooth')];
-  keyed = applyCommand(keyed, { type: 'layer-update', layer: { ...keyed.layers[0]!, keyframes: anchors } });
+  const keyed = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
+  const anchors = [gradePoint(20, { exposure: 0.3 }), gradePoint(70, { saturation: 0.6 }, 'smooth')];
+  keyed.adjustments = [{ ...adjustmentFrom0(60), keyframes: anchors }];
   await page.evaluate((document) => window.pascapLab!.setDocument(document), keyed);
   await sourceAtPointer(page, 'pattern-a.mp4', 0.25);
   await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('30');
   await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).fill('80');
   await page.getByRole('spinbutton', { name: 'Source OUT', exact: true }).press('Enter');
   expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.sourceIn)).toBe(0);
-  expect(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).layers[0]?.keyframes).toEqual(
+  expect(projectSchema.parse(await page.evaluate(() => window.pascapLab!.project())).adjustments[0]?.keyframes).toEqual(
     anchors,
   );
   await page.getByRole('button', { name: 'Close source review' }).click();
@@ -663,7 +673,7 @@ test('source-range choices are per project and do not alter already inserted exc
     'New source review project',
   );
   const fresh = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(fresh.layers[0]?.keyframes).toEqual([]);
+  expect(fresh.adjustments).toEqual([]);
   expect(fresh.media).toEqual({ videoIds: [], audioIds: [] });
   // The memory-only source-choice fixture explicitly imports this rush into its new bin.
   fresh.media.videoIds = [keyed.clips[0]!.mediaId];
@@ -685,7 +695,10 @@ test('overlay trims hold the opposite edge, preserve keys, cancel drafts and com
     type: 'layer-update',
     layer: {
       ...layer,
-      keyframes: [sharedPoint(10, { opacity: 0.4 }), sharedPoint(110, { opacity: 0.8 }, 'smooth')],
+      transform: {
+        ...layer.transform,
+        keyframes: [transformPoint(10, { opacity: 0.4 }), transformPoint(110, { opacity: 0.8 }, 'smooth')],
+      },
     },
   });
   await page.evaluate((document) => window.pascapLab!.setDocument(document), project);
@@ -735,8 +748,8 @@ test('overlay trims hold the opposite edge, preserve keys, cancel drafts and com
   await move('out', 20);
   edited = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(edited.clips.find((clip) => clip.id === id)).toMatchObject({ sourceIn: 0, sourceOut: 120, start: 0 });
-  expect(edited.layers[1]?.keyframes).toEqual(project.layers[1]?.keyframes);
-  expect(edited.layers[1]?.keyframes.map((point) => point.frame)).toEqual([10, 110]);
+  expect(edited.layers[1]?.transform.keyframes).toEqual(project.layers[1]?.transform.keyframes);
+  expect(edited.layers[1]?.transform.keyframes.map((point) => point.frame)).toEqual([10, 110]);
   expect(edited.clips[0]).toEqual(project.clips[0]);
 });
 

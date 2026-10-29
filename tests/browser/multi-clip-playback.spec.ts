@@ -5,6 +5,7 @@ import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { memoryProjects } from './memory-projects.js';
+import { transformPoint } from './editor-helpers.js';
 import { installMusicEvidence, observeRealtimeHeadroom } from './music-evidence.js';
 import { singleClipLane } from '../music-lanes.js';
 
@@ -134,9 +135,16 @@ function buildProject(
       transition: { leftId: `t${track}-c${left}`, rightId: `t${track}-c${left + 1}`, type: 'cross-dissolve', duration },
     });
   }
-  for (const [track, frame, value] of scenario.opacity ?? []) {
-    const layerId = track ? `multi-track-${track}` : document.layers[0]!.id;
-    document = applyCommand(document, { type: 'layer-key-toggle', layerId, frame, setting: 'opacity', value });
+  for (const layer of document.layers) {
+    const keyframes = (scenario.opacity ?? [])
+      .filter(([track]) => (track ? `multi-track-${track}` : document.layers[0]!.id) === layer.id)
+      .map(([, frame, value]) => transformPoint(frame, { opacity: value }));
+    if (keyframes.length)
+      document = applyCommand(document, {
+        type: 'transform',
+        layerId: layer.id,
+        transform: { ...layer.transform, keyframes },
+      });
   }
   if (music) {
     const duration = calculateLayout(document).duration;
