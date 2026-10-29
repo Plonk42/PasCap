@@ -220,7 +220,7 @@ frame 10, 0.5 at 30 with Linear Easing, and 0 from 50.
 
 The Colour keyframe line has a toggle **Add default keyframe** (pressed: **Remove default
 keyframe**) with its own amber icon, a diamond around a return arrow. It adds a default keyframe
-to the clip grade or adjustment at the playhead, or removes the one there, in one Undo step;
+to the grade the Colour tab edits, at the playhead, or removes the one there, in one Undo step;
 it is unavailable where an ordinary keyframe already exists (never merged or overwritten).
 On the timeline a clip grade's default keyframe marker is filled amber with the same icon, and
 its list entry carries a **Default** badge. Its values, per-setting Easing, time and enabled
@@ -228,8 +228,8 @@ settings stay editable like any keyframe's; it remains a default keyframe throug
 
 Control names follow the [editor control vocabulary](design/EDITOR_CONTROLS.md#vocabulary).
 
-The **Colour** Properties tab edits the selected clip's grade or the adjustment at the playhead,
-named in its pinned header with the **Clip / Adjustment** switch
+The **Colour** Properties tab edits the grade of the clip or adjustment selected on the timeline,
+named in its pinned header
 ([Colour tab](design/ROW_APPEARANCE.md#properties-and-history)). Its Colour section ends, below
 its grouped sliders, with **one directly visible keyframe list** for that grade under a small
 **Keyframes** heading, with the **Animation help** question-mark button beside it (fieldset

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { createAdjustment } from '../../src/shared/grade.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
-import { colourTarget, expandedInspectorPreferences, inspectorTab } from './editor-helpers.js';
+import { expandedInspectorPreferences, inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 let memory: MemoryProjects;
@@ -48,14 +48,9 @@ test('an adjustment created over a clip grades only its range, refuses an overla
   const before = { inside: await checksum(page, 10), after: await checksum(page, 60) };
   await page.locator('[data-clip-id="one"]').click();
   await seek(page, 10);
-  await colourTarget(page, 'Adjustment');
-  await expect(inspector(page).locator('.colour-target')).toContainText('No adjustment');
-  const create = inspector(page).getByRole('group', { name: 'New adjustment', exact: true });
-  await expect(create.getByRole('button', { name: 'Over the selected range' })).toHaveAttribute(
-    'title',
-    /Drag on the time ruler/,
-  );
-  await create.getByRole('button', { name: 'Over the selected clip' }).click();
+  const add = page.getByRole('button', { name: 'Add adjustment', exact: true });
+  await expect(add).toHaveAttribute('title', 'Add an adjustment over the selected clip, 00:00:00 – 00:01:10');
+  await add.click();
   await expect(inspector(page).locator('.colour-target')).toContainText('Adjustment 00:00:00 – 00:01:10');
   await expect.poll(async () => (await current(page)).adjustments).toMatchObject([{ start: 0, duration: 40 }]);
 
@@ -76,15 +71,9 @@ test('an adjustment created over a clip grades only its range, refuses an overla
   await expect.poll(async () => (await current(page)).adjustments).toEqual([]);
   await page.keyboard.press('Control+z');
   await expect.poll(async () => (await current(page)).adjustments).toHaveLength(1);
-  await seek(page, 50);
   await page.locator('[data-clip-id="one"]').click();
-  await seek(page, 50);
-  await colourTarget(page, 'Adjustment');
-  await expect(create.getByRole('button', { name: 'Over the selected clip' })).toHaveAttribute(
-    'title',
-    /Adjustments cannot overlap/,
-  );
-  await create.getByRole('button', { name: 'Over the selected clip' }).dispatchEvent('click');
+  await expect(add).toHaveAttribute('title', /Adjustments cannot overlap/);
+  await add.dispatchEvent('click');
   expect((await current(page)).adjustments).toHaveLength(1);
 });
 

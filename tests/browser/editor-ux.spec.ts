@@ -549,7 +549,7 @@ test('a failed deferred preview keeps the editor usable and saves pending edits 
   await expect(page.getByRole('button', { name: 'Play preview', exact: true })).toBeDisabled();
   // Without the preview module there is no lab API: open the selected clip's grade directly.
   await page.getByRole('tab', { name: 'Colour', exact: true }).click();
-  await expect(page.getByRole('radio', { name: 'Clip grade', exact: true })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.locator('#inspector-pane .colour-target > span')).toHaveText('This clip only');
   await expect(page.getByRole('button', { name: 'Keyframe Exposure', exact: true })).toBeDisabled();
   const main = page.locator('.keyframe-setting-navigation').filter({
     has: page.getByRole('button', { name: 'Keyframe Exposure', exact: true }),

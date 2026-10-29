@@ -125,24 +125,19 @@ Transform or Opacity edits; the measurement helper needs the same static clip gr
 
 ## Properties and history
 
-The Colour sections live in the **Colour** Properties tab (**Clip / Colour / Track / Audio**). Its
-pinned header names what it edits, beside a **Clip / Adjustment** switch (radio group **Colour
-target**, **Clip grade** and **Adjustment**; arrow keys move between them):
+The Colour sections live in the **Colour** Properties tab (**Clip / Colour / Track / Audio**). It
+edits the grade of what is selected on the timeline, named in its pinned header:
 
-- **Clip** edits the selected clip's grade: the header names its recording and says **This clip
-  only**. Without a selected clip it is unavailable and the tab shows the Adjustment view. With
-  several clips selected, the tab asks to select one; **Paste grade** sets the same grade on all
-  of them.
-- **Adjustment** edits the adjustment covering the playhead, named by its range (**Adjustment
-  01:12:05 – 01:20:00**) with **Every track within this range** and a trash, **Delete
-  adjustment**, which removes it and its keyframes. Without one at the playhead, the header reads
-  **No adjustment · At the playhead** and **New adjustment** offers **Over the selected range**
-  (the ruler range) and **Over the selected clip** (its span). Each is unavailable with its reason
-  without a range or clip, over another adjustment or at 64 items; creating one seeks into it when
-  the playhead is outside. Adjustments are not drawn on the timeline yet.
+- A selected **clip**: its grade. The header names its recording and says **This clip only**.
+- A selected **adjustment**: named by its range (**Adjustment 01:12:05 – 01:20:00**) with
+  **Every track within this range** and a trash, **Delete adjustment**, which removes it and its
+  keyframes. Adjustments are created on the adjustment track
+  ([timeline](../TIMELINE_EDITING.md#adjustment-track)).
+- Nothing selected: a hint to select a clip or an adjustment. Several clips or adjustments
+  selected: the tab asks to select one; **Paste grade** sets the same grade on all of them.
 
-The choice stays while other clips are selected; a clip grade marker on the timeline chooses
-**Clip**. Both targets show the same Colour, **HSL ranges** and **Colour curves** sections; only
+Clicking a clip grade or adjustment keyframe marker on the timeline selects its owner. Both show
+the same Colour, **HSL ranges** and **Colour curves** sections; only
 a clip grade has **Auto** and **Auto white balance**
 ([#285](https://github.com/Plonk42/PasCap/issues/285)).
 
@@ -152,12 +147,14 @@ a clip grade has **Auto** and **Auto white balance**
   grade the image uses, which eases between source frames in slow motion; only a setting keyed at
   the playhead's source frame shows that keyframe's own value, which it edits, while the image
   may already be slightly past it.
-- An adjustment's diamonds key its frame at the playhead; its list is **Adjustment keyframes**,
+- An adjustment's diamonds key its frame at the playhead (unavailable outside its range); its list
+  is **Adjustment keyframes**,
   counted from its start (**Frame in adjustment**), and **Go to adjustment keyframe N** seeks the
   keyframe, or the adjustment's nearest frame for a keyframe outside its range.
 
-**Copy grade** and **Paste grade** in a clip's context menu copy a grade without keyframes and
-replace the right-clicked clip's grade (or every selected clip's, when it is selected), removing
+**Copy grade** and **Paste grade** in a clip's or an adjustment's context menu copy a grade without
+keyframes and replace the right-clicked one's grade (or every selected clip's and adjustment's, when
+it is selected), removing
 its keyframes, in one Undo step. Holding **Original** bypasses every grade and Detail; with
 **Shift** only clip grades and Detail, with **Alt** only adjustments; its badge names the mode.
 

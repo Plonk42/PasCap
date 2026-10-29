@@ -60,12 +60,7 @@ import { PanelRail, toggleSidePanel, type SidePanel } from './PanelToggle.js';
 import { trackPointerFocus, type PointerFocus } from './pointer-focus.js';
 import { useRestingValue } from './use-delayed-flag.js';
 import { chooseProjectFile, readProjectFile } from './project-file.js';
-import type {
-  ColourTarget,
-  InspectorMode,
-  InspectorSectionRequest,
-  InspectorSectionTarget,
-} from './InspectorSection.js';
+import type { InspectorMode, InspectorSectionRequest, InspectorSectionTarget } from './InspectorSection.js';
 import { Jobs } from './Jobs.js';
 import { KeyframeNavigationContext, previewFrameFor } from './keyframe-navigation.js';
 import { clipStartRestriction } from './layer-actions.js';
@@ -1361,16 +1356,12 @@ export function App() {
     [seek],
   );
   const followPlayhead = useCallback((): void => undefined, []);
-  const openInspectorSection = useCallback((section: InspectorSectionTarget, colourTarget?: ColourTarget): void => {
+  const openInspectorSection = useCallback((section: InspectorSectionTarget): void => {
     setInspectorMode(INSPECTOR_TABS[section]);
     const workspace = latestWorkspace.current;
     if (!workspace.layout.inspectorOpen)
       workspace.update({ inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) }, false);
-    setSectionRequest((previous) => ({
-      section,
-      ...(section === 'colour' ? { colourTarget: colourTarget ?? 'clip' } : {}),
-      nonce: (previous?.nonce ?? 0) + 1,
-    }));
+    setSectionRequest((previous) => ({ section, nonce: (previous?.nonce ?? 0) + 1 }));
   }, []);
   const selectAdjustment = useCallback(
     (id: string): void => {
@@ -1381,7 +1372,7 @@ export function App() {
       clipGroup.set([]);
       setBoundaryId(null);
       setViewerMode('timeline');
-      openInspectorSection('colour', 'adjustment');
+      openInspectorSection('colour');
     },
     [clipGroup.set, adjustmentGroup.set, openInspectorSection],
   );
@@ -2328,7 +2319,6 @@ export function App() {
                     assets={assets}
                     selectedClipId={selectedId}
                     selectedClipCount={clipGroup.group.length}
-                    timeRange={timeRange}
                     selectedAdjustmentIds={adjustmentGroup.group}
                     selectedLayerId={selectedLayerId}
                     boundaryId={boundaryId}

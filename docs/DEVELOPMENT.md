@@ -641,7 +641,7 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
   reject saved `clip.colour` and `clip.correction`. Grade each source with its clip grade, then
   the adjustment at that frame, retaining
   two LUT buffers and existing raw/process budgets. Main Colour controls and keyframes
-  edit the selected clip's grade or the adjustment at the playhead. Required track `transform`
+  edit the grade of the selected clip or adjustment. Required track `transform`
   (base and project-frame keyframes, Opacity included) belongs to the track; reject saved
   `clip.spatial`. See
   [clip grades and adjustments](design/ROW_APPEARANCE.md). Required static clip `detail` and boolean `reverse`,

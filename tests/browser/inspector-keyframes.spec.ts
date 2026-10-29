@@ -109,13 +109,17 @@ test('four accessible tabs preserve selection across clips, populated/empty trac
   const list = adjustmentKeyframes(page).getByRole('list', { name: 'Edit adjustment keyframes', exact: true });
   await expect(list).toBeVisible();
   await expect(page.getByRole('button', { name: 'Edit adjustment keyframes', exact: true })).toHaveCount(0);
-  // The adjustment grades every track: it stays the target across clips and the empty track.
+  // The Colour tab edits what is selected: a clip's own grade, nothing on an empty track.
   await selectClip(page, 'upper-clip');
-  await expect(list).toBeVisible();
+  await expect(list).toHaveCount(0);
+  await expect(page.locator('#inspector-pane .colour-target > span')).toHaveText('This clip only');
   await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
-  await expect(list).toBeVisible();
-  await expect(page.getByRole('radio', { name: 'Clip grade', exact: true })).toHaveAttribute('aria-disabled', 'true');
+  const hint =
+    'Select a clip or an adjustment in the timeline to edit its grade. To grade every track over a stretch, draw an adjustment on the adjustment track.';
+  await expect(page.getByRole('tabpanel', { name: 'Colour', exact: true })).toHaveText(hint);
   await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await inspectorTab(page, 'Adjustment');
+  await expect(list).toBeVisible();
   await expect(page.getByRole('button', { name: 'Next Colour keyframe', exact: true })).toBeEnabled();
   const other = createProject('other-inspector', 'Other context');
   other.layers[0]!.name = 'Other row';
@@ -123,7 +127,7 @@ test('four accessible tabs preserve selection across clips, populated/empty trac
   await page.getByRole('button', { name: 'Open projects', exact: true }).click();
   await page.getByRole('button', { name: 'Open Other context', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Project title', exact: true })).toHaveValue('Other context');
-  await expect(page.locator('.colour-target strong')).toHaveText('No adjustment');
+  await expect(page.getByRole('tabpanel', { name: 'Colour', exact: true })).toHaveText(hint);
   await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(adjustmentKeyframes(page)).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
@@ -215,8 +219,9 @@ test('invalid stored drafts survive tab changes and cancel, without stale owner 
   await field.fill('99');
   await field.press('Enter');
   await expect(field).toHaveAttribute('aria-invalid', 'true');
-  await inspectorTab(page, 'Clip');
-  await inspectorTab(page, 'Adjustment');
+  // Switching tabs keeps the selection, so the hidden Colour tab keeps its draft.
+  await page.getByRole('tab', { name: 'Clip', exact: true }).click();
+  await page.getByRole('tab', { name: 'Colour', exact: true }).click();
   await expect(field).toHaveValue('99');
   await expect(field).toHaveAttribute('aria-invalid', 'true');
   await field.press('Escape');
@@ -245,10 +250,9 @@ test('invalid stored drafts survive tab changes and cancel, without stale owner 
   await other.getByLabel('Edit clip keyframe 10', { exact: true }).click();
   await expect(other.getByRole('slider', { name: 'Exposure keyframe value 10', exact: true })).toHaveValue('0.5');
   await expect(other.getByRole('spinbutton', { name: 'Exposure keyframe value 10', exact: true })).toHaveValue('0.5');
-  // Without a selected clip the Colour tab edits the adjustment again, with its committed value.
-  await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
-  const empty = await editAdjustmentPoint(page, 200);
-  const value = empty.getByRole('spinbutton', { name: 'Exposure keyframe value 200', exact: true });
+  // Selecting the adjustment again shows its committed value.
+  const again = await editAdjustmentPoint(page, 200);
+  const value = again.getByRole('spinbutton', { name: 'Exposure keyframe value 200', exact: true });
   await expect(value).toHaveValue('0.123456789');
   await value.fill('0.75');
   await value.press('Enter');

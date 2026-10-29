@@ -725,15 +725,25 @@ test('all fifteen setting buttons remain present and disabled throughout a nativ
   const box = (await handle.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
+  // The trim selects its clip, so the Colour tab shows that clip's grade; a synthetic tab click keeps the gesture.
+  const show = async (label: string): Promise<void> => {
+    if (transformOwned(label)) await settingTab(page, label);
+    else await page.getByRole('tab', { name: 'Colour', exact: true }).dispatchEvent('click');
+  };
+  await show('Exposure');
+  await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .colour-target > span')).toHaveText(
+    'This clip only',
+  );
   for (const { label } of KEYFRAME_SETTINGS) {
-    await settingTab(page, label);
+    await show(label);
     await expect(diamond(page, label)).toBeDisabled();
     for (const direction of ['Previous', 'Next'] as const) {
-      await settingTab(page, label);
+      await show(label);
       const main = mainStep(page, label, direction);
       await expect(main).toBeVisible();
       await guardedUnavailable(main);
       await main.evaluate((element) => (element as HTMLButtonElement).click());
+      if (!transformOwned(label)) continue;
       const button = await step(page, label, direction);
       await button.scrollIntoViewIfNeeded();
       await expect(button).toBeVisible();
@@ -741,7 +751,8 @@ test('all fifteen setting buttons remain present and disabled throughout a nativ
     }
   }
   for (const label of ['Colour', 'Speed', 'Transform'] as const) {
-    await settingTab(page, label);
+    if (label === 'Colour') await show('Exposure');
+    else await settingTab(page, label);
     for (const direction of ['Previous', 'Next'] as const)
       await expect(sectionStep(page, label, direction)).toBeDisabled();
   }
@@ -768,13 +779,12 @@ test('no opened project keeps Transform buttons and section navigation disabled,
   const dialog = page.getByRole('dialog', { name: 'Projects', exact: true });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-  // Without a project there is no adjustment to grade, so Colour offers only an unavailable new one.
+  // Without a project nothing can be selected, so Colour only asks to select a clip or an adjustment.
   await openTab(page, 'Colour');
   await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(0);
   await expect(sectionStep(page, 'Colour', 'Next')).toHaveCount(0);
-  const create = inspector(page).getByRole('group', { name: 'New adjustment', exact: true }).getByRole('button');
-  await expect(create).toHaveCount(2);
-  for (const button of await create.all()) await expect(button).toBeDisabled();
+  await expect(inspector(page)).toContainText('Select a clip or an adjustment in the timeline to edit its grade.');
+  await expect(inspector(page).locator('[role="tabpanel"]:not([hidden])').getByRole('button')).toHaveCount(0);
   // Speed is clip-owned, so without a project only the track's nine Transform settings exist.
   await openTab(page, 'Track');
   const toggles = inspector(page)

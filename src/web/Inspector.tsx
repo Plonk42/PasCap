@@ -1,11 +1,10 @@
 import { Fragment, memo, useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR, type ScalarColourSetting } from '../shared/colour.js';
-import { adjustmentAt, gradeColourAt } from '../shared/grade.js';
+import { gradeColourAt } from '../shared/grade.js';
 import { activeLayerSetting, hasLayerKeys, isKeyframeFrame } from '../shared/keyframes.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
-import type { TimelineRange } from '../shared/rush-editing.js';
 import { calculateLayout, transitionOffset, type PlacedClip, type TimelineLayout } from '../shared/timeline.js';
 import { ColourCurvesSection, HslRangesSection } from './AdvancedColour.js';
 import { adjustmentLabel } from './adjustment-ui.js';
@@ -24,7 +23,6 @@ import {
   InspectorExpansionControls,
   InspectorSection,
   useInspectorExpansion,
-  type ColourTarget,
   type InspectorMode,
   type InspectorSectionRequest,
   type InspectorSectionTarget,
@@ -64,9 +62,7 @@ interface Props {
   selectedClipId: string | null;
   /** Clips selected together (Ctrl/Cmd-click); one clip's grade is edited only on its own. */
   selectedClipCount?: number;
-  /** The ruler range, from which an adjustment can be created. */
-  timeRange?: TimelineRange | null;
-  /** The adjustments selected on the timeline; one is edited instead of the one at the playhead. */
+  /** The adjustments selected on the timeline; the Colour tab edits one selected alone. */
   selectedAdjustmentIds?: readonly string[];
   selectedLayerId: string;
   boundaryId: string | null;
@@ -796,130 +792,6 @@ function SourceRangeSection({
   );
 }
 
-/** The Colour tab's target: the selected clip's own grade, or the adjustment at the playhead (arrow keys switch). */
-function ColourTargetSwitch({
-  target,
-  clipAvailable,
-  disabled,
-  onTarget,
-}: Readonly<{
-  target: ColourTarget;
-  clipAvailable: boolean;
-  disabled: boolean;
-  onTarget: (target: ColourTarget) => void;
-}>) {
-  const choose = (event: KeyboardEvent<HTMLButtonElement>): void => {
-    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const next = target === 'clip' ? 'adjustment' : 'clip';
-    if (next === 'clip' && !clipAvailable) return;
-    onTarget(next);
-    event.currentTarget.parentElement?.querySelector<HTMLElement>(`[data-colour-target="${next}"]`)?.focus();
-  };
-  return (
-    <div className="colour-target-switch" role="radiogroup" aria-label="Colour target">
-      {(['clip', 'adjustment'] as const).map((option) => {
-        const unavailable = option === 'clip' && !clipAvailable;
-        let title = option === 'clip' ? 'Grade only the selected clip' : 'Grade every track over a stretch of the film';
-        if (unavailable) title = 'Select a clip in the timeline to grade it';
-        return (
-          <button
-            key={option}
-            type="button"
-            role="radio"
-            data-colour-target={option}
-            tabIndex={target === option ? 0 : -1}
-            aria-checked={target === option}
-            aria-label={option === 'clip' ? 'Clip grade' : 'Adjustment'}
-            aria-disabled={unavailable || undefined}
-            disabled={disabled}
-            title={title}
-            onClick={() => {
-              if (!unavailable) onTarget(option);
-            }}
-            onKeyDown={choose}
-          >
-            {option === 'clip' ? 'Clip' : 'Adjustment'}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** "01:12:05 – 01:20:00": an adjustment by its range, OUT exclusive. */
-function rangeReason(project: ProjectDocument, start: number, end: number): string | null {
-  return commandNumberError(
-    project,
-    { type: 'adjustment-add', adjustmentId: 'candidate', start, duration: end - start },
-    'Choose a stretch without one.',
-  );
-}
-
-/** Creates an adjustment over the ruler range or the selected clip's span; never over another one. */
-function NewAdjustment({
-  project,
-  timeRange,
-  placed,
-  frame,
-  disabled,
-  onEdit,
-  onSeek,
-}: Readonly<{
-  project: ProjectDocument;
-  timeRange: TimelineRange | null;
-  placed: PlacedClip | undefined;
-  frame: number;
-  disabled: boolean;
-  onEdit: Props['onEdit'];
-  onSeek: (frame: number) => void;
-}>) {
-  const create = (start: number, end: number): void => {
-    onEdit({ type: 'adjustment-add', adjustmentId: crypto.randomUUID(), start, duration: end - start });
-    if (frame < start || frame >= end) onSeek(start);
-  };
-  const choices = [
-    {
-      label: 'Over the selected range',
-      range: timeRange && { start: timeRange.inFrame, end: timeRange.outFrame },
-      missing: 'Drag on the time ruler to select a range first.',
-    },
-    {
-      label: 'Over the selected clip',
-      range: placed && { start: placed.start, end: placed.end },
-      missing: 'Select a clip in the timeline first.',
-    },
-  ];
-  return (
-    <fieldset className="adjustment-create" aria-label="New adjustment">
-      <legend>New adjustment: one grade for every track over a stretch of the film</legend>
-      {choices.map(({ label, range, missing }) => {
-        const reason = range ? rangeReason(project, range.start, range.end) : missing;
-        return (
-          <button
-            key={label}
-            type="button"
-            className="text-button"
-            disabled={disabled}
-            aria-disabled={reason !== null || undefined}
-            title={
-              reason ??
-              `Grade every track ${range ? adjustmentLabel({ start: range.start, duration: range.end - range.start }) : ''}`
-            }
-            onClick={() => {
-              if (range && reason === null) create(range.start, range.end);
-            }}
-          >
-            <Icon name="plus" size={13} />
-            {label}
-          </button>
-        );
-      })}
-    </fieldset>
-  );
-}
-
 interface ColourTabProps {
   project: ProjectDocument;
   assets: MediaAsset[];
@@ -932,25 +804,25 @@ interface ColourTabProps {
   frame: number;
   /** The source frame the selected clip shows at the playhead, or null off the clip. */
   sourceFrame: number | null;
-  timeRange: TimelineRange | null;
   selectedAdjustmentIds: readonly string[];
   layout: TimelineLayout;
   drafting: boolean;
   resetKey: string;
   id: string;
-  target: ColourTarget;
-  onTarget: (target: ColourTarget) => void;
   onEdit: (command: EditCommand | readonly EditCommand[]) => void;
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
   onPause: () => void;
   onSeek: (frame: number) => void;
 }
 
-/** Why the Colour tab edits nothing while several clips or adjustments are selected, or null. */
-function severalSelected(clips: number, adjustments: number, target: ColourTarget): string | null {
+/** Why the Colour tab edits nothing, with nothing or several clips and adjustments selected; null with one. */
+function nothingToEdit(clips: number, adjustments: number): string | null {
+  if (!clips && !adjustments)
+    return 'Select a clip or an adjustment in the timeline to edit its grade. To grade every track over a stretch, draw an adjustment on the adjustment track.';
+  if (clips + adjustments === 1) return null;
   const edit = 'select one to edit its grade. Paste grade sets the same grade on all of them.';
-  if (!adjustments) return target === 'clip' && clips > 1 ? `${countOf(clips, 'clip')} are selected: ${edit}` : null;
-  if (!clips) return adjustments > 1 ? `${countOf(adjustments, 'adjustment')} are selected: ${edit}` : null;
+  if (!adjustments) return `${countOf(clips, 'clip')} are selected: ${edit}`;
+  if (!clips) return `${countOf(adjustments, 'adjustment')} are selected: ${edit}`;
   return `${countOf(clips, 'clip')} and ${countOf(adjustments, 'adjustment')} are selected: ${edit}`;
 }
 
@@ -960,15 +832,12 @@ function gradeFrames(placed: PlacedClip | undefined, projectFrame: number, sourc
   return { frame: sourceFrame, valueFrame: gradeValuePosition(placed, projectFrame) };
 }
 
-/** Colour, HSL ranges and Colour curves for the selected clip's grade or the adjustment at the playhead. */
+/** Colour, HSL ranges and Colour curves for the selected clip's grade or the selected adjustment. */
 function ColourTab(props: Readonly<ColourTabProps>) {
   const { project, clip, placed, asset, drafting, onEdit, onPreview, onPause, onSeek } = props;
   const navigation = useKeyframeNavigation();
-  const adjustments = props.selectedAdjustmentIds;
-  const item = adjustments.length
-    ? project.adjustments.find((candidate) => candidate.id === adjustments[0])
-    : adjustmentAt(project.adjustments, props.frame);
-  const target: ColourTarget = clip ? props.target : 'adjustment';
+  const items = project.adjustments.filter((candidate) => props.selectedAdjustmentIds.includes(candidate.id));
+  const item = items.length === 1 ? items[0] : undefined;
   const clipNavigation = useMemo<KeyframeNavigation | null>(
     () =>
       placed
@@ -1000,39 +869,18 @@ function ColourTab(props: Readonly<ColourTabProps>) {
       <Icon name={icon} size={17} />
       <strong title={title}>{title}</strong>
       <span>{detail}</span>
-      <ColourTargetSwitch
-        target={target}
-        clipAvailable={clip !== undefined}
-        disabled={drafting}
-        onTarget={props.onTarget}
-      />
       {actions}
     </div>
   );
-  const several = severalSelected(clip ? Math.max(1, props.selectedClipCount) : 0, adjustments.length, target);
-  if (several) return <div className="inspector-empty">{several}</div>;
-  if (target === 'adjustment' && !item)
-    return (
-      <>
-        {header('colour', 'No adjustment', 'At the playhead')}
-        <NewAdjustment
-          project={project}
-          timeRange={props.timeRange}
-          placed={placed}
-          frame={props.frame}
-          disabled={drafting}
-          onEdit={onEdit}
-          onSeek={onSeek}
-        />
-      </>
-    );
+  const empty = nothingToEdit(clip ? Math.max(1, props.selectedClipCount) : 0, items.length);
+  if (empty) return <div className="inspector-empty">{empty}</div>;
   const clipName = asset ? shortName(asset.name) : 'Unavailable recording';
   let owner: ColourOwner;
   let frame: number;
   let valueFrame: number;
   let ownerNavigation: KeyframeNavigation;
   let title: string;
-  if (target === 'adjustment' && item) {
+  if (item) {
     owner = adjustmentColourOwner(item, `adjustment ${adjustmentLabel(item)}`);
     // Keyframes are captured only on the adjustment's own frames.
     frame = props.frame >= item.start && props.frame < item.start + item.duration ? props.frame - item.start : -1;
@@ -1112,7 +960,6 @@ function InspectorPanel({
   assets,
   selectedClipId,
   selectedClipCount = 0,
-  timeRange = null,
   selectedAdjustmentIds = NO_ADJUSTMENTS,
   selectedLayerId,
   boundaryId,
@@ -1163,12 +1010,6 @@ function InspectorPanel({
   }, [sectionRequest]);
   const sourceFrame =
     placed && frame >= placed.start && frame < placed.end ? placed.retiming.sourceAt(frame - placed.start) : null;
-  // The choice stays while other clips are selected, so a track being graded stays the target; a lazily mounted
-  // panel honours the marker that opened it.
-  const [colourTargetChoice, setColourTargetChoice] = useState<ColourTarget>(sectionRequest?.colourTarget ?? 'clip');
-  useEffect(() => {
-    if (sectionRequest?.colourTarget) setColourTargetChoice(sectionRequest.colourTarget);
-  }, [sectionRequest]);
   const inputContext = `${project.id}:${layer?.id}:${clip?.id ?? 'row'}`;
   const startRestriction = clip ? clipStartRestriction(project, clip) : null;
   const startHint = startRestriction ?? undefined;
@@ -1335,14 +1176,11 @@ function InspectorPanel({
             selectedClipCount={selectedClipCount}
             frame={frame}
             sourceFrame={sourceFrame}
-            timeRange={timeRange}
             selectedAdjustmentIds={selectedAdjustmentIds}
             layout={layout}
             drafting={drafting}
             resetKey={inputContext}
             id={colourControlId}
-            target={colourTargetChoice}
-            onTarget={setColourTargetChoice}
             onEdit={onEdit}
             onPreview={onPreview}
             onPause={onPause}

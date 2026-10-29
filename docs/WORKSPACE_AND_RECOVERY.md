@@ -15,8 +15,8 @@ The intended discrete-GPU and long real-flight checks remain deferred.
 
 ## Layout and navigation
 
-The **Colour** tab edits the twelve scalar colour values, HDR and Local contrast of the selected
-clip's grade or of the adjustment at the playhead. A clip grade belongs to its clip; an
+The **Colour** tab edits the twelve scalar colour values, HDR and Local contrast of the grade of the
+clip or adjustment selected on the timeline. A clip grade belongs to its clip; an
 adjustment grades every video track over a range of the film, after each clip's grade. Video
 tracks have no Colour; Opacity is in **Track → Transform**. The Original preview neutralizes
 grades and clip Detail, or only one kind of grade with a modifier.
@@ -64,9 +64,8 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
   with readable inputs and independent collapsible sections, split by ownership.
   Clip ("Clip N of M · track") contains the selected clip's **Speed**,
   **Detail**, **Range** and **Placement**; an empty video track shows one line instead.
-  Colour contains Colour, **HSL ranges** and **Colour curves** for the selected clip's grade or,
-  with its **Clip / Adjustment** switch (or without a selected clip), the adjustment at the
-  playhead, created there with **New adjustment** when none exists; the Colour section ends with
+  Colour contains Colour, **HSL ranges** and **Colour curves** for the selected clip's grade or the
+  selected adjustment (with nothing selected, a hint to select one); the Colour section ends with
   that grade's keyframe list (enabled-setting chips and Animation help).
   Track ("Applies to all N clips on this track") contains **Transform** with Opacity (ending with its own
   keyframe list), Transitions and Fades;
