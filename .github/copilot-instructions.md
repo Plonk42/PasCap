@@ -17,6 +17,14 @@ edits real projects with it, so saved data must keep working. Details are in
   (`gh pr merge --auto --squash`): playback/A-V clock, decoder/compositor, native
   export/FFmpeg, project schema or persisted formats, source-media safety, CI and
   scripts, dependency upgrades. Don't wait for CI in the session; report the PR.
+- **Long-lived dev branches** (owner-requested, no auto-merge, merged whole after
+  evaluation): split each issue into steps that keep tests passing (add the new
+  behaviour beside the old, then remove the old). Delete specs of removed behaviour
+  rather than porting them; add focused specs for the new. Per step run
+  `npm run check` plus the specs you edited; run the full suites on CI at the end of
+  each issue (`gh workflow run ci.yml --ref <branch>`), not locally. Do live UI
+  checks once per issue, on its final UI. Stop and report at each step boundary and
+  before any bulk test migration, never one multi-hour turn.
 - Commit each coherent step with its tests and doc updates, not every small
   correction. Imperative summary; add `(#N)` when tied to an issue, or `Closes #N`
   when the commit (or PR) completes it.
@@ -46,7 +54,8 @@ edits real projects with it, so saved data must keep working. Details are in
   tests, types, build, licenses) plus the affected Playwright specs for UI changes.
   Find affected specs by searching `tests/browser` for every accessible name,
   selector and visible/help text the change renamed, removed or newly hides, after
-  `git pull`; run each match, not only specs you edited.
+  `git pull`; run each match, not only specs you edited (on a long-lived dev
+  branch, CI runs them instead; see Workflow).
   Docs-only changes need only `npm run format`.
 - Full Chrome, Firefox and native suites run in CI. Run them locally only for
   playback, decoding, native export or test-infrastructure changes.
