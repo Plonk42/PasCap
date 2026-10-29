@@ -66,12 +66,7 @@ import type {
   InspectorSectionTarget,
 } from './InspectorSection.js';
 import { Jobs } from './Jobs.js';
-import {
-  inspectKeyframe,
-  KeyframeNavigationContext,
-  reconcileKeyframeInspection,
-  type KeyframeInspection,
-} from './keyframe-navigation.js';
+import { KeyframeNavigationContext, previewFrameFor } from './keyframe-navigation.js';
 import { clipStartRestriction } from './layer-actions.js';
 import {
   addTrackClips,
@@ -312,7 +307,6 @@ export function App() {
   const [selectedMusicId, setSelectedMusicId] = useState<string | null>(null);
   const [musicBoundary, setMusicBoundary] = useState<MusicBoundaryRequest | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState(EMPTY_PROJECT.layers[0]!.id);
-  const [keyframeInspection, setKeyframeInspection] = useState<KeyframeInspection | null>(null);
   const [sourceInspectionEpoch, setSourceInspectionEpoch] = useState(0);
   /** A source navigation set a stored cursor since the last epoch: only then does a seek need a new one. */
   const sourceInspected = useRef(false);
@@ -386,7 +380,6 @@ export function App() {
       const document = current.current;
       const layerId = document?.clips.find((clip) => clip.id === id)?.layerId;
       if (layerId) {
-        if (selectedLayer.current !== layerId) setKeyframeInspection(null);
         selectedLayer.current = layerId;
         setSelectedLayerId(layerId);
       }
@@ -474,7 +467,6 @@ export function App() {
       if (!next.layers.some((layer) => layer.id === selectedLayer.current)) {
         selectedLayer.current = next.layers[0]!.id;
         setSelectedLayerId(selectedLayer.current);
-        setKeyframeInspection(null);
         setBoundaryId(null);
       }
       const selectedClip = next.clips.find((clip) => clip.id === selection.current);
@@ -493,7 +485,6 @@ export function App() {
       ) {
         selectedLayer.current = selectedClip.layerId;
         setSelectedLayerId(selectedClip.layerId);
-        setKeyframeInspection(null);
       }
     },
     [select, clipGroup.set, clipGroup.latest],
@@ -642,7 +633,6 @@ export function App() {
     const document = current.current;
     if (!document || drafting.current) return;
     playAfterSeek.current = false;
-    setKeyframeInspection(null);
     if (!preserveSourceInspection && sourceInspected.current) {
       sourceInspected.current = false;
       setSourceInspectionEpoch((epoch) => epoch + 1);
@@ -667,7 +657,6 @@ export function App() {
   );
   const togglePlayback = useCallback(() => {
     if (drafting.current) return;
-    setKeyframeInspection(null);
     sourceInspected.current = false;
     setSourceInspectionEpoch((epoch) => epoch + 1);
     setViewerMode('timeline');
@@ -847,7 +836,6 @@ export function App() {
   }, []);
   useEffect(() => registerLivePreview(previewLive), [previewLive]);
   const previewDraft = useCallback((next: DraftPreview | null, frame?: number): void => {
-    if (next) setKeyframeInspection(null);
     if (next && !drafting.current) restoreFrame.current = engine.current?.diagnostics().frame ?? 0;
     if (!next) requestedFrame.current = frame ?? restoreFrame.current;
     drafting.current = next !== null;
@@ -863,7 +851,6 @@ export function App() {
       current.current = loaded;
       lastPreview.current = '';
       requestedFrame.current = 0;
-      setKeyframeInspection(null);
       setProject(loaded);
       setDraft(null);
       drafting.current = false;
@@ -933,7 +920,6 @@ export function App() {
     current.current = null;
     lastPreview.current = '';
     requestedFrame.current = 0;
-    setKeyframeInspection(null);
     setProject(null);
     setDraft(null);
     drafting.current = false;
@@ -1266,17 +1252,6 @@ export function App() {
   };
   const visible = draft?.document ?? project ?? EMPTY_PROJECT;
   const layout = useMemo(() => calculateLayout(visible), [visible]);
-  const inspection = draft
-    ? null
-    : reconcileKeyframeInspection(
-        keyframeInspection,
-        project,
-        selectedLayerId,
-        diagnostics?.frame ?? 0,
-        layout.duration,
-        diagnostics?.playing ?? false,
-      );
-  if (inspection !== keyframeInspection) setKeyframeInspection(inspection);
   const referenceBusy = jobs.some((job) => job.kind === 'reference' && ['running', 'queued'].includes(job.state));
   const setSourceRange = (range: MediaSelection): void => {
     const asset = latestAssets.current.find((item) => item.id === range.mediaId);
@@ -1302,7 +1277,6 @@ export function App() {
     (id: string): void => {
       if (drafting.current) return;
       clipGroup.set([]);
-      if (selectedLayer.current !== id) setKeyframeInspection(null);
       setViewerMode('timeline');
       selectedLayer.current = id;
       setSelectedLayerId(id);
@@ -1316,38 +1290,17 @@ export function App() {
     },
     [select],
   );
+  /** Grade keyframe lists override this with their own frames; the base seeks a project frame. */
   const seekKeyframe = useCallback(
-    (layerId: string, frame: number): void => {
+    (_owner: string, frame: number): void => {
       const document = current.current;
       if (!document || drafting.current) return;
-      const layer = document.layers.find((item) => item.id === layerId);
-      if (!layer) return;
-      const duration = calculateLayout(document).duration;
-      const next = inspectKeyframe(document.id, layer, frame, engine.current?.diagnostics().frame ?? 0, duration);
-      if (!next) return;
       engine.current?.pause();
-      if (selectedLayer.current !== layerId) selectLayer(layerId);
-      setViewerMode('timeline');
-      const workspace = latestWorkspace.current;
-      if (!workspace.layout.inspectorOpen)
-        workspace.update(
-          { inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) },
-          false,
-        );
-      setKeyframeInspection(next);
-      const preview = engine.current;
-      if (lastPreview.current !== `committed:${timingKey(document)}`) requestedFrame.current = next.expectedFrame;
-      // A just-committed timing edit may change duration before the preview reloads.
-      // Its requestedFrame is already queued; do not seek outside the old loaded layout.
-      if (duration && preview && next.expectedFrame < preview.diagnostics().duration) {
-        void preview
-          .seek(next.expectedFrame)
-          .catch((cause: unknown) => setError(message(cause, 'Cannot preview this keyframe.')));
-      }
+      seek(previewFrameFor(frame, calculateLayout(document).duration));
     },
-    [selectLayer],
+    [seek],
   );
-  const followPlayhead = useCallback((): void => setKeyframeInspection(null), []);
+  const followPlayhead = useCallback((): void => undefined, []);
   const openInspectorSection = useCallback((section: InspectorSectionTarget, colourTarget?: ColourTarget): void => {
     setInspectorMode(INSPECTOR_TABS[section]);
     const workspace = latestWorkspace.current;
@@ -1355,7 +1308,7 @@ export function App() {
       workspace.update({ inspectorOpen: true, ...(workspace.viewport.width < 980 ? { mediaOpen: false } : {}) }, false);
     setSectionRequest((previous) => ({
       section,
-      ...(section === 'colour' ? { colourTarget: colourTarget ?? 'track' } : {}),
+      ...(section === 'colour' ? { colourTarget: colourTarget ?? 'clip' } : {}),
       nonce: (previous?.nonce ?? 0) + 1,
     }));
   }, []);
@@ -1363,7 +1316,7 @@ export function App() {
   const navigationDisabled = !project || draft !== null || !previewReady;
   const keyframeNavigation = useMemo(
     () => ({
-      inspection,
+      inspection: null,
       duration: layout.duration,
       disabled: navigationDisabled,
       playing: diagnostics?.playing ?? false,
@@ -1373,7 +1326,6 @@ export function App() {
       onFollowPlayhead: followPlayhead,
     }),
     [
-      inspection,
       layout.duration,
       navigationDisabled,
       diagnostics?.playing,
@@ -2216,7 +2168,7 @@ export function App() {
                 {(Diagnostics) => (
                   <Diagnostics
                     diagnostics={diagnostics}
-                    colour={visible.layers.find((layer) => layer.id === selectedLayerId)?.colour ?? null}
+                    colour={visible.clips.find((clip) => clip.id === selectedId)?.grade.colour ?? null}
                     canRenderReference={
                       !needsLayeredExport(visible) &&
                       visible.clips.length === 2 &&
@@ -2293,6 +2245,7 @@ export function App() {
                     assets={assets}
                     selectedClipId={selectedId}
                     selectedClipCount={clipGroup.group.length}
+                    timeRange={timeRange}
                     selectedLayerId={selectedLayerId}
                     boundaryId={boundaryId}
                     frame={inspectorFrame}

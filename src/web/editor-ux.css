@@ -41,9 +41,36 @@
   color: var(--accent);
 }
 
-/* The Colour tab names its target, with a Clip/Track switch at the right. */
+/* The Colour tab names its target, with a Clip/Adjustment switch at the right (then Delete for an adjustment). */
 .product-workspace .inspector-selection.colour-target {
-  grid-template-columns: 18px minmax(0, 1fr) auto;
+  grid-template-columns: 18px minmax(0, 1fr) auto auto;
+}
+
+.inspector-selection.colour-target > .icon-button {
+  grid-column: 4;
+  grid-row: 1 / 3;
+  align-self: center;
+}
+
+/* Without an adjustment at the playhead: create one over the ruler range or the selected clip. */
+.adjustment-create {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.adjustment-create > span {
+  flex-basis: 100%;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.adjustment-create > button[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* Beside the switch, the scope line wraps rather than losing its clip count. */

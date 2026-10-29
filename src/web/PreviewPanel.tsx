@@ -96,13 +96,13 @@ function PreviewActions({
 const ORIGINAL_BADGES: Record<OriginalMode, string> = {
   all: 'Original · Colour and Detail bypassed',
   clip: 'Original · clip grades bypassed',
-  track: 'Original · track Colour bypassed',
+  adjustment: 'Original · adjustments bypassed',
 };
 
-/** Plain: everything; Shift: clip grades only; Alt: track Colour only. */
+/** Plain: everything; Shift: clip grades only; Alt: adjustments only. */
 function originalMode(event: { shiftKey: boolean; altKey: boolean }): OriginalMode {
   if (event.shiftKey) return 'clip';
-  return event.altKey ? 'track' : 'all';
+  return event.altKey ? 'adjustment' : 'all';
 }
 
 export function PreviewPanel({
@@ -175,7 +175,7 @@ export function PreviewPanel({
             className="preview-comparison-toggle"
             aria-label="Show original preview"
             aria-pressed={diagnostics?.ungraded ?? false}
-            title="Hold to show the image without Colour and Detail on every video track, keeping geometry, Opacity, fades and transitions. Hold Shift to bypass only clip grades, Alt only track Colour. Preview only; saved edits and exports are unchanged."
+            title="Hold to show the image without Colour and Detail on every video track, keeping geometry, Opacity, fades and transitions. Hold Shift to bypass only clip grades, Alt only adjustments. Preview only; saved edits and exports are unchanged."
             disabled={controlsUnavailable || failed || !diagnostics || status === 'disposed'}
             onPointerDown={pressPointer}
             onPointerUp={() => hold(false)}

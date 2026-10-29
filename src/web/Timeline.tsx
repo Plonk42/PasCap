@@ -15,7 +15,7 @@ import type { AudioAsset } from '../shared/audio.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { ColourSettings } from '../shared/colour.js';
 import { GRADE_SETTINGS } from '../shared/grade.js';
-import { KEYFRAME_SETTINGS, keySettings } from '../shared/keyframes.js';
+import { KEYFRAME_SETTINGS } from '../shared/keyframes.js';
 import { resolveMediaSelection, type MediaSelections } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
 import {
@@ -47,7 +47,7 @@ import {
   sourceSeconds,
 } from './display.js';
 import { Icon } from './icons.js';
-import { keyframeNavigationFrame, useKeyframeNavigation } from './keyframe-navigation.js';
+import { useKeyframeNavigation } from './keyframe-navigation.js';
 import {
   KeyframeMarkers,
   useKeyframeSlide,
@@ -67,7 +67,7 @@ import { useRulerRange } from './ruler-range.js';
 import { adjacentBookmark, bookmarkKind, bookmarkTargets, rangeBookmarkCommands } from './timeline-bookmarks.js';
 import { BeatSnapControl, RulerBeats, useBeatSnap } from './timeline-beats.js';
 import './timeline-bookmarks.css';
-import { trackKeyframeKind, transformKeyframeKind } from './timeline-keyframes.js';
+import { transformKeyframeKind } from './timeline-keyframes.js';
 import { planTimelineDrop, type DropPlan, type TimelinePayload } from './timeline-placement.js';
 import {
   LANE_HEIGHT,
@@ -216,13 +216,11 @@ function interactionMessage(
 
 function timelineInteractionMessage(
   {
-    keyframe,
     transform,
     speed,
     grade,
     bookmark,
   }: {
-    keyframe: KeyframeSlideDraft<KeyframeSlideTarget> | null;
     transform: KeyframeSlideDraft<KeyframeSlideTarget> | null;
     speed: KeyframeSlideDraft<ClipKeyframeTarget> | null;
     grade: KeyframeSlideDraft<ClipKeyframeTarget> | null;
@@ -245,11 +243,6 @@ function timelineInteractionMessage(
     return (
       transform.error ||
       `Transform keyframe · ${formatTimecode(transform.frame)} · all its settings move together · release to apply · Esc cancels`
-    );
-  if (keyframe)
-    return (
-      keyframe.error ||
-      `Track keyframe · ${formatTimecode(keyframe.frame)} · all animated settings move together · release to apply · Esc cancels`
     );
   return interactionMessage(error, plan, draft, selected);
 }
@@ -758,25 +751,6 @@ export function Timeline(props: Readonly<Props>) {
   const scale = framesToSeconds(1, project.frameRate) * pixelsPerSecond;
   const baseLayout = useMemo(() => calculateLayout(project), [project]);
   const baselineWidth = Math.max(viewportWidth, 32 + baseLayout.duration * scale + 96);
-  const keyframes = useKeyframeSlide({
-    kind: trackKeyframeKind({
-      onSelectLayer,
-      onSeekKeyframe: keyframeNavigation.onSeekKeyframe,
-      onOpenSection: props.onOpenSection,
-    }),
-    project,
-    frame,
-    scale,
-    width: baselineWidth,
-    disabled: keyframeNavigation.disabled || musicGesture !== null,
-    snapping,
-    beats,
-    viewport: scroll,
-    onPause,
-    onPreview,
-    onEdit,
-    onError,
-  });
   const clipKindOptions = {
     frameCountOf: (mediaId: string) => assets.find((asset) => asset.id === mediaId)?.metadata.frameCount ?? 0,
     onSelect,
@@ -788,7 +762,7 @@ export function Timeline(props: Readonly<Props>) {
     frame,
     scale,
     width: baselineWidth,
-    disabled: keyframeNavigation.disabled || musicGesture !== null || keyframes.active,
+    disabled: keyframeNavigation.disabled || musicGesture !== null,
     snapping,
     beats,
     viewport: scroll,
@@ -803,7 +777,7 @@ export function Timeline(props: Readonly<Props>) {
     frame,
     scale,
     width: baselineWidth,
-    disabled: keyframeNavigation.disabled || musicGesture !== null || keyframes.active || transformKeys.active,
+    disabled: keyframeNavigation.disabled || musicGesture !== null || transformKeys.active,
     snapping,
     beats,
     viewport: scroll,
@@ -821,7 +795,6 @@ export function Timeline(props: Readonly<Props>) {
     disabled:
       keyframeNavigation.disabled ||
       musicGesture !== null ||
-      keyframes.active ||
       transformKeys.active ||
       speedKeys.active,
     snapping,
@@ -832,7 +805,7 @@ export function Timeline(props: Readonly<Props>) {
     onEdit,
     onError,
   });
-  const gestureActive = keyframes.active || transformKeys.active || speedKeys.active || gradeKeys.active;
+  const gestureActive = transformKeys.active || speedKeys.active || gradeKeys.active;
   const bookmarks = useKeyframeSlide({
     kind: bookmarkKind(onSeek),
     project,
@@ -905,7 +878,6 @@ export function Timeline(props: Readonly<Props>) {
   });
 
   const visible =
-    keyframes.draft?.document ??
     transformKeys.draft?.document ??
     speedKeys.draft?.document ??
     gradeKeys.draft?.document ??
@@ -932,10 +904,8 @@ export function Timeline(props: Readonly<Props>) {
   // Stored points after video or music OUT stay reachable, without extending the playable duration.
   const lastKeyframe = Math.max(
     0,
-    ...project.layers.flatMap((layer) => [
-      ...layer.keyframes.map((point) => point.frame),
-      ...layer.transform.keyframes.map((point) => point.frame),
-    ]),
+    ...project.layers.flatMap((layer) => layer.transform.keyframes.map((point) => point.frame)),
+    ...project.adjustments.map((item) => item.start + item.duration),
     project.bookmarks.at(-1) ?? 0,
   );
   const storedExtent = Math.max(layout.duration, musicEnd, lastKeyframe);
@@ -945,7 +915,6 @@ export function Timeline(props: Readonly<Props>) {
       Math.max(
         storedExtent,
         dropExtent(dropPlan),
-        keyframes.draft?.frame ?? 0,
         transformKeys.draft?.frame ?? 0,
         bookmarks.draft?.frame ?? 0,
       ) *
@@ -953,7 +922,6 @@ export function Timeline(props: Readonly<Props>) {
       trailing,
     drag.current?.width ?? 0,
     movement.current?.width ?? 0,
-    keyframes.draft?.width ?? 0,
     transformKeys.draft?.width ?? 0,
     speedKeys.draft?.width ?? 0,
     gradeKeys.draft?.width ?? 0,
@@ -1385,7 +1353,6 @@ export function Timeline(props: Readonly<Props>) {
     ? musicGesture.error || `Music track · ${formatTimecode(musicGesture.start)} · release to apply · Esc cancels`
     : timelineInteractionMessage(
         {
-          keyframe: keyframes.draft,
           transform: transformKeys.draft,
           speed: speedKeys.draft,
           grade: gradeKeys.draft,
@@ -1755,7 +1722,7 @@ export function Timeline(props: Readonly<Props>) {
                       data-trim-handle={edge}
                       role="slider"
                       aria-label={`Trim ${edge === 'in' ? 'start' : 'end'} of ${name}, clip ${index + 1}`}
-                      disabled={keyframes.active || musicGesture !== null}
+                      disabled={transformKeys.active || musicGesture !== null}
                       aria-valuemin={trimHandleValue(clip, edge, asset?.metadata.frameCount).min}
                       aria-valuemax={trimHandleValue(clip, edge, asset?.metadata.frameCount).max}
                       aria-valuenow={trimHandleValue(clip, edge, asset?.metadata.frameCount).now}
@@ -1784,48 +1751,6 @@ export function Timeline(props: Readonly<Props>) {
               leading={leading}
               scale={scale}
             />
-            {visible.layers.map((layer) => (
-              <KeyframeMarkers
-                key={layer.id}
-                slide={keyframes}
-                targets={layer.keyframes.map((point) => ({ scope: layer.id, origin: point.frame }))}
-                blocked={() => interactionBlocked}
-                view={({ origin }, state) => {
-                  const point = layer.keyframes.find((item) => item.frame === origin)!;
-                  const settings = keySettings(point)
-                    .map((setting) => KEYFRAME_SETTINGS.find((definition) => definition.key === setting)!.label)
-                    .join(' · ');
-                  const current =
-                    layer.id === selectedLayerId &&
-                    state.frame === keyframeNavigationFrame(keyframeNavigation.inspection, layer.id, frame);
-                  return {
-                    className: `timeline-layer-key${point.reset ? ' reset' : ''}${current ? ' active' : ''}`,
-                    'data-layer-keyframe': state.frame,
-                    'data-keyframe-layer': layer.id,
-                    'aria-label': `Track keyframe ${state.frame} on ${layer.name}${point.reset ? ' (default)' : ''}`,
-                    'aria-pressed': current,
-                    title: `${layer.name} · ${formatTimecode(state.frame)} · ${point.reset ? 'Default keyframe: settings return to their defaults here' : settings} · Drag to move all animated settings; Arrow keys: 1 frame, Shift: 10; Delete removes. Alt bypasses snapping.`,
-                    style: { top: rowTop(layer.id) + 48, left: leading + (state.at ?? origin) * scale },
-                    children: (
-                      <>
-                        {point.reset ? (
-                          <Icon name="default-key" size={14} />
-                        ) : (
-                          <span aria-hidden="true" className="keyframe-glyph diamond">
-                            ◆
-                          </span>
-                        )}
-                        {state.moving && (
-                          <span className="timeline-layer-key-time" aria-hidden="true">
-                            {formatTimecode(state.frame)}
-                          </span>
-                        )}
-                      </>
-                    ),
-                  };
-                }}
-              />
-            ))}
             {visible.layers.map((layer) => (
               <KeyframeMarkers
                 key={`transform-${layer.id}`}
@@ -1972,7 +1897,6 @@ export function Timeline(props: Readonly<Props>) {
             )}
             {(
               [
-                ['track', keyframes.draft?.guide],
                 ['transform', transformKeys.draft?.guide],
                 ['speed', speedKeys.draft?.guide],
                 ['grade', gradeKeys.draft?.guide],
@@ -2023,7 +1947,6 @@ export function Timeline(props: Readonly<Props>) {
             className={
               dragError ||
               dropPlan?.error ||
-              keyframes.draft?.error ||
               transformKeys.draft?.error ||
               speedKeys.draft?.error ||
               gradeKeys.draft?.error ||

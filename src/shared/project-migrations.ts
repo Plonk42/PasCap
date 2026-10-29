@@ -1,70 +1,19 @@
-import { createColourSettings } from './colour.js';
 import { PROJECT_SCHEMA_VERSION } from './model.js';
 
 /** Oldest saved project schema this build still opens: the first one used for real editing. */
-export const OLDEST_PROJECT_SCHEMA_VERSION: number = 23;
+export const OLDEST_PROJECT_SCHEMA_VERSION: number = 27;
 
 type SavedProject = Record<string, unknown>;
 type Migration = (document: SavedProject) => SavedProject;
 
-/**
- * Schema 24: a music track holds clips joined by transitions and owns gain and fades. Each saved music
- * track becomes a track with that one clip, which keeps the old ID so saved export plans still match;
- * its fades become the track's opening/closing fades, so it sounds exactly the same.
- */
-function musicTracksWithClips(document: SavedProject): SavedProject {
-  const music = document['music'];
-  if (!Array.isArray(music)) return document;
-  const used = new Set(music.map((track: unknown) => (track as { id?: unknown } | null)?.id));
-  const laneId = (index: number): string => {
-    let candidate = `music-track-${index + 1}`;
-    while (used.has(candidate)) candidate = `${candidate}-x`;
-    used.add(candidate);
-    return candidate;
-  };
-  return {
-    ...document,
-    music: music.map((track: unknown, index) => {
-      if (typeof track !== 'object' || track === null || Array.isArray(track)) return track;
-      const { gainDb, fadeIn, fadeOut, ...clip } = track as SavedProject;
-      return {
-        id: laneId(index),
-        gainDb,
-        ripple: false,
-        openingFade: fadeIn,
-        closingFade: fadeOut,
-        clips: [clip],
-        transitions: [],
-      };
-    }),
-  };
-}
-
-/** Schema 25: no recording has kept ranges yet, so every whole recording stays available. */
-function withSelects(document: SavedProject): SavedProject {
-  return { ...document, selects: {} };
-}
-
-/** Schema 26: every clip gets its own neutral grade, so projects render exactly as before. */
-function withClipGrades(document: SavedProject): SavedProject {
-  const clips = document['clips'];
-  if (!Array.isArray(clips)) return document;
-  return {
-    ...document,
-    clips: clips.map((clip: unknown) =>
-      typeof clip === 'object' && clip !== null && !Array.isArray(clip)
-        ? { ...clip, grade: { colour: createColourSettings(), keyframes: [] } }
-        : clip,
-    ),
-  };
-}
-
 /** `MIGRATIONS[v]` upgrades a document saved with schema `v` to schema `v + 1`; it never mutates its input. */
-const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = {
-  23: musicTracksWithClips,
-  24: withSelects,
-  25: withClipGrades,
-};
+const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = {};
+
+/**
+ * Schema 27 replaced track Colour, Opacity and keyframes with clip grades, adjustments and Transform
+ * Opacity, without an upgrade (owner decision, #286): earlier projects are rejected and left unchanged.
+ */
+const TRACK_COLOUR_REMOVED = 27;
 
 export function supportedProjectVersions(): string {
   return OLDEST_PROJECT_SCHEMA_VERSION === PROJECT_SCHEMA_VERSION
@@ -98,7 +47,9 @@ export function upgradeProject(value: unknown, subject = 'project'): unknown {
     const reason =
       typeof rawVersion === 'number' && rawVersion > PROJECT_SCHEMA_VERSION
         ? 'It was saved by a newer PasCap version; update PasCap to open it.'
-        : `Projects older than version ${OLDEST_PROJECT_SCHEMA_VERSION} cannot be upgraded.`;
+        : typeof rawVersion === 'number' && rawVersion < TRACK_COLOUR_REMOVED
+          ? 'It grades with track Colour, which PasCap replaced with clip grades and adjustments; it cannot be upgraded and is left unchanged.'
+          : `Projects older than version ${OLDEST_PROJECT_SCHEMA_VERSION} cannot be upgraded.`;
     throw new Error(
       `Unsupported ${subject} schema version ${version}; this build requires ${supportedProjectVersions()}. ${reason}`,
     );

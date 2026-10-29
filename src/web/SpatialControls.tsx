@@ -150,6 +150,7 @@ function PoseFields({
         const keys = keysFor?.(control.key);
         const locked = disabled || (readOnly?.(control.key) ?? false);
         const unit = control.key === 'rotation' ? ' °' : '';
+        const scale = control.display?.scale ?? 1;
         return (
           <div
             className="colour-control layer-keyed-control spatial-pose-field"
@@ -188,15 +189,17 @@ function PoseFields({
             <ValueControl
               id={fieldId}
               aria-label={label(control.label)}
-              value={values[control.key]}
-              min={control.min}
-              max={control.max}
-              step={control.step}
+              value={values[control.key] * scale}
+              min={control.min * scale}
+              max={control.max * scale}
+              step={control.step * scale}
+              {...(control.display ? { unit: control.display.unit } : {})}
+              {...(control.key === 'opacity' ? { tone: 'opacity' as const } : {})}
               disabled={locked}
               resetKey={`${context}:${control.key}`}
-              validate={(value) => validate(control.key, value)}
-              onCommit={(value) => onCommit(control.key, value)}
-              onDraft={(value) => onDraft(control.key, value)}
+              validate={(value) => validate(control.key, value / scale)}
+              onCommit={(value) => onCommit(control.key, value / scale)}
+              onDraft={(value) => onDraft(control.key, value === null ? null : value / scale)}
             />
           </div>
         );
@@ -209,7 +212,8 @@ export function TransformHelp() {
   return (
     <HelpPopover label="Transform animation" guide="crop-scale-translate-and-rotate-a-track">
       <p>
-        Crop, scale, move and rotate every clip on this track. A setting animates once you add a keyframe for it (▽).
+        Crop, scale, move, rotate and fade every clip on this track. A setting animates once you add a keyframe for it
+        (▽).
       </p>
       <p className="editor-help-tip">Tip: to frame one clip differently, put it on its own track.</p>
     </HelpPopover>

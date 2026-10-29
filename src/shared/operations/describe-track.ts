@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { described } from '../described.js';
-import { interpolationSchema, keyframeSettingSchema } from '../keyframes.js';
+import { interpolationSchema } from '../keyframes.js';
 import { colourSchema } from '../colour.js';
 import { gradeSettingSchema } from '../grade.js';
 import { frameSchema, idSchema, layerSchema } from '../model.js';
@@ -35,17 +35,14 @@ export const trackDescriptionSchema = z
     revision: described(frameSchema, 'Saved revision of the project; pass it as expectedRevision to edit.'),
     track: described(
       layerSchema.optional(),
-      'The complete video track as saved: its base Colour (with HSL ranges and curves), Opacity, Transform and keyframes.',
+      'The complete video track as saved: its Transform (with Opacity) and keyframes, Ripple, transitions and fades.',
     ),
     keyframes: described(
       z
-        .object({
-          colour: z.array(compactKeyframe(keyframeSettingSchema)),
-          transform: z.array(compactKeyframe(spatialChannelSchema)),
-        })
+        .object({ transform: z.array(compactKeyframe(spatialChannelSchema)) })
         .strict()
         .optional(),
-      'The Colour and Opacity keyframes and the Transform keyframes, each with only its keyed settings.',
+      'The Transform keyframes (Opacity included), each with only its keyed settings.',
     ),
     grades: described(
       z
@@ -53,7 +50,7 @@ export const trackDescriptionSchema = z
           z
             .object({
               clipId: idSchema,
-              colour: described(colourSchema, "The clip's own Colour, applied before the track's."),
+              colour: described(colourSchema, "The clip's own Colour, applied before any adjustment."),
               keyframes: described(
                 z.array(compactKeyframe(gradeSettingSchema)),
                 'Its keyframes, at source frames of its recording (timecode too).',
@@ -67,10 +64,6 @@ export const trackDescriptionSchema = z
     keyed: described(
       z
         .object({
-          colour: described(
-            z.array(keyframeSettingSchema),
-            'Opacity and Colour settings with keyframes: their keyframes apply and their base value is ignored.',
-          ),
           transform: described(
             z.array(spatialChannelSchema),
             'Transform settings with keyframes: their keyframes apply and their base value is ignored.',
@@ -86,13 +79,19 @@ export const trackDescriptionSchema = z
             .object({
               frame: frameSchema,
               timecode: timecodeSchema,
-              values: described(
-                z.partialRecord(keyframeSettingSchema, z.number()),
-                'Opacity and every scalar Colour setting (or those asked for) as they apply at this frame.',
+              adjustment: described(
+                z
+                  .object({
+                    adjustmentId: idSchema,
+                    values: z.partialRecord(gradeSettingSchema, z.number()),
+                  })
+                  .strict()
+                  .optional(),
+                'The adjustment grading every track at this frame, if any, and its scalar Colour settings (or those asked for), applied after the clip grades.',
               ),
               transform: described(
                 spatialPoseSchema.partial(),
-                'The Transform pose (or the settings asked for) at this frame.',
+                'The Transform pose with Opacity (or the settings asked for) at this frame.',
               ),
               clipGrades: described(
                 z
@@ -106,7 +105,7 @@ export const trackDescriptionSchema = z
                       .strict(),
                   )
                   .optional(),
-                'The grade of each clip shown at this frame that has one, at the source frame it shows; values apply before the track values.',
+                'The grade of each clip shown at this frame that has one, at the source frame it shows; values apply before the adjustment.',
               ),
             })
             .strict(),
@@ -121,7 +120,7 @@ export type TrackDescription = z.infer<typeof trackDescriptionSchema>;
 export const describeTrack = defineOperation({
   name: 'describe_track',
   description:
-    'Read every appearance value of one video track: its saved Colour (scalar settings, HSL ranges, curves), Opacity, Transform and keyframes, which settings follow keyframes, the grades of its clips (each applied before the track Colour) and the values that apply at the requested project frames. Settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve), so read the whole track before grading it; afterwards, include keyframes or at with the settings you changed reads far less.',
+    'Read every appearance value of one video track: its Transform (with Opacity) and keyframes, which settings follow keyframes, the grades of its clips (scalar settings, HSL ranges, curves and keyframes) and the values that apply at the requested project frames, including the adjustment grading every track there. Settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve), so read the grades before changing them; afterwards, include keyframes or at with the settings you changed reads far less.',
   input: z
     .object({
       projectId: described(idSchema, 'ID of the saved project.'),
@@ -136,10 +135,10 @@ export const describeTrack = defineOperation({
       ),
       settings: described(
         z
-          .array(z.union([keyframeSettingSchema, spatialChannelSchema]))
+          .array(z.union([gradeSettingSchema, spatialChannelSchema]))
           .min(1)
           .optional(),
-        'Report only these Opacity, Colour and Transform settings in at; all when omitted.',
+        'Report only these Colour and Transform (Opacity included) settings in at; all when omitted.',
       ),
     })
     .strict(),

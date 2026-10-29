@@ -1,7 +1,6 @@
-import { colourSchema, NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
+import { NEUTRAL_COLOUR } from '../shared/colour.js';
 import { isNeutralDetail, NEUTRAL_DETAIL } from '../shared/detail.js';
 import { gradeUsesLocalTone, isNeutralClipGrade } from '../shared/grade.js';
-import { usesLocalTone } from '../shared/keyframes.js';
 import { PROXY_GOP_FRAMES } from '../shared/media.js';
 import { projectSchema, type ProjectDocument, type VideoClip } from '../shared/model.js';
 import { musicTracks } from '../shared/music-lanes.js';
@@ -26,8 +25,8 @@ export interface OriginalDimensions {
   readonly height: number;
 }
 export type OriginalDimensionsResolver = (mediaId: string) => OriginalDimensions;
-/** What the held Original preview bypasses: every grade, only clip grades, or only track Colour. */
-export type OriginalMode = 'all' | 'clip' | 'track';
+/** What the Original preview bypasses: every grade, clip grades only, or adjustments only. */
+export type OriginalMode = 'all' | 'clip' | 'adjustment';
 export interface PreviewDiagnostics {
   status: PreviewStatus;
   message: string;
@@ -476,7 +475,7 @@ export class PreviewEngine {
     if (!this.#compositor.available || !document) return;
     const detail =
       document.clips.some((clip) => !isNeutralDetail(clip.detail) || gradeUsesLocalTone(clip.grade)) ||
-      document.layers.some(usesLocalTone);
+      document.adjustments.some(gradeUsesLocalTone);
     if (detail) this.#compositor.prepareDetail();
     if (document.clips.some((clip) => !isNeutralClipGrade(clip.grade))) this.#compositor.prepareStaged(detail);
   }
@@ -668,16 +667,6 @@ export class PreviewEngine {
     this.#redrawPaused();
     this.#emit(true);
   }
-  updateColour(layerId: string, settings: ColourSettings): void {
-    if (!this.#document) return;
-    const layer = this.#document.layers.find((item) => item.id === layerId);
-    if (!layer) throw new Error('The graded track does not exist.');
-    layer.colour = colourSchema.parse(settings);
-    this.#prepareDetail();
-    this.#dirty = true;
-    this.#colourRequested = performance.now();
-    this.#redrawPaused();
-  }
   /** No music configuration or retiming reload for opacity/colour/spatial/stacking edits. */
   updateProjectAppearance(document: ProjectDocument): void {
     if (this.#disposed || !this.#document) throw new Error('Load a project before updating its appearance.');
@@ -800,7 +789,7 @@ export class PreviewEngine {
           return {
             slot,
             grade: this.#original === 'all' || this.#original === 'clip' ? NEUTRAL_COLOUR : layer.grade,
-            settings: this.#original === 'all' || this.#original === 'track' ? NEUTRAL_COLOUR : layer.colour,
+            settings: this.#original === 'all' || this.#original === 'adjustment' ? NEUTRAL_COLOUR : layer.colour,
             aspect: aspect ?? dimensions.width / dimensions.height,
             spatial: layer.spatial,
             detail: this.#original === 'all' || this.#original === 'clip' ? NEUTRAL_DETAIL : layer.detail,

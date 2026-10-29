@@ -1,16 +1,16 @@
 import { useId } from 'react';
 import type { EditCommand } from '../shared/commands.js';
-import { activeLayerSetting, hasLayerKeys, isKeyframeFrame, type KeyframeSetting } from '../shared/keyframes.js';
-import type { VideoLayer } from '../shared/model.js';
+import type { ScalarColourSetting } from '../shared/colour.js';
+import { activeLayerSetting, hasLayerKeys, isKeyframeFrame } from '../shared/keyframes.js';
 import { ChannelKeyframeNavigation } from './AnimationControls.js';
-import { isClipOwner, ownerTarget } from './colour-owner.js';
+import { isClipOwner, ownerTarget, type ColourOwner } from './colour-owner.js';
 import './layer-keyframes.css';
 import './keyframe-navigation.css';
 import { useKeyframeNavigation } from './keyframe-navigation.js';
 
 export interface KeyframeToggleProps {
-  layer: VideoLayer;
-  setting: KeyframeSetting;
+  layer: ColourOwner;
+  setting: ScalarColourSetting;
   label: string;
   frame: number;
   value: number;
@@ -18,26 +18,26 @@ export interface KeyframeToggleProps {
   onEdit: (command: EditCommand) => void;
 }
 
-/** The diamond's title and description, for a track's shared keyframes or a clip grade's own. */
-function toggleWording(layer: VideoLayer, label: string, frame: number, state: { active: boolean; valid: boolean }) {
+/** The diamond's title and description, for a clip grade's keyframes or an adjustment's. */
+function toggleWording(layer: ColourOwner, label: string, frame: number, state: { active: boolean; valid: boolean }) {
   const clip = isClipOwner(layer);
   const owner = clip
-    ? { scope: 'clip', at: 'source', whole: 'clip' }
-    : { scope: 'shared', at: 'timeline', whole: 'track' };
-  let title = `Keyframe ${label} at timeline frame ${frame}. Capture the displayed value for the whole video track ${layer.name}.`;
+    ? { scope: 'clip', at: 'source frame', whole: 'clip' }
+    : { scope: 'adjustment', at: 'frame', whole: 'adjustment' };
+  let title = `Keyframe ${label} at frame ${frame} of ${layer.name}. Capture the displayed value; the keyframe moves with the adjustment.`;
   if (clip)
     title = `Keyframe ${label} at source frame ${frame}. Capture the displayed value for ${layer.name}; the keyframe stays with its footage.`;
   if (state.active)
-    title = `Remove ${label} from the ${owner.scope} keyframe at ${owner.at} frame ${frame}. Other settings at this keyframe stay unchanged.`;
+    title = `Remove ${label} from the ${owner.scope} keyframe at ${owner.at} ${frame}. Other settings at this keyframe stay unchanged.`;
   if (!state.valid)
     title =
       clip && frame < 0
         ? 'Move the playhead onto this clip to capture a keyframe.'
-        : 'A valid timeline frame and value are required to capture a keyframe for this setting.';
+        : 'Move the playhead onto this adjustment to capture a keyframe.';
   return {
     title,
     animated: `This setting follows the whole ${owner.whole}’s animation curve. Capture a keyframe at the playhead before editing between keyframes.`,
-    still: `Not animated. The diamond captures the displayed value to animate this setting on the whole ${clip ? 'clip' : 'video track'}.`,
+    still: `Not animated. The diamond captures the displayed value to animate this setting on the whole ${owner.whole}.`,
   };
 }
 

@@ -1,35 +1,27 @@
 interface SettingContext {
   keyed: boolean;
   active: boolean;
-  baseAvailable: boolean;
-  baseLabel: 'Clip' | 'Track';
-  /** A clip grade's setting: its frames are source frames and its keyframes the clip's own. */
-  clipGrade?: boolean;
+  /** What the setting grades: a clip's own grade (source frames) or an adjustment (frames from its start). */
+  owner: 'clip' | 'adjustment';
   label: string;
   frame: number;
 }
 
 /** One vocabulary for the visible tooltip and screen-reader setting context. */
-export function settingPresentation({ keyed, active, baseAvailable, clipGrade, label, frame }: SettingContext) {
-  const clip = clipGrade === true;
-  const at = clip ? `source frame ${frame}` : `timeline frame ${frame}`;
+export function settingPresentation({ keyed, active, owner, label, frame }: SettingContext) {
+  const at = owner === 'clip' ? `source frame ${frame}` : `frame ${frame} of the adjustment`;
   if (keyed && active)
     return {
       scope: 'Keyframe at playhead',
-      hint: `Editable keyframe at ${at}. Edits change only ${label} at this ${clip ? 'clip' : 'shared track'} keyframe.`,
+      hint: `Editable keyframe at ${at}. Edits change only ${label} at this ${owner} keyframe.`,
     };
   if (keyed)
     return {
       scope: 'Animated · add a keyframe to edit',
       hint: `Read-only animated value at ${at}. Click the ${label} diamond to add a keyframe here, then edit the value.`,
     };
-  if (!baseAvailable)
-    return {
-      scope: 'No clip selected',
-      hint: `Select a clip to edit ${label}, or click the ${label} diamond to animate this setting on the track.`,
-    };
   return {
     scope: 'Not animated',
-    hint: `Editing ${label}. Add keyframes to animate this setting on the ${clip ? 'clip' : 'track'}.`,
+    hint: `Editing ${label}. Add keyframes to animate this setting on the ${owner}.`,
   };
 }
