@@ -3,13 +3,8 @@
   "id": "compatibility-fixture",
   "title": "Synthetic compatibility fixture",
   "media": {
-    "videoIds": [
-      "media-15c65bd770c8e918e18a97c649461898",
-      "media-7f88dc71115dfd5dc8ac0717acba35e7"
-    ],
-    "audioIds": [
-      "audio-653e5df4-e851-40bf-b96e-3c75247ef370"
-    ]
+    "videoIds": ["media-15c65bd770c8e918e18a97c649461898", "media-7f88dc71115dfd5dc8ac0717acba35e7"],
+    "audioIds": ["audio-653e5df4-e851-40bf-b96e-3c75247ef370"]
   },
   "frameRate": {
     "numerator": 30000,
@@ -864,10 +859,7 @@
       ]
     }
   ],
-  "bookmarks": [
-    12,
-    48
-  ],
+  "bookmarks": [12, 48],
   "selects": {
     "media-15c65bd770c8e918e18a97c649461898": [
       {

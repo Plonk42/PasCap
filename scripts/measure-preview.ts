@@ -62,7 +62,7 @@ try {
     original.clips.some((clip) => clip.reverse || clip.speed.mode !== 'constant' || clip.speed.rate !== 1)
   )
     throw new Error(
-      'This diagnostic expects two normal-speed forward excerpts on one enabled, opaque, zero-origin contiguous track, with static row Colour without HDR, neutral track Transform and detail filters and no Transform keys, music, extra layers or shared project-frame layer points. Choose a compatible project with PASCAP_MEASURE_URL; no saved document will be changed.',
+      'This diagnostic expects two normal-speed forward excerpts on one enabled, opaque, zero-origin contiguous track, with static scalar clip grades, no adjustments, a neutral track Transform and detail filters and no Transform keys, music or extra layers. Choose a compatible project with PASCAP_MEASURE_URL; no saved document will be changed.',
     );
   const layout = calculateLayout(original);
   const clips = layerClips(original, original.layers[0]!.id);
@@ -352,7 +352,7 @@ try {
     durationSeconds: framesToSeconds(layout.duration),
     notes: [
       'No saved edit is changed; only the independent engine is exercised.',
-      'Only strict schema-12 projects with static row Colour, Temperature, Tint, HSL and curves, neutral spatial bases and no spatial keys are measured; schema 1–11 data is incompatible and never migrated or defaulted.',
+      'Only strict current-schema projects with static scalar clip grades, no adjustments, neutral spatial bases and no spatial keys are measured; older projects are incompatible and never migrated or defaulted.',
       'Diagnostic profile and reference receipt schema versions are independent of the project schema.',
       'This retains the original two-excerpt acceptance measurements, not shared-layer-point or layered-throughput certification.',
       'Colour latency is engine update to next paint, not full input-event/React latency.',

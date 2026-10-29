@@ -11,34 +11,38 @@ deadline; hardware/real-media work requires explicit owner consent.
 ## Current baseline
 
 The local current-schema contract covers no-copy footage import, projects, source
-clips, multi-track timelines, colour/opacity track keyframes, music and verified
+clips, multi-track timelines, clip grades and adjustments, Transform and Opacity track
+keyframes, music and verified
 720p/4K export, with clip-only constant speed or precise source-frame speed curves.
-Video track-owned crop/scale/translation/rotation and per-setting project-frame
+Video track-owned crop/scale/translation/rotation, Opacity and per-setting project-frame
 animation are specified by [#131's current contract](design/SPATIAL_TRANSFORMS.md), without
 claiming qualification or changing milestone status. Static clip Sharpen, Clarity
-and Denoise and the keyable track HDR look and Local contrast follow [#123's contract](design/DETAIL_FILTERS.md), likewise without a
+and Denoise and the keyable HDR look and Local contrast follow [#123's contract](design/DETAIL_FILTERS.md), likewise without a
 qualification claim.
-The final approved [#67](https://github.com/Plonk42/PasCap/issues/67) contract has
-one video track-owned **Opacity** setting: required numeric `VideoLayer.opacity` in 0–1,
-initially 1 (100%) on new tracks. Its sole track channel, `opacity`, overrides that
-value on every clip, including both dissolve sources, without an additional track
-multiplier. The single slider/diamond/navigation lives in **Colour → Track** and
-works on empty tracks; **Placement** contains placement only. Without Opacity keyframes,
-the slider edits the track value; with keyframes, a setting not enabled at the real
-playhead is read-only until explicitly captured. Sliders never create keyframes, and
-unkeyed colour settings are track-owned. Shared keyframes have fifteen nullable channels:
-`opacity`, twelve scalar colour settings (including `temperature`, `tint`,
-`vibrance`, `whites` and `blacks`), `hdr` and `localContrast`. Saved `clip.opacity` and old
-`clipOpacity`/`layerOpacity` channels are rejected; track `opacity` is required and
-valid. Track-owned [Temperature and Tint](design/TEMPERATURE_AND_TINT.md) use
+Milestone v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)) moves Colour to
+[clip grades and adjustments](design/ROW_APPEARANCE.md): every clip has its own grade, keyed at
+source frames so it follows its footage, and up to 64 adjustments grade every video track over
+a range of the film, after each clip's grade. Its
+[decision record](design/CLIP_GRADES_AND_ADJUSTMENTS.md) lists what is implemented (#273,
+#285, #286) and what remains: adjustments on the timeline (#287), through MCP (#288) and the
+UX evaluation (#289). Video tracks keep Transform, Ripple, transitions and fades;
+**Opacity** is the ninth Transform setting (0–1, initially 1 on new tracks), keyed like the
+others on every clip, including both dissolve sources, without an additional track
+multiplier. Its slider lives in **Track → Transform** and works on empty tracks;
+**Placement** contains placement only. With keyframes, a setting not enabled at the real
+playhead is read-only until explicitly captured; sliders never create keyframes. Grade
+keyframes have fourteen nullable channels:
+twelve scalar colour settings (including `temperature`, `tint`,
+`vibrance`, `whites` and `blacks`), `hdr` and `localContrast`. Saved `clip.opacity` is
+rejected. [Temperature and Tint](design/TEMPERATURE_AND_TINT.md) use
 normalized −2…2 and −1…1, neutral 0, with independent animation. Positive Temperature
 warms; positive Tint adds magenta. The shared normalized linear-gain formula runs
 before Exposure and intentionally colours greys; neutral-white luminance is
-preserved before clipping only. Static track
+preserved before clipping only. Static
 [HSL ranges and master/RGB curves](design/HSL_AND_CURVES.md)
-follow scalar grading without adding animation channels. Projects saved with an older
-supported schema are upgraded on load; projects and receipt snapshots older than the
-oldest supported schema are rejected and preserved, without defaults or automatic deletion;
+follow scalar grading in each grade without adding animation channels. Projects and receipt
+snapshots saved before the current schema, with track Colour, are rejected with the reason and
+left unchanged, without defaults or automatic deletion;
 proxy/current PCM formats remain unchanged; the registries are version 2 (full-content
 checksums). Projects require a 0–8
 music track array of clips joined by transitions (`[]` without music); version-1 export receipts
@@ -53,12 +57,13 @@ Enabling Ripple packs from the current first start; while on, clips continuously
 sequence there, and turning it off retains actual placements. Video tracks display stored
 bottom-to-top composition order without primary/overlay roles. The UI provides a
 pinned ruler, synchronized native track access, accessible action bounds and contextual
-heading help. Properties tabs are **Clip / Colour / Track / Audio**, split by ownership: the
-[whole-track keyframe list](https://github.com/Plonk42/PasCap/issues/26) sits at the
-end of **Colour → Track**, under a small **Keyframes** heading with animation/timing help
-beside it. Nested keyframe details retain drafts and input
-identity; there is no outer list disclosure or per-track list expansion preference.
-Track also holds HSL ranges, Colour curves, Transform (ending with its own keyframe list),
+heading help. Properties tabs are **Clip / Colour / Track / Audio**, split by ownership:
+**Colour** edits the selected clip's grade or the adjustment at the playhead; its
+[keyframe list](https://github.com/Plonk42/PasCap/issues/26) sits at the
+end of the Colour section, under a small **Keyframes** heading with animation/timing help
+beside it, followed by HSL ranges and Colour curves. Nested keyframe details retain drafts and input
+identity; there is no outer list disclosure or list expansion preference.
+Track holds Transform with Opacity (ending with its own keyframe list),
 Transitions and Fades. Clip keeps
 source/clip settings and playhead Speed controls; its Expand all/Collapse all
 affects only the four Clip sections (**Speed**, **Detail**, **Range** and **Placement**),
@@ -156,13 +161,13 @@ the native FFmpeg toolchain at startup and scripts its local install.
 ## Scope boundaries
 
 - Original recordings are never uploaded, copied or automatically deleted.
-- Strict local data remains explicit; older supported projects are upgraded on load,
-  without fallback fields.
+- Strict local data remains explicit; projects saved before the current schema, with track
+  Colour, are rejected and left unchanged, without fallback fields.
 - The application is local/single-user, not GitHub Pages, LAN hosting or remote SaaS.
 - No new rendering effect is scheduled from an inspection checklist alone.
 - [The implementation plan](../EDITOR_IMPLEMENTATION_PLAN.md) is retained as design
   history, not an approved implementation backlog.
-- Titles, general-purpose masks, optical flow, HDR output or HDR footage (the track
+- Titles, general-purpose masks, optical flow, HDR output or HDR footage (the
   HDR look is an SDR effect), cloud/mobile/collaboration and native
   GPU encoding remain outside the current delivery milestones.
 

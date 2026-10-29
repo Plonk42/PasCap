@@ -1,15 +1,16 @@
 # Speed and audio contract
 
-Twelve video track-owned scalar Colour controls include Temperature/Tint (−2…2 and −1…1, neutral 0),
+Colour belongs to clip grades and adjustments, never to video tracks. Twelve scalar Colour
+settings include Temperature/Tint (−2…2 and −1…1, neutral 0),
 whose normalized linear gains precede Exposure. Positive Temperature warms;
 positive Tint adds magenta; nonzero settings intentionally colour greys. They
-can be keyed independently in video track animation, which is appearance-only and
+can be keyed independently, which is appearance-only and
 never changes timing. See [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
-Static track HSL and master/RGB colour curves follow scalar grading and precede
+Static HSL and master/RGB colour curves follow scalar grading in each grade and precede
 black fades/coverage. They remain active with scalar keyframes, add no animation
 channels and are unrelated to speed curves. The Original preview bypasses all Colour
 without changing retiming, geometry, Opacity or music. Required data/resources:
-[HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). The keyable track HDR look and Local contrast are
+[HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). The keyable HDR look and Local contrast are
 likewise appearance-only; see [detail filters](design/DETAIL_FILTERS.md#hdr-look).
 
 ## Clip speed
@@ -84,8 +85,9 @@ left trims still keep the timeline OUT, recovering footage after source OUT. Spl
 keeps the frame at the playhead as the first image of the right piece; split and cut
 pieces are all reversed, the left piece holding the higher source frames. Duplicate
 and Move to new track copy the flag. Toggling Reverse never moves or resizes the clip
-and is one Undo step. Track Colour, Opacity, Transform and keyframes stay in project
-time. Music has no reverse and source-video audio stays disabled.
+and is one Undo step. The clip grade keeps its keyframes on their source frames, so they play
+backwards with the footage; adjustments, Transform (Opacity included) and their keyframes stay in
+project time. Music has no reverse and source-video audio stays disabled.
 
 Preview decodes reversed clips GOP by GOP ([decoding](design/WEBCODECS_PREVIEW.md#reversed-lanes)).
 Native export decodes the original in serial chunks from OUT down to IN: each chunk
@@ -105,7 +107,7 @@ composited export alike. Native output requires a monotonic (descending when rev
 integer, in-range `sourceAt` result and exact frame counts; a malformed supplied
 map is rejected rather than falling back to a clip's stored speed.
 
-Transform is video track-owned, like Colour: its pose evaluates at absolute project
+Transform, Opacity included, is video track-owned: its pose evaluates at absolute project
 time and applies to every source on the track, independently of clip speed, while
 `sourceAt` identifies the integer recorded image. A held slow-motion image can
 therefore move with an animated pose without optical flow. Trim/move/split/cut/
@@ -113,33 +115,33 @@ duplicate never copy or shift Transform; a clip moved to another track adopts th
 track's Transform. Transform edits are appearance-only and do not change speed,
 placement or duration. See [track Transform](design/SPATIAL_TRANSFORMS.md).
 
-All track colour/opacity/Transform parameters are sampled at **absolute project time**, not at
-the retimed source frame. A held source image can therefore receive a different
-grade on the next project frame. Native LUT generation and preview redraw both
-follow that rule. Every source uses the track's required numeric `opacity` in 0–1,
-initially 1 on new tracks, unless the sole track **Opacity** (`opacity`) channel
-overrides it. Evaluate that one track setting for each source, including both
-dissolve sources; there is no saved `clip.opacity`.
+Adjustment and Transform parameters, Opacity included, are sampled at **absolute project
+time**, not at the retimed source frame: a held source image can receive a different
+adjustment or pose on the next project frame. A clip grade is sampled at the clip's continuous
+source position through its retiming (one frame lower when reversed, so a keyframe applies fully
+as its image appears): in slow motion it eases between keyframes even on a held image. Native
+LUT generation and preview redraw both follow these rules. Every source uses its track's
+Transform `opacity` in 0–1, initially 1 on new tracks, unless Transform keyframes key Opacity;
+both dissolve sources use it, and there is no saved `clip.opacity`.
 With graded RGB $G_i$, black-fade brightness $b_i$, evaluated Opacity $o_i$ and
 dissolve weight $w_i$ and spatial pixel coverage $m_i$, each track forms one group
 with $C = \sum_i G_i b_i o_i w_i m_i$ and $A = \sum_i o_i w_i m_i$. Source-over is
 $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no track multiplier; black fades
-change RGB without reducing coverage. Any shared track keyframe
-requires the composited export path; any nonneutral track Transform base or Transform
-keyframe (even neutral keyframes) does too, as does nonzero track HDR, Local contrast or any clip [detail filter](design/DETAIL_FILTERS.md). Exact neutral poses retain opaque black letterboxing
-after grading; nonneutral uncovered pixels reveal lower footage. The static chunk
+change RGB without reducing coverage. Any adjustment, keyed or advanced clip grade or
+Shadows/Highlights/HDR/Local contrast requires the composited export path; so do Opacity
+below 1, any nonneutral track Transform base or Transform
+keyframe (even neutral keyframes) and any clip [detail filter](design/DETAIL_FILTERS.md). Exact
+neutral geometry retains opaque black letterboxing after grading, whatever the Opacity;
+nonneutral uncovered pixels reveal lower footage. The static chunk
 plan cannot silently omit these edits.
 Opacity is composition coverage, not part of the SDR RGB grade.
-Its single native slider/exact `NumberField` is in **Colour → Track** alongside
-the colour controls. Its capture diamond is always visible;
-adjacent per-setting Previous/Next buttons appear with it, and stored
-enabled-setting chips retain their per-channel arrows.
-Main and stored sliders/exact fields use **0–100%**,
-neutral **100%**; track `opacity` and keyframe values stay **0–1**, without a schema change.
-Without Opacity keyframes it edits track `opacity`, even on
-an empty track. With keyframes, a setting not enabled at the real playhead is read-only
-until captured with the diamond; sliders never create keyframes. Unkeyed colour
-settings edit the track base. **Placement** contains placement only; Track options
+Its native slider/exact `NumberField` is the ninth setting of **Track → Transform**, after
+Rotation, with its own blue triangle (**Keyframe Opacity**) and per-setting Previous/Next
+buttons. Main and stored sliders/exact fields use **0–100%**,
+neutral **100%**; the Transform base and keyframe values stay **0–1**.
+Without Opacity keyframes it edits the Transform base, even on
+an empty track. With keyframes, a setting not keyed at the real playhead is read-only
+until captured with its triangle; sliders never create keyframes. **Placement** contains placement only; Track options
 contains rename, Ripple, ordering and deletion, with visibility separate.
 
 Each track's **Ripple** setting governs placement. While on (the new-track default),
@@ -148,10 +150,10 @@ a speed edit that changes a clip's duration re-sequences its suffix, and command
 persist these actual starts. Enabling Ripple closes gaps in one Undo step while retaining the
 first current start; turning it off captures actual placements. While off, starts
 stay independent and duration edits never move unrelated clips. Other tracks,
-music and absolute track keyframes stay put. Transition/fade durations remain **output**
+music, Transform keyframes and adjustments stay put. Transition/fade durations remain **output**
 frames on their own track. Invalid fade/transition regions, arbitrary same-track
 overlap or triple overlap reject the entire edit, including a rate, keyframe-frame or
-easing change, and never shorten transitions to make it fit. Shared track keyframes
+easing change, and never shorten transitions to make it fit. Grade and Transform keyframes
 are appearance-only: moving or editing them never retimes a clip.
 
 Moving ghosts and commits use the clip's own duration, which its destination never
@@ -162,7 +164,8 @@ retain the start in either mode and re-sequence the Ripple suffix normally, not
 the timeline left handle's retained-OUT rule. Ripple-on timeline left trims keep their sequence
 start and recompile the suffix. Only the first anchor supports numeric start/nudge
 while on; later clips expose the reason to turn Ripple off or drag to reorder.
-Trim/move/split/duplicate never copy or shift track keyframes; each
+Trim/move/split/duplicate keep each clip grade's keyframes on their source frames and never shift
+Transform keyframes or adjustments; each
 split piece rounds its own duration, so exact total duration is
 not guaranteed. Originals and full proxies remain unchanged.
 
@@ -171,7 +174,7 @@ not guaranteed. Originals and full proxies remain unchanged.
 Playback rates use the shared native slider plus an adjacent exact `NumberField`,
 bounded to **0.1×–8×**: the main **Speed ×** row and a selected curve keyframe's rate.
 Modes, presets and the curve graph remain
-separate controls. Pointer sliding changes only a transient local value draft (only Colour, Opacity, HSL and Transform sliders also preview it in the image); release applies one validated document edit and updates the image. Escape, pointer cancellation, lost capture or window blur restores the starting value without save/history. Each keyboard slider adjustment is an individual validated edit.
+separate controls. Pointer sliding changes only a transient local value draft (only Colour, HSL and Transform sliders, Opacity included, also preview it in the image); release applies one validated document edit and updates the image. Escape, pointer cancellation, lost capture or window blur restores the starting value without save/history. Each keyboard slider adjustment is an individual validated edit.
 Numeric entry retains full precision, applies on Enter/blur and restores on Escape;
 invalid drafts remain editable without clamping or rounding.
 
@@ -190,8 +193,8 @@ source frames first when reversed), including off-trim
 keyframes and the original exclusive OUT, previewing the nearest mapped image
 through authoritative `PlacedClip.retiming`: off-trim keyframes use the first/last
 available output image, and original OUT never requests an out-of-range image.
-A clip-local stored-source cursor, independent of the track inspection and
-Transform cursors, advances through successive keyframes even
+A clip-local stored-source cursor, independent of the Transform cursor, advances through
+successive keyframes even
 when several preview the same image. Stored source time stays distinct from the
 actual displayed source frame. Navigation is editor-only, preserving the Properties panel
 tab/focus without an edit, history or save. Speed has a single setting, so this
@@ -212,8 +215,9 @@ frame; it then edits that keyframe's rate and preview follows the keyframe.
 Sliders never create keyframes. Each accepted edit is one Undo step; timing
 conflicts remain inline errors.
 
-Shared video track keyframes contain only Opacity and Colour settings, and track
-Transform keyframes only pose settings; neither affects speed or duration. Storing/moving one beyond duration does not extend the
+Clip grade and adjustment keyframes contain only Colour settings, and track
+Transform keyframes only pose settings and Opacity; none affects speed or duration. Storing or
+moving one outside the footage or the duration does not extend the
 sequence; actual clip retiming or a music clip's OUT can change project duration.
 Details: [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
@@ -241,9 +245,9 @@ Numeric fields retain full entered decimal precision and commit on Enter/blur; i
 out-of-original positions and timing conflicts retain the draft with inline
 errors. They do not automatically seek. Escape restores the field. Easing belongs
 to the left keyframe; the last rate holds without a next interval.
-Custom clip-speed, Transform and track-keyframe selectors all visibly read
-**Easing**, retaining contextual accessible names such as **Track keyframe easing N**.
-Clip-speed and track-keyframe selectors retain
+Custom clip-speed, Colour and Transform keyframe selectors all visibly read
+**Easing**, retaining contextual accessible names such as **Clip keyframe easing N**.
+Clip-speed and Colour keyframe selectors retain
 the same compact selected-shape graph and accessible description. It illustrates
 the existing progress function, not a new rate or interpolation rule.
 Selection remains native and commits once, with one Undo step.
@@ -265,12 +269,13 @@ and Delete removes it; removing the last keyframe keeps its rate as constant spe
 These controls isolate timeline shortcuts; the source frame field
 remains reachable if a keyframe moves outside the visible trim. New keyframes select
 themselves. The keyframe line's Reset returns this clip to constant 1× without
-changing track keyframes or other clips.
+changing its grade, Transform keyframes or other clips.
 
 ### Timeline clip-speed markers
 
-Inside each clip rectangle, custom-speed source keyframes appear as a boxed salmon
-**●** lane, distinct from the boxed blue **▼** track Transform markers at the top of
+Inside each clip rectangle, custom-speed source keyframes appear as boxed salmon
+**●** markers, in one lane with the clip grade's boxed amber **◆** markers and distinct from the
+boxed blue **▼** track Transform markers at the top of
 the track row; each title lists the keyframe's rate. Positions follow authoritative retiming: each marker
 sits on the output frame showing its source image, where a click puts the playhead. Off-trim keyframes are
 omitted. Exclusive OUT has a boundary marker that seeks the final available frame.
@@ -290,7 +295,7 @@ keyframe retimes the clip, so its duration and Ripple suffix can change;
 overlap/fade/transition conflicts reject the release. Escape, pointer cancellation,
 lost capture, window blur, an occupied frame or a frame outside the original
 restores. Keyboard handling is isolated from timeline shortcuts. These markers are
-distinct from shared project-time track markers and from the editable source-speed
+distinct from project-time Transform markers and from the editable source-speed
 graph. Stored navigation still reaches all retained off-trim/original-OUT keyframes
 through the clip-local cursor; neither navigation nor inspection supplies a fake
 frame for main capture.
@@ -347,8 +352,8 @@ removes it (a track keeps at least one clip). Dragging a ready file from Media's
 when dropped on the empty music area. **Recording** only changes the selected clip's
 source. The trash beside **Music track** (**Delete selected music track**) removes that
 track and its clips. Import never implicitly places music. Selection is editor-only;
-edits, recording changes and removal leave other music tracks, video tracks, track
-keyframes and bin membership untouched. Each music track and clip retains independent
+edits, recording changes and removal leave other music tracks, video tracks, keyframes,
+adjustments and bin membership untouched. Each music track and clip retains independent
 drafts; selection never applies one's text to another. Each accepted add/edit/remove or
 completed gesture is one Undo step; invalid or cancelled gestures restore atomically
 without a committed edit/history/save.
@@ -389,7 +394,7 @@ silence. Sum all active sources linearly **after per-clip gain/fades**, then
 hard-clamp to **[−1, 1] once after the complete sum**, separately for each channel.
 Never clamp a source or intermediate sum: opposite-polarity contributions must
 remain able to cancel. No normalisation, ducking, effects or hidden gain compensation.
-Source-video audio stays disabled; clip speed and track Colour/Opacity are unchanged.
+Source-video audio stays disabled; clip speed, grades, adjustments and Opacity are unchanged.
 
 The preview streams **PCM16 48 kHz stereo** in exact bounded HTTP byte ranges into
 one mixed stereo queue and **one AudioContext/AudioWorklet**, not per-track
@@ -661,36 +666,37 @@ remains an image named **Waveform for music track…**.
 ## Versioning
 
 The current project schema requires explicit `media.videoIds` and `media.audioIds` arrays,
-unique and limited to 10,000 IDs each, plus complete video track colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast
-and static HSL/curves, clip constant or 1–256-keyframe custom-curve
-speed and a boolean `reverse`, required video track `transform: { base, keyframes }` with eight-value base and
-0–256 project-frame keyframes with required per-setting easing and `reset`, track
-keyframe arrays with all fifteen nullable value fields, placement and music
+unique and limited to 10,000 IDs each, plus a complete `grade` on every clip (Colour with
+Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves, and 0–64
+source-frame keyframes with all fourteen nullable value fields), the `adjustments` array, clip
+constant or 1–256-keyframe custom-curve
+speed and a boolean `reverse`, required video track `transform: { base, keyframes }` with a
+nine-value base (Opacity included) and
+0–256 project-frame keyframes with required per-setting easing and `reset`, placement and music
 source OUT. `music` is a required 0–8 array of music tracks with unique required track
 and clip IDs, each with gain, Ripple, opening/closing fades, 1–8 clips and one transition
 per adjacent pair; `[]` is the sole no-music representation, not null
 or a compatibility default. Every video track also requires `ripple`, `transitions`, `openingFade` and
-`closingFade`, plus numeric `opacity` in 0–1; 1 is the new-track initial value,
-not a default for missing saved fields. Transitions/fades are track-local, with
+`closingFade`, and has no `colour`, `opacity` or `keyframes`. Its Transform `opacity` starts at
+1 on a new track; that is not a default for missing saved fields. Transitions/fades are track-local, with
 no special first-track identity. Video tracks display and composite in their saved bottom-to-top array order.
-The sole track `opacity` channel overrides the track's saved `opacity` on every clip,
-including both dissolve sources; otherwise all use the saved track value.
-Required nullable channels are `opacity`, the twelve scalar colour settings
-(including `temperature`, `tint`, `vibrance`, `whites` and `blacks`), `hdr` and `localContrast`. Missing saved bases/channels are invalid, not defaulted.
-Track `opacity` is valid and required; saved `clip.opacity` and old
-`clipOpacity`/`layerOpacity` channels are rejected, not defaulted.
+Opacity keyframes override the Transform base on every clip of the track,
+including both dissolve sources. The fourteen nullable grade keyframe channels are the twelve
+scalar colour settings (including `temperature`, `tint`, `vibrance`, `whites` and `blacks`),
+`hdr` and `localContrast`. Missing saved bases/channels are invalid, not defaulted.
+Saved `clip.opacity` is rejected, not defaulted.
 New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; every music track's references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
-inherited by a new project. Projects saved with an older supported schema are upgraded on
-load; projects and export receipt snapshots older than the oldest supported schema remain
-unchanged and rejected. There is no compatibility reader, null fallback, default-field
+inherited by a new project. Projects and export receipt snapshots saved before the current
+schema, with track Colour, are rejected with the reason and left unchanged. There is no
+compatibility reader, null fallback, default-field
 injection or automatic deletion; recreate such projects and import their media to reuse
 registered assets/verified ready proxies. Confirmed project deletion affects only
 its saved document, not originals,
 the shared content-deduplicated registry/cache or finished exports/receipts.
 Video-proxy/current PCM formats, source guards and native video budgets are unchanged;
-native composition uses the sole Opacity contract without a track multiplier.
+native composition uses the Transform Opacity contract without a track multiplier.
 Preview uses the current explicitly prepared PCM cache described above.
 
 Export receipts remain **version 1** with a strict current-schema snapshot, required

@@ -2,23 +2,24 @@
 
 Decision record for [#215](https://github.com/Plonk42/PasCap/issues/215), part of milestone
 v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)). **Status: decided; the clip grade
-([#273](https://github.com/Plonk42/PasCap/issues/273)) and Auto writing it
-([#285](https://github.com/Plonk42/PasCap/issues/285)) are implemented on the v1.3 branch, the
-rest is not.** Until each implementation issue is delivered, the current contracts remain
-[track appearance](ROW_APPEARANCE.md), [HSL and curves](HSL_AND_CURVES.md),
+([#273](https://github.com/Plonk42/PasCap/issues/273)), Auto writing it
+([#285](https://github.com/Plonk42/PasCap/issues/285)) and adjustment items replacing track
+Colour ([#286](https://github.com/Plonk42/PasCap/issues/286)) are implemented on the v1.3 branch;
+items on the timeline (#287), through MCP (#288) and the UX evaluation (#289) are not.** The
+current contracts are [clip grades and adjustments](ROW_APPEARANCE.md),
+[spatial transforms](SPATIAL_TRANSFORMS.md) (with Opacity), [HSL and curves](HSL_AND_CURVES.md),
 [Temperature and Tint](TEMPERATURE_AND_TINT.md), [detail filters](DETAIL_FILTERS.md) and
-[Auto adjust](AUTO_ADJUST.md), with the clip grade as described in
-[track appearance](ROW_APPEARANCE.md#clip-grades).
+[Auto adjust](AUTO_ADJUST.md); this note keeps the decisions, including those still to deliver.
 
 Decisions marked **(owner)** were made on 2026-10-23 or 2026-10-28; every question of #215 is
 answered.
 
 ## Why
 
-All Colour belongs to the video track today (#70). So a grade for one shot is stored as track
-keyframes at project frames, and any trim, reorder, Ripple change or added dissolve leaves
-those keyframes behind (#273). A different treatment needs another track (at most eight), and
-a look over a stretch of the film has no object of its own.
+Before #286, all Colour belonged to the video track (#70). So a grade for one shot was stored as
+track keyframes at project frames, and any trim, reorder, Ripple change or added dissolve left
+those keyframes behind (#273). A different treatment needed another track (at most eight), and
+a look over a stretch of the film had no object of its own.
 
 The milestone splits the two jobs, as CapCut, Premiere and Resolve do:
 
@@ -38,22 +39,25 @@ Options considered (owner, 2026-10-23):
 
 ## Delivery order and compatibility
 
-1. [#273](https://github.com/Plonk42/PasCap/issues/273) clip grade. Track Colour still applies
-   after it. Additive: the next schema gives every clip a neutral grade through an upgrade step
-   and frozen fixture, so projects render as before.
+1. [#273](https://github.com/Plonk42/PasCap/issues/273) clip grade (implemented). Track Colour
+   still applied after it. Additive: the next schema gave every clip a neutral grade through an
+   upgrade step and frozen fixture, so projects rendered as before.
 2. [#285](https://github.com/Plonk42/PasCap/issues/285) Auto and Auto white balance write clip
-   grades.
-3. [#286](https://github.com/Plonk42/PasCap/issues/286) adjustment items replace track Colour.
+   grades (implemented).
+3. [#286](https://github.com/Plonk42/PasCap/issues/286) adjustment items replace track Colour
+   (implemented).
 4. [#287](https://github.com/Plonk42/PasCap/issues/287) items on the timeline;
    [#288](https://github.com/Plonk42/PasCap/issues/288) items through MCP;
    [#289](https://github.com/Plonk42/PasCap/issues/289) UX requirements and the closing
    evaluation.
 
-**No migration for #286 (owner, 2026-10-28):** removing track Colour is a breaking change,
-accepted because there are no real projects yet. Track Colour and its fourteen Colour keyframe
-channels are removed. Projects and export receipt snapshots saved before it are rejected with a
-clear reason and left untouched, never deleted: `OLDEST_PROJECT_SCHEMA_VERSION` rises to that
-schema. Proxy, PCM, registry and receipt format versions are unchanged.
+**No migration for #286 (owner, 2026-10-28; implemented):** removing track Colour is a breaking
+change, accepted because there are no real projects yet. Track Colour, track Opacity and the
+shared track keyframes are removed. Projects and export receipt snapshots saved before it are
+rejected with a clear reason ("It grades with track Colour, which PasCap replaced with clip
+grades and adjustments; it cannot be upgraded and is left unchanged.") and left untouched, never
+deleted: `OLDEST_PROJECT_SCHEMA_VERSION` is that schema. Proxy, PCM, registry and receipt format
+versions are unchanged.
 
 ## Data
 
@@ -62,7 +66,7 @@ schema. Proxy, PCM, registry and receipt format versions are unchanged.
 Every clip requires `grade: { colour, keyframes }`.
 
 - `colour` is the whole Colour section, with the same fields, bounds and neutral values as
-  today's track `colour`: the twelve scalar settings, `hdr`, `localContrast`, `hsl` and
+  the track `colour` it replaces: the twelve scalar settings, `hdr`, `localContrast`, `hsl` and
   `curves`. No Opacity or Transform. New clips are neutral.
 - `keyframes` are in **original-source frames**, like speed keyframes, so a key stays on its
   image through trims, splits, Reverse and speed changes. Each key is
@@ -95,7 +99,7 @@ items `{ id, start, duration, colour, keyframes }`, sorted by `start`, **never o
   they never follow clips. They do not extend the project duration.
 - Splitting an item gives both pieces the whole grade and every key, rebased.
 
-### Tracks after #286 (owner)
+### Tracks after #286 (owner, implemented)
 
 A video track keeps `transform`, Ripple, transitions and fades. **Opacity becomes a Transform
 setting**: the Transform base and each Transform keyframe gain `opacity` (0–1, neutral 1), with
@@ -104,7 +108,7 @@ the track's layer sits over the ones below; neither grades the image. `layer.opa
 shared track keyframes (`layer.keyframes`) are removed, so a track has one keyframe list.
 
 - A default Transform keyframe and **Reset transform** also return Opacity to 1.
-- "Exact neutral pose", which keeps today's opaque black letterboxing, stays about geometry
+- "Exact neutral pose", which keeps the opaque black letterboxing, stays about geometry
   only: a track at 50% Opacity with untouched geometry keeps the letterbox path. Opacity stays
   coverage, $o_i$ in the equations below.
 - Opacity alone is not per-pixel heavy work: it does not send a group to the GPU export worker.
@@ -134,8 +138,9 @@ when absent):
 
 In a dissolve each source has its own clip grade and both share the item at that frame. A
 transition slot (fade through black with pause) stays neutral black. An exactly neutral clip
-grade without an item bypasses grading, bit-identically to today's neutral track. Between #273
-and #286, the track's evaluated Colour takes the item's place in these equations.
+grade without an item bypasses grading, bit-identically to a neutral track before. Between #273
+and #286, the track's evaluated Colour took the item's place in these equations; with #286
+implemented, the item does.
 
 ### Preview
 
@@ -163,10 +168,10 @@ already attaches, and Firefox's llvmpipe). No texture, decoder or lane is added.
   tone, HSL or curves, besides the existing Detail and spatial conditions. Its page uses the
   preview's programs, so the capacity check above applies; a failure falls back to the CPU
   compositor as today.
-- **Static fast path:** each clip already gets its own LUT. Before #286, it is the clip grade
-  followed by the track Colour, composed into one LUT. After #286, it requires **no adjustment
-  items** and every clip grade unkeyed, scalar-only and with zero local tone, besides the
-  existing single-track conditions (Opacity 1 and neutral Transform without Transform
+- **Static fast path:** each clip already gets its own LUT. Before #286, it was the clip grade
+  followed by the track Colour, composed into one LUT. Since #286 (implemented), it requires **no
+  adjustment items** and every clip grade unkeyed, scalar-only and with zero local tone, besides
+  the existing single-track conditions (Opacity 1 and neutral Transform without Transform
   keyframes, neutral Detail, contiguous from frame 0). Anything else uses composited export.
 
 ## Editor
@@ -177,20 +182,23 @@ Follows the requirements of #289: one settings panel, an unmistakable target.
   the Colour section (groups, keyframe line, Auto, stored keyframes), **HSL ranges** and
   **Colour curves**, with today's controls and behaviour. Its pinned header names the target:
   the clip ("Clip 3 · DJI_0468"), or the item by its range ("Adjustment 01:12:05 – 01:20:00").
-  Between #273 and #286 it serves the selected clip or the selected track, and its header says
-  which.
+  Between #273 and #286 it served the selected clip or the selected track. With #286
+  implemented, a **Clip / Adjustment** switch chooses the selected clip's grade or the item at
+  the playhead, and the header says which.
 - **Target rules (owner).** Nothing is edited implicitly. With no clip or item selected, the tab
   shows nothing to edit and a hint to select one. Clips and items can be selected together
   (Ctrl/Cmd-click), so they can be dragged together; with several clips, or a clip and an item,
-  editing is disabled with the reason.
-- **Track tab (owner).** It keeps **Transform**, which now includes an **Opacity** setting (UI
+  editing is disabled with the reason. Until #287 makes items selectable on the timeline, the
+  Adjustment target edits the item at the playhead and offers **New adjustment** over the
+  selected ruler range or clip where there is none.
+- **Track tab (owner, implemented).** It keeps **Transform**, which now includes an **Opacity** setting (UI
   0–100%) with its triangle and per-setting Previous/Next like the other eight, then Transitions
   and Fades. The section keeps its name for now.
 - **Timeline (owner).** The adjustment track is a lane **above the video tracks, under the
-  ruler**. Items have no name: they are shown and announced by their timecode range. A clip
+  ruler** (#287). Items have no name: they are shown and announced by their timecode range. A clip
   grade's keyframes are amber markers inside the clip rectangle, moving with it; an item's are
   amber markers inside the item. Both slide through `useKeyframeSlide`. Track keyframes are the
-  blue Transform ▼ markers only.
+  blue Transform ▼ markers only (implemented, with the clip grade markers).
 - **A clip's whole grade (owner).** When a clip is selected, the item also grading it at the
   playhead is highlighted on the timeline, in a style distinct from the selection; clicking it
   selects it. The panel adds no line for it.
@@ -204,16 +212,16 @@ Follows the requirements of #289: one settings panel, an unmistakable target.
     the target's keyframes.
   - When the target belongs to the selection, the paste applies to every selected clip and
     item, still in one Undo step.
-- **Original preview (owner).** Three modes: bypass clip grades, bypass items, or both. Holding
+- **Original preview (owner, implemented).** Three modes: bypass clip grades, bypass items, or both. Holding
   a modifier while pressing the hold-to-show **Original** button chooses the mode directly, with
   no menu first. The button's tooltip and accessible description list the modifiers.
   The keys, for the pointer and for Enter/Space:
-  - plain: bypass both, as today;
+  - plain: bypass both;
   - **Shift**: bypass clip grades only;
   - **Alt**: bypass items only.
 
   Ctrl is avoided because Ctrl-click opens the context menu on macOS. Clip Detail is bypassed
-  with clip grades, as it is today. The **Original** badge names the mode in effect.
+  with clip grades. The **Original** badge names the mode in effect.
 
 - **Item gestures** (#287): create from the selected ruler range or a clip's span, or by drawing;
   move, trim, split and delete with snapping, red refused placements and one Undo step per valid
@@ -222,7 +230,7 @@ Follows the requirements of #289: one settings panel, an unmistakable target.
   are; the header ellipsizes); every accepted edit or completed gesture is one Undo step;
   Escape, cancellation, lost capture and blur restore.
 
-## Auto (owner)
+## Auto (owner, implemented)
 
 Auto and Auto white balance write **clip grades only** (#285): as clip values or a clip keyframe
 at the playhead. There is no Auto on items. The Track source grades each clip of the track on its
@@ -230,8 +238,8 @@ own, and the track-level compromise grade is removed with track Colour.
 
 ## Assistant
 
-- **Clip grades (owner):** one clip-grade edit command per clip and a batch form like
-  `detail-clips`. `estimate` with `applyAs: 'shots'` writes each clip's grade values; the
+- **Clip grades (owner, implemented):** one clip-grade edit command per clip and a batch form like
+  `detail-clips` (the Colour commands take `clipIds`). `estimate` with `applyAs: 'shots'` writes each clip's grade values; the
   track-keyframe shots mode is removed.
 - **Items (owner, #288),** balancing features, calls and tokens:
   - no new read: `describe_project` lists items compactly (id, range, non-neutral settings,
@@ -244,15 +252,16 @@ own, and the track-level compromise grade is removed with track Colour.
 ## Guides changed at delivery
 
 #70's track-only Colour ownership is superseded: Colour belongs to clips and items, while
-Transform, now including Opacity, stays on the track (#67, #131). At delivery, update
-[track appearance](ROW_APPEARANCE.md) (replaced by this contract),
-[spatial transforms](SPATIAL_TRANSFORMS.md) (Opacity setting),
+Transform, now including Opacity, stays on the track (#67, #131). With #286 delivered, these
+guides describe it: [clip grades and adjustments](ROW_APPEARANCE.md) (the former track
+appearance contract), [spatial transforms](SPATIAL_TRANSFORMS.md) (Opacity setting),
 [tracks and keyframes](../LAYERS_AND_KEYFRAMES.md), [HSL and curves](HSL_AND_CURVES.md),
 [Temperature and Tint](TEMPERATURE_AND_TINT.md), [detail filters](DETAIL_FILTERS.md),
 [Auto adjust](AUTO_ADJUST.md), [editor controls](EDITOR_CONTROLS.md),
 [timeline editing](../TIMELINE_EDITING.md), [workspace](../WORKSPACE_AND_RECOVERY.md),
 [speed and audio](../SPEED_AND_AUDIO.md), [colour and timing](../COLOUR_AND_TIMING.md),
 [development](../DEVELOPMENT.md), [the assistant](ASSISTANT_MCP.md), the
-[user guide](../USER_GUIDE.md) and the architecture notes in `.github/copilot-instructions.md`.
+[user guide](../USER_GUIDE.md) and the architecture notes in `.github/copilot-instructions.md`;
+#287 and #288 update them again for items on the timeline and through MCP.
 [#176](https://github.com/Plonk42/PasCap/issues/176) (HSL keyframes) then applies to clip grades
 and items.

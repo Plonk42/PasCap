@@ -458,7 +458,7 @@ export class Compositor {
     );
     if (staged && advanced && this.fragmentUniformVectors < STAGED_UNIFORM_VECTORS)
       throw new Error(
-        `This GPU supports ${this.fragmentUniformVectors} fragment uniform vectors; grading a clip and its track with HSL ranges or curves needs ${STAGED_UNIFORM_VECTORS}.`,
+        `This GPU supports ${this.fragmentUniformVectors} fragment uniform vectors; grading a clip and an adjustment with HSL ranges or curves needs ${STAGED_UNIFORM_VECTORS}.`,
       );
     this.#use({ path: advanced ? advancedPath : 'scalar', detail: detailed, staged });
     const mappings = sources.map((source) =>

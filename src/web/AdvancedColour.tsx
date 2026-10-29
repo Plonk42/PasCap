@@ -509,7 +509,7 @@ export function HslRangesSection(props: Readonly<Props>) {
       icon="sliders"
       modified={!isNeutralHsl(layer.colour.hsl)}
       help={
-        <HelpPopover label="HSL ranges" guide="colour-speed-and-shared-video-track-keyframes">
+        <HelpPopover label="HSL ranges" guide="colour-speed-and-keyframes">
           <p>
             Shift the hue, saturation or lightness of one colour range, such as the blues, on this {ownerNoun(layer)}.
             Neighbouring ranges blend smoothly and greys stay untouched.
@@ -601,7 +601,7 @@ export function ColourCurvesSection(props: Readonly<Props>) {
       icon="tone-curve"
       modified={!Object.values(layer.colour.curves).every(isIdentityCurve)}
       help={
-        <HelpPopover label="Colour curves" guide="colour-speed-and-shared-video-track-keyframes">
+        <HelpPopover label="Colour curves" guide="colour-speed-and-keyframes">
           <p>
             Drag control nodes to reshape brightness or colour: Master changes everything, Red, Green and Blue one
             channel each. Add a node to bend another part of the curve.

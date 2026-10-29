@@ -248,15 +248,17 @@ hand-written union, and `applyCommand` is unchanged. The `edit` operation's inpu
 `{ projectId, expectedRevision, commands: editCommandSchema.array().max(64) }`. Any command
 added later for the editor is exposed to the assistant the moment it is in the union.
 
-Four commands change one appearance setting of a track and keep every other saved value, so the
+Four commands change one appearance setting of a clip grade, an adjustment or a track and keep
+every other saved value, so the
 assistant never resends a whole Colour or Transform
 ([#252](https://github.com/Plonk42/PasCap/issues/252)): `colour-setting` (one of the fourteen
-scalar Colour settings), `hsl-band` (one HSL range), `colour-curve` (one curve) and
-`transform-setting` (one Transform base setting). A setting with keyframes follows them, so
+scalar Colour settings of a clip's grade or an adjustment), `hsl-band` (one HSL range),
+`colour-curve` (one curve) and
+`transform-setting` (one Transform base setting, Opacity included). A setting with keyframes follows them, so
 setting its base is rejected with the keyframe count; the assistant changes the keyframes with
 `layer-key-value` instead. The editor keeps sending whole `colour` and `transform` commands.
 
-The editor's `layer-add` and `layer-update` carry a complete track (every Colour and Transform
+The editor's `layer-add` and `layer-update` carry a complete track (every Transform
 setting and keyframe): half of the command schema. `edit` offers the assistant
 `assistantEditCommandSchema`, every command except those two, with `layer-create` (a neutral track
 with an ID and a name) and `layer-options` (name, visibility or Ripple; turning Ripple on packs the
@@ -564,28 +566,28 @@ The operations of the assistant and the editor, with their bounds (the generated
 holds their inputs). Session and editor-only ones are listed because they share the
 registry; the assistant never sees them.
 
-| Operation            | Audience  | Purpose                                                                                                                                                                                                                                       | Bounds                                                                                 |
-| -------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `session_start`      | both      | Start an assistant session: checkpoint, brief; refuses when a session is active or the revision is stale (the editor flushes autosave first)                                                                                                  | One session per project                                                                |
-| `session_status`     | both      | State, brief, edit log, notes (editor banner and LLM resource)                                                                                                                                                                                |                                                                                        |
-| `session_end`        | both      | Take over (editor) or finish with notes (assistant); the notes appear in the editor's hand-off dialog                                                                                                                                         |                                                                                        |
-| `checkpoint`         | both      | Named checkpoint of the current document; `checkpoint_restore` replaces the document in one revision after checkpointing the current state; `checkpoint_copy` (editor only) saves a checkpoint as a new project                               | Last 5 per project                                                                     |
-| `edit`               | both      | Apply a batch of commands atomically; with a session it also enforces selects and bin membership; returns the new revision and a one-line summary, or the first failing command's message                                                     | ≤ 64 commands                                                                          |
-| `preview_edits`      | both      | Dry run of a batch against the saved revision: resulting timeline summary and errors, no save                                                                                                                                                 |                                                                                        |
-| `describe_project`   | both      | Compact timeline: tracks, clips with timecodes, transitions, music, recordings with their kept ranges, bookmarks                                                                                                                              |                                                                                        |
-| `describe_track`     | both      | One video track's complete appearance (Colour with HSL and curves, Opacity, Transform, keyframes), its clips' grades, its keyed settings and the values that apply at requested frames ([#252](https://github.com/Plonk42/PasCap/issues/252)) | ≤ 32 frames                                                                            |
-| `describe_recording` | both      | Shot descriptors (below) inside the selects, flight data, damage, `allowedMovement`, an opt-in sheet (`sheet: true`) of each steady range's middle frame ([#239](https://github.com/Plonk42/PasCap/issues/239))                               | Computed on request, no cache                                                          |
-| `still`              | both      | One composed project frame from the proxies (`frame`, `width`, `crop?`, `commands?` for a candidate), JPEG ([#238](https://github.com/Plonk42/PasCap/issues/238))                                                                             | Serial, two waiting; refused (409) while an export or reference job runs; image budget |
-| `timeline_sheet`     | both      | Contact sheet of project frames (`frames[]`, `commands?`), JPEG plus legend                                                                                                                                                                   | Same as still                                                                          |
-| `recording_sheet`    | both      | Contact sheet of a recording's proxy frames (`mediaId`, `frames[]`), ungraded, JPEG plus legend                                                                                                                                               | Same as still                                                                          |
-| `compare_recordings` | assistant | Candidate shots of several recordings in one ungraded sheet, by default each one's best steady range, 1–4 cells each, with a legend                                                                                                           | Same as still                                                                          |
-| `hand_off_readiness` | editor    | What the assistant can use in a project (proxies, motion and music analysis, a running export) and how a client connects                                                                                                                      | Pure read                                                                              |
-| `music_waveform`     | editor    | The level of a music recording every 10 ms for the editor's waveform, cached as `waveform-v1.json`                                                                                                                                            | Read from the PCM cache                                                                |
-| `estimate`           | both      | Auto adjust, Auto white balance or detail measurement of a clip (whole, or 1 s around a frame), a track or a recording range, with the edit commands applying it (below, [#240](https://github.com/Plonk42/PasCap/issues/240))                | Serial with stills; ≤ 16 proxy frames                                                  |
-| `music_analyse`      | editor    | Not an operation: the editor queues the job (**Analyse music**) and the Hand off dialog's readiness list queues it; `music_analysis` (both) returns tempo, meter, beats, hits and sections at project frames, in an optional window           | Background job kind                                                                    |
-| `check_alignment`    | both      | Boundary-to-beat report (below)                                                                                                                                                                                                               | Pure, bounded by clip/beat counts                                                      |
-| `snap_cuts_to_beats` | both      | `layerId`, `prefer` (beat, downbeat, hit or beat-or-hit), `minimumSeconds`, `apply`: the alignment helper, a proposal or one `edit` batch                                                                                                     |                                                                                        |
-| `beats_to_bookmarks` | both      | Not an operation: the assistant adds `bookmark-add` commands for the frames `music_analysis` lists; the editor snaps to beats directly (**Snap to beats**)                                                                                    | ≤ 1,000 bookmarks                                                                      |
+| Operation            | Audience  | Purpose                                                                                                                                                                                                                                                                     | Bounds                                                                                 |
+| -------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `session_start`      | both      | Start an assistant session: checkpoint, brief; refuses when a session is active or the revision is stale (the editor flushes autosave first)                                                                                                                                | One session per project                                                                |
+| `session_status`     | both      | State, brief, edit log, notes (editor banner and LLM resource)                                                                                                                                                                                                              |                                                                                        |
+| `session_end`        | both      | Take over (editor) or finish with notes (assistant); the notes appear in the editor's hand-off dialog                                                                                                                                                                       |                                                                                        |
+| `checkpoint`         | both      | Named checkpoint of the current document; `checkpoint_restore` replaces the document in one revision after checkpointing the current state; `checkpoint_copy` (editor only) saves a checkpoint as a new project                                                             | Last 5 per project                                                                     |
+| `edit`               | both      | Apply a batch of commands atomically; with a session it also enforces selects and bin membership; returns the new revision and a one-line summary, or the first failing command's message                                                                                   | ≤ 64 commands                                                                          |
+| `preview_edits`      | both      | Dry run of a batch against the saved revision: resulting timeline summary and errors, no save                                                                                                                                                                               |                                                                                        |
+| `describe_project`   | both      | Compact timeline: tracks with their Transform Opacity and keyframe count, clips with timecodes and grade summaries, transitions, adjustments, music, recordings with their kept ranges, bookmarks                                                                           |                                                                                        |
+| `describe_track`     | both      | One video track's Transform (Opacity included) and keyframes, its clips' grades (Colour with HSL, curves and keyframes), its keyed settings and the values that apply at requested frames, with the adjustment there ([#252](https://github.com/Plonk42/PasCap/issues/252)) | ≤ 32 frames                                                                            |
+| `describe_recording` | both      | Shot descriptors (below) inside the selects, flight data, damage, `allowedMovement`, an opt-in sheet (`sheet: true`) of each steady range's middle frame ([#239](https://github.com/Plonk42/PasCap/issues/239))                                                             | Computed on request, no cache                                                          |
+| `still`              | both      | One composed project frame from the proxies (`frame`, `width`, `crop?`, `commands?` for a candidate), JPEG ([#238](https://github.com/Plonk42/PasCap/issues/238))                                                                                                           | Serial, two waiting; refused (409) while an export or reference job runs; image budget |
+| `timeline_sheet`     | both      | Contact sheet of project frames (`frames[]`, `commands?`), JPEG plus legend                                                                                                                                                                                                 | Same as still                                                                          |
+| `recording_sheet`    | both      | Contact sheet of a recording's proxy frames (`mediaId`, `frames[]`), ungraded, JPEG plus legend                                                                                                                                                                             | Same as still                                                                          |
+| `compare_recordings` | assistant | Candidate shots of several recordings in one ungraded sheet, by default each one's best steady range, 1–4 cells each, with a legend                                                                                                                                         | Same as still                                                                          |
+| `hand_off_readiness` | editor    | What the assistant can use in a project (proxies, motion and music analysis, a running export) and how a client connects                                                                                                                                                    | Pure read                                                                              |
+| `music_waveform`     | editor    | The level of a music recording every 10 ms for the editor's waveform, cached as `waveform-v1.json`                                                                                                                                                                          | Read from the PCM cache                                                                |
+| `estimate`           | both      | Auto adjust, Auto white balance or detail measurement of a clip (whole, or 1 s around a frame), a track or a recording range, with the edit commands writing it to clip grades (below, [#240](https://github.com/Plonk42/PasCap/issues/240))                                | Serial with stills; ≤ 16 proxy frames                                                  |
+| `music_analyse`      | editor    | Not an operation: the editor queues the job (**Analyse music**) and the Hand off dialog's readiness list queues it; `music_analysis` (both) returns tempo, meter, beats, hits and sections at project frames, in an optional window                                         | Background job kind                                                                    |
+| `check_alignment`    | both      | Boundary-to-beat report (below)                                                                                                                                                                                                                                             | Pure, bounded by clip/beat counts                                                      |
+| `snap_cuts_to_beats` | both      | `layerId`, `prefer` (beat, downbeat, hit or beat-or-hit), `minimumSeconds`, `apply`: the alignment helper, a proposal or one `edit` batch                                                                                                                                   |                                                                                        |
+| `beats_to_bookmarks` | both      | Not an operation: the assistant adds `bookmark-add` commands for the frames `music_analysis` lists; the editor snaps to beats directly (**Snap to beats**)                                                                                                                  | ≤ 1,000 bookmarks                                                                      |
 
 There are deliberately no `add_clip`/`set_transition`-style wrappers: those are `edit`
 commands, already described in `editCommandSchema`, and a wrapper would be a second place
@@ -596,8 +598,8 @@ to maintain. The brief carries no permissions: every command is available.
 Implemented ([stills](../../src/server/stills.ts)). Pipeline for project
 frame $f$, at the 1280 × 720 draft size:
 
-1. `sampleTimeline(document, f)` and `sampleSlots` give the active sources with evaluated
-   Colour, Transform, Detail, weights and Opacity.
+1. `sampleTimeline(document, f)` and `sampleSlots` give the active sources with their evaluated
+   clip grade and adjustment, Transform, Detail, weights and Opacity.
 2. Each source decodes proxy frame `sourceFrame` with FFmpeg: input `-ss` a quarter frame
    before it, so accurate seeking returns exactly that frame (a native test compares it with
    a full decode across GOP boundaries), fitted and padded like the export's decode, as
@@ -697,7 +699,8 @@ values plus the `edit` commands that apply them; it edits nothing itself:
   with `frame`, the project frames within 1 s of it in the clip, mapped through retiming, as the
   Playhead source and **Auto white balance** read them (white balance weighs each project frame,
   Auto adjust each source frame once, as in the editor);
-- **layerId**: every clip of the track by duration (`trackSamples`), as the Track source;
+- **layerId**: every clip of the track by duration (`trackSamples`), one compromise, values only
+  (`commands: false`): there is no track grade to write;
 - **mediaId** with `sourceIn`/`sourceOut`: a recording range, values only;
 - **clipIds** (up to 64), or **layerId** for `detail` or `applyAs: shots`: each clip on its own,
   whole, one call returning a `clips` list of results in timeline order
@@ -705,13 +708,15 @@ values plus the `edit` commands that apply them; it edits nothing itself:
 
 `kind: auto-adjust` runs `analyseAutoAdjust` and scales the correction by `intensity` (80 %
 is the fitted correction); `white-balance` runs `frameIlluminant` and `poolWhiteBalance`. Their
-commands are the editor's: track values as one `colour` edit leaving animated settings unchanged
-(listed in `unchanged`), or with `applyAs: keyframe` the settings captured at `frame` like their
+commands are the editor's and write clip grades only, never adjustments: with `clipId`, the
+clip grade's values as one `colour` edit leaving animated settings unchanged
+(listed in `unchanged`), or with `applyAs: keyframe` the settings captured at the source frame
+shown at `frame`, like their
 diamonds ([shared helpers](../../src/shared/auto-colour.ts)). `applyAs: shots`
 ([#272](https://github.com/Plonk42/PasCap/issues/272), clip grades since
 [#273](https://github.com/Plonk42/PasCap/issues/273)) writes each analysed clip's own correction
 into its clip grade, one `colour` command per clip keeping the grade's other settings and keyframes;
-the grade applies before the track's Colour and stays with the clip when it moves, and a
+the grade applies before any adjustment and stays with the clip when it moves, and a
 cross-dissolve blends the two clips' grades. The frames are decoded on the
 still renderer's serial queue from the proxy with FFmpeg, at the editor's analysis size
 (`analysisSize`, 320 × 180 for a 720p proxy) in RGBA, area-scaled with full chroma
@@ -914,10 +919,11 @@ Follow mode, Take over, restore and the Hand off dialog are implemented
   had before the session stays in the editor, its saves refused (423) until the session ends.
 - The preview follows the assistant: each `edit` records in the session's edit log the
   earliest project frame it changed (`editedFrame` in [edited-frame.ts](../../src/shared/edited-frame.ts):
-  clips and their placement, transitions, fades, keyframes, bookmarks and music clips), and
+  clips and their placement and grades, transitions, fades, keyframes, adjustments, bookmarks and
+  music clips), and
   adopting a revision seeks to the latest such frame, unless the preview is playing. Changes
-  without a particular frame (a whole track's Colour, Opacity or Transform, kept ranges, the
-  title) leave the playhead where it is.
+  without a particular frame (a track's Transform base, an adjustment's Colour values, kept
+  ranges, the title) leave the playhead where it is.
 - **Take over** calls `session_end`. When a session the editor saw ends (Take over, the
   assistant's `session_end` with notes, or expiry), the editor adopts the latest revision once
   and shows who ended it, the edit count and the notes, with **Restore project before
@@ -969,10 +975,10 @@ The LLM is told what good looks like and what PasCap can do; the tools do the ar
    check `check_alignment` and a `timeline_sheet` around each boundary. Set transitions:
    cuts on beats, short dissolves (8–15 frames) between related shots, fade through black
    between sections, opening and closing fades matching the music's fade.
-5. **Grade**: per track, `estimate auto-adjust` on a representative clip and apply at
-   80 %; compare `still`s of two or three frames per clip before and after; adjust
-   Temperature/Tint or Exposure per track when shots differ, moving a clip to its own
-   track if it needs its own grade. Set Detail per clip from `estimate detail`, verified
+5. **Grade**: `estimate auto-adjust` on a representative clip, or with `applyAs: shots` for a
+   correction per shot, applied at 80 % to clip grades; an adjustment only for a look shared by
+   every shot of a stretch. Compare `still`s of two or three frames per clip before and after; adjust
+   Temperature/Tint or Exposure in a clip's grade when shots differ. Set Detail per clip from `estimate detail`, verified
    on a 1:1 crop (no halos, no waxy denoise).
 6. **Verify**: a full `timeline_sheet`, the alignment report, the duration against the
    target, every clip inside its selects, music fades; then `session_end` with notes

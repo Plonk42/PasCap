@@ -337,7 +337,7 @@ function ColourSection({
       icon="colour"
       modified={adjusted > 0}
       help={
-        <HelpPopover label="Colour animation" guide="colour-speed-and-shared-video-track-keyframes">
+        <HelpPopover label="Colour animation" guide="colour-speed-and-keyframes">
           {clipGrade ? (
             <p>
               These settings grade this clip only, before any adjustment; its keyframes stay with its footage when you
@@ -891,8 +891,8 @@ function NewAdjustment({
     },
   ];
   return (
-    <div className="adjustment-create" role="group" aria-label="New adjustment">
-      <span>New adjustment: one grade for every track over a stretch of the film</span>
+    <fieldset className="adjustment-create" aria-label="New adjustment">
+      <legend>New adjustment: one grade for every track over a stretch of the film</legend>
       {choices.map(({ label, range, missing }) => {
         const reason = range ? rangeReason(project, range.start, range.end) : missing;
         return (
@@ -915,7 +915,7 @@ function NewAdjustment({
           </button>
         );
       })}
-    </div>
+    </fieldset>
   );
 }
 

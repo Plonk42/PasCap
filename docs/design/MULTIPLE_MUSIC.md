@@ -49,21 +49,18 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
   membership, each limited to 10,000 IDs. Every music reference also counts as
   visible membership; importing does not place music implicitly.
 - Video contracts do not change: 1–8 uniform tracks, required Ripple/transitions/
-  opening/closing fades and sole video track `opacity` in 0–1. All fifteen nullable keyframe
-  channels are `opacity`, twelve scalar colour fields (including
-  `temperature`, `tint`, `vibrance`, `whites` and `blacks`), `hdr` and `localContrast`. Complete static/keyed Colour remains video track-owned;
-  HSL/curves remain static. There is no clip colour/correction, clip opacity or
-  second opacity channel. Clip-only constant/custom source-frame speed retains
-  its ownership and retiming, plus a required boolean clip `reverse`. Projects also require video track-owned Transform
-  base/per-setting project-frame keyframes;
-  [spatial transforms](SPATIAL_TRANSFORMS.md) do not change music or video track Opacity.
+  opening/closing fades and video track-owned Transform base/per-setting project-frame
+  keyframes, Opacity (0–1) included. Colour belongs to clip grades and adjustments, whose
+  keyframes have fourteen nullable channels: twelve scalar colour fields (including
+  `temperature`, `tint`, `vibrance`, `whites` and `blacks`), `hdr` and `localContrast`;
+  HSL/curves remain static. Video tracks have no Colour, Opacity or keyframes of their own,
+  and there is no clip colour/correction or clip opacity. Clip-only constant/custom source-frame
+  speed retains its ownership and retiming, plus a required boolean clip `reverse`.
+  [Spatial transforms](SPATIAL_TRANSFORMS.md) and grades do not change music.
 
-Projects saved with an older supported schema are upgraded on load: a music track of the
-previous schema becomes a track holding one clip that keeps its ID, with its gain and its
-fades as the track's opening and closing fades, Ripple off and no transitions, so it plays
-exactly as before. Projects and receipt snapshots older than the oldest supported schema
-are rejected and preserved byte-for-byte, along with finished exports. Do not repair or
-delete them automatically. Video-proxy and current `pcm16-48k-stereo-mono-unity-v3` PCM
+Projects and receipt snapshots saved before the current schema, with track Colour, are
+rejected with the reason and preserved byte-for-byte, along with finished exports. Do not
+repair or delete them automatically. Video-proxy and current `pcm16-48k-stereo-mono-unity-v3` PCM
 cache formats and source guards are unchanged; the registries are version 2 (full-content
 checksums).
 
@@ -77,8 +74,8 @@ D = \max\left(\{0\} \cup \{c.\mathrm{end}\} \cup
 $$
 
 Use authoritative retimed clip ends, including hidden video tracks, and every
-music clip's OUT. Music **can extend project duration**. Stored track keyframes
-alone do not extend it. Seek/playback/export use this same duration; music
+music clip's OUT. Music **can extend project duration**. Stored Transform keyframes and
+adjustments alone do not extend it. Seek/playback/export use this same duration; music
 placement never follows video Ripple or video speed.
 
 Each video track's closing fade stays inside its last clip and ends at that
@@ -90,8 +87,9 @@ least one retained video clip; this is not an audio-only export feature.
 
 A music tail beyond video OUT requires the **composited exporter**, which fills
 trailing black frames through project OUT. The static fast path still requires
-one enabled, opaque, unanimated, zero-origin contiguous video track with Shadows/Highlights/HDR/Local contrast 0, exactly
-neutral spatial bases and no spatial keyframes, covering
+no adjustments, unkeyed scalar-only clip grades without Shadows/Highlights/HDR/Local contrast
+and one enabled, zero-origin contiguous video track with Opacity 1, an exactly
+neutral Transform base and no Transform keyframes, covering
 the entire project duration. No frozen-last-image or shortened-audio shortcut is
 permitted.
 
@@ -116,7 +114,7 @@ track adds a clip at the drop frame (a Ripple track takes it at the nearest plac
 sequence); onto the empty music area it starts a track.
 
 Selection is editor-only, with no save or Undo entry. Editing or removing a clip or track
-never edits the other music tracks, video clips, track keyframes or bin membership.
+never edits the other music tracks, video clips, keyframes, adjustments or bin membership.
 Changing Recording targets only the selected clip, which keeps its start and length
 (limited by the new recording unless it loops). Removal leaves the original/cache and
 other placements intact; Undo restores it. Timeline waveform selection, placement and
@@ -243,9 +241,8 @@ positions. Both are
 empty arrays without music, never singular/null/default-filled values. Several
 plans may refer to one captured original. The existing plan name `videoSamples`
 denotes the **full project** sample count, including music tails, not video-only
-OUT. A receipt whose snapshot an older supported schema saved is upgraded in memory
-like a project; its plans still match, since each upgraded clip keeps its ID. Reject
-older snapshots or invalid arrays clearly and preserve their receipts and finished MP4s.
+OUT. Reject snapshots saved before the current schema, or invalid arrays, clearly and
+preserve their receipts and finished MP4s.
 
 Pending acceptance includes strict schema/receipt rejection and preservation;
 independent selection/drafts/Undo and cancellation; repeated-source music tracks;

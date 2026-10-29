@@ -57,7 +57,7 @@ function changedAdjustments(before: ProjectDocument, after: ProjectDocument): nu
   const frames: number[] = [];
   for (const item of after.adjustments) {
     const earlier = previous.get(item.id);
-    if (!earlier || earlier.start !== item.start || earlier.duration !== item.duration) frames.push(item.start);
+    if (earlier?.start !== item.start || earlier.duration !== item.duration) frames.push(item.start);
     else
       frames.push(
         ...changedKeyframes(
