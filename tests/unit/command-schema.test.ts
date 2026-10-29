@@ -124,7 +124,13 @@ type FormerEditCommand =
   | { type: 'move-clips'; clipIds: string[]; delta: number; layerId: string | null }
   | { type: 'transition'; transition: Transition; keepCut?: boolean | undefined }
   | { type: 'fades'; layerId: string; opening: number; closing: number }
-  | { type: 'adjustment-add'; adjustmentId: string; start: number; duration: number }
+  | {
+      type: 'adjustment-add';
+      adjustmentId: string;
+      start: number;
+      duration: number;
+      settings?: Partial<Record<ScalarColourSetting, number>> | undefined;
+    }
   | { type: 'adjustment-remove'; adjustmentId: string }
   | { type: 'adjustment-range'; adjustmentId: string; start: number; duration: number; keyframes: 'move' | 'stay' }
   | { type: 'adjustment-split'; adjustmentId: string; frame: number; newAdjustmentId: string }
@@ -298,9 +304,7 @@ describe('editCommandSchema', () => {
   });
 
   it('validates commands other tools refer to exactly like edit, publishing only their type', () => {
-    const assistant = Object.values(samples).filter(
-      (sample) => !['layer-add', 'layer-update', 'adjustment-split'].includes(sample.type),
-    );
+    const assistant = Object.values(samples).filter((sample) => !['layer-add', 'layer-update'].includes(sample.type));
     for (const sample of assistant)
       expect(referencedEditCommandSchema.parse(sample)).toEqual(editCommandSchema.parse(sample));
     expect(referencedEditCommandSchema.safeParse({ ...samples.delete, clip: 'clip-1' }).success).toBe(false);
@@ -311,12 +315,12 @@ describe('editCommandSchema', () => {
     expect(published.length).toBeLessThan(1_500);
   });
 
-  it('offers the assistant every command but the two carrying a whole track and adjustment-split', () => {
+  it('offers the assistant every command but the two carrying a whole track', () => {
     const types = assistantEditCommandSchema.options.map((option) => option.shape.type.value);
-    expect(types).toHaveLength(editCommandSchema.options.length - 3);
+    expect(types).toHaveLength(editCommandSchema.options.length - 2);
     expect(types).not.toContain('layer-add');
     expect(types).not.toContain('layer-update');
-    expect(types).not.toContain('adjustment-split');
+    expect(types).toContain('adjustment-split');
     expect(assistantEditCommandSchema.safeParse(samples['layer-update']).success).toBe(false);
     expect(referencedEditCommandSchema.safeParse(samples['layer-add']).success).toBe(false);
     expect(assistantEditCommandSchema.parse(samples['layer-create'])).toEqual(samples['layer-create']);

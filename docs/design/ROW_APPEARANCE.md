@@ -67,11 +67,14 @@ only is a clip grade.
   `start + frame` stays a project frame, so trimming back restores them.
 - Items keep their project frames when clips are trimmed, moved, rippled, split or deleted: they
   never follow clips. They never extend the project duration.
-- Commands: `adjustment-add` (`adjustmentId`, `start`, `duration`; a neutral grade),
-  `adjustment-remove` and `adjustment-range` (new `start` and `duration`; with `keyframes: 'move'`
-  the keyframes move with the item, with `'stay'`, a trim, they keep their project frames). The
+- Commands: `adjustment-add` (`adjustmentId`, `start`, `duration` and optional `settings`, the
+  scalar Colour settings it starts with; the others neutral),
+  `adjustment-remove`, `adjustment-range` (new `start` and `duration`; with `keyframes: 'move'`
+  the keyframes move with the item, with `'stay'`, a trim, they keep their project frames) and
+  `adjustment-split` (at a project `frame` inside it, the second piece named `newAdjustmentId`). The
   Colour and `layer-key-*` commands take an `adjustmentId`, with frames counted from its start.
-  An overlap or a 65th item is refused with the reason. Each edit is one Undo step.
+  An overlap or a 65th item is refused with the reason. Each edit is one Undo step. The assistant
+  has every one of them.
 
 For example, clips A and B on two tracks under one adjustment with Exposure 0.5 both get that
 Exposure after their own grades, including in a dissolve; an adjustment keyframe at its frame 30

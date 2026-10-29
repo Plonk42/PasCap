@@ -181,6 +181,28 @@ describe('MCP endpoint', () => {
       });
       expect(stale.isError).toBe(true);
       expect(text(stale)).toMatch(/revision 2, not 1/);
+      // A look over a stretch of the film in one edit: an adjustment with its settings, split in two.
+      const look = await client.callTool({
+        name: 'edit',
+        arguments: {
+          projectId,
+          expectedRevision: 2,
+          commands: [
+            { type: 'adjustment-add', adjustmentId: 'look', start: 0, duration: 120, settings: { saturation: 1.3 } },
+            { type: 'adjustment-split', adjustmentId: 'look', frame: 60, newAdjustmentId: 'look-2' },
+          ],
+        },
+      });
+      expect(look.isError).toBeFalsy();
+      const looks = JSON.parse(
+        text(await client.callTool({ name: 'describe_project', arguments: { projectId, include: ['adjustments'] } })),
+      );
+      expect(
+        looks.adjustments.map((item: { id: string; start: number; end: number }) => [item.id, item.start, item.end]),
+      ).toEqual([
+        ['look', 0, 60],
+        ['look-2', 60, 120],
+      ]);
       const invalid = await client.callTool({ name: 'describe_track', arguments: { projectId } });
       expect(invalid.isError).toBe(true);
       expect(text(invalid)).toMatch(/layerId/);

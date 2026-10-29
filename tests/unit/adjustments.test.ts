@@ -112,6 +112,26 @@ describe('adjustments', () => {
     ).toThrow('at least one frame');
   });
 
+  it('start with the scalar settings they are added with, the others neutral', () => {
+    const added = applyCommand(project(), {
+      type: 'adjustment-add',
+      adjustmentId: 'look',
+      start: 0,
+      duration: 60,
+      settings: { saturation: 1.3, temperature: 0.2 },
+    });
+    expect(added.adjustments[0]!.colour).toEqual({ ...createColourSettings(), saturation: 1.3, temperature: 0.2 });
+    expect(() =>
+      applyCommand(project(), {
+        type: 'adjustment-add',
+        adjustmentId: 'look',
+        start: 0,
+        duration: 60,
+        settings: { saturation: 3 },
+      }),
+    ).toThrow();
+  });
+
   it('carry their keyframes when moved and keep their project frames when trimmed', () => {
     let document = applyCommand(project(), { type: 'adjustment-add', adjustmentId: 'a', start: 10, duration: 40 });
     document = applyCommand(document, {

@@ -36,10 +36,13 @@ export const colourSchema = z
       z.number().min(-1).max(1),
       'Neutral 0: strengthens or (negative) flattens detail against its surroundings.',
     ),
-    hsl: described(hslSchema, 'Static adjustments of eight colour ranges; all 0 is neutral.'),
+    hsl: described(
+      hslSchema,
+      'Static adjustments of eight colour ranges: hue shift, saturation and lightness change; all 0 is neutral.',
+    ),
     curves: described(
       curvesSchema,
-      'Static tone curves on encoded values: master first, then each of red, green and blue.',
+      'Static tone curves on encoded values, master first, then red, green and blue: each 2–16 control nodes with inputs ascending from 0 to 1; identity is (0,0), (0.5,0.5), (1,1).',
     ),
   })
   .strict();

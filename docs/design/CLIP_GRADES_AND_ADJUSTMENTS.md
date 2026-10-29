@@ -246,7 +246,10 @@ own, and the track-level compromise grade is removed with track Colour.
     keyframe count), and `describe_track` reports each clip's grade the same way plus the ids
     of the items overlapping it, so one read explains a clip's look;
   - edit commands `item-add` (a range with an optional grade), `item-set` (range or grade),
-    `item-key-set`, `item-split` and `item-remove`;
+    `item-key-set`, `item-split` and `item-remove`. Implemented under the names the model and the
+    editor use: `adjustment-add` with optional starting `settings`, `adjustment-range`, the
+    Colour commands and `layer-key-set` with an `adjustmentId`, `adjustment-split` and
+    `adjustment-remove`;
   - `estimate` writes clip grades only, like Auto. `still` and `timeline_sheet` render items.
 
 ## Guides changed at delivery
