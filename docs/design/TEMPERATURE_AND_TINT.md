@@ -1,4 +1,4 @@
-# Video track Temperature and Tint
+# Temperature and Tint
 
 Approved contract for [#68](https://github.com/Plonk42/PasCap/issues/68), with
 [automatic white balance](#automatic-white-balance) from [#218](https://github.com/Plonk42/PasCap/issues/218).
@@ -9,36 +9,35 @@ qualification.
 
 ## Ownership, data and controls
 
-Every video track requires finite `colour.temperature` in **−2…2** and `colour.tint` in **−1…1**;
-new tracks start at **0**, neutral. Positive Temperature warms (red relative to
+Every clip grade and adjustment requires finite `colour.temperature` in **−2…2** and
+`colour.tint` in **−1…1**; new ones start at **0**, neutral. Positive Temperature warms (red relative to
 blue), negative cools; positive Tint adds magenta (red/blue relative to green),
 negative adds green. Nonzero settings intentionally colour greys.
 
-All static and animated Colour is video track-owned. Existing, new and moved clips use
-their track's complete grade, including both dissolve sources. Empty tracks remain
-editable; different treatments require different tracks. No clip Colour/correction
-base, ownership toggle or copy to clips is introduced.
+Colour belongs to [clip grades and adjustments](ROW_APPEARANCE.md): a clip's grade follows
+its footage, and the adjustment covering a project frame grades every video track there, after
+each clip's grade, including both dissolve sources. Video tracks have no Colour.
 
-Shared video track keyframes require exactly **fifteen nullable channels**, in control order:
-`opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
+Grade keyframes require exactly **fourteen nullable channels**, in control order:
+`temperature`, `tint`, `exposure`, `brightness`, `contrast`,
 `hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`, `localContrast`. Temperature and Tint are keyed
-independently at absolute project frames, interpolate parameter values using their own
+independently (a clip grade at source frames of its recording, an adjustment at frames counted
+from its start), interpolate parameter values using their own
 Easing at the left keyframe and hold endpoints. Keyframes without that enabled setting are
-skipped. No keyframes for a setting means the saved track base; removing its final keyframe reveals
+skipped. No keyframes for a setting means the grade's saved base; removing its final keyframe reveals
 that unchanged base. HSL bands and master/RGB curves remain **static**, not new
-animation channels. Speed is clip-only, never a track channel.
+animation channels. Speed is clip-only, never a grade setting.
 
-**Colour → Track** shows Temperature and Tint first in its Colour group (the grade still
+The **Colour** tab shows Temperature and Tint first in its Colour group (the grade still
 applies them before Exposure). Main and stored
 keyed settings use native sliders (step 0.01) with coloured tracks (Temperature
 blue → yellow, Tint green → magenta), adjacent exact numeric fields,
-and reset to 0 by double-clicking the name. Main capture diamonds are always visible, with adjacent per-setting **Previous/Next** buttons because not every setting is enabled at every shared keyframe. Its single keyframe-line Previous/Next pair (with the keyframe count) visits the union of Opacity, all twelve scalar colour, HDR and Local contrast keys.
+and reset to 0 by double-clicking the name. Main capture diamonds are always visible, with adjacent per-setting **Previous/Next** buttons because not every setting is enabled at every keyframe. Its single keyframe-line Previous/Next pair (with the keyframe count) visits every keyframe of the grade it edits.
 Enabled setting chips in stored Colour keyframe rows retain
 their per-channel arrows. All main and stored per-channel arrows visit strictly
-earlier/later keyframes where that channel is nonnull (zero is enabled), sharing
-the central off-duration inspection cursor.
+earlier/later keyframes where that channel is nonnull (zero is enabled).
 There is no Animate toggle or stored preference.
-Main capture uses the real project playhead, never
+Main capture uses the real playhead (for a clip grade, the source frame shown there), never
 an inspected stored time. Visible easing selectors read **Easing**, with contextual
 accessible names and interpolation unchanged. No schema or data changes result.
 Sliders never create keyframes; animated main values without an enabled setting at the real
@@ -46,7 +45,7 @@ playhead are read-only until diamond capture.
 Pointer movement previews the draft in the image without a document change; valid release is one Undo step. Escape/cancellation/capture loss/blur restores control and preview.
 Numeric Enter/blur preserves entered precision; invalid drafts stay editable,
 never clamp or default. Resets affect only the targeted base or existing keyframe;
-Colour Reset on an animated track preserves track bases and static HSL/curves.
+Colour Reset on an animated grade preserves its bases and static HSL/curves.
 
 ## One grading formula
 
@@ -85,7 +84,7 @@ native process; existing frame/pixel/resource and A/V gates remain unchanged.
 
 ## Automatic white balance
 
-**Auto white balance**, a button under Tint in the Colour tab of a **clip grade** (track Colour has none, [#285](https://github.com/Plonk42/PasCap/issues/285)), estimates the light at the playhead and keyframes the grade's Temperature and Tint at the source frame shown there. It only chooses values: no
+**Auto white balance**, a button under Tint in the Colour tab of a **clip grade** (adjustments have none, [#285](https://github.com/Plonk42/PasCap/issues/285)), estimates the light at the playhead and keyframes the grade's Temperature and Tint at the source frame shown there. It only chooses values: no
 schema, grade stage, render, export or decoder changes. Its constants live in one
 module, [white-balance.ts](../../src/shared/white-balance.ts), as starting values to tune on real flights.
 
@@ -134,11 +133,10 @@ current grade. [Auto adjust](AUTO_ADJUST.md) reuses this estimate over 1 s aroun
 
 ## Strict preservation and validation
 
-Projects are upgraded to the **current schema** on load from the oldest supported schema
-onwards; current-schema snapshots in version-1 export receipts are accepted. Missing
+Projects and version-1 export receipt snapshots must use the **current schema**. Missing
 Temperature/Tint bases or either nullable keyframe field, unknown fields and saved clip
-Colour/correction are invalid. Reject documents and receipt snapshots **older than the
-oldest supported schema** clearly; preserve their bytes and successful outputs, without
+Colour/correction are invalid. Reject documents and receipt snapshots saved before the current
+schema, with track Colour, clearly with that reason; preserve their bytes and successful outputs, without
 compatibility readers, injected defaults, fallback or automatic deletion.
 Receipt/report/proxy/PCM format versions remain independent and unchanged (the
 registries are version 2, with full-content checksums);
@@ -148,7 +146,7 @@ not change.
 Required disposable checks cover strict bounds/rejection/preservation, neutral
 identity, both axis signs and combined gains, pre-clipping neutral-white
 luminance, intentionally coloured greys, stage order and unchanged CPU/reference/
-native/GPU error gates. Editing checks cover empty tracks, independent capture,
+native/GPU error gates. Editing checks cover clip grades and adjustments, independent capture,
 read-only gaps, final-keyframe removal, resets, invalid/cancelled drafts, Undo/Redo and
 live desktop/compact screenshots. Automatic white balance checks cover the estimator on
 synthetic images (neutral, casts, outlier frame, sky, sunset, letterbox and clipping), the

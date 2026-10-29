@@ -44,12 +44,12 @@ export function upgradeProject(value: unknown, subject = 'project'): unknown {
   ) {
     const version =
       typeof rawVersion === 'string' || typeof rawVersion === 'number' ? String(rawVersion) : 'missing or invalid';
-    const reason =
-      typeof rawVersion === 'number' && rawVersion > PROJECT_SCHEMA_VERSION
-        ? 'It was saved by a newer PasCap version; update PasCap to open it.'
-        : typeof rawVersion === 'number' && rawVersion < TRACK_COLOUR_REMOVED
-          ? 'It grades with track Colour, which PasCap replaced with clip grades and adjustments; it cannot be upgraded and is left unchanged.'
-          : `Projects older than version ${OLDEST_PROJECT_SCHEMA_VERSION} cannot be upgraded.`;
+    let reason = `Projects older than version ${OLDEST_PROJECT_SCHEMA_VERSION} cannot be upgraded.`;
+    if (typeof rawVersion === 'number' && rawVersion > PROJECT_SCHEMA_VERSION)
+      reason = 'It was saved by a newer PasCap version; update PasCap to open it.';
+    else if (typeof rawVersion === 'number' && rawVersion < TRACK_COLOUR_REMOVED)
+      reason =
+        'It grades with track Colour, which PasCap replaced with clip grades and adjustments; it cannot be upgraded and is left unchanged.';
     throw new Error(
       `Unsupported ${subject} schema version ${version}; this build requires ${supportedProjectVersions()}. ${reason}`,
     );

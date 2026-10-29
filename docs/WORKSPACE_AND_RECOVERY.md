@@ -1,12 +1,13 @@
 # Desktop workspace and recovery
 
-The workspace uses **the strict current schema with complete required video track colour and Transform, clip-only speed and reverse, uniform video tracks, required per-track
+The workspace uses **the strict current schema with a complete grade on every clip, project
+adjustments, track Transform with Opacity, clip-only speed and reverse, uniform video tracks, required per-track
 Ripple/transitions/fades, 0–8 independently identified music tracks of clips joined by transitions, project-specific
-video/music bins and draggable shared project-time track keyframes**, with per-setting channel navigation. Layout preferences,
+video/music bins and draggable keyframe markers**, with per-setting channel navigation. Layout preferences,
 stored-keyframe inspection and recovery feedback remain editor-only. Source protection,
 coverage-preserving black fades, grouped dissolves and native video budgets are
-unchanged. Every video track has one required numeric `opacity` in 0–1, initially 1 (100%)
-on new tracks; its sole `opacity` keyframe channel overrides the track value for every
+unchanged. Every video track's Transform has an `opacity` in 0–1, initially 1 (100%)
+on new tracks, which its `opacity` keyframes override for every
 source, including both dissolve sources. There is no saved `clip.opacity`
 or additional track multiplier; current native bounds
 are in [the resource contract](LAYERS_AND_KEYFRAMES.md#properties-panel-and-resource-limits).
@@ -14,11 +15,12 @@ The intended discrete-GPU and long real-flight checks remain deferred.
 
 ## Layout and navigation
 
-Main **Colour → Track** edits twelve scalar video track colour values, HDR, Local contrast and sole Opacity, including
-on empty tracks. Static and keyed Colour share this track ownership on every clip.
-Different treatments require different tracks; there is no per-clip grade or scope
-toggle. Sources are graded once; the Original preview neutralizes track Colour and clip Detail only.
-See [track appearance](design/ROW_APPEARANCE.md) for reset, context and storage details.
+The **Colour** tab edits the twelve scalar colour values, HDR and Local contrast of the selected
+clip's grade or of the adjustment at the playhead. A clip grade belongs to its clip; an
+adjustment grades every video track over a range of the film, after each clip's grade. Video
+tracks have no Colour; Opacity is in **Track → Transform**. The Original preview neutralizes
+grades and clip Detail, or only one kind of grade with a modifier.
+See [clip grades and adjustments](design/ROW_APPEARANCE.md) for reset, context and storage details.
 **Temperature / Tint** precede Exposure, use normalized values (Temperature −2…2, Tint −1…1) and Reset to
 0, and retain native sliders/exact fields in main and stored editors. Main
 diamonds and adjacent per-setting Previous/Next buttons are always visible, alongside section-header navigation and existing stored enabled-setting chip arrows.
@@ -30,7 +32,7 @@ the light of a few frames around it ([details](design/TEMPERATURE_AND_TINT.md#au
 **Auto**, in a clip grade's Colour keyframe line, analyses the second around the playhead, the whole clip or
 each clip of its track on its own, for the grades' values or (from the playhead) a keyframe there, and, from its
 popover's **Apply**, sets eleven settings of each analysed clip's grade in one Undo step, previewing first
-([Auto adjust](design/AUTO_ADJUST.md)). Track Colour has neither.
+([Auto adjust](design/AUTO_ADJUST.md)). Adjustments have neither.
 HSL/curves remain static. See
 [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 **HDR** (0–1, neutral 0) is a keyable SDR local tone-mapping look applied with the
@@ -63,9 +65,10 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
   Clip ("Clip N of M · track") contains the selected clip's **Speed**,
   **Detail**, **Range** and **Placement**; an empty video track shows one line instead.
   Colour contains Colour, **HSL ranges** and **Colour curves** for the selected clip's grade or,
-  with its **Clip / Track** switch, its track's Colour with the single track-owned Opacity control
-  and, at its end, the whole-keyframe list (enabled-setting chips and Animation help).
-  Track ("Applies to all N clips on this track") contains **Transform** (ending with its own
+  with its **Clip / Adjustment** switch (or without a selected clip), the adjustment at the
+  playhead, created there with **New adjustment** when none exists; the Colour section ends with
+  that grade's keyframe list (enabled-setting chips and Animation help).
+  Track ("Applies to all N clips on this track") contains **Transform** with Opacity (ending with its own
   keyframe list), Transitions and Fades;
   Audio owns selected-track music controls (**Music track / Add music track / Delete
   selected music track**, then the track's gain, Ripple and fades and its **Clip**,
@@ -73,7 +76,8 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
   Empty-track selection retains Track context and dormant fades. The chosen tab is
   a browser-local preference that survives reloads.
 - Bottom: frame-scaled multi-track timeline, playhead timecode, highlighted active
-  insertion track, one marker per stored track keyframe, dimmed hidden clips and Activity.
+  insertion track, blue Transform keyframe markers, amber clip grade keyframe markers inside
+  clips, dimmed hidden clips and Activity. Adjustments are not drawn on the timeline yet.
   The responsive toolbar starts with **Snap** and **Snap to beats** (with its Beats / Downbeats only / Hits / Beats and hits menu, [snap to beats](TIMELINE_EDITING.md#snap-to-beats)), then the **Bookmark** group (Previous bookmark, add at the playhead or delete the one there, Next bookmark), then keeps Split, Trim start/end and Delete (which deletes the selected range while one is selected)
   directly visible; Duplicate is in the clip's right-click menu (Ctrl+D), and start
   nudging beside Clip → Placement's start field. Zoom keeps its slider and Fit,
@@ -103,7 +107,7 @@ Media/Properties widths and Timeline height can be resized by pointer or focused
 arrows (16 px; Shift uses 32 px). Double-click/Home resets a divider. Pointer move
 changes only a transient UI size; release saves the layout preference. Escape,
 pointer cancellation and lost capture restore the prior size. Dividers are disabled
-during timeline trim/shared-keyframe/music drafts to preserve captured geometry.
+during timeline trim/keyframe/music drafts to preserve captured geometry.
 
 **Workspace options → Reset layout** restores defaults. Until its divider is moved, the
 Timeline is 220 px tall on viewports under 800 px high and 290 px otherwise.
@@ -125,7 +129,7 @@ insertion target **and its Track context/settings**. Selecting a
 clip or a populated/empty track preserves the user's chosen Properties tab. Its fields
 refresh for the new editing context without applying the previous track/clip's drafts
 to that selection. Automatic track reveal never runs under an active
-trim/shared-keyframe/native clip drag. Selected clips and source-list **Show**
+trim/keyframe/native clip drag. Selected clips and source-list **Show**
 requests are also revealed horizontally; showing the first
 clip restores the normal frame-zero gutter. Selection never changes
 source ranges, clip settings, track Opacity, track order or absolute project-frame keyframes.
@@ -152,20 +156,16 @@ Ctrl/Cmd-click on clips also builds; Delete and Alt+arrows then act on every sel
 ([multi-clip moves](TIMELINE_EDITING.md#insertion-reordering-and-history)).
 Track options contains only rename, Ripple,
 raise/lower and delete; visibility remains a separate sidebar control.
-**Colour → Track** contains the single **Opacity** native slider/exact
-`NumberField` alongside the colour controls, with its diamond.
-The Colour keyframe line's Previous/Next pair visits the union of Opacity,
-twelve scalar, HDR and Local contrast keyframes. Per-channel Opacity
-Previous/Next buttons remain beside the main diamond, alongside
-the existing arrows on enabled setting chips in stored Colour keyframe rows.
-Main and stored sliders/exact fields use **0–100%**, neutral **100%**.
-Required track `opacity` and keyframe values remain **0–1**; UI conversion changes no schema.
-Without Opacity keyframes, either value control edits track `opacity`, including on an empty
-track with no selected clip.
-With keyframes, that channel overrides the track value on every clip and both dissolve
-sources; a setting not enabled at the real playhead is read-only until captured
-with the diamond. Sliders never create implicit keyframes. Unkeyed colour remains
-track-owned with or without keyframes. Opacity is composition coverage, not SDR RGB grading.
+**Track → Transform** contains the track's **Opacity** native slider/exact
+`NumberField` after Rotation, with its blue triangle and per-setting Previous/Next buttons;
+the Transform keyframe line's Previous/Next pair visits every Transform keyframe, Opacity
+included. Main and stored Opacity sliders/exact fields use **0–100%**, neutral **100%**;
+the Transform base and keyframe values remain **0–1**. Without Opacity keyframes, the
+slider edits the Transform base, including on an empty track with no selected clip.
+With keyframes, Opacity follows them on every clip and both dissolve
+sources; a setting not keyed at the playhead is read-only until captured
+with its triangle. Sliders never create implicit keyframes. Opacity is composition coverage,
+not SDR RGB grading; the Colour tab has none.
 **Clip → Placement** contains placement only, without an Opacity or sidebar duplicate.
 Enabling Ripple packs current clips from the first
 current start, closing gaps in one Undo and retaining valid dissolves. While on,
@@ -173,7 +173,7 @@ later clips continuously follow the first anchor; commands persist actual starts
 Turning off captures actual placements for independent edits. **Timeline start
 frame** works on positioned clips or the first Ripple anchor; later
 Ripple starts are disabled with a tooltip explaining how to reorder or
-turn Ripple off. Music, other tracks and absolute track keyframes never follow Ripple.
+turn Ripple off. Music, other tracks, Transform keyframes and adjustments never follow Ripple.
 
 In **Track**, Transitions lists every boundary of the selected track and **Fades**
 edits its opening/closing fades.
@@ -195,11 +195,13 @@ source preview's IN–OUT playback while **Source preview** is shown, the timeli
 otherwise. Editing
 shortcuts cannot mutate clips while using a modal, source control, input, options
 popover, activity drawer or pane divider. Skip links expose the major editor regions.
-On a focused track keyframe marker, Left/Right moves that keyframe one project frame and Shift
-moves ten; Delete/Backspace removes it (one Undo step). Marker keyboard events remain in that context, retaining keyframe/Timeline
+On a focused Transform keyframe marker, Left/Right moves that keyframe one project frame and Shift
+moves ten; on a clip grade marker they move it one source frame (Shift ten). Delete/Backspace
+removes it (one Undo step). Marker keyboard events remain in that context, retaining keyframe/Timeline
 focus while navigating to the moved keyframe, without also firing ordinary playhead-step,
 clip-nudge or other editor shortcuts.
-Click or Enter on a marker selects its track, seeks and opens Colour → Track, without editing; whole-track keyframe navigation preserves the chosen Properties tab.
+Click or Enter on a Transform marker selects its track, seeks and opens Track → Transform; on a
+clip grade marker it selects the clip, seeks and opens the Colour tab on **Clip**, without editing.
 A focused bookmark moves the same way and Delete/Backspace removes it; click, Enter
 or Space only seeks to it.
 
@@ -212,14 +214,14 @@ Selecting a clip or track keeps the chosen tab; explicit Cut/Fade/Dissolve bound
 buttons open Track with that boundary expanded.
 **Expand all / Collapse all** is an icon button on the Properties panel tab bar that changes
 only the visible tab's sections, including temporarily absent ones: Clip's **Speed**,
-**Detail**, **Range** and **Placement**; Track's **Colour**, **HSL ranges**, **Colour curves**, **Transform**,
-**Transitions** and **Fades**; Audio's **Music**. It is hidden while Clip has no
+**Detail**, **Range** and **Placement**; Colour's **Colour**, **HSL ranges** and **Colour curves**;
+Track's **Transform**, **Transitions** and **Fades**; Audio's **Music**. It is hidden while Clip has no
 selected clip or Track no selected track. A tab with any section open offers Collapse all; only an all-collapsed tab offers Expand all. Individual toggles
 and the existing section preferences remain authoritative. Other tabs'
 sections, each keyframe's nested **Edit**, other nested details and help are unchanged.
 Bulk expansion is presentation-only and leaves mounted drafts, processing, history
 and saves unchanged. If preference storage fails, choices still work for the session.
-New preferences keep **Speed**, **Detail**, **Range**, **Placement**, **HSL ranges**, **Colour curves** and **Transform** collapsed and the other Track sections open;
+New preferences keep **Speed**, **Detail**, **Range**, **Placement**, **HSL ranges**, **Colour curves** and **Transform** collapsed and **Colour**, **Transitions**, **Fades** and **Music** open;
 existing expansion preferences remain respected. Help/reset details are contextual,
 not repeated across the main workspace. Collapsing never disables processing.
 
@@ -234,7 +236,7 @@ its valid/invalid drafts and section preferences.
 Each help body is at most two short sentences plus one tip, written as user guidance;
 exact behaviour stays in [the user guide](USER_GUIDE.md), reached from a **Learn more**
 link (opening in a new tab) on every help except startup details.
-Shared-keyframe timing guidance is combined with **Animation help** beside Colour's
+Keyframe timing guidance is combined with **Animation help** beside Colour's
 **Keyframes** heading; there is no separate Keyframe timing help button. Audio timing sits beside
 **Placement & fades**, and startup details beside **Preview needs attention**.
 These title-bar help targets remain available without expanding their settings;
@@ -271,7 +273,9 @@ The **Timeline preview** heading's native **Original** button has the accessible
 name **Show original preview**. The image is original (Colour and Detail bypassed,
 with the **Original** badge) only while the button is held: pointer down until
 release (the pointer is captured, so releasing outside the button counts), or
-Enter/Space held on the focused button. Pointer release or cancel, key release,
+Enter/Space held on the focused button. Holding **Shift** as it is pressed bypasses only clip
+grades and Detail (**Original · clip grades bypassed**), **Alt** only adjustments
+(**Original · adjustments bypassed**); the tooltip lists both. Pointer release or cancel, key release,
 losing button focus or window blur restore the graded preview. It works paused or
 during active playback, including normal decoder buffering. Buffering is not a pause:
 the requested mode is drawn once the required decoded frames arrive,
@@ -282,7 +286,7 @@ there is no global shortcut. **Source preview** is unaffected.
 
 The original view is the composed preview without grading, not the untouched
 recording, original-resolution footage or the selected clip in isolation. All evaluated colour settings are neutral
-across enabled video tracks, including track colour bases/keyframes and both dissolve
+across enabled video tracks, including clip grades, adjustments and both dissolve
 sources, and every clip's Sharpen/Clarity/Denoise is bypassed. Exact decoded source frames and retiming, spatial geometry/coverage, track Opacity,
 visibility, black fades, stacking and music are preserved.
 
@@ -293,11 +297,11 @@ or reloading the editor with a fresh engine restores normal graded preview.
 
 ## Numbers, titles and animation
 
-Colour/Opacity/Transform values, playback rates and music gain share a bounded native slider
+Colour, Opacity/Transform values, playback rates and music gain share a bounded native slider
 with an adjacent exact `NumberField` in main controls and stored-keyed-setting editors.
 The field is the sole numeric value display, not a read-only output or number-only
 layout. Opacity sliders/exact fields always use **0–100%**, neutral **100%**;
-only UI values are scaled, with track `opacity` and keyframe storage unchanged at **0–1**.
+only UI values are scaled, with the Transform's `opacity` base and keyframe values stored at **0–1**.
 
 Pointer sliding keeps a transient local control-value draft that updates the thumb and numeric value, not the document. Dragging a Colour, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Properties change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) update the image on release, after one validated document edit and one Undo step. An invalid release applies nothing; an unchanged value creates no history entry. Each native keyboard slider adjustment is an individual validated edit. Timeline/curve-keyframe gestures retain
 their separate live-preview contracts.
@@ -339,21 +343,21 @@ animated channels without an enabled setting at the playhead are read-only until
 
 Colour, Speed and Transform always show their capture diamonds while the section is expanded, Colour and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown.
 
-Main scalar Colour/Opacity diamonds retain adjacent per-setting
-**Previous/Next** buttons because not every setting is enabled at every shared
-keyframe. The keyframe line holds one Previous/Next pair: Colour visits the Opacity/twelve-scalar/HDR/Local contrast union;
+Main scalar Colour diamonds and Transform triangles retain adjacent per-setting
+**Previous/Next** buttons because not every setting is enabled at every
+keyframe. The keyframe line holds one Previous/Next pair: Colour visits every keyframe of the
+clip grade or adjustment it edits;
 Speed visits all retained custom speed source keyframes of the selected clip,
 including off-trim keyframes and original exclusive OUT, previewing the nearest
 mapped image through authoritative retiming. Speed has a single setting, so its
 diamond has no second per-setting arrows. Transform visits all track Transform
 keyframes, including those after the duration, with its own track-local cursor.
-Speed keeps a clip-local stored-source cursor independent of
-track inspection, allowing successive keyframes to be visited even when their
-nearest first/last preview image is the same. Main capture always uses the real
-displayed project/source frame, never an inspected stored time.
+Speed keeps a clip-local stored-source cursor, allowing successive keyframes to be visited
+even when their nearest first/last preview image is the same. Main capture always uses the
+real displayed project/source frame, never an inspected stored time.
 
-All track, Transform and custom clip-speed selectors visibly read
-**Easing**, retaining contextual accessible names such as **Track keyframe easing N**,
+All clip grade, adjustment, Transform and custom clip-speed keyframe selectors visibly read
+**Easing**, retaining contextual accessible names such as **Clip keyframe easing N**,
 and unchanged interpolation.
 
 ### Clip speed
@@ -369,14 +373,16 @@ plays the clip backwards with the same duration, in one Undo step. Details:
 
 ### Track Transform animation
 
-**Track → Transform** is track-owned and works exactly like Colour, including on an empty
+**Track → Transform** is track-owned and works like the Colour section, including on an empty
 track, with its own project-frame keyframe list and timeline markers.
 Its **Crop left / Crop right / Crop top / Crop bottom / Scale / Translate X /
-Translate Y / Rotation °** sliders and exact fields edit the saved base without
-keyframes. With keyframes, a keyed setting's main value requires that setting's keyframe at the
-real playhead; otherwise it is read-only, while unkeyed settings still edit their base. Each setting has its own blue triangle (**Keyframe Scale**, etc.) and Previous/Next; a triangle explicitly
+Translate Y / Rotation ° / Opacity** sliders and exact fields edit the saved base without
+keyframes; **Opacity** reads 0–100% (stored 0–1) and its slider track runs from a
+checkerboard to solid. With keyframes, a keyed setting's main value requires that setting's keyframe at the
+real playhead; otherwise it is read-only, while unkeyed settings still edit their base. Each setting has its own blue triangle (**Keyframe Scale**, **Keyframe Opacity**, etc.) and Previous/Next; a triangle explicitly
 captures that setting's evaluated value; sliders never create keyframes.
-**Add default Transform keyframe** adds or removes a default keyframe at the playhead.
+**Add default Transform keyframe** adds or removes a default keyframe at the playhead, Opacity
+100% included.
 
 At the end of the section, below the pose settings, a small **Keyframes** heading introduces
 the Transform keyframe list (**Transform keyframes** plus the track name), shown only when
@@ -386,13 +392,13 @@ nearest available frame), **Default** and **Outside duration** badges, a trash (
 Transform keyframe N**), blue enabled-setting chips with per-setting Previous/Next arrows and an
 **Edit** disclosure (closed initially) with **Timeline frame**, **Easing** and a slider/exact
 field per enabled setting. Its **Easing** sets every enabled setting's Easing (**Mixed** when
-they differ), with **Per setting** selects like a track keyframe's. The keyframe line's
+they differ), with **Per setting** selects like a Colour keyframe's. The keyframe line's
 **Previous/Next** pair, the rows and the chip arrows share a track-local cursor that advances
 even when several previews coincide; the inspected row is marked current, and a key after the
 duration gets the dashed **Stored keyframe** panel with **Follow playhead**.
 List fields edit their stored keyframe, not the real-playhead pose.
 Time/value edits do not seek automatically; navigation does not save.
-This cursor is distinct from the shared Colour inspection cursor below.
+Colour has no such cursor.
 
 Deleting the last keyframe reveals the unchanged base; **Reset transform** behaves like
 Colour's Reset (neutral base without keyframes, else the enabled settings of the keyframe
@@ -400,21 +406,21 @@ at the playhead), in one Undo. Exact numeric
 drafts and sliders follow the common apply/release/cancel rules above; collisions
 and out-of-range values retain errors without clamping/merging.
 Selecting another track refreshes context without applying the former draft.
-There is no Transform canvas gizmo or graph drag. Exact neutral poses retain old
-opaque black letterboxing; nonneutral uncovered pixels reveal lower tracks.
+There is no Transform canvas gizmo or graph drag. Exact neutral geometry retains old
+opaque black letterboxing, whatever the Opacity; nonneutral uncovered pixels reveal lower tracks.
 Full schema, geometry and animation details: [spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
-### Shared video track animation
+### Colour animation
 
-The stored **Keyframes** list at the end of **Colour → Track** (fieldset accessible name
-**Track keyframes** plus the track name) belongs to the selected **entire video track**, not
-the selected clip. It remains available on an empty track and shows the enabled-setting chips
-of the current or inspected keyframe; Colour's keyframe line counts and visits the same keyframes.
+The stored **Keyframes** list at the end of the **Colour** section (fieldset accessible name
+**Clip keyframes** or **Adjustment keyframes** plus its name) belongs to the clip grade or
+adjustment the tab edits, as its pinned header names it. It shows the enabled-setting chips of
+each keyframe; Colour's keyframe line counts and visits the same keyframes.
 The question-mark **Animation help** beside its heading uses the common hover/pin/dismiss
-contract above; explanatory text does not replace the shared keyframe editor.
-**Clip** keeps source/clip settings and Speed controls; **Colour → Track**
-keeps track Colour/Opacity playhead value/diamond controls and **Track → Transform** the pose.
-All fifteen settings (Opacity, twelve scalar colour parameters, HDR and Local contrast)
+contract above; explanatory text does not replace the keyframe editor.
+**Clip** keeps source/clip settings and Speed controls; **Colour** keeps the grade's playhead
+value/diamond controls and **Track → Transform** the pose and Opacity.
+All fourteen settings (twelve scalar colour parameters, HDR and Local contrast)
 expose a main diamond with adjacent per-setting **Previous/Next** buttons: **◇ hollow/inactive**
 versus **◆ filled/active**, with `aria-pressed`. A hollow diamond remains clickable; inactivity
 does not set HTML `disabled`. Actual invalid/draft states can disable actions.
@@ -423,32 +429,30 @@ Per-channel native **Previous/Next** arrows remain beside main diamonds and on e
 disabled without the corresponding neighbour, an opened project, or during any
 document-preview draft. They visit strictly
 earlier/later keyframes where that setting is not `null`, including zero, and skip
-keyframes enabling only unrelated channels. Main and stored Opacity arrows visit keyframes with
-`opacity` enabled; Colour's keyframe line visits the colour/Opacity union.
-No opacity diamond/buttons are duplicated in the sidebar.
-Navigation preserves the chosen Properties tab and the activated button's focus,
+keyframes enabling only unrelated channels: the main arrows from the playhead, the chips' from
+their own row. Navigation preserves the chosen Properties tab and the activated button's focus,
 rather than forcing Clip;
 it never saves or creates an Undo step.
 
-Clicking joins/leaves **only that setting** at the current absolute project frame.
-The first enabled setting creates the shared keyframe, the last removal deletes it, and
+Clicking joins/leaves **only that setting** at the playhead: a clip grade keys the source frame
+the clip shows there (unavailable, with the reason, off the clip), an adjustment its own frame
+there. The first enabled setting creates the keyframe, the last removal deletes it, and
 other enabled settings and their Easing are preserved; a joining setting takes the Easing
 the keyframe's settings agree on, else Linear. A keyed channel's main slider/number
 is read-only where that channel is absent, including keyframes belonging to other
 channels, and is shown dimmed with a lock cue. Click its hollow diamond to capture the displayed value first; there are no slider-created
-implicit keyframes. Without Opacity keyframes, the slider edits the track's saved `opacity`,
-including on an empty track. Its `opacity` curve overrides that value across every
-clip on the track, including both dissolve sources; removing the final keyed Opacity
-setting reveals the unchanged track value. Unkeyed colour edits the track base,
-including on empty tracks. Removing the final keyed colour setting reveals its unchanged
-track base. Speed is clip-only and never a track setting.
+implicit keyframes. Unkeyed settings edit the grade's saved values; removing the final keyed
+setting of a channel reveals its unchanged saved value. Speed is clip-only and never a grade
+setting.
 
-The list has no outer disclosure or per-track list expansion preference. Each entry has a
-timecode button (**Go to track keyframe N**) stretched over the entry, so a click anywhere
-outside its controls selects it, **Default** and **Outside duration** badges where
-they apply, a trash (**Delete track keyframe N**) and its enabled-setting chips;
-its inner **Edit** disclosure (closed initially) provides
-**Timeline frame**, **Easing** and values for the enabled settings.
+The list has no outer disclosure or list expansion preference. Each entry has a
+timecode button (**Go to clip keyframe N** or **Go to adjustment keyframe N**) stretched over
+the entry, so a click anywhere outside its controls selects it, **Default** and (for an
+adjustment keyframe after its end) **Outside duration** badges where
+they apply, a trash (**Delete clip keyframe N** or **Delete adjustment keyframe N**) and its
+enabled-setting chips;
+its inner **Edit** disclosure (closed initially) provides **Source frame** (clip grade) or
+**Frame in adjustment**, **Easing** and values for the enabled settings.
 A time edit moves all enabled settings
 and their Easing together in **one Undo step**; colliding times/invalid
 values are rejected without changing the committed document,
@@ -456,58 +460,48 @@ never merged or overwritten. Each enabled setting has its own Easing:
 the **Easing** select sets them all (reading **Mixed** when they differ), and **Per setting**
 reveals one select per setting; each change is one Undo step. Each channel
 interpolates toward its own **next keyframe with that setting enabled**, with
-endpoint holds and unkeyed values only for entirely unanimated channels: track
-`opacity` for Opacity, track `colour` for colour. Keyframe
+endpoint holds and the grade's saved values only for entirely unanimated channels. Keyframe
 input identity/focus and drafts survive time reordering and Undo;
 no persisted keyframe IDs are added.
 
-Stored keyed colour/opacity settings reuse the main sliders and double-click-the-name
-resets, with one exact `NumberField` to the right of each slider; Opacity uses
-**0–100%**, neutral **100%**, while stored values remain **0–1**.
+Stored keyed colour settings reuse the main sliders and double-click-the-name
+resets, with one exact `NumberField` to the right of each slider.
 The local-draft/release-only slider contract above
 applies to all stored keyed settings too. Each accepted value or reset targets only
 that existing stored keyed setting in one Undo step;
-keyframe time, every Easing, other enabled settings, track `opacity` and clip settings stay unchanged.
+keyframe time, every Easing, other enabled settings and saved values stay unchanged.
 There is no implicit joining. Numeric drafts retain entered precision and apply
 on Enter/blur; Escape restores. Empty, nonfinite or out-of-range
 values retain inline errors without clamping.
 
-Keyframes outside current duration remain stored/list-editable. A central editor-only
-inspection cursor is shared by main per-setting arrows, stored-setting chip arrows,
-section navigation to track keyframes, shared marker and list navigation, advancing through several
-off-duration keyframes even when their previews clamp to the same last
-available frame. Labels identify stored time separately from actual preview; a
-timeline without video or music duration has no preview frame; music-only regions
-preview black at their real project frame. List controls edit their stored keyframe,
-but the main setting values, diamond state and capture **still use the real playhead**.
-Manual seek (including the same clamped frame), playback, track/project changes and
-deletion of the inspected keyframe clear inspection. A valid single-keyframe move/Undo
-preserves the cursor and input identity; **Follow playhead** ends inspection explicitly.
+Keyframes on trimmed-off footage or outside an adjustment's range remain stored/list-editable.
+Colour keeps no stored-keyframe cursor: going to such a keyframe previews the clip's nearest
+image or the adjustment's nearest frame, and the main setting values, diamond state and capture
+always use the playhead.
 
-One marker per stored track keyframe lists enabled settings in its title; keyframes after the
-last clip keep their markers there without extending playback. **Horizontal
-marker dragging** captures the project/track/keyframe, zoom, grabbed pointer position,
-scroll and stationary playhead. Capture-relative travel is rounded once and bounded
-to frames 0–2,147,483,647. Valid drafts preview live but never enter autosave/history;
+A clip grade's keyframes are amber ◆ markers inside its clip on the timeline, one per keyframe
+on the footage it shows; adjustments have no timeline markers yet. **Horizontal
+marker dragging** captures the project/clip/keyframe, zoom, grabbed pointer position,
+scroll and stationary playhead and maps capture-relative travel through the clip's retiming
+to a source frame of the recording. Valid drafts preview live but never enter autosave/history;
 valid release moves all enabled settings/values/easing in one Undo step. Snap uses
-captured clip/music/transition boundaries and playhead within eight pixels; Alt
-bypasses it. Horizontal autoscroll retains the captured geometry, with no track move
-or automatic track reveal.
+captured clip/music/transition boundaries, bookmarks and playhead within eight pixels; Alt
+bypasses it. Horizontal autoscroll retains the captured geometry.
 
-An occupied time shows a red
+An occupied source frame shows a red
 invalid ghost. Release reports the error without merging, overwriting
 or committing an earlier valid draft. Escape, pointer cancellation,
 unexpected capture loss or window blur restores preview/document/scroll without a
-draft save. A keyframe may move beyond duration without extending the sequence merely
-to display it; moving it never retimes a clip. Other keyframes, source ranges,
-clip settings and music are not copied or shifted. The shared time field remains
+draft save. Moving a grade keyframe never retimes a clip. Other keyframes, source ranges,
+clip settings and music are not copied or shifted. The list's frame field remains
 an exact alternative, with the same atomic move validation.
 
-Colour **Reset** on an animated track
+Colour **Reset** on an animated grade
 changes only enabled colour values at the current keyframe; double-clicking a setting's
-name resets only that setting, including unanimated track colour bases. Stored-keyframe resets in Colour's keyframe list target that
+name resets only that setting, including the grade's unanimated saved values. Stored-keyframe resets in Colour's keyframe list target that
 keyframe's existing enabled setting, not a different value at the playhead.
-Trim/move/split/duplicate do not copy or shift track keyframes. The contract is in
+Trim/move/split/duplicate keep each clip's grade with its footage and never shift Transform
+keyframes or adjustments. The contract is in
 [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
 ### Clip speed-keyframe lanes and track Transform markers
@@ -522,7 +516,12 @@ inspection remains separate, reaches all retained off-trim/original-OUT keyframe
 and never supplies a fake frame for main capture.
 
 Track Transform keyframes are boxed blue **▼** markers at the top of their track row,
-at project frames; they select, seek, open Track → Transform and slide like Colour markers.
+one per stored keyframe at its project frame, with enabled settings in its title; keyframes
+after the last clip keep their markers there without extending playback. Click or Enter selects
+the track, seeks and opens Track → Transform. They slide like clip grade markers, in project
+frames: drag, or ←/→ (one frame, Shift ten), moves all enabled settings, values and Easing in one
+Undo step, never merging into an occupied frame. A keyframe may move beyond duration without
+extending the sequence merely to display it.
 
 ## Source review and import
 
@@ -631,7 +630,7 @@ anchor; off keeps other clips at independent starts. Left handle/keyboard trims
 keep the sequence start while on, retain timeline OUT while off, and reject an
 unrepresentable integer-frame OUT. **Clip → Range** fields/bar/**Restore full
 recording** instead keep the start in either mode with ordinary source-range trim
-and normal Ripple suffix sequencing. Music, other tracks and shared track keyframes keep their absolute project times. Invalid
+and normal Ripple suffix sequencing. Music, other tracks, Transform keyframes and adjustments keep their absolute project times. Invalid
 fade/overlap/quantisation edits remain atomic. Full details are in
 [TIMELINE_EDITING.md](TIMELINE_EDITING.md).
 
@@ -699,8 +698,8 @@ area it starts a track. Between clips, **Transitions** choose **Cut**, **Crossfa
 **Fade through silence** (or with a **Pause**) with its duration; each boundary's button on the timeline opens it.
 Import merely adds bin membership/preparation and never implicitly places music.
 Selection is editor-only: no seek requirement, history entry or save. Editing,
-changing Recording or removal leaves the other clips, music tracks, video tracks, track
-keyframes and bin membership untouched; Undo restores a removed clip or track, not deleted
+changing Recording or removal leaves the other clips, music tracks, video tracks, keyframes,
+adjustments and bin membership untouched; Undo restores a removed clip or track, not deleted
 media.
 
 Each clip has its own source IN/OUT, start/duration and selected-range loop; its track has
@@ -742,8 +741,9 @@ is editing this project** shows the edit count and the last command with **Take 
 the editor follows the saved project read-only: edits and Undo/Redo are refused with the
 reason; each newer saved revision replaces the document and its history whenever no draft,
 gesture or save is pending, and the preview moves to the earliest frame the assistant's latest
-edit changed (a clip, transition, fade, keyframe, bookmark or music clip; not while playing,
-and not for a whole-track grade). A draft from before the session stays, its saves refused, for
+edit changed (a clip or its grade, transition, fade, keyframe, adjustment, bookmark or music
+clip; not while playing, and not for a track's Transform base or an adjustment's Colour values).
+A draft from before the session stays, its saves refused, for
 the user to download or discard. **Take over** ends the session at once.
 
 When a session the editor followed ends (Take over, the assistant finishing, or the lease
@@ -767,8 +767,9 @@ the dialog was loaded asynchronously while its trigger was disabled.
 project's autosave, to `<title>.pascap.json`: through the browser's save dialog where
 available (Chrome), else as a download; cancelling the dialog does nothing.
 **Open project file…** reads such a file (at most 16 MiB) and creates a **new**
-project from it with a fresh ID, upgrading an older supported schema; it never
-overwrites an existing project. The service validates it like a save: its
+project from it with a fresh ID; it never
+overwrites an existing project. A file saved before the current schema, with track Colour, is
+refused with that reason. The service validates it like a save: its
 recordings and music must be registered here with unchanged originals and valid
 ranges, otherwise nothing is created and the error stays in the dialog.
 
@@ -778,11 +779,14 @@ proxies/cache files, successful MP4s or receipts. This is not cache garbage
 collection; another project's membership and immutable export snapshots are unaffected.
 
 Only strict current-schema projects and project snapshots in version-1 export receipts are interpreted.
-Every video track requires complete Colour, including `temperature`, `tint`, `vibrance`, `whites`, `blacks`, `hdr` and `localContrast` bases
-and static HSL/curves; missing fields and clip colour/correction are invalid.
+Every clip requires a complete `grade`: Colour, including `temperature`, `tint`, `vibrance`,
+`whites`, `blacks`, `hdr` and `localContrast` bases and static HSL/curves, and 0–64 keyframes at
+source frames. The required `adjustments` array holds 0–64 ordered, non-overlapping items with
+the same Colour and keyframes counted from their start. Missing fields and clip
+colour/correction are invalid.
 Every clip requires constant or 1–256-keyframe custom-curve speed and a boolean `reverse`; every video track
 requires complete Transform base/per-setting project-frame keyframes with easing and
-`reset`; saved `clip.spatial` or missing track Transform is invalid, not default-filled.
+`reset`, Opacity included; saved `clip.spatial` or missing track Transform is invalid, not default-filled.
 The required `music` array holds 0–8 music tracks with unique required track and clip IDs,
 each with gain, Ripple, fades, 1–8 clips (source/timing/loop) and one transition per
 adjacent pair; `[]` means no music,
@@ -794,16 +798,15 @@ Both `media` arrays are required, unique and limited to 10,000 IDs each; missing
 membership is an invalid document, not an invitation to expose the global library.
 Every video track requires `ripple`, `transitions`, `openingFade` and `closingFade`;
 project-level transitions/fades and a mandatory first-track identity are absent.
-Every video track also requires numeric `opacity` in 0–1. A new track starts at 1 (100%);
-a missing saved value is invalid, not default-filled. Every keyframe requires exactly
-fifteen nullable fields, in control order: `opacity`, `temperature`,
+A video track has no `colour`, `opacity` or `keyframes`, and saved `clip.opacity` is invalid,
+not ignored or defaulted. Every grade keyframe requires exactly
+fourteen nullable fields, in control order: `temperature`,
 `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `vibrance`, `highlights`,
-`shadows`, `whites`, `blacks`, `hdr`, `localContrast`. HSL/curves remain static. Track
-`opacity` is the sole valid stored value; saved `clip.opacity` and old
-`clipOpacity`/`layerOpacity` channels are invalid, not ignored or defaulted.
-Projects/receipt snapshots saved with an older supported schema are upgraded in memory
-on load; the first save keeps the original file as `<id>.json.schema-N.bak`. Those
-older than the oldest supported schema, or saved by a newer PasCap, are preserved,
+`shadows`, `whites`, `blacks`, `hdr`, `localContrast`. HSL/curves remain static.
+Projects/receipt snapshots saved before the current schema, with track Colour, are refused with
+that reason; there is no upgrade. A later format change upgrades projects in memory
+on load, the first save keeping the original file as `<id>.json.schema-N.bak`. Refused
+documents, including those saved by a newer PasCap, are preserved,
 incompatible and never rewritten with fallback/default local fields; there is no
 automatic deletion of
 projects, receipts or finished videos. Proxy/current PCM formats are unchanged; the
@@ -927,22 +930,27 @@ Export shows the project title, contextual duration and quality up front, then a
 **Output name** field (default project title + quality, validated as 1–100
 characters without slashes/control characters; Enter starts the export). Its
 Rendering details hold the fixed snapshot with counts of clips/video tracks (enabled),
-track keyframes and animated settings, and all independent music tracks. A keyframe
-with several channels counts once, not as separate clip/channel keyframes. Both 720p/4K
-use originals. The static fast path requires neutral HSL/identity colour curves and one enabled, unanimated,
-zero-origin contiguous video track with Opacity 1 and Shadows/Highlights/HDR/Local contrast 0, an exactly neutral Transform base
-and no Transform keyframes; any Transform edit/keyframe (even neutral keyframes), clip detail filter, nonzero HDR or Local contrast, track keyframe, leading start,
+**Adjustments**, **Colour keyframes** (clip grade and adjustment keyframes, with their animated
+settings) and all independent music tracks; the hint below adds the output size, keyed colour
+values and Transform keyframes. A keyframe
+with several settings counts once, not as separate setting keyframes. Both 720p/4K
+use originals. The static fast path requires no adjustments, every clip grade unkeyed,
+scalar-only and without Shadows/Highlights/HDR/Local contrast, and one enabled,
+zero-origin contiguous video track with an exactly neutral Transform base, Opacity 1
+and no Transform keyframes; any adjustment, keyed or advanced clip grade, local tone,
+Transform or Opacity edit/keyframe (even neutral keyframes), clip detail filter, leading start,
 gap, unsupported coverage or music beyond video OUT uses generalized composited
 export. Static video must cover full project duration; composited export fills music
 tails with black rather than holding a last image. That path renders
 premultiplied RGBA16 groups, with $C = \sum_i G_i b_i o_i w_i m_i$ and
 $A = \sum_i o_i w_i m_i$, then source-overs as
 $\mathrm{result} = C + \mathrm{lower}(1 - A)$ without regrading or a track multiplier.
-Here $G_i$ is graded RGB, $b_i$ black-fade brightness, $o_i$ the track's evaluated
+Here $G_i$ is RGB graded by the clip grade, then the adjustment at that frame, $b_i$ black-fade
+brightness, $o_i$ the track's evaluated
 Opacity for each source, $w_i$ dissolve weight and $m_i$ per-pixel spatial coverage.
-Nonneutral uncovered pixels reveal lower tracks; exact neutral poses retain
+Nonneutral uncovered pixels reveal lower tracks; exact neutral geometry retains
 opaque black letterboxing after grading. Both dissolve sources use the
-same track value or overriding `opacity` curve at that project frame, with no second
+same Transform Opacity at that project frame, with no second
 group multiplier. Black fades change $b_i$, not coverage.
 Preview uses two decoders per track (16 maximum) plus one source-review decoder.
 Native limits are four

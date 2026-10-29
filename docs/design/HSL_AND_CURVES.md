@@ -1,10 +1,10 @@
-# Video track HSL ranges and colour curves
+# HSL ranges and colour curves
 
-All colour belongs to the video track, keyed or unkeyed. Clips have no colour or
-correction fields. Twelve scalar colour controls, including Temperature, Tint, Vibrance, Whites and Blacks,
-can be keyed independently in video track animation. HSL ranges and colour curves are
-**static video track settings**, including on empty tracks; the fifteen nullable keyframe
-channels are Opacity, those twelve scalars, HDR and Local contrast (detail-stage settings applied
+Colour belongs to [clip grades and adjustments](ROW_APPEARANCE.md), keyed or unkeyed; video
+tracks have none. Twelve scalar colour settings, including Temperature, Tint, Vibrance, Whites and Blacks,
+can be keyed independently in each grade. HSL ranges and colour curves are
+**static settings of each grade**; the fourteen nullable keyframe
+channels are those twelve scalars, HDR and Local contrast (detail-stage settings applied
 before grading; see [detail filters](DETAIL_FILTERS.md#hdr-look)). Animation does not suppress
 or replace advanced static settings. Temperature (−2…2) and Tint (−1…1) use normalized values,
 neutral 0, and linear gains before Exposure; see
@@ -12,24 +12,25 @@ neutral 0, and linear gains before Exposure; see
 
 ## Required data and SDR order
 
-Required `layer.colour.hsl` contains eight named bands: red, orange, yellow, green,
+Every clip grade and adjustment requires `colour.hsl` with eight named bands: red, orange, yellow, green,
 cyan, blue, purple and magenta. Each requires hue −30…30 degrees, saturation
 −1…1 (multiplier offset) and lightness −0.5…0.5. Centres are 0, 30, 60, 120, 180,
-240, 270 and 300 degrees. Required `layer.colour.curves` contains master, red,
+240, 270 and 300 degrees. Required `colour.curves` contains master, red,
 green and blue arrays, each 2…16 strict `{ x, y }` control nodes with finite coordinates
 in 0…1. Inputs strictly ascend, with first x=0 and last x=1. Endpoint outputs are
 editable; nonmonotonic outputs are valid. No control-node IDs or preset fields are saved.
 Neutral factories create independent nested objects/arrays, with each curve starting as three identity nodes (0, 0.5, 1). They are only creators,
-never repairs for missing saved fields. Projects with an older supported schema are upgraded
-on load; older projects and receipt snapshots are rejected and preserved. Receipt format remains 1;
+never repairs for missing saved fields. Projects and receipt snapshots saved before the current
+schema, with track Colour, are rejected with the reason and left unchanged. Receipt format remains 1;
 proxy and PCM formats are unchanged; the registries are version 2 (full-content
 checksums). No automatic deletion.
 
 The exact order is inverse BT.709 → normalized Temperature/Tint linear gains →
 Exposure → Contrast → Brightness → Whites/Blacks → Hue/Saturation/Vibrance → final
 linear clipping/BT.709 encoding → encoded HSL → master curve → separate RGB curves →
+the adjustment's grade in the same order →
 black-fade brightness → grouped coverage and source-over. This is not HDR output,
-scene-linear HSL, automatic white balance, a speed curve or a per-clip correction.
+scene-linear HSL, automatic white balance or a speed curve.
 Shadows, Highlights, HDR and Local contrast are local stages on source pixels before this grade; see
 [detail filters](DETAIL_FILTERS.md#local-shadows-and-highlights).
 The Original preview bypasses **all** colour stages, retaining
@@ -61,8 +62,8 @@ CPU, native and GPU evaluate the same spline from the same slopes; the editor gr
 draws it as one cubic Bézier per segment. Outputs need not ascend. Arbitrarily narrow
 valid knees are evaluated analytically in native export, not approximated by a
 65³ advanced-colour LUT. Nonneutral HSL or curves route even otherwise static
-projects through composited export. Each such source evaluates the complete eleven
-scalar controls → HSL → master/RGB curves directly on the sampled fractional RGB,
+projects through composited export. Each such source evaluates, for each of its two grades in
+sequence, the complete per-pixel scalar stages → HSL → master/RGB curves directly on the sampled fractional RGB,
 before black fades and group composition. A scalar-only LUT followed by exact
 curves is insufficient: a sharp curve can amplify that LUT's scalar error.
 The exact CPU path retains full input precision without minimum control-node spacing,
@@ -71,10 +72,10 @@ quantisation remain measured approximations under the unchanged error gates.
 
 ## Editing, resets and resource ownership
 
-Colour → Track contains twelve scalar sliders, HDR, Local contrast and the sole Opacity control, grouped
-as in [track appearance](ROW_APPEARANCE.md#properties-and-history).
-The separate, initially collapsed Track sections
-**HSL ranges** and **Colour curves** (after Colour) choose their band/channel with a row of coloured
+The **Colour** tab's Colour section contains twelve scalar sliders, HDR and Local contrast, grouped
+as in [clip grades and adjustments](ROW_APPEARANCE.md#properties-and-history), for the clip grade
+or adjustment the tab edits. The separate, initially collapsed sections
+**HSL ranges** and **Colour curves** follow it in the same tab and edit the same grade. They choose their band/channel with a row of coloured
 square swatches (a radio group: **HSL range** with eight band-centre colours, **Colour curve channel**
 with master grey, red, green and blue), and contain exact numeric fields and a compact SVG curve graph.
 The graph draws all four curves at once in their channel colours; only the selected channel's curve is
@@ -89,26 +90,29 @@ disabled); outputs remain editable.
 Add inserts a sampled control node; delete removes only an interior control node. Graph dragging
 edits both coordinates from capture-relative geometry, clamped to the 0–1 plot: an interior node stays strictly
 between its neighbours (a margin of at most 0.001 keeps it from merging) and endpoint inputs stay fixed. Drafts never save or enter
-history; release commits one complete validated video track colour command. Exact fields still reject invalid
+history; release commits one complete validated colour command for that grade. Exact fields still reject invalid
 values. Escape, cancellation, lost
 capture and window blur restore. Keyboard/exact fields remain usable at 270 px.
 
 Band/all-HSL and channel/all-curves resets affect only their respective static
-settings in one Undo step. Colour Reset on an animated track changes only current keyed
-scalar/Opacity settings, never advanced settings or saved video track bases. Unanimated Reset
-colour resets the entire video track colour and Opacity. Selection/collapse/tab changes
-never apply a former track's draft to another track. Same-track clip selection retains
-track ownership. Control vocabulary follows the [editor control catalogue](EDITOR_CONTROLS.md#vocabulary).
+settings in one Undo step. Colour Reset on an animated grade changes only its current keyed
+scalar settings, never advanced settings or saved bases. Unanimated Reset
+resets the grade's entire Colour, HSL and curves included. Selection/collapse/tab changes
+never apply a former clip's or adjustment's draft to another. Control vocabulary follows the [editor control catalogue](EDITOR_CONTROLS.md#vocabulary).
 
 GPU uses bounded uniforms for two sources: eight HSL vec4 entries and four arrays
-of at most sixteen vec3 (input, output, slope) control nodes per source, plus counts/neutral flags. No extra LUT
+of at most sixteen vec3 (input, output, slope) control nodes per grade, for each source's clip
+grade and adjustment, plus counts/neutral flags. The compositor reads
+`MAX_FRAGMENT_UNIFORM_VECTORS` at start-up; when a source has two grades with HSL ranges or
+curves and the GPU has no room for them, preview fails with an explicit error naming both
+numbers. No extra LUT
 texture, decoder, full-frame buffer, per-track uniform multiplier or native child.
 The compositor owns three fixed shader programs, compiled before playback: the
 complete grouped advanced program, its exact single-source specialization and
 the scalar-only fast path. They share geometry, grading equations, the existing
 decoder textures and vertex array. Single-source specialization eliminates unused
-source-1 grade work; dissolves retain the complete grouped shader. Neutral advanced
-tracks use the scalar path. Curves use at most four binary subdivisions
+source-1 grade work; dissolves retain the complete grouped shader. Sources whose grades are
+both scalar-only use the scalar path. Curves use at most four binary subdivisions
 to locate one of their fifteen intervals. Zero-coverage sources are not graded.
 The engine reuses an intact surface only when exact decoded source identities and
 every evaluated composition value are unchanged. It retains one bounded identity

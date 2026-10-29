@@ -6,12 +6,15 @@ highlight recovery. Originals remain untouched.
 
 ## Colour
 
-The video track's required `colour` (or evaluated colour keyframes) grades sampled RGB once.
-Every clip on that track shares this treatment, whether keyframes are used or not.
-Clips have no colour/correction field. Exactly neutral Colour short-circuits.
-Grading precedes black fades and coverage/group composition. Native scalar paths
-use track-only LUTs and retain at most two reused LUT arrays; advanced grades are exact.
-See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict storage.
+Each source is graded by its clip's grade (`clip.grade`, keyframed at source frames), then by
+the adjustment covering that project frame (`project.adjustments`, keyframed from its start):
+each applies the complete grade below to the previous one's encoded output. Video tracks have
+no Colour, and a dissolve's two sources share the adjustment at that frame. An exactly neutral
+grade short-circuits; a neutral clip grade without an adjustment returns its input unchanged.
+Grading precedes black fades and coverage/group composition. Static export bakes each clip's
+unkeyed scalar grade into its own LUT; composited paths compose each source's two scalar grades
+into one of at most two reused LUT arrays, and advanced grades are exact.
+See [clip grades and adjustments](design/ROW_APPEARANCE.md) for ownership, UI and strict storage.
 
 - Input/output: full-range normalised nonlinear R′G′B′, BT.709 primaries and transfer.
   Limited-range BT.709 Y′CbCr footage is converted with the BT.709 matrix first.
@@ -43,7 +46,8 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
   - Brightness `b`: `V ← V + 2b × V × (1 − V)`, moving mid grey by `b / 2`.
   - Shadows and Highlights are not part of this per-pixel grade: they are local
     exposure changes applied to source pixels before grading, from each area's
-    edge-aware base brightness. See
+    edge-aware base brightness, with the clip grade's and adjustment's values summed
+    and tones chosen after their summed Exposure. See
     [detail filters](design/DETAIL_FILTERS.md#local-shadows-and-highlights).
   - Whites `w`: `V ← V + 0.25w × V^4`, moving the white point: −1 dims pure white to 0.75,
     +1 pushes near-white tones to white; it barely touches tones below the upper range.
@@ -78,17 +82,18 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
 - Grade each decoder independently, then blend **encoded** RGB for dissolves.
   Black fades multiply already-graded encoded RGB. Thus tinted/lifted black cannot
   contaminate fade-to-black. No hidden sharpening, tone mapping or loudness change;
-  clip **Sharpen/Clarity/Denoise** and track **HDR** and **Local contrast** run only when set, on source
+  clip **Sharpen/Clarity/Denoise** and the grades' **HDR** and **Local contrast** run only when set, on source
   taps before this grade ([detail filters](design/DETAIL_FILTERS.md)).
 - With neutral HSL/identity curves, static single-track export generates a 65³
-  scalar cube for FFmpeg `lut3d` tetrahedral interpolation. Composited/animated export
-  reuses at most two scalar-only in-memory 65³ Float32 LUTs from **evaluated parameters**.
+  scalar cube per clip for FFmpeg `lut3d` tetrahedral interpolation. Composited/animated export
+  reuses at most two scalar-only in-memory 65³ Float32 LUTs from **evaluated parameters**,
+  each composing a source's clip grade and adjustment.
   Nonneutral HSL/curves instead require composited export and exact complete CPU
   grading on fractional sampled RGB before premultiplied RGBA16 and final H.264;
   narrow valid knees never pass through a LUT, including the preceding scalar stage.
   No endpoint-LUT/image crossfade substitutes for parameter animation. Scaling to
-  the fitted target image occurs before grading. Exact neutral track Transform poses retain
-  the old opaque black padding after grading. Nonneutral poses inverse-map
+  the fitted target image occurs before grading. Exact neutral track Transform geometry retains
+  the old opaque black padding after grading. Nonneutral geometry inverse-maps
   and resample source RGB before grading, with transparent coverage outside the
   transformed/cropped original; crop does not refit the image.
   Quantisation, interpolation and 4:2:0 encoding are
@@ -97,45 +102,45 @@ See [track appearance](design/ROW_APPEARANCE.md) for ownership, UI and strict st
 
 ## Opacity and animation
 
-Shared video track opacity and colour keyframes, and track Transform keyframes, use
-integer **project frames** and override each keyed channel across every clip on that
-track. Clip-instance custom speed keyframes instead use integer **original-source
-frames**; unkeyed track colour uses `layer.colour` and unkeyed Transform settings
-`layer.transform.base`. Clip speed remains per clip and is never a track channel. **Opacity** is one track-owned
-setting: `VideoLayer.opacity` is a required number in 0–1, initially 1 on a new
-track. Without keyed Opacity settings, every source uses that track value; otherwise
-the track's sole `opacity` channel overrides it, including both dissolve sources.
-There is no saved `clip.opacity` or second opacity channel. The fifteen required
-nullable keyframe fields are `opacity`, `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
-`hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr` and `localContrast`.
+Clip grade keyframes and clip-instance custom speed keyframes use integer **original-source
+frames**; adjustment keyframes count integer frames from the adjustment's start; track
+Transform keyframes use integer **project frames** and override each keyed setting across every
+clip on that track. Unkeyed grade settings use the grade's `colour` and unkeyed Transform
+settings `layer.transform.base`. Clip speed remains per clip and is never a grade setting.
+**Opacity** is the ninth Transform setting: `transform.base.opacity` is a required number in
+0–1, initially 1 on a new track, and nullable `opacity` in Transform keyframes overrides it
+with its own Easing, including on both dissolve sources. There is no saved `clip.opacity` and
+no Opacity in Colour. The fourteen required nullable grade keyframe fields are `temperature`,
+`tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `vibrance`, `highlights`,
+`shadows`, `whites`, `blacks`, `hdr` and `localContrast`.
 Hold/linear/ease-in/ease-out/smooth interpolation is that setting's own Easing at the left keyframe
 with that setting enabled; endpoints hold outside the
-keyed interval. Colour evaluates all twelve scalar parameter values before applying the
-equations above; evaluated HDR and Local contrast feed the detail kernel before grading instead. Trim/split never copy or shift track keyframes or Transform; they retain clip-speed
+keyed interval. Each grade evaluates all twelve scalar parameter values before applying the
+equations above; evaluated HDR and Local contrast feed the detail kernel before grading instead.
+Trim/split keep each clip grade's keyframes on their source frames and never shift Transform
+keyframes or adjustments; they retain clip-speed
 anchors, including those outside the clip range and at the registered
-original's exclusive OUT. Transform poses evaluate at absolute project time, like
-Colour, and apply to every source on the track; see
-[track Transform](design/SPATIAL_TRANSFORMS.md).
+original's exclusive OUT. Transform poses evaluate at absolute project time and apply to every
+source on the track; see [track Transform](design/SPATIAL_TRANSFORMS.md).
 
-The single **Opacity** slider is in **Colour → Track**, beside the colour sliders,
-and starts at **100%**. It edits track `opacity` without keyframes and works on an empty
-track. With keyframes, only an enabled setting at the real playhead is editable; the hollow
-diamond explicitly captures a setting that is not enabled there. Sliders never create keyframes.
-This shared UI placement does not make Opacity an RGB grading parameter: it
+The **Opacity** slider is in **Track → Transform**, after Rotation, and starts at **100%**.
+It edits the Transform base without keyframes and works on an empty track. With keyframes, only
+a setting keyed at the real playhead is editable; its hollow triangle explicitly captures it.
+Sliders never create keyframes. Opacity is not an RGB grading parameter: it
 controls coverage during composition after the SDR colour math above.
 
 For each enabled video track, source-over uses premultiplied encoded RGB/coverage.
 Let $w_i$ be dissolve weight, $o_i$ evaluated Opacity, $b_i$ black-fade brightness
 and $G_i$ graded RGB, with $m_i$ spatial coverage at the output pixel. Evaluate the
-track's Opacity and Transform for each source at the same project frame; each source
+track's Transform, Opacity included, for each source at the same project frame; each source
 keeps its own coverage mask. Group RGB and coverage are
 $C = \sum_i G_i b_i o_i w_i m_i$ and $A = \sum_i o_i w_i m_i$.
 Source-over is $\mathrm{result} = C + \mathrm{lower}(1 - A)$, with no additional track multiplier.
 Every track's dissolve is one group, preventing unintended double attenuation;
 independent pairs may dissolve simultaneously on several tracks. Black fades affect
 that track's RGB, **not alpha**, preserving its available coverage of lower footage.
-Nonneutral poses use $m_i=0$ outside the transformed/cropped source. Exact neutral
-poses preserve $m_i=1$ over the canvas and ungraded black letterbox RGB.
+Nonneutral geometry uses $m_i=0$ outside the transformed/cropped source. Exact neutral
+geometry preserves $m_i=1$ over the canvas and ungraded black letterbox RGB, whatever the Opacity.
 Enabled video track groups blend bottom-to-top over opaque black, with no implicit linear-
 light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
@@ -143,17 +148,18 @@ light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAME
 
 Holding the preview's **Original** button replaces **all evaluated colour settings** with the
 shared `NEUTRAL_COLOUR` value for every enabled video track and both sources in each
-dissolve, bypassing track colour bases and evaluated track colour keyframes alike. Future
-colour controls added to `NEUTRAL_COLOUR` are automatically bypassed, without a
-separate per-control list. Stored grades and keyframes are unchanged.
+dissolve, bypassing clip grades, adjustments and their keyframes alike, and bypasses clip
+Detail. Holding **Shift** as it is pressed bypasses only clip grades and Detail, **Alt** only
+adjustments. Future colour controls added to `NEUTRAL_COLOUR` are automatically bypassed,
+without a separate per-control list. Stored grades and keyframes are unchanged.
 
 Only grading is neutralized: exact observed source frames and `PlacedClip.retiming`,
-spatial geometry/coverage, track Opacity, visibility, dissolve weights, black fades, stacking
+spatial geometry/coverage, Opacity, visibility, dissolve weights, black fades, stacking
 and music retain their normal contract. Original is still the composed preview,
 not the untouched recording, an original-resolution or isolated-selected-clip view; Source preview is unchanged.
 
 The native **Original** button is accessible as **Show original preview**; the image is original
-with a matching canvas badge only while the pointer or focused Enter/Space is held, and the graded
+with a canvas badge naming the mode only while the pointer or focused Enter/Space is held, and the graded
 preview returns on release, focus loss or window blur. It works paused or playing, with no global shortcut.
 Holding is editor-only: no seek, save/history entry, export, schema, proxy or original
 change, or additional decoder. Same-project seeks, appearance updates and timing
@@ -162,8 +168,8 @@ resets to normal graded preview. Export continues to use the saved grading contr
 
 ## Timing
 
-- Project placements, track (including Transform) keyframes and output durations use integer **project frames**;
-  source bounds and clip-speed anchors use integer **original-source frames**.
+- Project placements, Transform keyframes, adjustments and output durations use integer **project frames**;
+  source bounds, clip grade keyframes and clip-speed anchors use integer **original-source frames**.
   Rate: exactly `30000/1001`.
   Seconds exist only at media API / FFmpeg boundaries. Source OUT is exclusive.
 - Cuts consume zero frames. With Ripple on, a track sequences from its first
@@ -191,8 +197,8 @@ resets to normal graded preview. Export continues to use the saved grading contr
   a black transition's centre. It is intentional, deterministic and testable.
 - Incoming/outgoing transition and opening/closing regions must not overlap
   within a clip. Invalid durations/edits are rejected, never silently clamped.
-- Splits deep-copy static settings/clip-speed anchors, preserve exterior boundaries
-  and add a cut; shared track and Transform keyframes stay at their project frames. Pieces recompile
+- Splits deep-copy static settings, grades and clip-speed anchors, preserve exterior boundaries
+  and add a cut; Transform keyframes and adjustments stay at their project frames. Pieces recompile
   and round independently. Ripple-on tracks re-sequence; off tracks retain
   unrelated placements. Reordering tracks changes composition, not clip timing.
   Reordering preserves only unchanged adjacent ID pairs; new pairs become cuts.
@@ -203,7 +209,8 @@ resets to normal graded preview. Export continues to use the saved grading contr
 - Constant or keyframed clip speed changes output duration/source mapping using the shared
   contract in [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md); a clip's duration never
   depends on its track or start. Transitions/fades stay in
-  output frames. Shared video track Colour grades each source once before blending.
+  output frames. Each source is graded by its clip grade, then the adjustment at that frame,
+  before blending.
 - Ripple-off starts are independent absolute project frames; gaps reveal lower
   footage/black. Exact adjacent Cross-dissolve overlap is the only allowed
   same-track overlap; triple overlap is invalid. Total duration is the maximum
@@ -225,7 +232,7 @@ silence outside placement, and receives its own `10^(gainDb/20)` linear fade
 envelope before mixing. Sum all music tracks linearly and **hard-clamp [−1, 1] once
 after all sources**, never per-source or during native pairwise accumulation.
 No normalisation, ducking, effects or hidden gain compensation. Music is not
-retimed/rippled with video tracks; clip speed and track Colour/Opacity are unchanged.
+retimed/rippled with video tracks; clip speed, grades, adjustments and Opacity are unchanged.
 
 One AudioContext/worklet and output-timestamp epoch retain the exact one-frame
 A/V bound through music-only black regions. Native audio uses serial selected
@@ -246,8 +253,9 @@ are not allocated per stored clip; missing decoded frames buffer explicitly
 ([WebCodecs preview decoding](design/WEBCODECS_PREVIEW.md)).
 
 Production export reads originals and uses exact shared retiming. The static fast
-path requires neutral HSL/identity curves, Shadows/Highlights/HDR/Local contrast 0, one enabled video track with Opacity 1, no track keyframes, an exactly neutral
-track Transform base without Transform keyframes, zero origin
+path requires no adjustments, every clip grade unkeyed, scalar-only and without
+Shadows/Highlights/HDR/Local contrast, one enabled video track with an exactly neutral
+Transform base, Opacity 1 and no Transform keyframes, zero origin
 and no internal gaps, covering full project duration; supported track fades/dissolves retain bounded chunks.
 Other valid timelines use generalized sequential RGBA16 group and source-over
 passes without regrading, then one final H.264 encode,
@@ -257,9 +265,9 @@ export requires at least one retained video clip. Resource and numeric limits ar
 [Properties panel and resource limits](LAYERS_AND_KEYFRAMES.md#properties-panel-and-resource-limits).
 
 The diagnostic reference accepts **exactly two normal-speed (constant 1×) clips on one
-enabled, zero-origin contiguous video track with Opacity 1 and static scalar track Colour**,
-neutral HSL and identity curves, Shadows/Highlights/HDR/Local contrast 0, an exactly neutral track Transform
-base without Transform keyframes, without music, extra tracks or track keyframes,
+enabled, zero-origin contiguous video track with unkeyed scalar clip grades**,
+without HSL, curves or Shadows/Highlights/HDR/Local contrast, an exactly neutral track Transform
+base with Opacity 1 and without Transform keyframes, without adjustments, music or extra tracks,
 and is limited to 3,600 project frames. It refuses unsupported
 documents regardless of Ripple or track ID.
 It requires a strict current-schema project snapshot, including explicit project media
@@ -268,12 +276,15 @@ measurement reports must identify their project snapshot's schema without overwr
 historical reports; the report identifier is separate from the project schema.
 Project identifiers such as `preview-lab`/`preview-lab-v6` are not schema versions
 and are not renamed by this contract.
-Project documents saved with an older supported schema are upgraded on load; documents
-and receipt snapshots older than the oldest supported schema are rejected and preserved,
-with no compatibility defaults, old-format/null fallback readers or automatic deletion. The strict current schema requires
-complete video track `colour`, including Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast bases and static HSL/curves,
-all fifteen nullable keyframe fields, constant or custom-curve clip speed, boolean clip `reverse`, track `transform` base/per-setting keyframes and track `opacity`; saved `clip.colour`, `clip.correction`, `clip.opacity`, `clip.spatial` and
-old `clipOpacity`/`layerOpacity` keyframe fields are rejected, not defaulted.
+Projects and receipt snapshots saved before the current schema, with track Colour, are
+rejected with the reason and left unchanged, with no compatibility defaults, old-format/null
+fallback readers or automatic deletion. The strict current schema requires
+a complete `grade` on every clip (Colour, including Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local
+contrast bases and static HSL/curves, and keyframes with all fourteen nullable fields), the
+`adjustments` array, constant or custom-curve clip speed, boolean clip `reverse` and track
+`transform` base/per-setting keyframes, Opacity included; video tracks carry no `colour`,
+`opacity` or `keyframes`, and saved `clip.colour`, `clip.correction`, `clip.opacity` and
+`clip.spatial` are rejected, not defaulted.
 Production export receipts also remain version 1, with strict current-schema snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
 older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
@@ -282,11 +293,12 @@ version 2 (full-content checksums).
 Source ranges and every retained clip speed keyframe position are validated against registered
 original frame counts, including hidden track references.
 
-Video track colour also requires static eight-band HSL and master/red/green/blue curves.
+Each grade, clip grade or adjustment, also requires static eight-band HSL and master/red/green/blue curves.
 The order is decoded linear Temperature/Tint gains before Exposure and the
 remaining scalar SDR stages, encoded BT.709 HSL, master curve, individual RGB
-curves, black-fade brightness and group coverage/source-over. HSL/curves add no
-channels to the fifteen nullable track fields. HSL protects greys in its incoming
+curves, then the adjustment's grade in the same order, black-fade brightness and group
+coverage/source-over. HSL/curves add no channels to the fourteen nullable keyframe fields.
+HSL protects greys in its incoming
 RGB, not greys already coloured by Temperature/Tint. The Original preview bypasses
 the entire colour transform, not geometry or coverage. Precise advanced bounds,
 circular weighting, smooth monotone cubic curves and resource budgets are in

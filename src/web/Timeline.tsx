@@ -792,11 +792,7 @@ export function Timeline(props: Readonly<Props>) {
     frame,
     scale,
     width: baselineWidth,
-    disabled:
-      keyframeNavigation.disabled ||
-      musicGesture !== null ||
-      transformKeys.active ||
-      speedKeys.active,
+    disabled: keyframeNavigation.disabled || musicGesture !== null || transformKeys.active || speedKeys.active,
     snapping,
     beats,
     viewport: scroll,
@@ -912,12 +908,7 @@ export function Timeline(props: Readonly<Props>) {
   const width = Math.max(
     viewportWidth,
     leading +
-      Math.max(
-        storedExtent,
-        dropExtent(dropPlan),
-        transformKeys.draft?.frame ?? 0,
-        bookmarks.draft?.frame ?? 0,
-      ) *
+      Math.max(storedExtent, dropExtent(dropPlan), transformKeys.draft?.frame ?? 0, bookmarks.draft?.frame ?? 0) *
         scale +
       trailing,
     drag.current?.width ?? 0,
