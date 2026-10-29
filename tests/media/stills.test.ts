@@ -6,7 +6,6 @@ import { createApp } from '../../src/server/app.js';
 import { createConfig, type ServiceConfig } from '../../src/server/config.js';
 import { runProcess } from '../../src/server/process.js';
 import { proxyFrameArgs, STILL_SIZE } from '../../src/server/stills.js';
-import { createColourSettings } from '../../src/shared/colour.js';
 import { createClip, projectSchema } from '../../src/shared/model.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
@@ -133,6 +132,7 @@ describe.skipIf(!enabled)('project stills · disposable native fixture', () => {
 
     const created = await app.inject({ method: 'POST', url: '/api/projects', headers, payload: { title: 'Stills' } });
     const project = projectSchema.parse(created.json<{ document: unknown }>().document);
+    const { grade: _grade, ...clip } = createClip('clip-1', asset.id, 0, 60);
     const inserted = await app.inject({
       method: 'POST',
       url: '/api/ops/edit',
@@ -140,7 +140,7 @@ describe.skipIf(!enabled)('project stills · disposable native fixture', () => {
       payload: {
         projectId: project.id,
         expectedRevision: 1,
-        commands: [{ type: 'insert', clip: createClip('clip-1', asset.id, 0, 60), index: 0 }],
+        commands: [{ type: 'insert', clip, index: 0 }],
       },
     });
     expect(inserted.statusCode, inserted.body).toBe(200);
@@ -183,7 +183,7 @@ describe.skipIf(!enabled)('project stills · disposable native fixture', () => {
     );
     expect(meanError(await rgbOf(config, jpeg), expected)).toBeLessThan(4);
 
-    // A candidate grade renders brighter and is never saved.
+    // A candidate adjustment renders brighter and is never saved.
     const brighter = await app.inject({
       method: 'POST',
       url: '/api/ops/still',
@@ -191,7 +191,7 @@ describe.skipIf(!enabled)('project stills · disposable native fixture', () => {
       payload: {
         projectId: project.id,
         frame: 20,
-        commands: [{ type: 'colour', layerId: 'video-1', colour: { ...createColourSettings(), exposure: 1 } }],
+        commands: [{ type: 'adjustment-add', adjustmentId: 'look', start: 0, duration: 60, settings: { exposure: 1 } }],
       },
     });
     expect(brighter.statusCode, brighter.body).toBe(200);
