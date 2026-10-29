@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { described } from '../described.js';
 import { frameSchema, idSchema, musicTransitionSchema, selectRangeSchema, transitionSchema } from '../model.js';
 import { defineOperation } from './spec.js';
+import { gradeSummarySchema } from './grade-summary.js';
 import { durationSchema, timecodeSchema } from './timecode.js';
 
 const span = {
@@ -67,7 +68,7 @@ export const projectDescriptionSchema = z
             .object({
               id: idSchema,
               ...span,
-              grade: described(z.string(), 'Its grade: "none", "static" or "N keyframes".'),
+              grade: described(gradeSummarySchema, 'Its grade: what it changes from neutral, and its keyframe count.'),
             })
             .strict(),
         )

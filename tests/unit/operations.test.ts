@@ -332,7 +332,12 @@ describe('operation routes', () => {
     }>();
     expect(description.revision).toBe(saved.revision);
     expect(saved.adjustments).toEqual([
-      expect.objectContaining({ id: 'look', start: 0, end: 200, grade: '2 keyframes' }),
+      expect.objectContaining({
+        id: 'look',
+        start: 0,
+        end: 200,
+        grade: { settings: { contrast: 1.2, shadows: 0.3 }, keyframes: 2 },
+      }),
     ]);
     expect(description.track!.transform.base).toMatchObject({ scale: 1.5, opacity: 1 });
     expect(description.track!.transform.keyframes.map((key) => [key.frame, key.values.opacity])).toEqual([
@@ -373,6 +378,9 @@ describe('operation routes', () => {
           { frame: 30, timecode: '00:01:00', values: { opacity: 1 }, easing: { opacity: 'linear' }, reset: false },
           { frame: 90, timecode: '00:03:00', values: { opacity: 0.5 }, easing: { opacity: 'linear' }, reset: false },
         ],
+        clips: [],
+        // The track has no clips, so no adjustment lies over it.
+        adjustments: [],
       },
       at: [
         {

@@ -1,5 +1,6 @@
 import { isNeutralClipGrade, type ClipGrade } from '../../shared/grade.js';
 import { projectParts, type describeProject } from '../../shared/operations/describe-project.js';
+import { gradeSummary } from '../../shared/operations/grade-summary.js';
 import { durationOf } from '../../shared/operations/timecode.js';
 import { calculateLayout } from '../../shared/timeline.js';
 import { formatTimecode } from '../../shared/timing.js';
@@ -21,7 +22,7 @@ function span(start: number, end: number) {
 }
 
 /** "none", "static" or "N keyframes". */
-function gradeSummary(grade: Pick<ClipGrade, 'colour' | 'keyframes'>): string {
+function gradeLabel(grade: Pick<ClipGrade, 'colour' | 'keyframes'>): string {
   if (grade.keyframes.length) return `${grade.keyframes.length} keyframe${grade.keyframes.length === 1 ? '' : 's'}`;
   return isNeutralClipGrade(grade) ? 'none' : 'static';
 }
@@ -62,7 +63,7 @@ export const runDescribeProject: OperationRunner<typeof describeProject> = async
                 ? `${clip.speed.rate}×`
                 : `curve, ${clip.speed.keyframes.length} keyframes`,
             reverse: clip.reverse,
-            grade: gradeSummary(clip.grade),
+            grade: gradeLabel(clip.grade),
           })),
         transitions: layer.transitions,
       }));

@@ -2,6 +2,7 @@ import { scalarColourValues } from '../../shared/colour.js';
 import { adjustmentAt, adjustmentColourAt, gradeColourAt, isNeutralClipGrade } from '../../shared/grade.js';
 import type { Interpolation } from '../../shared/keyframes.js';
 import type { describeTrack } from '../../shared/operations/describe-track.js';
+import { gradeSummary } from '../../shared/operations/grade-summary.js';
 import { evaluateSpatial, hasSpatialChannelKeys, SPATIAL_CHANNELS } from '../../shared/spatial.js';
 import { calculateLayout, gradePosition } from '../../shared/timeline.js';
 import { formatTimecode } from '../../shared/timing.js';
@@ -44,17 +45,34 @@ export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
   const chosen = settings ? new Set<string>(settings) : null;
   const placed = calculateLayout(project).clips.filter((item) => item.clip.layerId === layerId);
   const graded = placed.filter(({ clip }) => clip.grade.keyframes.length || !isNeutralClipGrade(clip.grade));
+  const over = ({ start, end }: { start: number; end: number }) =>
+    project.adjustments.filter((item) => item.start < end && start < item.start + item.duration);
+  const adjustments = project.adjustments.filter((item) => placed.some((clip) => over(clip).includes(item)));
   return {
     revision: project.revision,
     ...(parts.has('track') && { track }),
     ...(parts.has('keyframes') && {
-      keyframes: { transform: track.transform.keyframes.map(compact) },
+      keyframes: {
+        transform: track.transform.keyframes.map(compact),
+        clips: placed
+          .filter(({ clip }) => clip.grade.keyframes.length)
+          .map(({ clip }) => ({ clipId: clip.id, keyframes: clip.grade.keyframes.map(compact) })),
+        adjustments: adjustments
+          .filter((item) => item.keyframes.length)
+          .map((item) => ({
+            adjustmentId: item.id,
+            keyframes: item.keyframes.map((key) => ({
+              ...compact(key),
+              timecode: formatTimecode(item.start + key.frame),
+            })),
+          })),
+      },
     }),
     ...(parts.has('grades') && {
-      grades: graded.map(({ clip }) => ({
-        clipId: clip.id,
-        colour: clip.grade.colour,
-        keyframes: clip.grade.keyframes.map(compact),
+      grades: placed.map((item) => ({
+        clipId: item.clip.id,
+        grade: gradeSummary(item.clip.grade),
+        adjustmentIds: over(item).map((adjustment) => adjustment.id),
       })),
     }),
     keyed: {
