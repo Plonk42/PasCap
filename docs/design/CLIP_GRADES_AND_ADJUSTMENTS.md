@@ -6,7 +6,7 @@ v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)). **Status: decided; 
 ([#285](https://github.com/Plonk42/PasCap/issues/285)) and adjustment items replacing track
 Colour ([#286](https://github.com/Plonk42/PasCap/issues/286)) and items on the timeline
 ([#287](https://github.com/Plonk42/PasCap/issues/287), with the Colour tab following the
-selection) are implemented on the v1.3 branch; MCP (#288) and the UX evaluation (#289) are not.** The
+selection) are implemented on the v1.3 branch, and so are items through MCP (#288); the UX evaluation (#289) is not.** The
 current contracts are [clip grades and adjustments](ROW_APPEARANCE.md),
 [spatial transforms](SPATIAL_TRANSFORMS.md) (with Opacity), [HSL and curves](HSL_AND_CURVES.md),
 [Temperature and Tint](TEMPERATURE_AND_TINT.md), [detail filters](DETAIL_FILTERS.md) and
@@ -47,8 +47,8 @@ Options considered (owner, 2026-10-23):
    grades (implemented).
 3. [#286](https://github.com/Plonk42/PasCap/issues/286) adjustment items replace track Colour
    (implemented).
-4. [#287](https://github.com/Plonk42/PasCap/issues/287) items on the timeline;
-   [#288](https://github.com/Plonk42/PasCap/issues/288) items through MCP;
+4. [#287](https://github.com/Plonk42/PasCap/issues/287) items on the timeline and
+   [#288](https://github.com/Plonk42/PasCap/issues/288) items through MCP (implemented);
    [#289](https://github.com/Plonk42/PasCap/issues/289) UX requirements and the closing
    evaluation.
 
@@ -241,7 +241,7 @@ own, and the track-level compromise grade is removed with track Colour.
 - **Clip grades (owner, implemented):** one clip-grade edit command per clip and a batch form like
   `detail-clips` (the Colour commands take `clipIds`). `estimate` with `applyAs: 'shots'` writes each clip's grade values; the
   track-keyframe shots mode is removed.
-- **Items (owner, #288),** balancing features, calls and tokens:
+- **Items (owner, #288, implemented),** balancing features, calls and tokens:
   - no new read: `describe_project` lists items compactly (id, range, non-neutral settings,
     keyframe count), and `describe_track` reports each clip's grade the same way plus the ids
     of the items overlapping it, so one read explains a clip's look;
@@ -265,6 +265,6 @@ appearance contract), [spatial transforms](SPATIAL_TRANSFORMS.md) (Opacity setti
 [speed and audio](../SPEED_AND_AUDIO.md), [colour and timing](../COLOUR_AND_TIMING.md),
 [development](../DEVELOPMENT.md), [the assistant](ASSISTANT_MCP.md), the
 [user guide](../USER_GUIDE.md) and the architecture notes in `.github/copilot-instructions.md`;
-#287 and #288 update them again for items on the timeline and through MCP.
+#287 and #288 updated them again for items on the timeline and through MCP.
 [#176](https://github.com/Plonk42/PasCap/issues/176) (HSL keyframes) then applies to clip grades
 and items.

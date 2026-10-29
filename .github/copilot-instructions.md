@@ -199,8 +199,8 @@ edits real projects with it, so saved data must keep working. Details are in
   bypasses only clip grades /
   adjustments. Colour and `layer-key-*` commands take `clipId` (`colour`: `clipIds`) or
   `adjustmentId`. No migration (owner, 2026-10-28): projects and receipt snapshots saved with track
-  Colour are rejected with the reason and left unchanged. The timeline lane for items is #287, MCP
-  #288; see [clip grades and adjustments](../docs/design/CLIP_GRADES_AND_ADJUSTMENTS.md) and
+  Colour are rejected with the reason and left unchanged. Items are on a pinned timeline lane (#287)
+  and edited through MCP with the `adjustment-*` commands (#288); see [clip grades and adjustments](../docs/design/CLIP_GRADES_AND_ADJUSTMENTS.md) and
   [row appearance](../docs/design/ROW_APPEARANCE.md).
 - Owner-approved #131: Transform is **track-owned, exactly like Colour**.
   Every video track requires strict `transform: { base, keyframes }`; clips have no
