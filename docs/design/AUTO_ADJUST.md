@@ -26,27 +26,29 @@ cannot be edited or the clip's recording has no verified proxy. It analyses the 
 wherever the playhead is, also in a dissolve.
 
 Choosing Auto opens a nonmodal popover naming what it analyses, with two choices. **Source**
-is what it analyses:
+is what it analyses, named by its scope rather than its container, since the track has no grade
+of its own:
 
 - **Playhead** (1 s around it): 16 frames within 30 project frames of the playhead, never
   across the clip's ends, mapped to source frames through `PlacedClip.retiming`. It needs the
   playhead on the clip, otherwise it explains so.
-- **Clip** (all of it): 16 frames spread over the clip's **whole source range**.
-- **Track** (each clip on its own): every clip of the clip's track, each analysed like the Clip
-  source and graded with its own correction, like `estimate` with `clipIds`. It is unavailable,
+- **This clip** (all of it): 16 frames spread over the clip's **whole source range**.
+- **Every clip on Track 1** (each analysed on its own, with the track's name): every clip of the
+  clip's track, each analysed like This clip and graded with its own correction, like `estimate` with `clipIds`. It is unavailable,
   with the reason, until every clip of the track has a verified proxy.
 
 **Apply as** is what it changes:
 
-- **Grade values** (whole clip; **each clip** for the Track source) replaces the values of each
-  analysed clip's grade, from any source.
+- **Grade values** (whole clip; **each clip's grade** for every clip) replaces the values of
+  each analysed clip's grade, from any source.
 - **Keyframe** (at playhead) keys the eleven settings of the clip's grade at the source frame
   shown at the playhead. A keyframe takes the light at the playhead, so it needs the Playhead
-  source: with Clip or Track it is unavailable (**needs Playhead**), and choosing either of them
-  returns Apply as to Grade values. It is also unavailable, with the reason, when the grade holds
+  source: with This clip it is unavailable (**needs Playhead**), with every clip too (**this clip
+  only**: keyframes go to the selected clip only, at the playhead), and choosing either returns
+  Apply as to Grade values. It is also unavailable, with the reason, when the grade holds
   64 keyframes and none is at that source frame.
 
-Auto opens on Clip and Grade values while the grade animates none of the eleven settings, on
+Auto opens on This clip and Grade values while the grade animates none of the eleven settings, on
 Playhead and Keyframe once it animates any of them and the playhead is on the clip. Changing the
 source starts its own analysis; changing Apply as reuses it. While it runs the popover shows
 **Analysing n/N frames…** (16 per analysed clip) and **Cancel**. Then:
@@ -57,7 +59,9 @@ source starts its own analysis; changing Apply as reuses it. While it runs the p
   intensity is previewed in the image while the popover is open, the dragged value while
   dragging, through the live preview path: no document, history or save change.
 - For Grade values, a line per setting a grade animates, such as **Exposure is animated: not
-  changed**, or **Exposure is animated on 2 clips: not changed** for the Track source.
+  changed**, or **Exposure is animated on 2 clips: not changed** for every clip; for every clip,
+  a line also counts the clips keeping some animated settings (**1 of 3 clips keep their
+  animated settings.**), and Apply names its reach: **Apply to 3 clips**.
 - **Apply** commits one Undo step and closes the popover. Hue, HDR, Local contrast, HSL,
   curves, the tracks, Detail and other clips are untouched.
   - Grade values: one `colour` edit per analysed clip (`clipIds` of one clip), the scaled
@@ -73,7 +77,7 @@ source starts its own analysis; changing Apply as reuses it. While it runs the p
   click outside closes it and restores the preview, without an edit.
 
 Errors (an unreadable proxy, frames too dark or too uniform) stay in the popover with
-**Close**; with the Track source they name the clip (**Clip 2 (DJI_0468): These frames are too
+**Close**; for every clip they name the clip (**Clip 2 (DJI_0468): These frames are too
 dark or too uniform to analyse.**), and nothing is applied. Selecting another clip, changing
 project or trimming the clip closes the popover and cancels a running analysis. Moving the
 playhead does not; from the Playhead it starts the analysis around the new playhead.
@@ -99,13 +103,13 @@ Exposure are log-gains, so half the correction is the geometric midpoint of the 
 ## Analysis
 
 **Frames.** For the Clip source, the centres of up to **16** equal slices of the clip's
-`[sourceIn, sourceOut)`; for the Track source, the same for each clip of the track, each fitted on
+`[sourceIn, sourceOut)`; for every clip of the track, the same for each clip, each fitted on
 its own. For the Playhead, the playhead and up to 15 more project frames within
 **30** (1 s) of it inside its clip, shared between the two sides in proportion to their room
 and evenly spaced, exactly as Auto white balance's window (one shared constant), each mapped to the source frame shown there
 (repeated source frames of slow motion are read once). They are
 decoded from the verified proxy (never an original) on a temporary one-decoder reader, one
-clip at a time for the Track source,
+clip at a time for every clip,
 separate from the timeline and source review lanes. Each is drawn into a canvas of at
 most 320 × 180 pixels, exactly the decoded frame the compositor uploads, read back and
 closed at once; the reader is released when done, failed or cancelled. The editor then
@@ -126,7 +130,7 @@ frames: Shades of Grey and Grey-Edge per frame, median pooling, confidence and d
 (cool casts more than warm ones, soft limits 0.5 and 0.3). They are applied to every
 analysed pixel before the tone and colour fits. With the Playhead source and Intensity 80%
 they equal what Auto white balance captures at the same playhead (a unit test compares them);
-the Clip and Track sources deliberately analyse more of the footage, so they can differ from it.
+the whole-clip sources deliberately analyse more of the footage, so they can differ from it.
 When no frame has a usable illuminant (black, clipped or uniform frames), white balance is
 neutral (0 and 0) and the tone fit continues, where Auto white balance reports an error.
 Intensity scales Temperature and Tint like the other settings, within their Colour bounds, not
@@ -308,6 +312,6 @@ over snow kept within 0.05 of its saturation, Saturation giving way first; muted
 raised by both settings, very
 colourful ones lowered by Saturation, monochrome ones untouched; intensity scaling, exaggeration within bounds and frame selection. Editor tests cover the target (the graded clip, wherever the playhead is, and each clip of its track) and the keyframe window (reversed and retimed), the clip grade edits (one per clip, one Undo step, kept through a trim), the keyframe capture at the source frame (new, joined, 64-keyframe limit), the initial choice, animated settings and session memory. A
 browser test checks, on a generated flat proxy, that Apply at the initial 80% writes
-exactly the estimator's result for the pixels the page decodes into the clip's grade, as values and as keyframes at two frames, and each clip's own correction for the Track source; it previews without editing and covers
+exactly the estimator's result for the pixels the page decodes into the clip's grade, as values and as keyframes at two frames, and each clip's own correction for every clip of a track; it previews without editing and covers
 Undo, intensity including 100%, reuse without decoding, animated settings, cancellation, selecting another clip and failures, including a black clip named among the track's. The analysed pixels equal the compositor input, as checked for Auto white
 balance.

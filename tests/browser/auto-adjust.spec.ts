@@ -240,9 +240,11 @@ function keyframed(document: ProjectDocument, frame: number, correction: AutoCor
 const auto = (page: Page) => page.locator('summary[aria-label="Auto adjust"]');
 const apply = (page: Page) => page.getByRole('button', { name: 'Apply', exact: true });
 const intensity = (page: Page) => page.getByRole('spinbutton', { name: 'Auto adjust intensity', exact: true });
-/** A Source (Playhead, Clip, Track) or Apply as (Grade values, Keyframe at playhead) choice. */
-const choice = (page: Page, name: 'Playhead' | 'Clip' | 'Track' | 'Grade values' | 'Keyframe at playhead') =>
-  page.getByRole('radio', { name, exact: true });
+/** A Source (Playhead, This clip, Every clip on Track 1) or Apply as (Grade values, Keyframe at playhead) choice. */
+const choice = (
+  page: Page,
+  name: 'Playhead' | 'This clip' | 'Every clip on Track 1' | 'Grade values' | 'Keyframe at playhead',
+) => page.getByRole('radio', { name, exact: true });
 const flatGrade = (document: ProjectDocument) => document.clips.find((clip) => clip.id === 'flat')!.grade;
 const selectClip = (page: Page, clipId: string) =>
   page.locator(`[data-clip-id="${clipId}"] .timeline-clip-body`).click();
@@ -443,7 +445,7 @@ test('leaves animated settings and keyframes unchanged and says so', async ({ pa
   // The grade animates Exposure and Saturation: Auto starts on a keyframe, the grade values remain a choice.
   await expect(choice(page, 'Playhead')).toBeChecked();
   await expect(choice(page, 'Keyframe at playhead')).toBeChecked();
-  await choice(page, 'Clip').check();
+  await choice(page, 'This clip').check();
   await expect(choice(page, 'Grade values')).toBeChecked();
   await expect(page.getByText('Saturation is animated: not changed', { exact: true })).toBeVisible();
   await expect(page.getByText('Exposure is animated: not changed', { exact: true })).toBeVisible();
@@ -465,7 +467,7 @@ test('Keyframe at playhead keys the eleven settings from the frames around it, o
   const first = await expectedCorrection(page, keyframeFrames(before, 45));
   const graded = await checksum(page);
   await auto(page).click();
-  await expect(choice(page, 'Clip')).toBeChecked();
+  await expect(choice(page, 'This clip')).toBeChecked();
   await expect(choice(page, 'Grade values')).toBeChecked();
   // A keyframe takes the light at the playhead: it needs the Playhead source.
   await expect(choice(page, 'Keyframe at playhead')).toBeDisabled();
@@ -539,6 +541,8 @@ test('the Track source grades each clip of the track on its own in one Undo step
   // A second flat range replaces the black clip, so that both clips can be analysed.
   const seeded = await current(page);
   seeded.clips[1] = { ...seeded.clips[1]!, id: 'later', sourceIn: 40, sourceOut: 120 };
+  // The later clip's grade animates Exposure, which applying values leaves to its keyframe.
+  seeded.clips[1].grade.keyframes = [layerKeyAsGradeKey(sharedPoint(60, { exposure: 0.2 }))];
   seeded.layers[0]!.transitions = [{ leftId: 'flat', rightId: 'later', type: 'cut', duration: 0 }];
   memory.seed(projectSchema.parse(seeded));
   await page.reload();
@@ -559,12 +563,21 @@ test('the Track source grades each clip of the track on its own in one Undo step
   await expect(apply(page)).toBeVisible();
   await choice(page, 'Playhead').check();
   await choice(page, 'Keyframe at playhead').check();
-  await choice(page, 'Track').check();
+  await choice(page, 'Every clip on Track 1').check();
   await expect(choice(page, 'Grade values')).toBeChecked();
   await expect(choice(page, 'Keyframe at playhead')).toBeDisabled();
+  // Keyframes go to the selected clip only; the grade values reach each clip's grade.
+  await expect(page.locator('label', { has: choice(page, 'Keyframe at playhead') })).toHaveAttribute(
+    'title',
+    'Keyframes go to this clip only, at the playhead.',
+  );
+  await expect(page.locator('label', { has: choice(page, 'Grade values') })).toContainText('each clip’s grade');
   await expect(page.locator('.auto-adjust-source')).toHaveText('From 2 clips on Track 1, each on its own');
-  await expect(apply(page)).toBeVisible();
-  await apply(page).click();
+  const applyAll = page.getByRole('button', { name: 'Apply to 2 clips', exact: true });
+  await expect(applyAll).toBeVisible();
+  await expect(page.locator('.auto-adjust-scope')).toHaveText('1 of 2 clips keep their animated settings.');
+  await expect(page.getByText('Exposure is animated: not changed', { exact: true })).toBeVisible();
+  await applyAll.click();
   const expected = autoAdjustCommands(context(before, 45), target, 'values', corrections, 0.8).reduce(
     applyCommand,
     before,
@@ -600,7 +613,7 @@ test('explains when it cannot run, and a cancelled or failed analysis leaves no 
 
   // Each clip of the track is analysed on its own, and the black one has nothing to measure.
   await auto(page).click();
-  await choice(page, 'Track').check();
+  await choice(page, 'Every clip on Track 1').check();
   await expect(page.locator('.auto-adjust-panel').getByRole('alert')).toHaveText(
     /^Clip 2 \(pattern-a\): These frames are too dark or too uniform to analyse\.$/,
   );
