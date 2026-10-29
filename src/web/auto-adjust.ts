@@ -75,7 +75,7 @@ export function autoAdjustTarget(
   if (!asset) return unavailable('Prepare the recording of this clip first.');
   const { sourceIn, sourceOut } = placed.clip;
   const prefix = [placed.clip.id, asset.id, preparedAt(asset), sourceIn, sourceOut];
-  const target = (key: unknown[], sourceFrames: number[]): AutoAdjustAvailability => ({
+  const target = (key: (string | number)[], sourceFrames: number[]): AutoAdjustAvailability => ({
     target: { source, label: asset.name, key: key.join(':'), parts: [{ clip: placed, name: '', asset, sourceFrames }] },
     reason: null,
   });
@@ -84,6 +84,12 @@ export function autoAdjustTarget(
     return unavailable('Move the playhead over this clip to analyse 1 s around it.');
   const sourceFrames = windowSourceFrames(placed, context.playhead);
   return target(['playhead', ...prefix, context.playhead, sourceFrames.join(',')], sourceFrames);
+}
+
+/** The name of the graded clip's track. */
+export function trackNameOf(context: AutoAdjustContext): string {
+  const clip = context.project.clips.find((item) => item.id === context.clipId);
+  return context.project.layers.find((layer) => layer.id === clip?.layerId)?.name ?? 'this track';
 }
 
 function trackTarget(context: AutoAdjustContext, graded: PlacedClip): AutoAdjustAvailability {
@@ -113,6 +119,7 @@ function trackTarget(context: AutoAdjustContext, graded: PlacedClip): AutoAdjust
 
 /** Why a keyframe cannot take the correction from `source` at the playhead, or null. */
 export function keyframeReason(context: AutoAdjustContext, source: AutoAdjustSource): string | null {
+  if (source === 'track') return 'Keyframes go to this clip only, at the playhead.';
   if (source !== 'playhead') return 'A keyframe takes the light at the playhead: analyse the playhead.';
   const owner = gradeOwnerOf(context.project, context.clipId);
   const placed = context.layout.clips.find((item) => item.clip.id === context.clipId);
@@ -145,6 +152,14 @@ export function animatedParts(
     for (const setting of owner ? animatedSettings(owner) : []) counts.set(setting, (counts.get(setting) ?? 0) + 1);
   }
   return [...counts].map(([setting, clips]) => ({ setting, clips }));
+}
+
+/** How many analysed clips' grades animate a setting Auto sets, which applying values leaves unchanged there. */
+export function clipsKeepingAnimated(project: ProjectDocument, target: AutoAdjustTarget): number {
+  return target.parts.filter((part) => {
+    const owner = gradeOwnerOf(project, part.clip.clip.id);
+    return owner !== null && animatedSettings(owner).length > 0;
+  }).length;
 }
 
 /**

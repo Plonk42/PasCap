@@ -466,8 +466,9 @@ colour with Saturation and Vibrance, which lifts muted colours more than strong 
 strong colours such as a blue sky fill much of the frame, it relies on Vibrance so they stay
 close to how they were. It lowers only very colourful footage, with Saturation.
 First choose its **Source**, what it analyses: **Playhead** (the second around it, with the
-playhead on the clip), **Clip** (16 frames spread over the whole clip) or **Track** (each clip of
-the track on its own, so each gets its own correction). Then choose how to **Apply as**:
+playhead on the clip), **This clip** (16 frames spread over the whole clip) or **Every clip on** the track (each clip
+analysed on its own, so each gets its own correction; Apply then reads **Apply to N clips**).
+Keyframes always go to the selected clip only, at the playhead. Then choose how to **Apply as**:
 
 - **Grade values** sets Temperature, Tint, Saturation, Vibrance, Exposure, Brightness,
   Contrast, Highlights, Shadows, Whites and Blacks of the clip's grade (with Track, of each
