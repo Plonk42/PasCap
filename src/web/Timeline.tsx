@@ -14,7 +14,7 @@ import {
 import type { AudioAsset } from '../shared/audio.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { ColourSettings } from '../shared/colour.js';
-import { GRADE_SETTINGS } from '../shared/grade.js';
+import { adjustmentAt, GRADE_SETTINGS } from '../shared/grade.js';
 import { KEYFRAME_SETTINGS } from '../shared/keyframes.js';
 import { resolveMediaSelection, type MediaSelections } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
@@ -33,6 +33,8 @@ import { spatialKeyChannels } from '../shared/spatial.js';
 import { clipDuration } from '../shared/speed.js';
 import { calculateLayout, transitionOffset, type PlacedClip } from '../shared/timeline.js';
 import { formatTimecode, framesToSeconds, secondsToFrames } from '../shared/timing.js';
+import { AdjustmentLane, type AdjustmentGesture } from './AdjustmentLane.js';
+import { adjustmentKeyframeKind, adjustmentLabel, type AdjustmentKeyframeTarget } from './adjustment-ui.js';
 import { clipKeyframeMarkers, gradeKeyframeMarkers, type ClipKeyframeMarker } from './clip-keyframe-markers.js';
 import { clipKeyframeKind, clipKeyframeSlideTarget, type ClipKeyframeTarget } from './clip-keyframe-drag.js';
 import type { ColourTarget, InspectorSectionTarget } from './InspectorSection.js';
@@ -74,7 +76,7 @@ import {
   LANE_OFFSET,
   MUSIC_LANE_HEIGHT,
   musicLanesTop,
-  TIMELINE_RULER_HEIGHT,
+  TIMELINE_PINNED_HEIGHT,
   timelineLayerAt,
   timelineRows,
 } from './timeline-rows.js';
@@ -114,6 +116,8 @@ interface Props {
   onSelectLayer: (id: string) => void;
   selectedMusicId: string | null;
   onSelectMusic: (id: string) => void;
+  selectedAdjustmentId: string | null;
+  onSelectAdjustment: (id: string) => void;
   /** Opens the transition after this music clip in Audio. */
   onMusicBoundary: (leftClipId: string) => void;
   selectedBoundaryId: string | null;
@@ -219,11 +223,13 @@ function timelineInteractionMessage(
     transform,
     speed,
     grade,
+    adjustment,
     bookmark,
   }: {
     transform: KeyframeSlideDraft<KeyframeSlideTarget> | null;
     speed: KeyframeSlideDraft<ClipKeyframeTarget> | null;
     grade: KeyframeSlideDraft<ClipKeyframeTarget> | null;
+    adjustment: KeyframeSlideDraft<AdjustmentKeyframeTarget> | null;
     bookmark: KeyframeSlideDraft<KeyframeSlideTarget> | null;
   },
   error: string,
@@ -239,12 +245,39 @@ function timelineInteractionMessage(
       grade.error ||
       `Clip grade keyframe · source frame ${grade.frame} · all its settings move together · release to apply · Esc cancels`
     );
+  if (adjustment)
+    return (
+      adjustment.error ||
+      `Adjustment keyframe · ${formatTimecode(adjustment.at)} · all its settings move together · release to apply · Esc cancels`
+    );
   if (transform)
     return (
       transform.error ||
       `Transform keyframe · ${formatTimecode(transform.frame)} · all its settings move together · release to apply · Esc cancels`
     );
   return interactionMessage(error, plan, draft, selected);
+}
+
+/** A music or adjustment gesture's status line, if one is active. */
+function laneGestureMessage(music: MusicTimelineGesture | null, adjustment: AdjustmentGesture | null): string | null {
+  if (music) return music.error || `Music track · ${formatTimecode(music.start)} · release to apply · Esc cancels`;
+  if (adjustment)
+    return (
+      adjustment.error ||
+      `Adjustment ${adjustmentLabel(adjustment.range)} · release to apply · Alt bypasses snapping · Esc cancels`
+    );
+  return null;
+}
+
+/** The adjustment grading the selected clip where the playhead is. */
+function gradingAdjustmentId(selected: PlacedClip | undefined, frame: number, project: ProjectDocument) {
+  if (!selected || frame < selected.start || frame >= selected.end) return null;
+  return adjustmentAt(project.adjustments, frame)?.id ?? null;
+}
+
+/** Another gesture blocks the adjustment track; its own gesture keeps it live. */
+function adjustmentLaneDisabled(blocked: boolean, gesture: AdjustmentGesture | null, drop: DropPlan | null): boolean {
+  return (blocked && gesture === null) || drop !== null;
 }
 
 /** Timeline-direction trim steps: positive moves the edge right. A reversed clip shows source OUT at its left. */
@@ -729,6 +762,8 @@ export function Timeline(props: Readonly<Props>) {
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const [draft, setDraft] = useState<ProjectDocument | null>(null);
   const [musicGesture, setMusicGesture] = useState<MusicTimelineGesture | null>(null);
+  const [adjustmentGesture, setAdjustmentGesture] = useState<AdjustmentGesture | null>(null);
+  const laneGesture = musicGesture !== null || adjustmentGesture !== null;
   const [dragError, setDragError] = useState('');
   const [dropPlan, setDropPlan] = useState<DropPlan | null>(null);
   const [verticalScroll, setVerticalScroll] = useState(0);
@@ -762,7 +797,7 @@ export function Timeline(props: Readonly<Props>) {
     frame,
     scale,
     width: baselineWidth,
-    disabled: keyframeNavigation.disabled || musicGesture !== null,
+    disabled: keyframeNavigation.disabled || laneGesture,
     snapping,
     beats,
     viewport: scroll,
@@ -777,7 +812,7 @@ export function Timeline(props: Readonly<Props>) {
     frame,
     scale,
     width: baselineWidth,
-    disabled: keyframeNavigation.disabled || musicGesture !== null || transformKeys.active,
+    disabled: keyframeNavigation.disabled || laneGesture || transformKeys.active,
     snapping,
     beats,
     viewport: scroll,
@@ -792,7 +827,7 @@ export function Timeline(props: Readonly<Props>) {
     frame,
     scale,
     width: baselineWidth,
-    disabled: keyframeNavigation.disabled || musicGesture !== null || transformKeys.active || speedKeys.active,
+    disabled: keyframeNavigation.disabled || laneGesture || transformKeys.active || speedKeys.active,
     snapping,
     beats,
     viewport: scroll,
@@ -801,14 +836,34 @@ export function Timeline(props: Readonly<Props>) {
     onEdit,
     onError,
   });
-  const gestureActive = transformKeys.active || speedKeys.active || gradeKeys.active;
+  const adjustmentKeys = useKeyframeSlide({
+    kind: adjustmentKeyframeKind({
+      onSelect: props.onSelectAdjustment,
+      onSeek,
+      onOpen: () => props.onOpenSection('colour', 'adjustment'),
+    }),
+    project,
+    frame,
+    scale,
+    width: baselineWidth,
+    disabled:
+      keyframeNavigation.disabled || laneGesture || transformKeys.active || speedKeys.active || gradeKeys.active,
+    snapping,
+    beats,
+    viewport: scroll,
+    onPause,
+    onPreview,
+    onEdit,
+    onError,
+  });
+  const gestureActive = transformKeys.active || speedKeys.active || gradeKeys.active || adjustmentKeys.active;
   const bookmarks = useKeyframeSlide({
     kind: bookmarkKind(onSeek),
     project,
     frame,
     scale,
     width: baselineWidth,
-    disabled: keyframeNavigation.disabled || musicGesture !== null || gestureActive,
+    disabled: keyframeNavigation.disabled || laneGesture || gestureActive,
     snapping,
     beats,
     viewport: scroll,
@@ -877,9 +932,11 @@ export function Timeline(props: Readonly<Props>) {
     transformKeys.draft?.document ??
     speedKeys.draft?.document ??
     gradeKeys.draft?.document ??
+    adjustmentKeys.draft?.document ??
     bookmarks.draft?.document ??
     draft ??
     musicGesture?.document ??
+    adjustmentGesture?.document ??
     project;
   const layout = useMemo(
     () => (visible === project ? baseLayout : calculateLayout(visible)),
@@ -892,7 +949,8 @@ export function Timeline(props: Readonly<Props>) {
   const availableHead = recoverableHead(selected, source?.metadata.frameCount);
   // Selection must not move frame zero beneath the mouse. The timeline origin
   // stays fixed; omitted source is still recoverable through handles/Home/End.
-  const leading = drag.current?.leading ?? movement.current?.leading ?? musicGesture?.leading ?? 32;
+  const leading =
+    drag.current?.leading ?? movement.current?.leading ?? musicGesture?.leading ?? adjustmentGesture?.leading ?? 32;
   const unusedTail =
     source && selected ? recoverableTail(selected, source.metadata.frameCount) - (layout.duration - selected.end) : 0;
   const trailing = Math.max(TRAILING_MIN, unusedTail * scale + 24);
@@ -916,11 +974,12 @@ export function Timeline(props: Readonly<Props>) {
     transformKeys.draft?.width ?? 0,
     speedKeys.draft?.width ?? 0,
     gradeKeys.draft?.width ?? 0,
+    adjustmentKeys.draft?.width ?? 0,
     bookmarks.draft?.width ?? 0,
     musicGesture?.width ?? 0,
+    adjustmentGesture?.width ?? 0,
   );
-  const interactionBlocked =
-    musicGesture !== null || timelineInteractionBlocked(draft, slideActive, keyframeNavigation.disabled);
+  const interactionBlocked = laneGesture || timelineInteractionBlocked(draft, slideActive, keyframeNavigation.disabled);
   const clipMarkerBlocked = (): boolean =>
     interactionBlocked ||
     drag.current !== null ||
@@ -943,8 +1002,7 @@ export function Timeline(props: Readonly<Props>) {
     : ZOOM_MAX;
   const zoomMin = Math.min(ZOOM_MIN, fitScale);
   const fitTimeline = (): void => {
-    if (storedExtent && !drag.current && !slideActive && !musicGesture)
-      setPixelsPerSecond(Math.min(ZOOM_MAX, fitScale));
+    if (storedExtent && !drag.current && !slideActive && !laneGesture) setPixelsPerSecond(Math.min(ZOOM_MAX, fitScale));
   };
   const zoomBy = (factor: number): void =>
     setPixelsPerSecond(Math.max(zoomMin, Math.min(ZOOM_MAX, pixelsPerSecond * factor)));
@@ -970,17 +1028,17 @@ export function Timeline(props: Readonly<Props>) {
       drag.current ||
       movingClip.current ||
       slideActive ||
-      musicGesture
+      laneGesture
     )
       return;
     const top = selectedRowTop - LANE_OFFSET;
-    if (top < element.scrollTop + TIMELINE_RULER_HEIGHT) element.scrollTop = Math.max(0, top - TIMELINE_RULER_HEIGHT);
+    if (top < element.scrollTop + TIMELINE_PINNED_HEIGHT) element.scrollTop = Math.max(0, top - TIMELINE_PINNED_HEIGHT);
     else if (top + LANE_HEIGHT > element.scrollTop + element.clientHeight)
       element.scrollTop = top + LANE_HEIGHT - element.clientHeight;
   }, [selectedLayerId, selectedClipId, props.revealRequest, selectedRowTop, viewportHeight]);
   useEffect(() => {
     const element = scroll.current;
-    if (!element || drag.current || movingClip.current || movement.current || slideActive || musicGesture) return;
+    if (!element || drag.current || movingClip.current || movement.current || slideActive || laneGesture) return;
     const placed = calculateLayout(project).clips.find((item) => item.clip.id === selectedClipId);
     if (!placed) return;
     const left = 32 + placed.start * scale;
@@ -996,14 +1054,14 @@ export function Timeline(props: Readonly<Props>) {
       !element ||
       revealTarget.current !== 'music' ||
       index < 0 ||
-      musicGesture ||
+      laneGesture ||
       drag.current ||
       movingClip.current ||
       slideActive
     )
       return;
     const top = musicTop + index * MUSIC_LANE_HEIGHT;
-    if (top < element.scrollTop + TIMELINE_RULER_HEIGHT) element.scrollTop = Math.max(0, top - TIMELINE_RULER_HEIGHT);
+    if (top < element.scrollTop + TIMELINE_PINNED_HEIGHT) element.scrollTop = Math.max(0, top - TIMELINE_PINNED_HEIGHT);
     else if (top + MUSIC_LANE_HEIGHT > element.scrollTop + element.clientHeight)
       element.scrollTop = Math.max(0, top + MUSIC_LANE_HEIGHT - element.clientHeight);
     const music = project.music[index]!.clips.find((clip) => clip.id === selectedMusicId)!;
@@ -1202,7 +1260,7 @@ export function Timeline(props: Readonly<Props>) {
   };
   const layerAt = (clientY: number): string | null => {
     const viewport = scroll.current;
-    if (!viewport || clientY < viewport.getBoundingClientRect().top + TIMELINE_RULER_HEIGHT) return null;
+    if (!viewport || clientY < viewport.getBoundingClientRect().top + TIMELINE_PINNED_HEIGHT) return null;
     const y = clientY - (surface.current?.getBoundingClientRect().top ?? 0);
     return timelineLayerAt(rows, y);
   };
@@ -1256,7 +1314,7 @@ export function Timeline(props: Readonly<Props>) {
       const beforeX = viewport.scrollLeft;
       const beforeY = viewport.scrollTop;
       viewport.scrollLeft += velocity(pointer.x, bounds.left, bounds.right);
-      viewport.scrollTop += velocity(pointer.y, bounds.top + TIMELINE_RULER_HEIGHT, bounds.bottom);
+      viewport.scrollTop += velocity(pointer.y, bounds.top + TIMELINE_PINNED_HEIGHT, bounds.bottom);
       if (viewport.scrollLeft !== beforeX || viewport.scrollTop !== beforeY) latestDrop.current();
       dropScroll.current = requestAnimationFrame(advance);
     };
@@ -1340,20 +1398,21 @@ export function Timeline(props: Readonly<Props>) {
   });
 
   const groupDrag = movement.current?.payload.kind === 'group' ? movement.current.payload : null;
-  const interactionStatus = musicGesture
-    ? musicGesture.error || `Music track · ${formatTimecode(musicGesture.start)} · release to apply · Esc cancels`
-    : timelineInteractionMessage(
-        {
-          transform: transformKeys.draft,
-          speed: speedKeys.draft,
-          grade: gradeKeys.draft,
-          bookmark: bookmarks.draft,
-        },
-        dragError,
-        dropPlan,
-        draft,
-        selected?.clip,
-      );
+  const interactionStatus =
+    laneGestureMessage(musicGesture, adjustmentGesture) ??
+    timelineInteractionMessage(
+      {
+        transform: transformKeys.draft,
+        speed: speedKeys.draft,
+        grade: gradeKeys.draft,
+        adjustment: adjustmentKeys.draft,
+        bookmark: bookmarks.draft,
+      },
+      dragError,
+      dropPlan,
+      draft,
+      selected?.clip,
+    );
   return (
     <section className="timeline-panel panel" id="timeline-pane" tabIndex={-1} aria-label="Video timeline">
       <div className="timeline-toolbar">
@@ -1545,6 +1604,29 @@ export function Timeline(props: Readonly<Props>) {
                 })}
               />
             </div>
+            <AdjustmentLane
+              project={project}
+              display={visible}
+              leading={leading}
+              scale={scale}
+              width={width}
+              viewport={scroll}
+              frame={frame}
+              snapping={snapping}
+              beats={beats}
+              disabled={adjustmentLaneDisabled(interactionBlocked, adjustmentGesture, dropPlan)}
+              selectedId={props.selectedAdjustmentId}
+              gradingId={gradingAdjustmentId(selected, frame, visible)}
+              keyframes={adjustmentKeys}
+              keyframesBlocked={clipMarkerBlocked}
+              onSelect={props.onSelectAdjustment}
+              onSeek={onSeek}
+              onPause={onPause}
+              onEdit={onEdit}
+              onPreview={onPreview}
+              onGesture={setAdjustmentGesture}
+              onError={onError}
+            />
             {visible.bookmarks.map((bookmark) => (
               <div
                 key={`bookmark-line-${bookmark}`}
@@ -1713,7 +1795,7 @@ export function Timeline(props: Readonly<Props>) {
                       data-trim-handle={edge}
                       role="slider"
                       aria-label={`Trim ${edge === 'in' ? 'start' : 'end'} of ${name}, clip ${index + 1}`}
-                      disabled={transformKeys.active || musicGesture !== null}
+                      disabled={transformKeys.active || laneGesture}
                       aria-valuemin={trimHandleValue(clip, edge, asset?.metadata.frameCount).min}
                       aria-valuemax={trimHandleValue(clip, edge, asset?.metadata.frameCount).max}
                       aria-valuenow={trimHandleValue(clip, edge, asset?.metadata.frameCount).now}
@@ -1891,6 +1973,7 @@ export function Timeline(props: Readonly<Props>) {
                 ['transform', transformKeys.draft?.guide],
                 ['speed', speedKeys.draft?.guide],
                 ['grade', gradeKeys.draft?.guide],
+                ['adjustment', adjustmentKeys.draft?.guide],
                 ['bookmark', bookmarks.draft?.guide],
               ] as const
             ).map(
@@ -1941,8 +2024,10 @@ export function Timeline(props: Readonly<Props>) {
               transformKeys.draft?.error ||
               speedKeys.draft?.error ||
               gradeKeys.draft?.error ||
+              adjustmentKeys.draft?.error ||
               bookmarks.draft?.error ||
-              musicGesture?.error
+              musicGesture?.error ||
+              adjustmentGesture?.error
                 ? 'trim-error'
                 : ''
             }

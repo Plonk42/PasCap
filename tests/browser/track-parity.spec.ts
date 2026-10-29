@@ -23,6 +23,7 @@ import {
   transformPoint,
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
+import { LANE_HEIGHT, TIMELINE_PINNED_HEIGHT } from '../../src/web/timeline-rows.js';
 import { singleClipLane } from '../music-lanes.js';
 
 const PROJECT_ID = 'track-parity-memory';
@@ -702,7 +703,7 @@ test('Raise and Lower cross the old initial-layer boundary and display the new b
     const laneTops = await page
       .locator('[data-layer-lane]')
       .evaluateAll((rows) => rows.map((row) => Number.parseFloat((row as HTMLElement).style.top)));
-    expect(laneTops).toEqual([31, 109]);
+    expect(laneTops).toEqual([TIMELINE_PINNED_HEIGHT, TIMELINE_PINNED_HEIGHT + LANE_HEIGHT]);
     expect((await captureAt(page, 20)).sample).not.toEqual(originalPixels);
     await undoOnce(page, before);
     expect((await captureAt(page, 20)).sample).toEqual(originalPixels);

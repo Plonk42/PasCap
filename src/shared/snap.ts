@@ -26,6 +26,7 @@ export function snapPoints(project: ProjectDocument, beats: BeatSnap = NO_BEATS)
   const layout = calculateLayout(project);
   const points = layout.clips.flatMap((clip) => [clip.start, clip.end]);
   for (const clip of musicClips(project.music)) points.push(clip.start, clip.start + clip.duration);
+  for (const item of project.adjustments) points.push(item.start, item.start + item.duration);
   return [
     ...new Set([
       0,

@@ -1,14 +1,14 @@
 import { Fragment, memo, useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { COLOUR_CONTROLS, NEUTRAL_COLOUR, type ScalarColourSetting } from '../shared/colour.js';
-import { adjustmentAt, gradeColourAt, type Adjustment } from '../shared/grade.js';
+import { adjustmentAt, gradeColourAt } from '../shared/grade.js';
 import { activeLayerSetting, hasLayerKeys, isKeyframeFrame } from '../shared/keyframes.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
 import type { TimelineRange } from '../shared/rush-editing.js';
 import { calculateLayout, transitionOffset, type PlacedClip, type TimelineLayout } from '../shared/timeline.js';
-import { formatTimecode } from '../shared/timing.js';
 import { ColourCurvesSection, HslRangesSection } from './AdvancedColour.js';
+import { adjustmentLabel } from './adjustment-ui.js';
 import { TrackAnimationControls } from './AnimationControls.js';
 import { AutoAdjust } from './AutoAdjust.js';
 import { AutoWhiteBalance } from './AutoWhiteBalance.js';
@@ -65,6 +65,8 @@ interface Props {
   selectedClipCount?: number;
   /** The ruler range, from which an adjustment can be created. */
   timeRange?: TimelineRange | null;
+  /** The adjustment selected on the timeline, which the Colour tab edits instead of the one at the playhead. */
+  selectedAdjustmentId?: string | null;
   selectedLayerId: string;
   boundaryId: string | null;
   frame: number;
@@ -844,10 +846,6 @@ function ColourTargetSwitch({
 }
 
 /** "01:12:05 – 01:20:00": an adjustment by its range, OUT exclusive. */
-export function adjustmentLabel(item: Pick<Adjustment, 'start' | 'duration'>): string {
-  return `${formatTimecode(item.start)} – ${formatTimecode(item.start + item.duration)}`;
-}
-
 function rangeReason(project: ProjectDocument, start: number, end: number): string | null {
   return commandNumberError(
     project,
@@ -932,6 +930,7 @@ interface ColourTabProps {
   /** The source frame the selected clip shows at the playhead, or null off the clip. */
   sourceFrame: number | null;
   timeRange: TimelineRange | null;
+  selectedAdjustmentId: string | null;
   layout: TimelineLayout;
   drafting: boolean;
   resetKey: string;
@@ -954,7 +953,9 @@ function gradeFrames(placed: PlacedClip | undefined, projectFrame: number, sourc
 function ColourTab(props: Readonly<ColourTabProps>) {
   const { project, clip, placed, asset, drafting, onEdit, onPreview, onPause, onSeek } = props;
   const navigation = useKeyframeNavigation();
-  const item = adjustmentAt(project.adjustments, props.frame);
+  const item =
+    project.adjustments.find((candidate) => candidate.id === props.selectedAdjustmentId) ??
+    adjustmentAt(project.adjustments, props.frame);
   const target: ColourTarget = clip ? props.target : 'adjustment';
   const clipNavigation = useMemo<KeyframeNavigation | null>(
     () =>
@@ -1026,7 +1027,8 @@ function ColourTab(props: Readonly<ColourTabProps>) {
   let title: string;
   if (target === 'adjustment' && item) {
     owner = adjustmentColourOwner(item, `adjustment ${adjustmentLabel(item)}`);
-    frame = props.frame - item.start;
+    // Keyframes are captured only on the adjustment's own frames.
+    frame = props.frame >= item.start && props.frame < item.start + item.duration ? props.frame - item.start : -1;
     valueFrame = frame;
     ownerNavigation = itemNavigation!;
     title = `Adjustment ${adjustmentLabel(item)}`;
@@ -1104,6 +1106,7 @@ function InspectorPanel({
   selectedClipId,
   selectedClipCount = 0,
   timeRange = null,
+  selectedAdjustmentId = null,
   selectedLayerId,
   boundaryId,
   frame,
@@ -1143,7 +1146,10 @@ function InspectorPanel({
         const element = globalThis.document
           .querySelector<HTMLElement>(`.inspector-panel [aria-label="${SECTION_TITLES[target]} section"]`)
           ?.closest('.inspector-section');
-        if (element) revealInPanel(element, element.querySelector('[data-selected="true"]'));
+        // Colour starts from the header naming the clip or adjustment it edits.
+        const top =
+          target === 'colour' ? (element?.parentElement?.querySelector(':scope > .colour-target') ?? element) : element;
+        if (element && top) revealInPanel(top, element.querySelector('[data-selected="true"]'));
       });
     });
     return () => cancelAnimationFrame(frameId);
@@ -1323,6 +1329,7 @@ function InspectorPanel({
             frame={frame}
             sourceFrame={sourceFrame}
             timeRange={timeRange}
+            selectedAdjustmentId={selectedAdjustmentId}
             layout={layout}
             drafting={drafting}
             resetKey={inputContext}

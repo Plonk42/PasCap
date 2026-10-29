@@ -1,6 +1,8 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import type { EditCommand } from '../shared/commands.js';
+import { MAX_ADJUSTMENTS } from '../shared/grade.js';
 import { MAX_VIDEO_LAYERS, type ProjectDocument, type VideoLayer } from '../shared/model.js';
+import './adjustment-lane.css';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { layerActionRestrictions } from './layer-actions.js';
@@ -188,6 +190,13 @@ export function Layers({
             <Icon name="plus" size={14} />
             <span className="layer-add-label">Track</span>
           </button>
+        </div>
+        <div
+          className="layer-sidebar-adjustments"
+          title="Adjustments grade every video track over their range, after each clip's own grade"
+        >
+          <Icon name="colour" size={14} />
+          Adjustments · {project.adjustments.length} / {MAX_ADJUSTMENTS}
         </div>
         {timelineRows(project.layers).map(({ layer, index, top }) => {
           const restrictions = layerActionRestrictions(index, project.layers.length, disabled);

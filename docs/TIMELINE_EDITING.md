@@ -483,7 +483,37 @@ that source frame and opens the Colour tab on **Clip**; a click edits nothing. D
 horizontally, or press ←/→ (one original source frame along the timeline, Shift ten), to move the
 keyframe with all its settings to another source frame of the recording: drafts preview only, a
 valid release is one Undo step, and Escape, cancellation, blur or an occupied frame restores.
-Delete or Backspace removes it. Adjustments have no timeline lane or markers yet.
+Delete or Backspace removes it.
+
+### Adjustment track
+
+The project's adjustments sit on one **adjustment track**, a 36-pixel lane pinned under the time
+ruler above the video tracks, so they stay in view however the tracks scroll. Its header reads
+**Adjustments · N / 64**. Each adjustment is drawn over its range and named by it
+(**Adjustment 00:00:10 – 00:01:00**, OUT exclusive), with no other name.
+
+- **Select:** a click selects the adjustment, puts the playhead where it was clicked and opens the
+  Colour tab on it; Enter or Space selects it and moves the playhead into it when outside. Selecting
+  a clip or a track clears it. While an adjustment is selected the Colour tab edits it, even with the
+  playhead elsewhere (keyframes are then captured only on its own frames); otherwise the Adjustment
+  target edits the one at the playhead.
+- **The selected clip's adjustment:** when a clip is selected and the playhead is on it, the
+  adjustment grading it there has a dashed ring, distinct from the solid selection, and its name
+  adds **(grades the selected clip)**.
+- **Move and trim:** drag its body to move it with its keyframes, or a handle to trim it, its
+  keyframes keeping their project frames. Edges snap within eight pixels to clip, music, transition
+  and other adjustment boundaries, bookmarks, the playhead and (with **Snap to beats**) the music;
+  Alt bypasses snapping. Drafts preview the image without history or saving; a valid release is one
+  Undo step. An overlap, a start before frame 0 or an empty range turns it red and is refused with
+  its reason, never clamped; Escape, pointer cancellation or blur restores it. On a focused body or
+  handle, ←/→ move or trim by one frame (Shift ten), each one Undo step, and Delete or Backspace
+  removes the adjustment; Delete also removes the selected adjustment when no clip is selected.
+- **Keyframes:** an adjustment's keyframes within its range are amber **◆** markers inside it. They
+  slide like clip grade markers, staying within the adjustment, through `useKeyframeSlide`: drag or
+  ←/→ (one frame, Shift ten), one Undo step per valid release, Delete removes. Click, Enter or Space
+  selects the adjustment, seeks the keyframe and opens the Colour tab.
+
+Clips, trims, Ripple and track edits never move adjustments.
 
 Custom-speed keyframes use a boxed salmon **●** lane.
 Marker output positions come from authoritative `PlacedClip.retiming`.
