@@ -46,6 +46,11 @@
   grid-template-columns: 18px minmax(0, 1fr) auto;
 }
 
+/* Beside the switch, the scope line wraps rather than losing its clip count. */
+.inspector-selection.colour-target > span {
+  white-space: normal;
+}
+
 .colour-target-switch {
   display: flex;
   grid-column: 3;
