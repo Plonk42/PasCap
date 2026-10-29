@@ -62,6 +62,53 @@ export function planAdjustmentGesture(
   }
 }
 
+/** Moves adjustments by `delta` with their keyframes, the leading one first so none passes over another. */
+export function adjustmentMoveCommands(
+  project: ProjectDocument,
+  adjustmentIds: readonly string[],
+  delta: number,
+): EditCommand[] {
+  if (!delta) return [];
+  return project.adjustments
+    .filter((item) => adjustmentIds.includes(item.id))
+    .sort((left, right) => (delta > 0 ? right.start - left.start : left.start - right.start))
+    .map((item): EditCommand => ({
+      type: 'adjustment-range',
+      adjustmentId: item.id,
+      start: item.start + delta,
+      duration: item.duration,
+      keyframes: 'move',
+    }));
+}
+
+export interface GroupMovePlan {
+  document: ProjectDocument;
+  commands: EditCommand[];
+  error: string;
+}
+
+/** Selected clips and adjustments move together by `delta`, clips staying on their tracks, in one transaction. */
+export function planGroupMove(
+  project: ProjectDocument,
+  clipIds: readonly string[],
+  adjustmentIds: readonly string[],
+  delta: number,
+): GroupMovePlan {
+  const fail = (error: string): GroupMovePlan => ({ document: project, commands: [], error });
+  if (project.adjustments.some((item) => adjustmentIds.includes(item.id) && item.start + delta < 0))
+    return fail('An adjustment cannot start before the first frame.');
+  const commands: EditCommand[] = [
+    ...(clipIds.length && delta ? [{ type: 'move-clips' as const, clipIds: [...clipIds], delta, layerId: null }] : []),
+    ...adjustmentMoveCommands(project, adjustmentIds, delta),
+  ];
+  try {
+    const document = commands.reduce((next, command) => applyCommand(next, command), project);
+    return { document, commands, error: '' };
+  } catch (cause) {
+    return fail(cause instanceof Error ? cause.message : 'These clips and adjustments cannot move there.');
+  }
+}
+
 export interface AdjustmentKeyframeTarget extends KeyframeSlideTarget {
   /** The adjustment as drawn when the gesture started; `origin` counts from its start. */
   item: Adjustment;

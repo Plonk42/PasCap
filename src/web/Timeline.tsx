@@ -64,6 +64,7 @@ import {
   type KeyframeSlideTarget,
 } from './keyframe-slide.js';
 import { ClipContextMenu, type ClipMenuAnchor } from './ClipContextMenu.js';
+import type { GradeTarget } from './grade-clipboard.js';
 import { nextLayerName } from './move-to-track.js';
 import './editor-panels.css';
 import './layers.css';
@@ -122,8 +123,10 @@ interface Props {
   onSelectLayer: (id: string) => void;
   selectedMusicId: string | null;
   onSelectMusic: (id: string) => void;
-  selectedAdjustmentId: string | null;
+  selectedAdjustmentIds: readonly string[];
   onSelectAdjustment: (id: string) => void;
+  /** Ctrl/Cmd-click adds an adjustment to the selection, or removes it. */
+  onToggleAdjustment: (id: string) => void;
   /** Opens the transition after this music clip in Audio. */
   onMusicBoundary: (leftClipId: string) => void;
   selectedBoundaryId: string | null;
@@ -263,6 +266,40 @@ function timelineInteractionMessage(
     );
   return interactionMessage(error, plan, draft, selected);
 }
+
+/** Every selected clip: the group, else the primary clip alone. */
+function selectedClipList(primary: string | null, group: readonly string[]): readonly string[] {
+  if (group.length) return group;
+  return primary === null ? [] : [primary];
+}
+
+function toGradeSelection(clips: readonly string[], adjustments: readonly string[]): GradeTarget[] {
+  return [
+    ...clips.map((id) => ({ kind: 'clip' as const, id })),
+    ...adjustments.map((id) => ({ kind: 'adjustment' as const, id })),
+  ];
+}
+
+function inSelection(selection: readonly GradeTarget[], target: GradeTarget): boolean {
+  return selection.some((item) => item.kind === target.kind && item.id === target.id);
+}
+
+/** A selected clip drags the whole selection, adjustments included; any other clip drags alone. */
+function clipDragPayload(
+  clipId: string,
+  grabFrame: number,
+  clips: readonly string[],
+  adjustments: readonly string[],
+): TimelinePayload {
+  if (clips.includes(clipId) && (clips.length > 1 || adjustments.length))
+    return { kind: 'group', clipIds: clips, clipId, grabFrame, adjustmentIds: adjustments };
+  return { kind: 'clip', clipId, grabFrame };
+}
+
+function dropCommands(plan: DropPlan): EditCommand | EditCommand[] {
+  return plan.adjustmentCommands?.length ? [plan.command!, ...plan.adjustmentCommands] : plan.command!;
+}
+const NO_GHOSTS: NonNullable<DropPlan['adjustmentGhosts']> = [];
 
 /** A music or adjustment gesture's status line, if one is active. */
 function laneGestureMessage(music: MusicTimelineGesture | null, adjustment: AdjustmentGesture | null): string | null {
@@ -1392,7 +1429,7 @@ export function Timeline(props: Readonly<Props>) {
       const candidate = latestDrop.current();
       if (!candidate) throw new Error('Drop onto a video track.');
       if (candidate.error) throw new Error(candidate.error);
-      if (candidate.command) onEdit(candidate.command);
+      if (candidate.command) onEdit(dropCommands(candidate));
       else onInsert(ids, candidate.index, candidate.layerId, candidate.start);
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Cannot drop clip');
@@ -1419,6 +1456,8 @@ export function Timeline(props: Readonly<Props>) {
 
   const groupDrag = movement.current?.payload.kind === 'group' ? movement.current.payload : null;
   const addAdjustment = addAdjustmentState(project, props.timeRange, selected);
+  const selectedClips = selectedClipList(selectedClipId, selectedClipIds);
+  const gradeSelection = toGradeSelection(selectedClips, props.selectedAdjustmentIds);
   const interactionStatus =
     laneGestureMessage(musicGesture, adjustmentGesture) ??
     timelineInteractionMessage(
@@ -1472,8 +1511,11 @@ export function Timeline(props: Readonly<Props>) {
           timeRange={props.timeRange}
           selectedCount={selectedClipIds.length}
           adjustment={
-            selected ? null : (project.adjustments.find((item) => item.id === props.selectedAdjustmentId) ?? null)
+            selected || props.selectedAdjustmentIds.length !== 1
+              ? null
+              : (project.adjustments.find((item) => item.id === props.selectedAdjustmentIds[0]) ?? null)
           }
+          adjustmentCount={props.selectedAdjustmentIds.length}
           onSplit={onSplit}
           onDelete={onDelete}
           onQuickTrim={props.onQuickTrim}
@@ -1648,11 +1690,20 @@ export function Timeline(props: Readonly<Props>) {
               snapping={snapping}
               beats={beats}
               disabled={adjustmentLaneDisabled(interactionBlocked, adjustmentGesture, dropPlan)}
-              selectedId={props.selectedAdjustmentId}
+              selectedIds={props.selectedAdjustmentIds}
+              selectedClips={selectedClips}
+              ghosts={dropPlan?.adjustmentGhosts ?? NO_GHOSTS}
+              ghostsInvalid={!!dropPlan?.error}
               gradingId={gradingAdjustmentId(selected, frame, visible)}
               keyframes={adjustmentKeys}
               keyframesBlocked={clipMarkerBlocked}
               onSelect={props.onSelectAdjustment}
+              onToggle={props.onToggleAdjustment}
+              onMenu={(id, x, y) => {
+                const target = { kind: 'adjustment' as const, id };
+                if (!inSelection(gradeSelection, target)) props.onSelectAdjustment(id);
+                setClipMenu({ target, x, y });
+              }}
               onSeek={onSeek}
               onPause={onPause}
               onEdit={onEdit}
@@ -1749,12 +1800,10 @@ export function Timeline(props: Readonly<Props>) {
                         (event.clientX - event.currentTarget.getBoundingClientRect().left) / scale,
                       ),
                     );
-                    // Dragging a clip of the selection moves every selected clip.
-                    const group = grouped ? selectedClipIds : null;
+                    // Dragging a clip of the selection moves every selected clip and adjustment.
+                    const payload = clipDragPayload(clip.id, grabFrame, selectedClips, props.selectedAdjustmentIds);
                     movement.current = {
-                      payload: group
-                        ? { kind: 'group', clipIds: group, clipId: clip.id, grabFrame }
-                        : { kind: 'clip', clipId: clip.id, grabFrame },
+                      payload,
                       scale,
                       leading,
                       width,
@@ -1762,7 +1811,7 @@ export function Timeline(props: Readonly<Props>) {
                       playhead: frame,
                     };
                     onPause();
-                    if (!group) onSelect(clip.id);
+                    if (payload.kind === 'clip') onSelect(clip.id);
                     event.dataTransfer.setData(CLIP_DRAG_TYPE, clip.id);
                     event.dataTransfer.effectAllowed = 'move';
                   }}
@@ -1770,12 +1819,14 @@ export function Timeline(props: Readonly<Props>) {
                   onContextMenu={(event) => {
                     event.preventDefault();
                     if (interactionBlocked) return;
-                    onSelect(clip.id);
+                    const target = { kind: 'clip' as const, id: clip.id };
+                    // A selected clip keeps the selection, so a paste applies to all of it.
+                    if (!inSelection(gradeSelection, target)) onSelect(clip.id);
                     // The Menu key reports no pointer position; anchor to the clip instead.
                     const box = event.currentTarget.getBoundingClientRect();
                     const keyboard = event.clientX === 0 && event.clientY === 0;
                     setClipMenu({
-                      clipId: clip.id,
+                      target,
                       x: keyboard ? box.left : event.clientX,
                       y: keyboard ? box.bottom : event.clientY,
                     });
@@ -2078,7 +2129,7 @@ export function Timeline(props: Readonly<Props>) {
             onDuplicate();
           }}
           project={project}
-          selectedClipIds={selectedClipIds}
+          selected={gradeSelection}
           copiedGrade={copiedGrade}
           onCopyGrade={setCopiedGrade}
           onEdit={onEdit}

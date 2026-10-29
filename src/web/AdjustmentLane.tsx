@@ -19,6 +19,7 @@ import {
   adjustmentLabel,
   planAdjustmentCreation,
   planAdjustmentGesture,
+  planGroupMove,
   type AdjustmentGestureKind,
   type AdjustmentKeyframeTarget,
 } from './adjustment-ui.js';
@@ -26,7 +27,7 @@ import './adjustment-lane.css';
 import { Icon } from './icons.js';
 import { KeyframeMarkers, type KeyframeSlide } from './keyframe-slide.js';
 import { editorShortcut } from './shortcuts.js';
-import { placementSnapPoints, snapPlacement } from './timeline-placement.js';
+import { groupSnapPoints, placementSnapPoints, snapPlacement } from './timeline-placement.js';
 import type { DraftPreview } from './Timeline.js';
 
 export interface AdjustmentGesture {
@@ -56,15 +57,22 @@ interface Props {
   snapping: boolean;
   beats: BeatSnap;
   disabled: boolean;
-  selectedId: string | null;
+  selectedIds: readonly string[];
+  /** Selected clips: dragging a selected adjustment moves them too. */
+  selectedClips: readonly string[];
+  /** Where selected adjustments land while selected clips are dragged. */
+  ghosts: readonly Pick<Adjustment, 'id' | 'start' | 'duration'>[];
+  ghostsInvalid: boolean;
   /** The adjustment grading the selected clip at the playhead. */
   gradingId: string | null;
   keyframes: KeyframeSlide<AdjustmentKeyframeTarget>;
   keyframesBlocked: () => boolean;
   onSelect: (id: string) => void;
+  onToggle: (id: string) => void;
+  onMenu: (id: string, x: number, y: number) => void;
   onSeek: (frame: number) => void;
   onPause: () => void;
-  onEdit: (command: EditCommand) => void;
+  onEdit: (command: EditCommand | readonly EditCommand[]) => void;
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
   onGesture: (gesture: AdjustmentGesture | null) => void;
   onError: (message: string) => void;
@@ -73,8 +81,14 @@ interface Props {
 interface LanePlan {
   range: Pick<Adjustment, 'start' | 'duration'>;
   document: ProjectDocument;
-  command: EditCommand | null;
+  command: EditCommand | readonly EditCommand[] | null;
   error: string;
+}
+
+/** Clips and adjustments selected together and moved by one dragged adjustment. */
+interface Group {
+  clipIds: readonly string[];
+  adjustmentIds: readonly string[];
 }
 
 interface Drag {
@@ -84,6 +98,7 @@ interface Drag {
   /** For a drawing, the new adjustment's ID and the frame where it was pressed. */
   item: Pick<Adjustment, 'id' | 'start' | 'duration'>;
   kind: AdjustmentGestureKind | 'draw';
+  group: Group | null;
   x: number;
   pointerX: number;
   scroll: number;
@@ -103,14 +118,73 @@ interface Candidate {
   creating: boolean;
   plan: LanePlan;
   guide: number | null;
+  /** The adjustments of a group move and how far they move. */
+  group: { ids: readonly string[]; delta: number } | null;
 }
 
 const KEY_STEP = { ArrowLeft: -1, ArrowRight: 1 } as const;
 
+/** A selected adjustment drags every selected clip and adjustment with it. */
+function selectionGroup(id: string, props: Pick<Props, 'selectedIds' | 'selectedClips'>): Group | null {
+  if (!props.selectedIds.includes(id) || props.selectedIds.length + props.selectedClips.length < 2) return null;
+  return { clipIds: props.selectedClips, adjustmentIds: props.selectedIds };
+}
+
+/** Dragged adjustments follow the pointer, even where they cannot go. */
+function drawnItems(project: ProjectDocument, display: ProjectDocument, candidate: Candidate | null): Adjustment[] {
+  const group = candidate?.group;
+  return display.adjustments.map((item) => {
+    if (group?.ids.includes(item.id)) {
+      const base = project.adjustments.find((entry) => entry.id === item.id) ?? item;
+      return { ...base, start: base.start + group.delta };
+    }
+    return candidate?.id === item.id ? { ...item, ...candidate.plan.range } : item;
+  });
+}
+
+function itemState(
+  id: string,
+  props: Pick<Props, 'selectedIds' | 'gradingId'>,
+  candidate: Candidate | null,
+): { selected: boolean; grading: boolean; invalid: boolean; moving: boolean; className: string } {
+  const selected = props.selectedIds.includes(id);
+  const grading = !selected && id === props.gradingId;
+  const moving = candidate !== null && (candidate.id === id || !!candidate.group?.ids.includes(id));
+  const invalid = moving && candidate.plan.error !== '';
+  const classes = ['adjustment-item'];
+  if (selected) classes.push('selected');
+  if (grading) classes.push('grading');
+  if (invalid) classes.push('invalid');
+  if (moving) classes.push('moving');
+  return { selected, grading, invalid, moving, className: classes.join(' ') };
+}
+
+/** The dragged adjustment's snapped move, and the whole selection with it. */
+function planGroupDrag(active: Drag, group: Group, delta: number, snap: boolean) {
+  const { item, targets, base } = active;
+  const snapped = snap
+    ? snapPlacement(item.start + delta, item.duration, targets, 8 / active.scale)
+    : { start: item.start + delta, guide: null };
+  const shift = snapped.start - item.start;
+  const move = planGroupMove(base, group.clipIds, group.adjustmentIds, shift);
+  const plan: LanePlan = {
+    range: { start: snapped.start, duration: item.duration },
+    document: move.document,
+    command: move.commands.length && !move.error ? move.commands : null,
+    error: move.error,
+  };
+  return { plan, guide: snapped.guide, shift };
+}
+
 /** The draft after `delta` frames of pointer travel, snapping the edges that move. */
-function planDrag(active: Drag, delta: number, snap: boolean): { plan: LanePlan; guide: number | null } {
+function planDrag(
+  active: Drag,
+  delta: number,
+  snap: boolean,
+): { plan: LanePlan; guide: number | null; shift?: number } {
   const tolerance = 8 / active.scale;
   const { item, kind, targets, base } = active;
+  if (active.group) return planGroupDrag(active, active.group, delta, snap);
   if (kind === 'draw') {
     const end = snap ? snapFrame(item.start + delta, targets, tolerance) : item.start + delta;
     const guide = end === item.start + delta ? null : end;
@@ -207,11 +281,12 @@ export function AdjustmentLane(props: Readonly<Props>) {
     if (!active.moved && Math.abs(travel) < 3) return;
     active.moved = true;
     const delta = Math.round(travel / active.scale);
-    const { plan, guide } = planDrag(active, delta, latest.current.snapping && !active.alt);
+    const { plan, guide, shift } = planDrag(active, delta, latest.current.snapping && !active.alt);
     active.plan = plan;
     active.guide = plan.error ? null : guide;
     const creating = active.kind === 'draw';
-    setCandidate({ id: active.item.id, creating, plan, guide: active.guide });
+    const group = active.group && { ids: active.group.adjustmentIds, delta: shift ?? 0 };
+    setCandidate({ id: active.item.id, creating, plan, guide: active.guide, group });
     latest.current.onGesture({
       id: active.item.id,
       creating,
@@ -241,7 +316,13 @@ export function AdjustmentLane(props: Readonly<Props>) {
     }
     animation.current = requestAnimationFrame(autoScroll);
   };
-  const begin = (event: PointerEvent<HTMLElement>, item: Drag['item'], kind: Drag['kind'], targets: number[]): void => {
+  const begin = (
+    event: PointerEvent<HTMLElement>,
+    item: Drag['item'],
+    kind: Drag['kind'],
+    targets: number[],
+    group: Group | null = null,
+  ): void => {
     const { viewport, frame, width, onPause } = latest.current;
     onPause();
     drag.current = {
@@ -250,6 +331,7 @@ export function AdjustmentLane(props: Readonly<Props>) {
       base: project,
       item,
       kind,
+      group,
       x: event.clientX,
       pointerX: event.clientX,
       scroll: viewport.current!.scrollLeft,
@@ -274,7 +356,11 @@ export function AdjustmentLane(props: Readonly<Props>) {
     if (event.ctrlKey || event.metaKey) return;
     event.preventDefault();
     event.stopPropagation();
-    begin(event, item, kind, placementSnapPoints(project, item.id, frame, beats));
+    const group = kind === 'move' ? selectionGroup(item.id, latest.current) : null;
+    const targets = group
+      ? groupSnapPoints(project, [...group.clipIds, ...group.adjustmentIds], frame, beats)
+      : placementSnapPoints(project, item.id, frame, beats);
+    begin(event, item, kind, targets, group);
   };
   /** Pressing the empty track draws a new adjustment from that frame. */
   const draw = (event: PointerEvent<HTMLDivElement>): void => {
@@ -327,7 +413,8 @@ export function AdjustmentLane(props: Readonly<Props>) {
       return;
     }
     if (active.plan.command) onEdit(active.plan.command);
-    onSelect(active.item.id);
+    // A group move keeps the selection.
+    if (!active.group) onSelect(active.item.id);
   };
   const handlers = { onPointerMove: move, onPointerUp: finish, onPointerCancel: cancel, onLostPointerCapture: cancel };
   const keyboard = (event: KeyboardEvent<HTMLButtonElement>, item: Adjustment, kind: AdjustmentGestureKind): void => {
@@ -349,18 +436,28 @@ export function AdjustmentLane(props: Readonly<Props>) {
     if (plan.error) onError(plan.error);
     else if (plan.command) onEdit(plan.command);
   };
-  /** Enter/Space on the body: the pointer case was handled by its gesture. */
+  /** Ctrl/Cmd-click toggles the selection; Enter/Space selects (the pointer case was handled by its gesture). */
   const activate = (event: MouseEvent<HTMLButtonElement>, item: Adjustment): void => {
-    if (event.detail !== 0 || disabled) return;
+    if (disabled) return;
+    if (event.ctrlKey || event.metaKey) {
+      latest.current.onToggle(item.id);
+      return;
+    }
+    if (event.detail !== 0) return;
     latest.current.onSelect(item.id);
     const { frame } = latest.current;
     if (frame < item.start || frame >= item.start + item.duration) latest.current.onSeek(item.start);
   };
+  const menu = (event: MouseEvent<HTMLDivElement>, item: Adjustment): void => {
+    event.preventDefault();
+    if (disabled || drag.current) return;
+    // The Menu key reports no pointer position; anchor to the adjustment instead.
+    const box = event.currentTarget.getBoundingClientRect();
+    const keyboard = event.clientX === 0 && event.clientY === 0;
+    latest.current.onMenu(item.id, keyboard ? box.left : event.clientX, keyboard ? box.bottom : event.clientY);
+  };
 
-  // The dragged adjustment follows the pointer, even where it cannot go.
-  const items = display.adjustments.map((item) =>
-    candidate?.id === item.id ? { ...item, ...candidate.plan.range } : item,
-  );
+  const items = drawnItems(project, display, candidate);
   const drawn = candidate?.creating ? candidate : null;
   const guide = candidate?.guide ?? null;
   return (
@@ -384,27 +481,31 @@ export function AdjustmentLane(props: Readonly<Props>) {
           <span className="adjustment-label">{adjustmentLabel(drawn.plan.range)}</span>
         </div>
       )}
+      {props.ghosts.map((ghost) => (
+        <div
+          key={`ghost-${ghost.id}`}
+          className={`adjustment-item drawing${props.ghostsInvalid ? ' invalid' : ''}`}
+          data-adjustment-ghost={ghost.id}
+          data-adjustment-start={ghost.start}
+          style={{ left: leading + ghost.start * scale, width: ghost.duration * scale }}
+        />
+      ))}
       {items.map((item) => {
         const label = adjustmentLabel(item);
-        const selected = item.id === props.selectedId;
-        const grading = !selected && item.id === props.gradingId;
-        const invalid = candidate?.id === item.id && candidate.plan.error !== '';
-        const classes = ['adjustment-item'];
-        if (selected) classes.push('selected');
-        if (grading) classes.push('grading');
-        if (invalid) classes.push('invalid');
-        if (candidate?.id === item.id) classes.push('moving');
+        const state = itemState(item.id, props, candidate);
+        const { selected, grading, invalid } = state;
         const dragging = drag.current?.item.id === item.id;
         return (
           <div
             key={item.id}
-            className={classes.join(' ')}
+            className={state.className}
             data-adjustment-id={item.id}
             data-adjustment-start={item.start}
             data-adjustment-duration={item.duration}
             data-adjustment-valid={!invalid}
-            title={invalid ? candidate.plan.error : undefined}
+            title={invalid ? candidate?.plan.error : undefined}
             style={{ left: (drag.current?.leading ?? leading) + item.start * scale, width: item.duration * scale }}
+            onContextMenu={(event) => menu(event, item)}
           >
             <button
               type="button"
@@ -412,7 +513,7 @@ export function AdjustmentLane(props: Readonly<Props>) {
               aria-label={`Adjustment ${label}${grading ? ' (grades the selected clip)' : ''}`}
               aria-pressed={selected}
               disabled={disabled && !dragging}
-              title={`Adjustment ${label} · grades every track here${grading ? ', including the selected clip' : ''} · Click to edit its Colour; drag to move it with its keyframes; Arrow keys: 1 frame, Shift: 10; Delete removes. Alt bypasses snapping.`}
+              title={`Adjustment ${label} · grades every track here${grading ? ', including the selected clip' : ''} · Click to edit its Colour; Ctrl-click to select several; drag to move it with its keyframes (and the rest of the selection); Arrow keys: 1 frame, Shift: 10; Delete removes. Alt bypasses snapping.`}
               onPointerDown={(event) => start(event, item, 'move')}
               onClick={(event) => activate(event, item)}
               onKeyDown={(event) => keyboard(event, item, 'move')}
@@ -423,7 +524,7 @@ export function AdjustmentLane(props: Readonly<Props>) {
             <div className="adjustment-keyframes">
               <KeyframeMarkers
                 slide={props.keyframes}
-                targets={candidate?.id === item.id ? [] : adjustmentKeyframeTargets(item)}
+                targets={state.moving ? [] : adjustmentKeyframeTargets(item)}
                 blocked={props.keyframesBlocked}
                 view={({ origin }, state) => keyframeView(item, origin, state.frame, state.at, scale)}
               />

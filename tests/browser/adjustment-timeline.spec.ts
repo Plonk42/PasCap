@@ -50,7 +50,11 @@ test.beforeEach(async ({ page, request }) => {
   document.media.videoIds = [asset.id];
   document.clips = [createClip('one', asset.id, 0, 40), { ...createClip('two', asset.id, 40, 80), start: 40 }];
   document.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cut', duration: 0 }];
-  document.adjustments = [createAdjustment('a', 10, 20), createAdjustment('b', 50, 10)];
+  // Clips keep their own starts, so a moved selection changes nothing else.
+  document.layers[0]!.ripple = false;
+  const desaturated = createAdjustment('b', 50, 10);
+  desaturated.colour.saturation = 0.4;
+  document.adjustments = [createAdjustment('a', 10, 20), desaturated];
   document = applyCommand(document, {
     type: 'layer-key-toggle',
     adjustmentId: 'a',
@@ -291,4 +295,97 @@ test('Split and Delete act on the selected adjustment, keeping its grade and key
       { id: 'a', start: 10, duration: 20 },
       { id: 'b', start: 50, duration: 10 },
     ]);
+});
+
+const clipStart = async (page: Page, id: string): Promise<number> =>
+  (await current(page)).clips.find((clip) => clip.id === id)!.start;
+
+/** Clip "two" and adjustment "b" selected together with Ctrl-click. */
+async function selectTwoAndB(page: Page): Promise<void> {
+  await page.locator('[data-clip-id="two"] .timeline-clip-body').click();
+  await body(page, 'b').click({ modifiers: ['Control'] });
+  await expect(body(page, 'b')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-clip-id="two"]')).toHaveClass(/\bselected\b/);
+}
+
+test('Ctrl-click selects clips and adjustments together: Colour edits neither, a drag moves both', async ({ page }) => {
+  await selectTwoAndB(page);
+  await page.getByRole('tab', { name: 'Colour', exact: true }).click();
+  await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .inspector-empty')).toHaveText(
+    '1 clip and 1 adjustment are selected: select one to edit its grade. Paste grade sets the same grade on all of them.',
+  );
+  await expect(
+    page.getByRole('button', { name: 'Delete selected clips and adjustments', exact: true }),
+  ).toHaveAttribute('title', 'Remove the selected 1 clip and 1 adjustment in one Undo step · Delete');
+
+  const release = await press(page, body(page, 'b'), 5);
+  await expect(item(page, 'b')).toHaveAttribute('data-adjustment-start', '55');
+  await release();
+  await expect.poll(() => clipStart(page, 'two')).toBe(45);
+  expect(await ranges(page)).toContainEqual({ id: 'b', start: 55, duration: 10 });
+  await expect(body(page, 'b')).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => clipStart(page, 'two')).toBe(40);
+  expect(await ranges(page)).toContainEqual({ id: 'b', start: 50, duration: 10 });
+
+  // Dragging the clip carries the adjustment too, by the same frames.
+  const box = (await page.locator('[data-clip-id="two"]').boundingBox())!;
+  const scale = await pixelsPerFrame(page);
+  await page.mouse.move(box.x + 12 * scale, box.y + 30);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 12 * scale + 12, box.y + 30, { steps: 3 });
+  await page.mouse.move(box.x + 22 * scale, box.y + 30, { steps: 8 });
+  await page.mouse.move(box.x + 22 * scale, box.y + 30);
+  await expect(page.locator('[data-adjustment-ghost="b"]')).toHaveAttribute('data-adjustment-start', '60');
+  await page.mouse.up();
+  await expect.poll(() => clipStart(page, 'two')).toBe(50);
+  expect(await ranges(page)).toContainEqual({ id: 'b', start: 60, duration: 10 });
+
+  // Ctrl-click takes the clip out again, leaving the adjustment, and Delete removes what is selected.
+  await page.locator('[data-clip-id="two"] .timeline-clip-body').click({ modifiers: ['Control'] });
+  await expect(page.locator('[data-clip-id="two"]')).not.toHaveClass(/\bselected\b/);
+  await expect(body(page, 'b')).toHaveAttribute('aria-pressed', 'true');
+  await body(page, 'a').click({ modifiers: ['Control'] });
+  const remove = page.getByRole('button', { name: 'Delete selected adjustments', exact: true });
+  await expect(remove).toBeEnabled();
+  await remove.click();
+  await expect.poll(() => ranges(page)).toEqual([]);
+  expect((await current(page)).clips).toHaveLength(2);
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => (await ranges(page)).length).toBe(2);
+  // The Delete key removes the same selection in one Undo step.
+  await body(page, 'a').click();
+  await body(page, 'b').click({ modifiers: ['Control'] });
+  await page.locator('.timeline-panel').focus();
+  await page.keyboard.press('Delete');
+  await expect.poll(() => ranges(page)).toEqual([]);
+  expect((await current(page)).clips).toHaveLength(2);
+});
+
+test('Copy grade and Paste grade work between clips and adjustments from the context menu', async ({ page }) => {
+  await body(page, 'a').click({ button: 'right' });
+  await expect(page.getByRole('button', { name: 'Copy grade of this adjustment' })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+  await expect(page.getByRole('button', { name: 'Duplicate selected clip' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await body(page, 'b').click({ button: 'right' });
+  await page.getByRole('button', { name: 'Copy grade of this adjustment' }).click();
+  await page.locator('[data-clip-id="one"] .timeline-clip-body').click({ button: 'right' });
+  await page.getByRole('button', { name: 'Paste grade on this clip' }).click();
+  await expect.poll(async () => (await current(page)).clips[0]!.grade.colour.saturation).toBe(0.4);
+
+  // Pasting on a selected item pastes on the whole selection, keyframes removed, in one Undo step.
+  await selectTwoAndB(page);
+  await body(page, 'a').click({ modifiers: ['Control'] });
+  await body(page, 'a').click({ button: 'right' });
+  await page.getByRole('button', { name: 'Paste grade on 1 clip and 2 adjustments' }).click();
+  await expect.poll(async () => (await current(page)).adjustments[0]!.keyframes).toEqual([]);
+  const pasted = await current(page);
+  expect(pasted.clips[1]!.grade.colour.saturation).toBe(0.4);
+  expect(pasted.adjustments[0]!.colour.saturation).toBe(0.4);
+  await page.keyboard.press('Control+z');
+  await expect.poll(async () => (await current(page)).adjustments[0]!.keyframes).toHaveLength(1);
+  expect((await current(page)).clips[1]!.grade.colour.saturation).toBe(1);
 });

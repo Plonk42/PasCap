@@ -4,6 +4,7 @@ import { musicClips } from '../shared/music-lanes.js';
 import { NO_BEATS, type BeatSnap } from '../shared/snap.js';
 import { clipDuration } from '../shared/speed.js';
 import { calculateLayout, layerClips, transitionOffset, type PlacedClip } from '../shared/timeline.js';
+import { adjustmentMoveCommands } from './adjustment-ui.js';
 
 /** Off, on, or on with the beats to snap to as well. */
 export type PlacementSnapping = boolean | BeatSnap;
@@ -12,8 +13,14 @@ const beatsOf = (snapping: PlacementSnapping): BeatSnap => (typeof snapping === 
 export type TimelinePayload =
   | { kind: 'clip'; clipId: string; grabFrame: number }
   | { kind: 'media'; clips: readonly VideoClip[] }
-  /** Selected clips dragged together by one of them, `clipId`. */
-  | { kind: 'group'; clipIds: readonly string[]; clipId: string; grabFrame: number };
+  /** Selected clips dragged together by one of them, `clipId`, with any selected adjustments. */
+  | {
+      kind: 'group';
+      clipIds: readonly string[];
+      clipId: string;
+      grabFrame: number;
+      adjustmentIds?: readonly string[];
+    };
 type SinglePayload = Exclude<TimelinePayload, { kind: 'group' }>;
 export interface DropGhost {
   clipId: string;
@@ -32,6 +39,9 @@ export interface DropPlan {
   error: string;
   /** Every moved clip of a group drag, the dragged one included. */
   ghosts?: DropGhost[];
+  /** Selected adjustments moving with a group drag by the requested frames, and their commands after `command`. */
+  adjustmentGhosts?: { id: string; start: number; duration: number }[];
+  adjustmentCommands?: EditCommand[];
 }
 
 /** Match either edge, never pull the moving clip toward its own old boundaries. */
@@ -66,6 +76,16 @@ export function placementSnapPoints(
   beats: BeatSnap = NO_BEATS,
 ): number[] {
   return snapPointsWithout(project, new Set(excludedClipId === null ? [] : [excludedClipId]), playhead, beats);
+}
+
+/** Snap points of everything but the clips and adjustments moving together. */
+export function groupSnapPoints(
+  project: ProjectDocument,
+  excludedIds: readonly string[],
+  playhead: number,
+  beats: BeatSnap = NO_BEATS,
+): number[] {
+  return snapPointsWithout(project, new Set(excludedIds), playhead, beats);
 }
 
 function snapPointsWithout(
@@ -221,11 +241,18 @@ function planGroupDrop(
   let delta = Math.round(pointerFrame - payload.grabFrame) - grabbed.start;
   let guide: number | null = null;
   const free = moved.filter((placed) => !rippleOn(placed));
+  const adjustmentIds = payload.adjustmentIds ?? [];
   if (snapping && free.length) {
-    const points = snapPointsWithout(project, new Set(payload.clipIds), playhead, beatsOf(snapping));
+    const points = snapPointsWithout(
+      project,
+      new Set([...payload.clipIds, ...adjustmentIds]),
+      playhead,
+      beatsOf(snapping),
+    );
     ({ delta, guide } = snapGroupDelta(free, delta, points, tolerance));
   }
   const command: EditCommand = { type: 'move-clips', clipIds: [...payload.clipIds], delta, layerId };
+  const adjustmentCommands = adjustmentMoveCommands(project, adjustmentIds, delta);
   const requestedGhosts = moved.map((placed) => ({
     clipId: placed.clip.id,
     layerId: destination(placed),
@@ -242,9 +269,19 @@ function planGroupDrop(
     command,
     error: '',
     ghosts: requestedGhosts,
+    adjustmentGhosts: project.adjustments
+      .filter((item) => adjustmentIds.includes(item.id))
+      .map((item) => ({ id: item.id, start: item.start + delta, duration: item.duration })),
+    adjustmentCommands,
   };
   try {
-    const candidate = calculateLayout(applyCommand(project, command)).clips;
+    if (project.adjustments.some((item) => adjustmentIds.includes(item.id) && item.start + delta < 0))
+      throw new Error('An adjustment cannot start before the first frame.');
+    const document = adjustmentCommands.reduce(
+      (next, item) => applyCommand(next, item),
+      applyCommand(project, command),
+    );
+    const candidate = calculateLayout(document).clips;
     plan.ghosts = moved.map((placed) => {
       const next = candidate.find((item) => item.clip.id === placed.clip.id)!;
       return { clipId: next.clip.id, layerId: next.clip.layerId, start: next.start, duration: next.duration };

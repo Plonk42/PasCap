@@ -120,6 +120,8 @@ test('a locked animated slider neither previews nor creates a keyframe', async (
   const graded = await checksum(page);
   const slider = page.getByRole('slider', { name: 'Exposure', exact: true });
   await expect(slider).toBeDisabled();
+  // Below the Colour group: without scrolling, the click would land on the timeline underneath the Properties panel.
+  await slider.scrollIntoViewIfNeeded();
   const box = (await slider.boundingBox())!;
   await page.mouse.click(box.x + box.width * 0.8, box.y + box.height / 2);
   expect(await checksum(page)).toBe(graded);

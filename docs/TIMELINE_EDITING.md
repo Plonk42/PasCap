@@ -358,7 +358,8 @@ and undoable, and never move music, other tracks, Transform keyframes or adjustm
 - **Several clips** can be selected: **Ctrl-click** (Cmd-click) adds a clip, which becomes the
   primary clip that Clip properties edit (solid outline; the others are dashed), or removes a
   selected one; the **Select all clips** icon in a track header adds that track's clips. A plain
-  click, or selecting a track, returns to one selected clip. The selection is editor-only, never
+  click, or selecting a track, returns to one selected clip. Adjustments join the same selection
+  ([adjustment track](#adjustment-track)). The selection is editor-only, never
   saved. Dragging any selected clip moves them all by the same number of frames: clips from one
   track follow the pointer to its track, clips from several tracks stay on their own tracks. On
   a Ripple-off destination each keeps its offset from the others and any moved edge snaps; on a
@@ -499,8 +500,8 @@ ruler above the video tracks, so they stay in view however the tracks scroll. It
   (the + in the track's header) covers the selected ruler range, else the selected clip's span; it is
   unavailable, with the reason in its tooltip, without either, over another adjustment or at 64.
 - **Select:** a click selects the adjustment, puts the playhead where it was clicked and opens the
-  Colour tab on it; Enter or Space selects it and moves the playhead into it when outside. Selecting
-  a clip or a track clears it. While an adjustment is selected the Colour tab edits it, even with the
+  Colour tab on it; Enter or Space selects it and moves the playhead into it when outside. A plain
+  click on a clip or selecting a track clears it. While an adjustment is selected the Colour tab edits it, even with the
   playhead elsewhere (keyframes are then captured only on its own frames); otherwise the Adjustment
   target edits the one at the playhead.
 - **The selected clip's adjustment:** when a clip is selected and the playhead is on it, the
@@ -522,6 +523,19 @@ ruler above the video tracks, so they stay in view however the tracks scroll. It
   slide like clip grade markers, staying within the adjustment, through `useKeyframeSlide`: drag or
   ←/→ (one frame, Shift ten), one Undo step per valid release, Delete removes. Click, Enter or Space
   selects the adjustment, seeks the keyframe and opens the Colour tab.
+- **With clips:** Ctrl-click (Cmd-click) adds an adjustment to the selection or takes it out, and
+  also adds or removes clips without losing the selected adjustments. Dragging any selected clip or
+  adjustment moves every selected clip and adjustment by the same frames in one Undo step: clips keep
+  their tracks when an adjustment is dragged, adjustments show dashed ghosts while a clip is dragged,
+  and anything that cannot go there refuses the whole move. Delete removes the whole selection in one
+  Undo step (the toolbar's trash then reads **Delete selected clips and adjustments**, or **Delete
+  selected adjustments**). While two or more clips or adjustments are selected, the Colour tab edits none of them and
+  says so ("1 clip and 1 adjustment are selected: select one to edit its grade").
+- **Copy and paste a grade:** right-click an adjustment (or press the Menu key on it) for **Copy
+  grade** and **Paste grade**, which also work from a clip's menu, between clips and adjustments.
+  Copy is unavailable, with the reason, for a grade with keyframes. Paste replaces the whole grade of
+  the right-clicked item and removes its keyframes; on an item of the selection it pastes on every
+  selected clip and adjustment (**Paste grade on 1 clip and 2 adjustments**), in one Undo step.
 
 Clips, trims, Ripple and track edits never move adjustments.
 

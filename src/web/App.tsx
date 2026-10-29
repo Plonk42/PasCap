@@ -325,8 +325,8 @@ export function App() {
   const clipGroup = useClipGroup();
   const [selectedMusicId, setSelectedMusicId] = useState<string | null>(null);
   /** An adjustment selected on the timeline; selecting a clip or track clears it. */
-  const [selectedAdjustmentId, setSelectedAdjustmentId] = useState<string | null>(null);
-  const adjustmentSelection = useRef<string | null>(null);
+  /** Adjustments selected on the timeline; Ctrl/Cmd-click selects them together with clips. */
+  const adjustmentGroup = useClipGroup();
   const [musicBoundary, setMusicBoundary] = useState<MusicBoundaryRequest | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState(EMPTY_PROJECT.layers[0]!.id);
   const [sourceInspectionEpoch, setSourceInspectionEpoch] = useState(0);
@@ -394,12 +394,11 @@ export function App() {
   const togglePanel = useCallback((panel: SidePanel) => toggleSidePanel(latestWorkspace.current, panel), []);
 
   const select = useCallback(
-    (id: string) => {
+    (id: string, keepAdjustments = false) => {
       selection.current = id;
       setSelectedId(id);
       clipGroup.set([]);
-      adjustmentSelection.current = null;
-      setSelectedAdjustmentId(null);
+      if (!keepAdjustments) adjustmentGroup.set([]);
       setViewerMode('timeline');
       const document = current.current;
       const layerId = document?.clips.find((clip) => clip.id === id)?.layerId;
@@ -413,15 +412,21 @@ export function App() {
         transitions?.find((item) => item.rightId === id) ?? transitions?.find((item) => item.leftId === id);
       setBoundaryId(boundary?.leftId ?? null);
     },
-    [clipGroup.set],
+    [clipGroup.set, adjustmentGroup.set],
   );
   const toggleClipSelection = useCallback(
     (id: string): void => {
       if (drafting.current) return;
+      // With adjustments selected too, the only selected clip can leave the selection.
+      if (adjustmentGroup.latest.current.length && selection.current === id && !clipGroup.latest.current.length) {
+        selection.current = null;
+        setSelectedId(null);
+        return;
+      }
       const next = toggleClip({ primary: selection.current, group: clipGroup.latest.current }, id);
-      applyClipSelection(next, selection.current, select, clipGroup.set);
+      applyClipSelection(next, selection.current, (clipId) => select(clipId, true), clipGroup.set);
     },
-    [select, clipGroup.set, clipGroup.latest],
+    [select, clipGroup.set, clipGroup.latest, adjustmentGroup.latest],
   );
   const selectTrackClips = useCallback(
     (layerId: string): void => {
@@ -487,13 +492,10 @@ export function App() {
         setSelectedMusicId(nextMusicId);
       }
       autosave.current?.update(next);
-      if (
-        adjustmentSelection.current !== null &&
-        !next.adjustments.some((item) => item.id === adjustmentSelection.current)
-      ) {
-        adjustmentSelection.current = null;
-        setSelectedAdjustmentId(null);
-      }
+      const keptAdjustments = adjustmentGroup.latest.current.filter((id) =>
+        next.adjustments.some((item) => item.id === id),
+      );
+      if (keptAdjustments.length !== adjustmentGroup.latest.current.length) adjustmentGroup.set(keptAdjustments);
       setHistoryState({ canUndo: history.current?.canUndo ?? false, canRedo: history.current?.canRedo ?? false });
       if (!next.layers.some((layer) => layer.id === selectedLayer.current)) {
         selectedLayer.current = next.layers[0]!.id;
@@ -518,7 +520,7 @@ export function App() {
         setSelectedLayerId(selectedClip.layerId);
       }
     },
-    [select, clipGroup.set, clipGroup.latest],
+    [select, clipGroup.set, clipGroup.latest, adjustmentGroup.set, adjustmentGroup.latest],
   );
   const commit = useCallback(
     (next: ProjectDocument, removed?: MediaRemoval, keepRange = false): boolean => {
@@ -713,16 +715,15 @@ export function App() {
   };
   const split = useCallback(() => {
     if (!current.current || drafting.current) return;
-    if (!selection.current && adjustmentSelection.current) {
+    if (!selection.current && adjustmentGroup.latest.current.length === 1) {
       const result = splitAdjustmentAt(
         current.current,
-        adjustmentSelection.current,
+        adjustmentGroup.latest.current[0]!,
         engine.current?.diagnostics().frame ?? 0,
       );
       if (typeof result === 'string') setError(result);
       else if (commit(result.next)) {
-        adjustmentSelection.current = result.id;
-        setSelectedAdjustmentId(result.id);
+        adjustmentGroup.set([result.id]);
         setError('');
       }
       return;
@@ -791,11 +792,19 @@ export function App() {
   }, [commit, timeRange, select]);
   const remove = useCallback(() => {
     if (timeRange) cutRange();
-    else if (selection.current && !drafting.current)
-      edit(selectedClipIds(clipGroup.latest.current, selection.current).map((clipId) => ({ type: 'delete', clipId })));
-    else if (adjustmentSelection.current && !drafting.current)
-      edit({ type: 'adjustment-remove', adjustmentId: adjustmentSelection.current });
-  }, [edit, cutRange, timeRange, clipGroup.latest]);
+    else if (!drafting.current) {
+      // Selected clips and adjustments go together, in one Undo step.
+      const clips = selection.current ? selectedClipIds(clipGroup.latest.current, selection.current) : [];
+      const commands: EditCommand[] = [
+        ...clips.map((clipId): EditCommand => ({ type: 'delete', clipId })),
+        ...adjustmentGroup.latest.current.map((adjustmentId): EditCommand => ({
+          type: 'adjustment-remove',
+          adjustmentId,
+        })),
+      ];
+      if (commands.length) edit(commands);
+    }
+  }, [edit, cutRange, timeRange, clipGroup.latest, adjustmentGroup.latest]);
   const addBookmark = useCallback(() => {
     if (!current.current || drafting.current) return;
     if (!calculateLayout(current.current).duration) {
@@ -911,8 +920,7 @@ export function App() {
       selection.current = null;
       setSelectedId(null);
       clipGroup.set([]);
-      adjustmentSelection.current = null;
-      setSelectedAdjustmentId(null);
+      adjustmentGroup.set([]);
       musicSelection.current = loaded.music[0]?.clips[0]?.id ?? null;
       setSelectedMusicId(musicSelection.current);
       setMusicBoundary(null);
@@ -981,8 +989,7 @@ export function App() {
     selection.current = null;
     setSelectedId(null);
     clipGroup.set([]);
-    adjustmentSelection.current = null;
-    setSelectedAdjustmentId(null);
+    adjustmentGroup.set([]);
     musicSelection.current = null;
     setSelectedMusicId(null);
     selectedLayer.current = EMPTY_PROJECT.layers[0]!.id;
@@ -1329,8 +1336,7 @@ export function App() {
     (id: string): void => {
       if (drafting.current) return;
       clipGroup.set([]);
-      adjustmentSelection.current = null;
-      setSelectedAdjustmentId(null);
+      adjustmentGroup.set([]);
       setViewerMode('timeline');
       selectedLayer.current = id;
       setSelectedLayerId(id);
@@ -1369,8 +1375,7 @@ export function App() {
   const selectAdjustment = useCallback(
     (id: string): void => {
       if (drafting.current || !current.current?.adjustments.some((item) => item.id === id)) return;
-      adjustmentSelection.current = id;
-      setSelectedAdjustmentId(id);
+      adjustmentGroup.set([id]);
       selection.current = null;
       setSelectedId(null);
       clipGroup.set([]);
@@ -1378,7 +1383,17 @@ export function App() {
       setViewerMode('timeline');
       openInspectorSection('colour', 'adjustment');
     },
-    [clipGroup.set, openInspectorSection],
+    [clipGroup.set, adjustmentGroup.set, openInspectorSection],
+  );
+  const toggleAdjustmentSelection = useCallback(
+    (id: string): void => {
+      if (drafting.current) return;
+      const ids = adjustmentGroup.latest.current;
+      const next = ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id];
+      // The last selected item stays selected.
+      if (next.length || selection.current) adjustmentGroup.set(next);
+    },
+    [adjustmentGroup.set, adjustmentGroup.latest],
   );
   const seekSourceKeyframe = useCallback((frame: number): void => seek(frame, true), [seek]);
   const navigationDisabled = !project || draft !== null || !previewReady;
@@ -2314,7 +2329,7 @@ export function App() {
                     selectedClipId={selectedId}
                     selectedClipCount={clipGroup.group.length}
                     timeRange={timeRange}
-                    selectedAdjustmentId={selectedAdjustmentId}
+                    selectedAdjustmentIds={adjustmentGroup.group}
                     selectedLayerId={selectedLayerId}
                     boundaryId={boundaryId}
                     frame={inspectorFrame}
@@ -2361,8 +2376,9 @@ export function App() {
             onSelectLayer={selectLayer}
             selectedMusicId={selectedMusicId}
             onSelectMusic={selectMusic}
-            selectedAdjustmentId={selectedAdjustmentId}
+            selectedAdjustmentIds={adjustmentGroup.group}
             onSelectAdjustment={selectAdjustment}
+            onToggleAdjustment={toggleAdjustmentSelection}
             onMusicBoundary={(leftId) => {
               selectMusic(leftId);
               setMusicBoundary((previous) => ({ leftId, serial: (previous?.serial ?? 0) + 1 }));
