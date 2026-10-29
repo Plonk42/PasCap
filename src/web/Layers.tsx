@@ -125,6 +125,8 @@ export function Layers({
   onSelectClips,
   onEdit,
   onAdd,
+  addAdjustment,
+  onAddAdjustment,
 }: Readonly<{
   project: ProjectDocument;
   selectedId: string;
@@ -138,6 +140,9 @@ export function Layers({
   onSelectClips: (id: string) => void;
   onEdit: (command: EditCommand) => void;
   onAdd: () => void;
+  /** What Add adjustment covers, or why it is unavailable. */
+  addAdjustment: { available: boolean; title: string };
+  onAddAdjustment: () => void;
 }>) {
   const viewport = useRef<HTMLElement>(null);
   const synchronizedScroll = useRef<number | null>(null);
@@ -196,7 +201,21 @@ export function Layers({
           title="Adjustments grade every video track over their range, after each clip's own grade"
         >
           <Icon name="colour" size={14} />
-          Adjustments · {project.adjustments.length} / {MAX_ADJUSTMENTS}
+          <span className="layer-sidebar-title">
+            Adjustments · {project.adjustments.length} / {MAX_ADJUSTMENTS}
+          </span>
+          <button
+            className="text-button layer-add"
+            aria-label="Add adjustment"
+            aria-disabled={!addAdjustment.available || undefined}
+            title={addAdjustment.title}
+            disabled={disabled}
+            onClick={() => {
+              if (addAdjustment.available) onAddAdjustment();
+            }}
+          >
+            <Icon name="plus" size={14} />
+          </button>
         </div>
         {timelineRows(project.layers).map(({ layer, index, top }) => {
           const restrictions = layerActionRestrictions(index, project.layers.length, disabled);

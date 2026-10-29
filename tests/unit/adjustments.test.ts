@@ -148,6 +148,41 @@ describe('adjustments', () => {
     expect(restored.adjustments).toEqual(document.adjustments);
   });
 
+  it('split into two pieces with the whole grade and every keyframe at its project frame', () => {
+    let document = applyCommand(project(), { type: 'adjustment-add', adjustmentId: 'a', start: 10, duration: 40 });
+    document = applyCommand(document, { type: 'colour-setting', adjustmentId: 'a', setting: 'saturation', value: 0.5 });
+    for (const frame of [5, 30])
+      document = applyCommand(document, {
+        type: 'layer-key-toggle',
+        adjustmentId: 'a',
+        frame,
+        setting: 'exposure',
+        value: 1,
+      });
+    const split = applyCommand(document, {
+      type: 'adjustment-split',
+      adjustmentId: 'a',
+      frame: 30,
+      newAdjustmentId: 'b',
+    });
+    const [left, right] = split.adjustments;
+    expect(left).toMatchObject({ id: 'a', start: 10, duration: 20 });
+    expect(right).toMatchObject({ id: 'b', start: 30, duration: 20 });
+    expect(right!.colour).toEqual(left!.colour);
+    expect(left!.keyframes.map((key) => key.frame)).toEqual([5, 30]);
+    expect(right!.keyframes.map((key) => key.frame)).toEqual([-15, 10]);
+    // Each frame keeps its grade.
+    for (const frame of [12, 29, 30, 45])
+      expect(sampleTimeline(split, frame)[0]!.colour).toEqual(sampleTimeline(document, frame)[0]!.colour);
+    for (const frame of [10, 50])
+      expect(() =>
+        applyCommand(document, { type: 'adjustment-split', adjustmentId: 'a', frame, newAdjustmentId: 'b' }),
+      ).toThrow('inside it');
+    expect(() =>
+      applyCommand(split, { type: 'adjustment-split', adjustmentId: 'b', frame: 40, newAdjustmentId: 'a' }),
+    ).toThrow('already exists');
+  });
+
   it('never follow clip edits and never extend the project', () => {
     const document = applyCommand(project(), { type: 'adjustment-add', adjustmentId: 'a', start: 100, duration: 500 });
     const moved = applyCommand(document, { type: 'delete', clipId: 'lower' });

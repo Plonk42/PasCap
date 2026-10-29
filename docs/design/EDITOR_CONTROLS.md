@@ -66,7 +66,8 @@ and technical paths stay unchanged; this glossary does not change the project sc
   such as **Adjustment 01:12:05 – 01:20:00**, OUT exclusive; its keyframes count frames from its
   start. It is not a clip or a track and never follows clip edits. Adjustments sit on the
   **adjustment track** (header **Adjustments · N / 64**), pinned under the time ruler, where a
-  click selects one for the Colour tab and dragging moves or trims it.
+  click selects one for the Colour tab, dragging moves or trims it, dragging across an empty stretch
+  draws a new one and its header's **Add adjustment** covers the ruler range or the selected clip.
 - **Keyframe**: a stored animation value at a frame. Clip grade and adjustment keyframes contain
   **enabled settings**; track Transform keyframes are separate and use project frames;
   clip grade and clip speed keyframes use original-source frames.

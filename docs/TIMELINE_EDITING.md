@@ -492,6 +492,12 @@ ruler above the video tracks, so they stay in view however the tracks scroll. It
 **Adjustments · N / 64**. Each adjustment is drawn over its range and named by it
 (**Adjustment 00:00:10 – 00:01:00**, OUT exclusive), with no other name.
 
+- **Create:** drag across an empty stretch of the track to draw a new adjustment, in either
+  direction; its ends snap like an adjustment's edges and Alt bypasses snapping. The draft is dashed,
+  red where it would overlap another adjustment, and a valid release adds a neutral adjustment in one
+  Undo step and selects it. A click on the empty track only moves the playhead. **Add adjustment**
+  (the + in the track's header) covers the selected ruler range, else the selected clip's span; it is
+  unavailable, with the reason in its tooltip, without either, over another adjustment or at 64.
 - **Select:** a click selects the adjustment, puts the playhead where it was clicked and opens the
   Colour tab on it; Enter or Space selects it and moves the playhead into it when outside. Selecting
   a clip or a track clears it. While an adjustment is selected the Colour tab edits it, even with the
@@ -508,6 +514,10 @@ ruler above the video tracks, so they stay in view however the tracks scroll. It
   its reason, never clamped; Escape, pointer cancellation or blur restores it. On a focused body or
   handle, ←/→ move or trim by one frame (Shift ten), each one Undo step, and Delete or Backspace
   removes the adjustment; Delete also removes the selected adjustment when no clip is selected.
+- **Split:** with an adjustment selected and no clip, **Split at playhead** (S) splits it at the
+  playhead, after its first frame, into two adjustments with its whole grade and every keyframe, each
+  keyframe keeping its project frame; the second piece is selected. **Delete selected adjustment** in
+  the toolbar removes it. Each is one Undo step.
 - **Keyframes:** an adjustment's keyframes within its range are amber **◆** markers inside it. They
   slide like clip grade markers, staying within the adjustment, through `useKeyframeSlide`: drag or
   ←/→ (one frame, Shift ten), one Undo step per valid release, Delete removes. Click, Enter or Space

@@ -374,6 +374,8 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
           onSelectClips: vi.fn(),
           onEdit: vi.fn(),
           onAdd: vi.fn(),
+          addAdjustment: { available: false, title: 'Select a range first.' },
+          onAddAdjustment: vi.fn(),
         }),
       ),
     );

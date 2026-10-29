@@ -355,6 +355,15 @@ export const editCommandSchema = z.discriminatedUnion('type', [
       'move: keyframes move with it (a move); stay: they keep their project frames (a trim).',
     ),
   }),
+  command(
+    'adjustment-split',
+    'Split an adjustment at a project frame inside it: both pieces keep its whole grade and every keyframe, each keyframe at its project frame.',
+    {
+      adjustmentId,
+      frame: described(frameSchema, 'Project frame strictly inside it: the first frame of the second piece.'),
+      newAdjustmentId: described(idSchema, 'Unused ID of the second piece.'),
+    },
+  ),
   command('bookmark-add', 'Add a bookmark, a snap point that is never rendered; at most 1,000.', {
     frame: described(frameSchema, 'Project frame without a bookmark.'),
   }),
@@ -380,7 +389,8 @@ export const editCommandSchema = z.discriminatedUnion('type', [
 export type EditCommand = z.infer<typeof editCommandSchema>;
 
 /** Editor commands carrying a whole track: half of edit's schema, and the assistant has a command per setting. */
-const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set(['layer-add', 'layer-update']);
+// adjustment-split waits for the assistant's adjustment commands (#288).
+const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set(['layer-add', 'layer-update', 'adjustment-split']);
 
 /** The commands of the edit operation. */
 export const assistantEditCommandSchema = z.discriminatedUnion(

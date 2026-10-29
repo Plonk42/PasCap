@@ -1,6 +1,8 @@
 import { applyCommand, type EditCommand } from '../shared/commands.js';
-import type { Adjustment } from '../shared/grade.js';
+import { MAX_ADJUSTMENTS, type Adjustment } from '../shared/grade.js';
 import type { ProjectDocument } from '../shared/model.js';
+import type { TimelineRange } from '../shared/rush-editing.js';
+import type { PlacedClip } from '../shared/timeline.js';
 import { formatTimecode } from '../shared/timing.js';
 import type { KeyframeMove, KeyframeSlideKind, KeyframeSlideTarget } from './keyframe-slide.js';
 
@@ -63,6 +65,59 @@ export function planAdjustmentGesture(
 export interface AdjustmentKeyframeTarget extends KeyframeSlideTarget {
   /** The adjustment as drawn when the gesture started; `origin` counts from its start. */
   item: Adjustment;
+}
+
+export interface AdjustmentCreation {
+  range: Pick<Adjustment, 'start' | 'duration'>;
+  document: ProjectDocument;
+  command: Extract<EditCommand, { type: 'adjustment-add' }> | null;
+  error: string;
+}
+
+/** A new neutral adjustment over frames [start, end); overlaps and the 64-adjustment limit are refused. */
+export function planAdjustmentCreation(
+  project: ProjectDocument,
+  adjustmentId: string,
+  start: number,
+  end: number,
+): AdjustmentCreation {
+  const range = { start: Math.min(start, end), duration: Math.abs(end - start) };
+  const fail = (error: string): AdjustmentCreation => ({ range, document: project, command: null, error });
+  if (range.duration < 1) return fail('An adjustment lasts at least one frame.');
+  if (range.start < 0) return fail('An adjustment cannot start before the first frame.');
+  const command = { type: 'adjustment-add' as const, adjustmentId, ...range };
+  try {
+    return { range, document: applyCommand(project, command), command, error: '' };
+  } catch (cause) {
+    return fail(cause instanceof Error ? cause.message : 'An adjustment cannot go there.');
+  }
+}
+
+/** What **Add adjustment** covers: the ruler range, else the selected clip's span. */
+export function adjustmentSpan(
+  range: TimelineRange | null,
+  clip: PlacedClip | undefined,
+): { start: number; end: number } | null {
+  if (range) return { start: range.inFrame, end: range.outFrame };
+  return clip ? { start: clip.start, end: clip.end } : null;
+}
+
+/** Why an adjustment cannot be added over `span`, or null. */
+export function addAdjustmentReason(
+  project: ProjectDocument,
+  span: { start: number; end: number } | null,
+): string | null {
+  if (project.adjustments.length >= MAX_ADJUSTMENTS)
+    return `A project has at most ${MAX_ADJUSTMENTS} adjustments. Remove one first.`;
+  if (!span) return 'Select a range on the time ruler or a clip first, or draw one in the adjustment track.';
+  return planAdjustmentCreation(project, 'candidate', span.start, span.end).error || null;
+}
+
+/** An adjustment can be split at frames after its first one. */
+export function splitAdjustmentReason(item: Adjustment, frame: number): string | null {
+  return frame > item.start && frame < item.start + item.duration
+    ? null
+    : 'Place the playhead inside the selected adjustment, after its first frame, to split it.';
 }
 
 /** Moves a keyframe to another frame of its adjustment; its markers stay within the adjustment's range. */
