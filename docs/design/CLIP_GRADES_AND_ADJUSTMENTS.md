@@ -5,7 +5,8 @@ v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)). **Status: decided; 
 ([#273](https://github.com/Plonk42/PasCap/issues/273)), Auto writing it
 ([#285](https://github.com/Plonk42/PasCap/issues/285)) and adjustment items replacing track
 Colour ([#286](https://github.com/Plonk42/PasCap/issues/286)) are implemented on the v1.3 branch;
-items on the timeline (#287), through MCP (#288) and the UX evaluation (#289) are not.** The
+items on the timeline (#287) are in progress (the pinned lane with selection, move, trim, delete and
+keyframe markers is implemented); MCP (#288) and the UX evaluation (#289) are not.** The
 current contracts are [clip grades and adjustments](ROW_APPEARANCE.md),
 [spatial transforms](SPATIAL_TRANSFORMS.md) (with Opacity), [HSL and curves](HSL_AND_CURVES.md),
 [Temperature and Tint](TEMPERATURE_AND_TINT.md), [detail filters](DETAIL_FILTERS.md) and
@@ -188,9 +189,10 @@ Follows the requirements of #289: one settings panel, an unmistakable target.
 - **Target rules (owner).** Nothing is edited implicitly. With no clip or item selected, the tab
   shows nothing to edit and a hint to select one. Clips and items can be selected together
   (Ctrl/Cmd-click), so they can be dragged together; with several clips, or a clip and an item,
-  editing is disabled with the reason. Until #287 makes items selectable on the timeline, the
-  Adjustment target edits the item at the playhead and offers **New adjustment** over the
-  selected ruler range or clip where there is none.
+  editing is disabled with the reason. Items are now selectable on the timeline: a selected item is
+  the Adjustment target; without one, the Adjustment target still edits the item at the playhead
+  and offers **New adjustment** over the selected ruler range or clip where there is none, until the
+  rest of #287 replaces the switch with the selection.
 - **Track tab (owner, implemented).** It keeps **Transform**, which now includes an **Opacity** setting (UI
   0–100%) with its triangle and per-setting Previous/Next like the other eight, then Transitions
   and Fades. The section keeps its name for now.

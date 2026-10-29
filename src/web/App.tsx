@@ -305,6 +305,9 @@ export function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const clipGroup = useClipGroup();
   const [selectedMusicId, setSelectedMusicId] = useState<string | null>(null);
+  /** An adjustment selected on the timeline; selecting a clip or track clears it. */
+  const [selectedAdjustmentId, setSelectedAdjustmentId] = useState<string | null>(null);
+  const adjustmentSelection = useRef<string | null>(null);
   const [musicBoundary, setMusicBoundary] = useState<MusicBoundaryRequest | null>(null);
   const [selectedLayerId, setSelectedLayerId] = useState(EMPTY_PROJECT.layers[0]!.id);
   const [sourceInspectionEpoch, setSourceInspectionEpoch] = useState(0);
@@ -376,6 +379,8 @@ export function App() {
       selection.current = id;
       setSelectedId(id);
       clipGroup.set([]);
+      adjustmentSelection.current = null;
+      setSelectedAdjustmentId(null);
       setViewerMode('timeline');
       const document = current.current;
       const layerId = document?.clips.find((clip) => clip.id === id)?.layerId;
@@ -463,6 +468,13 @@ export function App() {
         setSelectedMusicId(nextMusicId);
       }
       autosave.current?.update(next);
+      if (
+        adjustmentSelection.current !== null &&
+        !next.adjustments.some((item) => item.id === adjustmentSelection.current)
+      ) {
+        adjustmentSelection.current = null;
+        setSelectedAdjustmentId(null);
+      }
       setHistoryState({ canUndo: history.current?.canUndo ?? false, canRedo: history.current?.canRedo ?? false });
       if (!next.layers.some((layer) => layer.id === selectedLayer.current)) {
         selectedLayer.current = next.layers[0]!.id;
@@ -747,6 +759,8 @@ export function App() {
     if (timeRange) cutRange();
     else if (selection.current && !drafting.current)
       edit(selectedClipIds(clipGroup.latest.current, selection.current).map((clipId) => ({ type: 'delete', clipId })));
+    else if (adjustmentSelection.current && !drafting.current)
+      edit({ type: 'adjustment-remove', adjustmentId: adjustmentSelection.current });
   }, [edit, cutRange, timeRange, clipGroup.latest]);
   const addBookmark = useCallback(() => {
     if (!current.current || drafting.current) return;
@@ -863,6 +877,8 @@ export function App() {
       selection.current = null;
       setSelectedId(null);
       clipGroup.set([]);
+      adjustmentSelection.current = null;
+      setSelectedAdjustmentId(null);
       musicSelection.current = loaded.music[0]?.clips[0]?.id ?? null;
       setSelectedMusicId(musicSelection.current);
       setMusicBoundary(null);
@@ -931,6 +947,8 @@ export function App() {
     selection.current = null;
     setSelectedId(null);
     clipGroup.set([]);
+    adjustmentSelection.current = null;
+    setSelectedAdjustmentId(null);
     musicSelection.current = null;
     setSelectedMusicId(null);
     selectedLayer.current = EMPTY_PROJECT.layers[0]!.id;
@@ -1277,6 +1295,8 @@ export function App() {
     (id: string): void => {
       if (drafting.current) return;
       clipGroup.set([]);
+      adjustmentSelection.current = null;
+      setSelectedAdjustmentId(null);
       setViewerMode('timeline');
       selectedLayer.current = id;
       setSelectedLayerId(id);
@@ -1312,6 +1332,20 @@ export function App() {
       nonce: (previous?.nonce ?? 0) + 1,
     }));
   }, []);
+  const selectAdjustment = useCallback(
+    (id: string): void => {
+      if (drafting.current || !current.current?.adjustments.some((item) => item.id === id)) return;
+      adjustmentSelection.current = id;
+      setSelectedAdjustmentId(id);
+      selection.current = null;
+      setSelectedId(null);
+      clipGroup.set([]);
+      setBoundaryId(null);
+      setViewerMode('timeline');
+      openInspectorSection('colour', 'adjustment');
+    },
+    [clipGroup.set, openInspectorSection],
+  );
   const seekSourceKeyframe = useCallback((frame: number): void => seek(frame, true), [seek]);
   const navigationDisabled = !project || draft !== null || !previewReady;
   const keyframeNavigation = useMemo(
@@ -2246,6 +2280,7 @@ export function App() {
                     selectedClipId={selectedId}
                     selectedClipCount={clipGroup.group.length}
                     timeRange={timeRange}
+                    selectedAdjustmentId={selectedAdjustmentId}
                     selectedLayerId={selectedLayerId}
                     boundaryId={boundaryId}
                     frame={inspectorFrame}
@@ -2292,6 +2327,8 @@ export function App() {
             onSelectLayer={selectLayer}
             selectedMusicId={selectedMusicId}
             onSelectMusic={selectMusic}
+            selectedAdjustmentId={selectedAdjustmentId}
+            onSelectAdjustment={selectAdjustment}
             onMusicBoundary={(leftId) => {
               selectMusic(leftId);
               setMusicBoundary((previous) => ({ leftId, serial: (previous?.serial ?? 0) + 1 }));
