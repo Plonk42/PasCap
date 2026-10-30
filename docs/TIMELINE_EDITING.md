@@ -491,7 +491,7 @@ Delete or Backspace removes it.
 
 The project's adjustments sit on one **adjustment track**, a 36-pixel lane pinned under the time
 ruler above the video tracks, so they stay in view however the tracks scroll. Its header reads
-**Adjustments · selected / N**. Each adjustment is drawn over its range and named by it
+**Adjustments · N**, the number of adjustments. Each adjustment is drawn over its range and named by it
 (**Adjustment 00:00:10 – 00:01:00**, OUT exclusive), with no other name.
 
 - **Create:** drag across an empty stretch of the track to draw a new adjustment, in either

@@ -1566,7 +1566,6 @@ export function Timeline(props: Readonly<Props>) {
         <Layers
           project={project}
           selectedId={selectedLayerId}
-          selectedAdjustmentCount={props.selectedAdjustmentIds.length}
           scrollTop={verticalScroll}
           surfaceHeight={surfaceHeight}
           viewportHeight={viewportHeight}
