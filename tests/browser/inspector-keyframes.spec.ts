@@ -138,6 +138,8 @@ test('four accessible tabs preserve selection across clips, populated/empty trac
 test('all participants reuse their main control bounds and resets with one exact value beside each slider while edits isolate the stored point', async ({
   page,
 }) => {
+  // Every Colour setting's main and stored control, about 24 s CI-like.
+  test.setTimeout(75_000);
   const main = new Map<string, { min: string | null; max: string | null; step: string | null }>();
   await inspectorTab(page, 'Adjustment');
   for (const setting of COLOUR_CONTROLS) {
