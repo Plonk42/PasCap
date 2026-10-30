@@ -203,6 +203,7 @@ export function adjustmentKeyframeKind(options: {
   };
   return {
     at: ({ item, origin }, travel) => item.start + Math.max(0, Math.min(item.duration - 1, origin + travel)),
+    snapRange: ({ item }) => ({ min: item.start, max: item.start + item.duration - 1 }),
     planAt: (project, { scope, origin, item }, at) =>
       planAdjustmentKeyframeMove(project, scope, origin, at - item.start),
     step: (project, { scope, origin }, delta) => planAdjustmentKeyframeMove(project, scope, origin, origin + delta),
@@ -218,9 +219,7 @@ export function adjustmentKeyframeKind(options: {
   };
 }
 
-/** The keyframes drawn inside an adjustment: those within its range. */
+/** The keyframes drawn inside an adjustment; they always lie within its range. */
 export function adjustmentKeyframeTargets(item: Adjustment): AdjustmentKeyframeTarget[] {
-  return item.keyframes
-    .filter((key) => key.frame >= 0 && key.frame < item.duration)
-    .map((key) => ({ scope: item.id, origin: key.frame, item }));
+  return item.keyframes.map((key) => ({ scope: item.id, origin: key.frame, item }));
 }

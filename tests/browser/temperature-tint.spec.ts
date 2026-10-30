@@ -72,8 +72,8 @@ test.beforeEach(async ({ page, request }) => {
   document.clips = [createClip('one', assets[0]!.id, 0, 60), { ...createClip('two', assets[1]!.id, 0, 60), start: 60 }];
   document.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cut', duration: 0 }];
   document.layers.push(createLayer('empty', 'Empty row'));
-  // Temperature and Tint below grade this adjustment, whose frames equal project frames over the 120-frame timeline.
-  document.adjustments = [adjustmentFrom0(120)];
+  // Temperature and Tint below grade this adjustment, whose frames equal project frames over the 120-frame timeline, extended so keyframes can follow it.
+  document.adjustments = [adjustmentFrom0(200)];
   memory = await memoryProjects(page, document);
   await expandedInspectorPreferences(page);
   await page.goto(`/?project=${document.id}`);
@@ -598,7 +598,7 @@ test('channel navigation skips unrelated keys and previews a key after the adjus
   await page.keyboard.press('Tab');
   await expect(controls(page, 'Temperature').slider).toBeFocused();
   await page.keyboard.press('Shift+Tab');
-  // A keyframe after the adjustment's range previews its last frame; the diamond still captures at the playhead.
+  // A keyframe after the timeline previews its last frame; the diamond still captures at the playhead.
   await next.press('Enter');
   await previewAt(page, 119);
   await expect(next).toBeFocused();
@@ -607,7 +607,6 @@ test('channel navigation skips unrelated keys and previews a key after the adjus
   await expect(diamond(page, 'Temperature')).toHaveAttribute('title', /at frame 119 of adjustment /);
   await expect(controls(page, 'Temperature').exact).toBeDisabled();
   const keys = adjustmentKeyframes(page);
-  await expect(keys.locator('[data-keyframe-frame="130"]')).toContainText('Outside duration');
   await expect(keys.locator('.keyframe-row[aria-current="true"]')).toHaveCount(0);
   // Terminal arrows remain native buttons: aria-disabled guards activation
   // and removes them from Tab order without discarding the activated focus.

@@ -517,8 +517,8 @@ ruler above the video tracks, so they stay in view however the tracks scroll. It
   handle, ←/→ move or trim by one frame (Shift ten), each one Undo step, and Delete or Backspace
   removes the adjustment; Delete also removes the selected adjustment when no clip is selected.
 - **Split:** with an adjustment selected and no clip, **Split at playhead** (S) splits it at the
-  playhead, after its first frame, into two adjustments with its whole grade and every keyframe, each
-  keyframe keeping its project frame; the second piece is selected. **Delete selected adjustment** in
+  playhead, after its first frame, into two adjustments with its whole grade, each
+  keyframe staying on its project frame in the piece that contains it; the second piece is selected. **Delete selected adjustment** in
   the toolbar removes it. Each is one Undo step.
 - **Keyframes:** an adjustment's keyframes within its range are amber **◆** markers inside it. They
   slide like clip grade markers, staying within the adjustment, through `useKeyframeSlide`: drag or
@@ -570,8 +570,7 @@ project, or during any document-preview draft. They seek
 strictly earlier/later keyframes where that channel is not `null` (zero included),
 skipping unrelated enabled settings; Colour's main arrows start from the playhead and its chips
 from their own row. Colour keeps no stored-keyframe cursor: a clip grade keyframe on
-trimmed-off footage previews the clip's nearest image, an adjustment keyframe outside its range
-the adjustment's nearest frame. With keyframes, a setting not enabled at the playhead stays
+trimmed-off footage previews the clip's nearest image. With keyframes, a setting not enabled at the playhead stays
 read-only until its diamond captures it; sliders never create implicit keyframes. Opacity, in
 Track → Transform, affects composition coverage, not SDR RGB grading.
 **Clip → Placement** contains placement only. Track options remains limited to

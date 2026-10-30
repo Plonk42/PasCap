@@ -63,12 +63,12 @@ describe('adjustments', () => {
     expect(gradeChainPixel(bright, [{ ...lower!.grade, exposure: 0 }])).toEqual(bright);
   });
 
-  it('evaluate keyframes counted from their start, including before it', () => {
+  it('evaluate keyframes counted from their start', () => {
     const item: Adjustment = {
       ...createAdjustment('look', 100, 50),
       keyframes: [
         {
-          frame: -10,
+          frame: 0,
           values: { ...nullValues(), exposure: 0 },
           easing: { ...nullEasing(), exposure: 'linear' },
           reset: false,
@@ -82,7 +82,8 @@ describe('adjustments', () => {
       ],
     };
     const document = { adjustments: [item] };
-    expect(adjustmentColour(document, 100).exposure).toBeCloseTo(0.5);
+    expect(adjustmentColour(document, 100).exposure).toBeCloseTo(0);
+    expect(adjustmentColour(document, 105).exposure).toBeCloseTo(0.5);
     expect(adjustmentColour(document, 110).exposure).toBe(1);
     expect(adjustmentColour(document, 149).exposure).toBe(1);
     expect(adjustmentColour(document, 150)).toEqual(NEUTRAL_COLOUR);
@@ -132,12 +133,12 @@ describe('adjustments', () => {
     ).toThrow();
   });
 
-  it('carry their keyframes when moved and keep their project frames when trimmed', () => {
+  it('carry their keyframes when moved and keep their project frames when trimmed, never outside their range', () => {
     let document = applyCommand(project(), { type: 'adjustment-add', adjustmentId: 'a', start: 10, duration: 40 });
     document = applyCommand(document, {
       type: 'layer-key-toggle',
       adjustmentId: 'a',
-      frame: 5,
+      frame: 15,
       setting: 'exposure',
       value: 0.5,
     });
@@ -148,7 +149,7 @@ describe('adjustments', () => {
       duration: 40,
       keyframes: 'move',
     });
-    expect(moved.adjustments[0]!.keyframes[0]!.frame).toBe(5);
+    expect(moved.adjustments[0]!.keyframes[0]!.frame).toBe(15);
     const trimmed = applyCommand(document, {
       type: 'adjustment-range',
       adjustmentId: 'a',
@@ -156,8 +157,8 @@ describe('adjustments', () => {
       duration: 30,
       keyframes: 'stay',
     });
-    // The keyframe at project frame 15 stays there, now before the trimmed start, so trimming back restores it.
-    expect(trimmed.adjustments[0]!.keyframes[0]!.frame).toBe(-5);
+    // The keyframe at project frame 25 stays there.
+    expect(trimmed.adjustments[0]!.keyframes[0]!.frame).toBe(5);
     const restored = applyCommand(trimmed, {
       type: 'adjustment-range',
       adjustmentId: 'a',
@@ -166,9 +167,28 @@ describe('adjustments', () => {
       keyframes: 'stay',
     });
     expect(restored.adjustments).toEqual(document.adjustments);
+    // A trim that would leave the keyframe outside the adjustment is refused, never clamped.
+    for (const range of [
+      { start: 30, duration: 20, keyframes: 'stay' as const },
+      { start: 10, duration: 10, keyframes: 'stay' as const },
+      { start: 10, duration: 15, keyframes: 'move' as const },
+    ])
+      expect(() => applyCommand(document, { type: 'adjustment-range', adjustmentId: 'a', ...range })).toThrow(
+        'within the adjustment',
+      );
+    for (const frame of [-1, 40])
+      expect(() =>
+        applyCommand(document, {
+          type: 'layer-key-toggle',
+          adjustmentId: 'a',
+          frame,
+          setting: 'exposure',
+          value: 0.5,
+        }),
+      ).toThrow('within the adjustment');
   });
 
-  it('split into two pieces with the whole grade and every keyframe at its project frame', () => {
+  it('split into two pieces with the whole grade, each keeping the keyframes within its range', () => {
     let document = applyCommand(project(), { type: 'adjustment-add', adjustmentId: 'a', start: 10, duration: 40 });
     document = applyCommand(document, { type: 'colour-setting', adjustmentId: 'a', setting: 'saturation', value: 0.5 });
     for (const frame of [5, 30])
@@ -189,8 +209,8 @@ describe('adjustments', () => {
     expect(left).toMatchObject({ id: 'a', start: 10, duration: 20 });
     expect(right).toMatchObject({ id: 'b', start: 30, duration: 20 });
     expect(right!.colour).toEqual(left!.colour);
-    expect(left!.keyframes.map((key) => key.frame)).toEqual([5, 30]);
-    expect(right!.keyframes.map((key) => key.frame)).toEqual([-15, 10]);
+    expect(left!.keyframes.map((key) => key.frame)).toEqual([5]);
+    expect(right!.keyframes.map((key) => key.frame)).toEqual([10]);
     // Each frame keeps its grade.
     for (const frame of [12, 29, 30, 45])
       expect(sampleTimeline(split, frame)[0]!.colour).toEqual(sampleTimeline(document, frame)[0]!.colour);

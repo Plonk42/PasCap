@@ -68,12 +68,15 @@ describe('adjustment timeline gestures', () => {
   });
 
   it('trims either end, its keyframes keeping their project frames', () => {
-    const start = planAdjustmentGesture(keyed(), 'a', 'in', 4);
-    expect(item(start.document, 'a')).toMatchObject({ start: 34, duration: 36 });
-    expect(item(start.document, 'a').keyframes.map((key) => key.frame)).toEqual([-4, 6]);
+    const start = planAdjustmentGesture(keyed(), 'a', 'in', -4);
+    expect(item(start.document, 'a')).toMatchObject({ start: 26, duration: 44 });
+    expect(item(start.document, 'a').keyframes.map((key) => key.frame)).toEqual([4, 14]);
     const end = planAdjustmentGesture(keyed(), 'a', 'out', -15);
     expect(item(end.document, 'a')).toMatchObject({ start: 30, duration: 25 });
     expect(end.command?.keyframes).toBe('stay');
+    // A trim never leaves a keyframe outside the adjustment.
+    expect(planAdjustmentGesture(keyed(), 'a', 'in', 4).error).toMatch(/within the adjustment/);
+    expect(planAdjustmentGesture(keyed(), 'a', 'out', -35).error).toMatch(/within the adjustment/);
   });
 
   it('refuses overlaps, empty ranges and starts before frame 0 without clamping', () => {
@@ -217,15 +220,8 @@ describe('clips and adjustments selected together', () => {
 });
 
 describe('adjustment keyframe markers', () => {
-  it('draws only the keyframes within the range', () => {
-    const document = applyCommand(keyed(), {
-      type: 'adjustment-range',
-      adjustmentId: 'a',
-      start: 35,
-      duration: 35,
-      keyframes: 'stay',
-    });
-    expect(adjustmentKeyframeTargets(item(document, 'a')).map((target) => target.origin)).toEqual([5]);
+  it('draws every keyframe, which always lies within the range', () => {
+    expect(adjustmentKeyframeTargets(item(keyed(), 'a')).map((target) => target.origin)).toEqual([0, 10]);
   });
 
   it('moves a keyframe within its adjustment, refusing occupied frames and frames outside it', () => {
@@ -245,6 +241,9 @@ describe('adjustment keyframe markers', () => {
     const [, target] = adjustmentKeyframeTargets(item(document, 'a'));
     expect(kind.at(target!, 0)).toBe(40);
     expect(kind.at(target!, 100)).toBe(69);
+    // Snapping may land on the last frame but never past the adjustment, whose OUT is exclusive.
+    expect(kind.snapRange!(target!)).toEqual({ min: 30, max: 69 });
+    expect(kind.planAt(document, target!, 69).error).toBe('');
     expect(kind.planAt(document, target!, 50).frame).toBe(20);
     expect(kind.step(document, target!, -1).frame).toBe(9);
     kind.reveal(document, target!, 10, false);

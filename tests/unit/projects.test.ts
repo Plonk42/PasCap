@@ -397,14 +397,14 @@ describe('multiple-project store', () => {
       colour: { ...NEUTRAL_COLOUR, exposure: 0.25 },
       keyframes: [gradeKey(550, { tint: 0.1 }), gradeKey(590, { tint: -0.1 }, 'hold')],
     };
-    // Counted from the adjustment's start, its keyframes may precede it while they stay on project frames.
+    // Counted from the adjustment's start, its keyframes always lie within its range.
     document.adjustments = [
       {
-        ...createAdjustment('look', 50, 40),
-        keyframes: Array.from({ length: 64 }, (_, index) => gradeKey(index * 10 - 50, { exposure: index % 2 })),
+        ...createAdjustment('look', 50, 700),
+        keyframes: Array.from({ length: 64 }, (_, index) => gradeKey(index * 10, { exposure: index % 2 })),
       },
     ];
-    document.adjustments[0]!.keyframes[0] = gradeKey(-50, scalarColourValues(NEUTRAL_COLOUR), 'smooth');
+    document.adjustments[0]!.keyframes[0] = gradeKey(0, scalarColourValues(NEUTRAL_COLOUR), 'smooth');
     const saved = await store.save(document, 0);
     expect(saved.adjustments[0]!.keyframes).toHaveLength(64);
     expect(Object.keys(saved.adjustments[0]!.keyframes[0]!.values)).toEqual(GRADE_SETTINGS);
@@ -417,7 +417,8 @@ describe('multiple-project store', () => {
     const invalid: unknown[] = [
       { ...saved, adjustments: [{ ...item, keyframes: [...item.keyframes, gradeKey(600, { hue: 90 })] }] },
       { ...saved, adjustments: [{ ...item, keyframes: [{ ...first, values: { ...first.values, opacity: 0 } }] }] },
-      { ...saved, adjustments: [{ ...item, keyframes: [{ ...first, frame: -51 }] }] },
+      { ...saved, adjustments: [{ ...item, keyframes: [{ ...first, frame: -1 }] }] },
+      { ...saved, adjustments: [{ ...item, keyframes: [{ ...first, frame: 700 }] }] },
       { ...saved, adjustments: [{ ...item, keyframes: [gradeKey(10, {})] }] },
       { ...saved, adjustments: [{ ...item, duration: 0 }] },
       { ...saved, adjustments: [{ ...item, layerId: 'video-1' }] },
@@ -426,7 +427,7 @@ describe('multiple-project store', () => {
         ...saved,
         adjustments: [
           { ...item, start: 100 },
-          { ...item, id: 'earlier', start: 0, keyframes: [] },
+          { ...item, id: 'earlier', start: 0, duration: 40, keyframes: [] },
         ],
       },
       { ...saved, adjustments: [item, { ...item, start: 200 }] },

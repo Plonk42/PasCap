@@ -54,6 +54,8 @@ export interface KeyframeSlideKind<T extends KeyframeSlideTarget> {
   selector(target: T, frame: number): string;
   /** Snap targets other than the playhead; defaults to `snapPoints(project)`. */
   snapTargets?(project: ProjectDocument, target: T): number[];
+  /** Timeline frames the marker may snap to, when the key cannot go everywhere. */
+  snapRange?(target: T): { min: number; max: number };
   /** Delete/Backspace on a focused marker, when the type supports it. */
   remove?(project: ProjectDocument, target: T): EditCommand;
 }
@@ -182,7 +184,9 @@ export function useKeyframeSlide<T extends KeyframeSlideTarget>(options: Options
     active.moved = true;
     const travel = slideTravel(active.startX, active.pointerX, active.startScroll, scrollLeft, active.scale);
     const free = kind.at(active.target, travel);
-    const at = snapping && !active.alt ? snapFrame(free, active.targets, 8 / active.scale) : free;
+    const range = kind.snapRange?.(active.target);
+    const targets = range ? active.targets.filter((frame) => frame >= range.min && frame <= range.max) : active.targets;
+    const at = snapping && !active.alt ? snapFrame(free, targets, 8 / active.scale) : free;
     const plan = { ...kind.planAt(active.project, active.target, at), at, guide: at === free ? null : at };
     if (
       !started &&
