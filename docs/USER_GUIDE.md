@@ -700,7 +700,8 @@ separately from the real frame used for capture.
 Track Transform keyframes are boxed blue **▼** markers at the top of their track row
 (a default keyframe shows the default-keyframe icon), at their project frames. Click or Enter
 selects the track, seeks and opens **Track → Transform**; drag or ←/→ (Shift for ten) moves them
-one project frame, one Undo step per release. Adjustments are not drawn on the timeline yet.
+one project frame, one Undo step per release. Adjustments sit on the pinned adjustment track
+under the ruler, with their keyframes as amber markers inside them.
 
 ### Animate Colour with keyframes
 
