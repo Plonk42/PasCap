@@ -413,7 +413,8 @@ image and opens the **Colour** tab on its **Clip** target; a click edits nothing
 horizontally, or press ←/→ (one original source frame, Shift ten, along the timeline), to move
 the keyframe with all its settings to another source frame of the recording; a valid release is
 one Undo step, while Escape, cancellation, blur or an occupied frame restores. Delete or Backspace
-removes it. Adjustments are not drawn on the timeline yet, so their keyframes have no markers.
+removes it. An adjustment's keyframes are amber markers inside it on the
+[adjustment track](TIMELINE_EDITING.md#adjustment-track), sliding the same way within it.
 
 Custom speed keyframes use a boxed salmon **●** lane. Their positions use
 authoritative clip retiming; off-trim
@@ -528,10 +529,9 @@ offscreen/unmount/project-switch releases the review decoder.
 The Properties panel uses **Clip / Colour / Track / Audio** tabs, split by ownership. **Clip**
 holds the selected clip's **Speed**, **Detail**, **Range** and **Placement** (placement only) under a "Clip N of M · track" header; on an empty video track it shows only
 "Select a clip on … to edit it." **Colour** holds Colour, HSL ranges and Colour curves for the
-selected clip's [grade](design/ROW_APPEARANCE.md#clip-grades) or, through its **Clip /
-Adjustment** switch (or without a selected clip), the
-[adjustment](design/ROW_APPEARANCE.md#adjustments) at the playhead, created there over the ruler
-range or the selected clip when none exists; the Colour section ends with that grade's keyframe
+selected clip's [grade](design/ROW_APPEARANCE.md#clip-grades) or the selected
+[adjustment](design/ROW_APPEARANCE.md#adjustments), created on the adjustment track; with nothing
+selected it shows a hint to select one. The Colour section ends with that grade's keyframe
 list, Animation help and enabled-setting chips.
 **Track** holds what the whole video track owns under an "Applies to all N clips on
 this track" header: Transform with Opacity (ending with its own keyframe list), Transitions (every

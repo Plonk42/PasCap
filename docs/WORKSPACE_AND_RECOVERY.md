@@ -76,7 +76,8 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
   a browser-local preference that survives reloads.
 - Bottom: frame-scaled multi-track timeline, playhead timecode, highlighted active
   insertion track, blue Transform keyframe markers, amber clip grade keyframe markers inside
-  clips, dimmed hidden clips and Activity. Adjustments are not drawn on the timeline yet.
+  clips, dimmed hidden clips and Activity. Adjustments sit on the adjustment track pinned under
+  the ruler ([adjustment track](TIMELINE_EDITING.md#adjustment-track)).
   The responsive toolbar starts with **Snap** and **Snap to beats** (with its Beats / Downbeats only / Hits / Beats and hits menu, [snap to beats](TIMELINE_EDITING.md#snap-to-beats)), then the **Bookmark** group (Previous bookmark, add at the playhead or delete the one there, Next bookmark), then keeps Split, Trim start/end and Delete (which deletes the selected range while one is selected)
   directly visible; Duplicate is in the clip's right-click menu (Ctrl+D), and start
   nudging beside Clip → Placement's start field. Zoom keeps its slider and Fit,
@@ -479,7 +480,7 @@ image or the adjustment's nearest frame, and the main setting values, diamond st
 always use the playhead.
 
 A clip grade's keyframes are amber ◆ markers inside its clip on the timeline, one per keyframe
-on the footage it shows; adjustments have no timeline markers yet. **Horizontal
+on the footage it shows; an adjustment's keyframes are amber markers inside it. **Horizontal
 marker dragging** captures the project/clip/keyframe, zoom, grabbed pointer position,
 scroll and stationary playhead and maps capture-relative travel through the clip's retiming
 to a source frame of the recording. Valid drafts preview live but never enter autosave/history;
