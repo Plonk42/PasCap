@@ -1859,7 +1859,9 @@ export function Timeline(props: Readonly<Props>) {
                     </span>
                     <span className="timeline-clip-label">
                       {!isNeutralClipGrade(clip.grade) && (
-                        <span className="clip-grade-mark" title="This clip has its own grade" />
+                        <span className="clip-grade-mark" title="This clip has its own grade">
+                          <Icon name="colour" size={12} />
+                        </span>
                       )}
                       <strong>{shortName(name)}</strong>
                       <small>
