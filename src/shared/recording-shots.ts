@@ -163,6 +163,17 @@ export function rankedSmoothRanges(
   return rankRanges(ranges, (range) => shotKind(analysis, range.sourceIn, range.sourceOut, fps), fps);
 }
 
+/** The best steady range Source preview's Use best keeps, or null without one. */
+export function bestSteadyRange(
+  analysis: MotionAnalysis,
+  damage: readonly DamagedRange[],
+  allowedMovement: number,
+  fps: number,
+): SmoothRange | null {
+  const ranges = smoothRanges(motionProfile(analysis, fps), allowedMovement, fps, damage);
+  return rankedSmoothRanges(analysis, ranges, fps)[0] ?? null;
+}
+
 /** Mean flight data over a range; null without telemetry there. */
 export function flightMeans(
   telemetry: readonly TelemetrySample[],

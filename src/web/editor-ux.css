@@ -306,6 +306,60 @@
   height: 24px;
 }
 
+.library-best-ranges[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.library-summary label span {
+  white-space: nowrap;
+}
+
+/* Narrower panels keep the icons, Prepare's label going first; tooltips keep the names. */
+@container media-library (width < 360px) {
+  .library-action-label.prepare {
+    display: none;
+  }
+}
+
+@container media-library (width < 310px) {
+  .library-action-label.best {
+    display: none;
+  }
+}
+
+@container media-library (width < 280px) {
+  .product-workspace .library-summary {
+    padding-inline: 8px;
+  }
+}
+
+.library-best-count {
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: #2a3d2f;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.media-best-report {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  border-bottom: 1px solid var(--line);
+  color: #bacfbe;
+}
+
+.media-best-report span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .product-workspace .media-state > .media-state-icon {
   display: inline-flex;
   align-items: center;

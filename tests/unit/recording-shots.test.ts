@@ -7,6 +7,7 @@ import {
   type TelemetrySample,
 } from '../../src/shared/motion-analysis.js';
 import {
+  bestSteadyRange,
   cameraMotion,
   rankedSmoothRanges,
   rankRanges,
@@ -151,6 +152,9 @@ describe('ranking steady ranges', () => {
     expect(ranges[0]).toMatchObject({ sourceIn: shots[0]!.sourceIn });
     const best = rankedSmoothRanges(motion, ranges, FPS)[0]!;
     expect([best.sourceIn, best.sourceOut]).toEqual([shots[2]!.sourceIn, shots[2]!.sourceOut]);
+    // Use best in Media keeps the same range.
+    expect(bestSteadyRange(motion, [], 2, FPS)).toEqual(best);
+    expect(bestSteadyRange(stretches([{ seconds: 1, movement: orbit }]), [], 2, FPS)).toBeNull();
   });
 
   it('names orbits, reveals, approaches and other moves from the picture and the flight data', () => {

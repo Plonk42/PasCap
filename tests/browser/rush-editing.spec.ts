@@ -2246,6 +2246,92 @@ test('Use all keeps every steady range as a kept range in one Undo step, adding 
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
+test('Use best in Media keeps the best steady range of each selected recording, replacing kept ranges once confirmed', async ({
+  page,
+}) => {
+  const [a, b] = assets as [MediaAsset, MediaAsset];
+  const fps = 30000 / 1001;
+  const bestOf = (asset: MediaAsset) => {
+    const analysis = jerkyThenSteady(asset);
+    const best = rankedSmoothRanges(
+      analysis,
+      smoothRanges(motionProfile(analysis, fps), SMOOTH_TOLERANCE.initial, fps),
+      fps,
+    )[0]!;
+    return { sourceIn: best.sourceIn, sourceOut: best.sourceOut };
+  };
+  let analyzeB = false;
+  await page.route(`**/api/media/${a.id}/motion`, (route) =>
+    route.fulfill({ json: { analysis: jerkyThenSteady(a), job: null } }),
+  );
+  await page.route(`**/api/media/${b.id}/motion`, (route) =>
+    route.fulfill({ json: { analysis: analyzeB ? jerkyThenSteady(b) : null, job: null } }),
+  );
+  const use = page.getByRole('button', { name: 'Use best steady ranges', exact: true });
+  const check = (asset: MediaAsset) => page.getByRole('checkbox', { name: `Select ${asset.name}`, exact: true });
+  const selects = async () => (await current(page)).selects;
+
+  // One selected recording is enough; without an analysis it says why nothing can change.
+  await check(b).check();
+  await expect(use).toHaveAttribute('aria-disabled', 'true');
+  await expect(use).toHaveAttribute(
+    'title',
+    'No best steady range to keep: pattern-b.mp4 (camera motion not analyzed)',
+  );
+  await use.focus();
+  await page.keyboard.press('Enter');
+  await flush(page);
+  expect(await selects()).toEqual({});
+
+  // Without kept ranges it applies at once and names the recordings it skipped.
+  await check(a).check();
+  await expect(use).toHaveAttribute('aria-disabled', 'false');
+  await expect(use).toHaveText('Use best1');
+  await expect(use).toHaveAttribute('title', /^Keep the best steady range of 1 recording .*Skipped: pattern-b\.mp4/);
+  await use.click();
+  await expect.poll(selects).toEqual({ [a.id]: [bestOf(a)] });
+  await expect(page.getByRole('status').filter({ hasText: 'Kept the best steady range' })).toHaveText(
+    'Kept the best steady range of 1 recording. Skipped: pattern-b.mp4 (camera motion not analyzed).',
+  );
+  await expect(use).toHaveAttribute('aria-disabled', 'true');
+  // It is the range Use best keeps in Source preview.
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await expect(page.locator('.smooth-panel')).toHaveAttribute('data-smooth-in', String(bestOf(a).sourceIn));
+  await expect(page.getByRole('button', { name: /^Use best steady range / })).toHaveText('In use');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(selects).toEqual({});
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+
+  // Existing kept ranges are replaced only after confirmation, in one Undo step for every recording.
+  const kept = [
+    { sourceIn: 0, sourceOut: 10 },
+    { sourceIn: 20, sourceOut: 40 },
+  ];
+  analyzeB = true;
+  await fixture(page, { ...sequence(), selects: { [a.id]: kept } });
+  await check(a).check();
+  await check(b).check();
+  await expect(use).toHaveText('Use best2');
+  await expect(use).toHaveAttribute('title', /replacing the kept ranges of 1 recording;/);
+  await use.click();
+  const confirm = page.locator('.best-ranges-confirm');
+  await expect(confirm).toContainText('Replace the kept ranges of 1 recording?');
+  await confirm.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(confirm).toHaveCount(0);
+  await flush(page);
+  expect(memory.snapshot().selects).toEqual({ [a.id]: kept });
+  await use.click();
+  await confirm.getByRole('button', { name: 'Replace kept ranges', exact: true }).click();
+  await expect.poll(selects).toEqual({ [a.id]: [bestOf(a)], [b.id]: [bestOf(b)] });
+  await expect(page.getByRole('status').filter({ hasText: 'Kept the best steady range' })).toHaveText(
+    'Kept the best steady range of 2 recordings.',
+  );
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(selects).toEqual({ [a.id]: kept });
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await expectOnlyRangesSaved(page);
+});
+
 test('a proxy prepared before the analysis offers Analyze camera motion, which runs one background job', async ({
   page,
 }) => {

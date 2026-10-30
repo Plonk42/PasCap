@@ -573,6 +573,7 @@ svg {
 
 .prepare-confirm > div {
   display: flex;
+  clear: both;
   gap: 8px;
 }
 

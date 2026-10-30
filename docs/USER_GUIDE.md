@@ -193,6 +193,9 @@ drone flies) or a reveal (a climb or a pull out), then other camera moves, then 
 pushing in) and nearly still footage, each counting its length up to 10 s.
 **Use all N** keeps every steady range instead, in recording order and in one
 Undo step; neither adds clips: use the **Kept ranges** list for that.
+To sort a batch, select the recordings in Media and choose **Use best** in the selection bar:
+each keeps only its best steady range, in one Undo step. It first asks before replacing kept
+ranges you already set, and names the recordings it skipped, such as those not analyzed yet.
 Move **Allowed movement** left for only very steady footage,
 right to accept more movement. **Flight data** adds or removes lanes: flight and
 vertical speed, height, distance from home, ISO, shutter speed, exposure bias and digital

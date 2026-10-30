@@ -9,6 +9,15 @@ import {
 import { damageLabel, type MediaAsset } from '../shared/media.js';
 import { MAX_VIDEO_LAYERS, type ProjectDocument } from '../shared/model.js';
 import { mediaRemovalUsage } from '../shared/projects.js';
+import {
+  bestRangesHint,
+  bestRangesReport,
+  bestRangesUnavailable,
+  recordingCount,
+  replacingCount,
+  useBestRanges,
+  type BestRangeChange,
+} from './best-ranges.js';
 import { durationLabel, MEDIA_DRAG_TYPE, mediaReady, shortName } from './display.js';
 import { Icon } from './icons.js';
 import type { RelinkTarget } from './ImportDialog.js';
@@ -37,6 +46,8 @@ interface Props {
   onRelink: (target: RelinkTarget | null) => void;
   onRemove: (mediaIds: string[]) => boolean;
   onRemoveMusic: (ids: string[]) => boolean;
+  /** Keeps each recording's best steady range as its only kept range, in one Undo step. */
+  onKeepBestRanges: (changes: readonly BestRangeChange[]) => boolean;
   onImport: () => void;
   /** Changes after a successful import, so new media is not hidden by a search or filter. */
   importRevision: number;
@@ -261,6 +272,7 @@ export function MediaLibrary({
   onRelink,
   onRemove,
   onRemoveMusic,
+  onKeepBestRanges,
   onImport,
   importRevision,
   review,
@@ -399,7 +411,13 @@ export function MediaLibrary({
         }),
     [assets, filter, search, sort, usage],
   );
-  const selectedAssets = assets.filter((asset) => selected.has(asset.id));
+  const selectedAssets = useMemo(() => assets.filter((asset) => selected.has(asset.id)), [assets, selected]);
+  const selectionKey = [...selected].join('|');
+  const best = useBestRanges(selectedAssets, project?.selects);
+  const bestUnavailable = bestRangesUnavailable(best);
+  const replacing = replacingCount(best);
+  const [bestConfirm, setBestConfirm] = useState<string | null>(null);
+  const [bestReport, setBestReport] = useState<{ key: string; text: string } | null>(null);
   const visibleMusic = music.filter((asset) => musicMatchesFilter(asset, project, search, filter));
   // Damaged recordings need their own explicit choice to show the damage black.
   const prepareIds = selectedAssets
@@ -441,8 +459,20 @@ export function MediaLibrary({
     else setLastSelected(id);
   };
   const prepareSelected = (): void => {
+    setBestConfirm(null);
     if (prepareIds.length > 1) setConfirmPrepare(true);
     else void onPrepare(prepareIds);
+  };
+  const keepBest = (): void => {
+    setBestConfirm(null);
+    if (onKeepBestRanges(best.changes)) setBestReport({ key: selectionKey, text: bestRangesReport(best) });
+  };
+  const requestBest = (): void => {
+    if (!project || busy || bestUnavailable) return;
+    setConfirmPrepare(false);
+    setBestReport(null);
+    if (replacing) setBestConfirm(selectionKey);
+    else keepBest();
   };
   const setLibraryView = (next: 'list' | 'grid'): void => {
     setView(next);
@@ -616,9 +646,24 @@ export function MediaLibrary({
             <Icon name="x" size={12} />
           </button>
         )}
-        {selectedAssets.length > 1 && (
+        {selectedAssets.length > 0 && (
           <span className="library-selection-actions">
-            {prepareIds.length > 0 && (
+            <button
+              className="secondary-button small library-best-ranges"
+              aria-label="Use best steady ranges"
+              title={bestUnavailable ?? bestRangesHint(best)}
+              aria-disabled={bestUnavailable !== null}
+              aria-busy={best.loading}
+              disabled={!project || busy}
+              onClick={requestBest}
+            >
+              <Icon name="star" size={13} />
+              <span className="library-action-label best">Use best</span>
+              {!best.loading && best.changes.length > 0 && (
+                <span className="library-best-count">{best.changes.length}</span>
+              )}
+            </button>
+            {selectedAssets.length > 1 && prepareIds.length > 0 && (
               <button
                 className="secondary-button small"
                 aria-label="Prepare selected"
@@ -627,24 +672,61 @@ export function MediaLibrary({
                 onClick={prepareSelected}
               >
                 <Icon name="wand" size={13} />
-                Prepare
+                <span className="library-action-label prepare">Prepare</span>
               </button>
             )}
-            <button
-              className="icon-button"
-              aria-label="Remove selected from project"
-              title="Remove the selected recordings from this project; original recordings are kept"
-              disabled={!project || busy}
-              onClick={() => requestRemove(selectedAssets.map((asset) => asset.id))}
-            >
-              <Icon name="trash" size={14} />
-            </button>
-            <button className="icon-button" aria-label="Clear selected" title="Clear selection" onClick={clearSelected}>
-              <Icon name="x" size={14} />
-            </button>
+            {selectedAssets.length > 1 && (
+              <>
+                <button
+                  className="icon-button"
+                  aria-label="Remove selected from project"
+                  title="Remove the selected recordings from this project; original recordings are kept"
+                  disabled={!project || busy}
+                  onClick={() => requestRemove(selectedAssets.map((asset) => asset.id))}
+                >
+                  <Icon name="trash" size={14} />
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label="Clear selected"
+                  title="Clear selection"
+                  onClick={clearSelected}
+                >
+                  <Icon name="x" size={14} />
+                </button>
+              </>
+            )}
           </span>
         )}
       </div>
+      {bestConfirm === selectionKey && replacing > 0 && (
+        <fieldset className="prepare-confirm best-ranges-confirm">
+          <legend>
+            Replace the kept ranges of {recordingCount(replacing)}? Each selected recording keeps only its best steady
+            range.
+          </legend>
+          <div>
+            <button className="primary-button small" disabled={busy} onClick={keepBest}>
+              Replace kept ranges
+            </button>
+            <button className="secondary-button small" onClick={() => setBestConfirm(null)}>
+              Cancel
+            </button>
+          </div>
+        </fieldset>
+      )}
+      {bestReport?.key === selectionKey && (
+        <output className="media-best-report">
+          <span>{bestReport.text}</span>
+          <button
+            className="icon-button"
+            aria-label="Dismiss best steady range report"
+            onClick={() => setBestReport(null)}
+          >
+            <Icon name="x" size={14} />
+          </button>
+        </output>
+      )}
       {confirmPrepare && prepareIds.length > 1 && (
         <fieldset className="prepare-confirm">
           <legend>Prepare {prepareIds.length} editing proxies?</legend>

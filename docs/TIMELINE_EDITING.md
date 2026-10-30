@@ -817,8 +817,9 @@ are the review button's accessible description. Unapplied numeric drafts and
 existing clips do not change it. Search is always visible; **Media options**
 holds sort (name/duration/newest), readiness/usage filters and List/Grid. A plain
 click reviews a recording without selecting it; checkboxes, Ctrl-click and
-Shift-click select. With two or more selected, the **Select all** bar shows the
-count with **Prepare** (when needed), remove and **Clear selected**, without
+Shift-click select. With one or more selected, the **Select all** bar shows the count with
+**Use best** ([below](#keeping-the-best-steady-range-of-several-recordings)) and, from two,
+**Prepare** (when needed), remove and **Clear selected**, without
 a separate footer or Add button. Unprepared cards say **Not prepared** under their
 name. User imports automatically queue eligible proxies through one heavy
 worker, reusing ready/in-flight work. Manual preparation remains for legacy
@@ -979,6 +980,23 @@ camera motion** in the header instead, which queues one **Camera motion analysis
 acceleration seen straight ahead barely changes the picture, so speed changes without
 turning are not detected by the jolts; the flight speed line shows them, but does
 not change the suggestion. Flight logs are not used.
+
+### Keeping the best steady range of several recordings
+
+With one or more recordings selected in Media, **Use best** (star icon, **Use best steady
+ranges**) in the selection bar keeps, for each of them, the best steady range Source preview's
+**Use best** would choose at the current **Allowed movement**, as its **only** kept range,
+replacing any others, in one Undo step, and makes it active. It reads each
+recording's camera motion analysis when the selection changes (once per session) and shows how
+many recordings it will change beside its label. Recordings that cannot get a suggestion (not
+prepared, analysis missing, queued, running or unreadable, or no steady range of 2 s or more)
+are skipped, their kept ranges untouched, and named in its tooltip and in the report shown after
+it applies; it never prepares or analyzes them. When a recording to change already has kept
+ranges, a confirmation names how many will lose theirs and nothing changes until **Replace kept
+ranges**; **Cancel** leaves every kept range as it was. It is unavailable, with the reason in its
+tooltip, while the analyses are read or when no selected recording can change (including when each
+already keeps only its best range). It adds nothing to the timeline. Narrow Media panels hide the
+labels of **Prepare**, then **Use best**, keeping their icons and the count.
 
 Source **Add clip** stays in the pinned review for repeated additions. Its
 sticky header and native nonmodal clip popup keep adding/reviewing reachable

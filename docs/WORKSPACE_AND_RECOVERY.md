@@ -53,8 +53,9 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
   the two buttons.
 - Left: independently scrolling Media list/grid with search, import and compact
   status. **Media options** holds filter/sort/view controls. A plain click reviews;
-  checkboxes/Ctrl/Shift select. With two or more recordings selected, the
-  **Select all** bar shows their count with Prepare/Clear; dragging
+  checkboxes/Ctrl/Shift select. With one or more recordings selected, the
+  **Select all** bar shows their count with **Use best** (each keeps only its best steady
+  range) and, from two, Prepare/Clear; dragging
   a selected recording inserts the whole selection. A recording or music file whose
   original is not at its registered path shows **Original missing** with a **Relink**
   button in place of its add/prepare actions.

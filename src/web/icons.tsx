@@ -53,6 +53,7 @@ export type IconName =
   | 'clock'
   | 'link'
   | 'select-all'
+  | 'star'
   | 'assistant'
   | 'panel-left-close'
   | 'panel-left-open'
@@ -118,6 +119,7 @@ const paths: Record<IconName, string> = {
   'panel-right-open': 'M3 4h18v16H3V4Zm12 0v16m-4-11-3 3 3 3',
   link: 'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7',
   'select-all': 'M3 8V4h4m10 0h4v4m0 8v4h-4M7 20H3v-4M7 9h4v6H7V9Zm6 0h4v6h-4V9Z',
+  star: 'm12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9L12 3Z',
   assistant:
     'M10 3c.6 4.2 2.8 6.4 7 7-4.2.6-6.4 2.8-7 7-.6-4.2-2.8-6.4-7-7 4.2-.6 6.4-2.8 7-7Zm8 11c.3 2 1.1 2.8 3 3-1.9.2-2.7 1-3 3-.3-2-1.1-2.8-3-3 1.9-.2 2.7-1 3-3Z',
 };

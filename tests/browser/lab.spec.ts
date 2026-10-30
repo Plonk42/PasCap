@@ -811,6 +811,15 @@ test('the selection header keeps Prepare and Clear keyboard reachable without st
   await expect(summary).toContainText('2 selected');
   await page.getByRole('checkbox', { name: 'Select visible recordings', exact: true }).focus();
   await page.keyboard.press('Tab');
+  // Use best comes first; unprepared recordings have no steady range to keep.
+  const useBest = summary.getByRole('button', { name: 'Use best steady ranges', exact: true });
+  await expect(useBest).toBeFocused();
+  await expect(useBest).toHaveAttribute('aria-disabled', 'true');
+  await expect(useBest).toHaveAttribute(
+    'title',
+    'No best steady range to keep: recording-05.mp4 (not prepared), recording-06.mp4 (not prepared)',
+  );
+  await page.keyboard.press('Tab');
   await expect(summary.getByRole('button', { name: 'Prepare selected', exact: true })).toBeFocused();
   await page.keyboard.press('Enter');
   const confirm = page.getByRole('group', { name: 'Prepare 2 editing proxies?', exact: true });

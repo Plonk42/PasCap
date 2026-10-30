@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent,
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
@@ -81,6 +82,45 @@ function readTolerance(): number {
   return value >= SMOOTH_TOLERANCE.min && value <= SMOOTH_TOLERANCE.max ? value : SMOOTH_TOLERANCE.initial;
 }
 
+let allowedMovement: number | null = null;
+const toleranceListeners = new Set<() => void>();
+
+function currentTolerance(): number {
+  allowedMovement ??= readTolerance();
+  return allowedMovement;
+}
+
+function subscribeTolerance(listener: () => void): () => void {
+  toleranceListeners.add(listener);
+  return () => {
+    toleranceListeners.delete(listener);
+  };
+}
+
+function keepTolerance(value: number): void {
+  allowedMovement = value;
+  writePreference(TOLERANCE_PREFERENCE, String(value));
+  for (const listener of toleranceListeners) listener();
+}
+
+/** The kept Allowed movement, shared by every steady-range suggestion. */
+export function useAllowedMovement(): [number, (value: number) => void] {
+  return [useSyncExternalStore(subscribeTolerance, currentTolerance), keepTolerance];
+}
+
+/** Identifies a recording's verified proxy, whose analysis is kept for the session. */
+export function motionKey(asset: MediaAsset): string {
+  return `${asset.id}/${asset.prepared?.verification.verifiedAt ?? ''}`;
+}
+
+export function knownMotion(asset: MediaAsset): MotionAnalysis | undefined {
+  return known.get(motionKey(asset));
+}
+
+export function rememberMotion(asset: MediaAsset, analysis: MotionAnalysis): void {
+  known.set(motionKey(asset), analysis);
+}
+
 function wait(ms: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, ms);
@@ -120,9 +160,9 @@ export interface SmoothRangeState {
 /** Steady-range suggestions for one recording, from the analysis made when its proxy was prepared. */
 export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
   const ready = mediaReady(asset);
-  const key = `${asset.id}/${asset.prepared?.verification.verifiedAt ?? ''}`;
+  const key = motionKey(asset);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
-  const [savedTolerance, setSavedTolerance] = useState(readTolerance);
+  const [savedTolerance, setTolerance] = useAllowedMovement();
   const [draftTolerance, setDraftTolerance] = useState<number | null>(null);
   const tolerance = draftTolerance ?? savedTolerance;
   const controller = useRef<AbortController | null>(null);
@@ -206,10 +246,6 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
   );
   const best = ranges[0];
   const bestKind = analysis && best ? shotKind(analysis, best.sourceIn, best.sourceOut, fps) : null;
-  const keepTolerance = useCallback((value: number) => {
-    setSavedTolerance(value);
-    writePreference(TOLERANCE_PREFERENCE, String(value));
-  }, []);
   const telemetry = analysis ? analysis.telemetry : NO_TELEMETRY;
   return {
     phase,
@@ -219,7 +255,7 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
     bestKind,
     tolerance,
     savedTolerance,
-    setTolerance: keepTolerance,
+    setTolerance,
     previewTolerance: setDraftTolerance,
     find,
   };

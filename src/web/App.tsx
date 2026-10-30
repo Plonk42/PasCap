@@ -51,6 +51,7 @@ import type { AnalysisFrame } from '../shared/white-balance.js';
 import { api, proxyUrl, type RequestOptions } from './api.js';
 import { Autosave, type SaveState } from './autosave.js';
 import { AssistantEditingBanner, AssistantEndedBanner, useFollowAssistant } from './AssistantSession.js';
+import type { BestRangeChange } from './best-ranges.js';
 import { callOperation } from './operations.js';
 import { waitForService } from './connection.js';
 import { DeferredPanel } from './DeferredPanel.js';
@@ -1327,6 +1328,22 @@ export function App() {
     setError('');
     setActiveSelects((chosen) => ({ ...chosen, [mediaId]: active }));
   };
+  const keepBestRanges = (changes: readonly BestRangeChange[]): boolean => {
+    if (!current.current || drafting.current || !changes.length) return false;
+    try {
+      const next = changes.reduce(
+        (document, { mediaId, range }) => applyCommand(document, { type: 'select-set', mediaId, ranges: [range] }),
+        current.current,
+      );
+      if (!commit(next)) return false;
+    } catch (cause) {
+      setError(message(cause, 'Cannot keep the best steady ranges.'));
+      return false;
+    }
+    setError('');
+    setActiveSelects((chosen) => ({ ...chosen, ...Object.fromEntries(changes.map(({ mediaId }) => [mediaId, 0])) }));
+    return true;
+  };
   const selectLayer = useCallback(
     (id: string): void => {
       if (drafting.current) return;
@@ -2100,6 +2117,7 @@ export function App() {
               onRelink={requestRelink}
               onRemove={(videoIds) => removeMedia({ videoIds, audioIds: [] })}
               onRemoveMusic={(audioIds) => removeMedia({ videoIds: [], audioIds })}
+              onKeepBestRanges={keepBestRanges}
               onImport={() => requestImport()}
               importRevision={importRevision}
               review={review}
