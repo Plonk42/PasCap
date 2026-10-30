@@ -76,7 +76,7 @@ test('adjustments sit on a pinned track above the video tracks; a click selects 
   const lane = page.locator('.adjustment-lane');
   const track = page.locator('[data-layer-lane]').first();
   expect((await lane.boundingBox())!.y + 30).toBeLessThan((await track.boundingBox())!.y);
-  await expect(page.locator('.layer-sidebar-adjustments')).toHaveText('Adjustments · 0 / 2');
+  await expect(page.locator('.layer-sidebar-adjustments')).toHaveText('Adjustments · 2');
   await expect(body(page, 'a')).toHaveAccessibleName('Adjustment 00:00:10 – 00:01:00');
   await expect(item(page, 'a').locator('[data-adjustment-keyframe="5"]')).toHaveAccessibleName(
     /Adjustment keyframe at 00:00:15/,
@@ -163,7 +163,7 @@ test('keyboard moves, trims and deletes an adjustment', async ({ page }) => {
   await body(page, 'a').focus();
   await page.keyboard.press('Delete');
   await expect.poll(() => ranges(page)).toEqual([{ id: 'b', start: 50, duration: 10 }]);
-  await expect(page.locator('.layer-sidebar-adjustments')).toHaveText('Adjustments · 0 / 1');
+  await expect(page.locator('.layer-sidebar-adjustments')).toHaveText('Adjustments · 1');
   await page.keyboard.press('Control+z');
   await expect.poll(() => ranges(page)).toContainEqual({ id: 'a', start: 1, duration: 10 });
 });
