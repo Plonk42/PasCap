@@ -68,7 +68,7 @@ interface ChannelKeys {
   onSeek: (key: SpatialKeyframe) => void;
 }
 
-/** One channel's capture triangle and Previous/Next, matching the Colour setting controls. */
+/** One channel's capture triangle and Previous/Next, matching the Color setting controls. */
 function SpatialChannelKeys({
   label,
   frame,
@@ -109,7 +109,7 @@ function SpatialChannelKeys({
   );
 }
 
-/** Eight settings with the Colour pattern: a capture button and arrows each, read-only until captured. */
+/** Eight settings with the Color pattern: a capture button and arrows each, read-only until captured. */
 function PoseFields({
   values,
   label,
@@ -153,7 +153,7 @@ function PoseFields({
         const scale = control.display?.scale ?? 1;
         return (
           <div
-            className="colour-control layer-keyed-control spatial-pose-field"
+            className="color-control layer-keyed-control spatial-pose-field"
             key={control.key}
             data-animated={keys?.keyed ?? false}
             data-key-at-playhead={keys?.active ?? false}
@@ -175,7 +175,7 @@ function PoseFields({
               </ResetLabel>
               {readOnly?.(control.key) && <LockedCue glyph="▽" className="transform" />}
               {keys && (
-                <span className="colour-control-actions">
+                <span className="color-control-actions">
                   <SpatialChannelKeys
                     label={control.label}
                     frame={frame}
@@ -315,7 +315,7 @@ export function SpatialControls({
     settings: SPATIAL_CONTROLS,
     enabled: spatialKeyChannels,
     continuing: (key) => continuingSettings(settings.keyframes, key, SPATIAL_CHANNELS),
-    neighbours: (key, channel) => {
+    neighbors: (key, channel) => {
       const from = inspectedFrame ?? key.frame;
       const keyed = settings.keyframes.filter((other) => other.values[channel] !== null);
       return {

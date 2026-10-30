@@ -3,11 +3,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { CATALOGUE_DOCUMENT, withCatalogue } from '../../scripts/operation-catalogue.js';
+import { CATALOG_DOCUMENT, withCatalog } from '../../scripts/operation-catalog.js';
 import { createApp } from '../../src/server/app.js';
 import { createConfig } from '../../src/server/config.js';
 import { runners } from '../../src/server/operations/index.js';
-import { createColourSettings } from '../../src/shared/colour.js';
+import { createColorSettings } from '../../src/shared/color.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { createClipGrade } from '../../src/shared/grade.js';
 import { createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
@@ -76,9 +76,9 @@ describe('operation registry', () => {
     }
   });
 
-  it('keeps the catalogue in the design guide up to date', async () => {
-    const document = await readFile(CATALOGUE_DOCUMENT, 'utf8');
-    expect(document === (await withCatalogue(document)), 'Run npm run operations:catalogue.').toBe(true);
+  it('keeps the catalog in the design guide up to date', async () => {
+    const document = await readFile(CATALOG_DOCUMENT, 'utf8');
+    expect(document === (await withCatalog(document)), 'Run npm run operations:catalog.').toBe(true);
   });
 });
 
@@ -252,7 +252,7 @@ describe('operation routes', () => {
         },
       },
     } as unknown as Parameters<typeof runners.still>[0];
-    const candidate = [{ type: 'colour-setting', clipId: 'clip-1', setting: 'exposure', value: 0.5 }] as const;
+    const candidate = [{ type: 'color-setting', clipId: 'clip-1', setting: 'exposure', value: 0.5 }] as const;
     const compared = await runners.still(pictures, {
       projectId: project.id,
       frame: 10,
@@ -280,7 +280,7 @@ describe('operation routes', () => {
       480,
       null,
     ]);
-    expect(edited.document.clips[0]!.grade.colour.exposure).toBe(0.5);
+    expect(edited.document.clips[0]!.grade.color.exposure).toBe(0.5);
     const original = await runners.still(pictures, { projectId: project.id, frame: 10, compare: 'original' });
     expect(original.legend.map(({ shows }) => shows)).toEqual(['original', 'saved']);
     expect((sides[1] as [{ ungraded: boolean }[]])[0].map((side) => side.ungraded)).toEqual([true, false]);
@@ -304,7 +304,7 @@ describe('operation routes', () => {
       expectedRevision: 1,
       commands: [
         { type: 'adjustment-add', adjustmentId: 'look', start: 0, duration: 200 },
-        { type: 'colour', adjustmentId: 'look', colour: { ...createColourSettings(), shadows: 0.3, contrast: 1.2 } },
+        { type: 'color', adjustmentId: 'look', color: { ...createColorSettings(), shadows: 0.3, contrast: 1.2 } },
         {
           type: 'transform',
           layerId: 'video-1',
@@ -441,8 +441,8 @@ describe('operation routes', () => {
     } as unknown as Parameters<typeof runners.hand_off_readiness>[0];
     expect(await runners.hand_off_readiness(context, { projectId: project.id })).toEqual({
       recordings: [
-        { id: 'rec-1', name: 'A.MP4', preparation: 'ready', cameraMotion: 'analysed' },
-        { id: 'rec-2', name: 'B.MP4', preparation: 'preparing', cameraMotion: 'analysing' },
+        { id: 'rec-1', name: 'A.MP4', preparation: 'ready', cameraMotion: 'analyzed' },
+        { id: 'rec-2', name: 'B.MP4', preparation: 'preparing', cameraMotion: 'analyzing' },
         { id: 'rec-3', name: 'C.MP4', preparation: 'unprepared', cameraMotion: 'missing' },
       ],
       music: [{ id: 'song-1', name: 'song.wav', preparation: 'ready', beats: 'missing' }],
@@ -696,7 +696,7 @@ describe('operation routes', () => {
     expect(music.clips[0]).toMatchObject({
       musicClipId: 'song-clip',
       trackId: 'track-1',
-      analysis: 'analysed',
+      analysis: 'analyzed',
       tempo: { bpm: 89.9 },
       beatCount: 3,
       hitCount: 2,

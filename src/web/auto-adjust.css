@@ -1,4 +1,4 @@
-/* Track → Colour: Auto ends the Colour keyframe line, styled like its Reset text button. */
+/* Track → Color: Auto ends the Color keyframe line, styled like its Reset text button. */
 .auto-adjust {
   display: inline-flex;
 }
@@ -24,10 +24,10 @@
 
 /* The line measures itself: too narrow for Auto beside a two-digit count, Auto takes its own row. */
 .section-keyframe-line:has(> .auto-adjust) {
-  container: colour-keyframe-line / inline-size;
+  container: color-keyframe-line / inline-size;
 }
 
-@container colour-keyframe-line (width < 280px) {
+@container color-keyframe-line (width < 280px) {
   .section-keyframe-line > .auto-adjust {
     flex-basis: 100%;
     justify-content: flex-end;

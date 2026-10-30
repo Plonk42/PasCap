@@ -28,17 +28,17 @@ it('groups Playwright and Vitest failures by file and title, classifying timeout
   ]);
 });
 
-it('ignores logs without recognised test failures', () => {
+it('ignores logs without recognized test failures', () => {
   expect(failureSignatures('npm ERR! network\nProcess completed with exit code 1.')).toEqual([]);
 });
 
-it('strips ANSI colour from Vitest output and recognises Firefox prerequisite failures', () => {
-  const coloured = [
+it('strips ANSI color from Vitest output and recognizes Firefox prerequisite failures', () => {
+  const colored = [
     '2026-10-08T08:55:01.4Z \u001b[31m FAIL \u001b[39m tests/media/layered-export.test.ts > exports at final4k',
     '2026-10-08T08:55:01.4Z \u001b[31mError: Test timed out in 60000ms.\u001b[39m',
     '2026-10-08T09:40:01.0Z Error: Firefox WebGL2 prerequisite failed. On GPU-less Linux, install Xvfb.',
   ].join('\n');
-  expect(failureSignatures(coloured)).toEqual([
+  expect(failureSignatures(colored)).toEqual([
     { test: 'tests/media/layered-export.test.ts › exports at final4k', kind: 'timeout' },
     { test: 'Firefox WebGL2 prerequisite failed', kind: 'failure' },
   ]);

@@ -1,4 +1,4 @@
-import { analyseAutoAdjust, autoAdjustFrames, scaleCorrection } from '../../shared/auto-adjust.js';
+import { analyzeAutoAdjust, autoAdjustFrames, scaleCorrection } from '../../shared/auto-adjust.js';
 import {
   animatedSettings,
   autoAdjustCommand,
@@ -9,10 +9,10 @@ import {
   windowSourceFrames,
   type AutoOwner,
   type GradeValues,
-} from '../../shared/auto-colour.js';
+} from '../../shared/auto-color.js';
 import type { EditCommand } from '../../shared/commands.js';
 import { detailFrames, measureDetail, suggestDetail } from '../../shared/detail-estimate.js';
-import type { ScalarColourSetting } from '../../shared/colour.js';
+import type { ScalarColorSetting } from '../../shared/color.js';
 import { gradeKeyAsLayerKey } from '../../shared/grade.js';
 import { hasLayerKeys } from '../../shared/keyframes.js';
 import type { ProjectDocument } from '../../shared/model.js';
@@ -38,14 +38,14 @@ interface Read {
   sourceFrames: number[];
 }
 
-/** The clip grade an estimate's Colour commands edit, and the source frame a keyframe goes to. */
+/** The clip grade an estimate's Color commands edit, and the source frame a keyframe goes to. */
 interface GradeTarget {
   owner: AutoOwner;
   values: GradeValues;
   keyFrame: number | null;
 }
 
-/** What an estimate analyses, and the clip grade its commands edit. */
+/** What an estimate analyzes, and the clip grade its commands edit. */
 interface Target {
   description: string;
   reads: Read[];
@@ -57,7 +57,7 @@ function clipGrade(clip: PlacedClip, keyFrame: number | null): GradeTarget {
   const { grade } = clip.clip;
   return {
     owner: { kind: 'clip', clipId: clip.clip.id },
-    values: { colour: grade.colour, keyframes: grade.keyframes.map(gradeKeyAsLayerKey) },
+    values: { color: grade.color, keyframes: grade.keyframes.map(gradeKeyAsLayerKey) },
     keyFrame,
   };
 }
@@ -99,7 +99,7 @@ function trackTarget(project: ProjectDocument, input: Input): Target {
   if (!layer) throw new ServiceError(`The project has no video track ${input.layerId}; read describe_project.`, 404);
   if (input.kind === 'detail') throw invalid('Detail belongs to each clip: estimate it with clipId.');
   const clips = calculateLayout(project).clips.filter((item) => item.clip.layerId === layer.id);
-  if (!clips.length) throw invalid(`${layer.name} has no clips to analyse.`);
+  if (!clips.length) throw invalid(`${layer.name} has no clips to analyze.`);
   const reads = new Map<string, Read>();
   for (const { clip, sourceFrame } of trackSamples(clips)) {
     const read = reads.get(clip.clip.mediaId) ?? { mediaId: clip.clip.mediaId, sourceFrames: [] };
@@ -141,24 +141,24 @@ function checkChoice(input: Input): void {
 
 function targetOf(project: ProjectDocument, input: Input, context: ServiceContext): Target {
   if (input.applyAs === 'keyframe' && (input.kind === 'detail' || input.frame === undefined))
-    throw invalid('A keyframe takes the light at one frame: give clipId and frame, for a Colour kind.');
+    throw invalid('A keyframe takes the light at one frame: give clipId and frame, for a Color kind.');
   if (input.clipId !== undefined) return clipTarget(project, input);
   if (input.layerId !== undefined) {
     if (input.kind !== 'detail' && input.commands)
       throw invalid(
-        "A track has no Colour of its own: write each clip's grade with applyAs shots, or give commands false for the values of one compromise.",
+        "A track has no Color of its own: write each clip's grade with applyAs shots, or give commands false for the values of one compromise.",
       );
     return trackTarget(project, input);
   }
   return rangeTarget(project, input, context);
 }
 
-/** The clips analysed each on its own, in timeline order, or null for one analysis. */
+/** The clips analyzed each on its own, in timeline order, or null for one analysis. */
 function separateClips(project: ProjectDocument, input: Input): PlacedClip[] | null {
   const shots = input.applyAs === 'shots';
-  if (shots && input.kind === 'detail') throw invalid('applyAs shots keys Colour: use it with a Colour kind.');
+  if (shots && input.kind === 'detail') throw invalid('applyAs shots keys Color: use it with a Color kind.');
   if (shots && (input.frame !== undefined || input.mediaId !== undefined))
-    throw invalid('applyAs shots analyses whole clips: give clipId, clipIds or layerId, without frame.');
+    throw invalid('applyAs shots analyzes whole clips: give clipId, clipIds or layerId, without frame.');
   const each = input.clipIds !== undefined || shots || (input.layerId !== undefined && input.kind === 'detail');
   if (!each) return null;
   if (input.kind !== 'detail' && !shots)
@@ -170,7 +170,7 @@ function separateClips(project: ProjectDocument, input: Input): PlacedClip[] | n
     if (!project.layers.some((layer) => layer.id === input.layerId))
       throw new ServiceError(`The project has no video track ${input.layerId}; read describe_project.`, 404);
     const clips = layout.filter((item) => item.clip.layerId === input.layerId);
-    if (!clips.length) throw invalid('This track has no clips to analyse.');
+    if (!clips.length) throw invalid('This track has no clips to analyze.');
     return clips;
   }
   const ids = input.clipIds ?? [input.clipId!];
@@ -180,8 +180,8 @@ function separateClips(project: ProjectDocument, input: Input): PlacedClip[] | n
   return layout.filter((item) => ids.includes(item.clip.id)).sort((left, right) => left.start - right.start);
 }
 
-/** The analysed frames in sample order, each distinct source frame decoded once. */
-async function colourFrames(stills: ServiceContext['stills'], reads: readonly Read[]): Promise<AnalysisFrame[]> {
+/** The analyzed frames in sample order, each distinct source frame decoded once. */
+async function colorFrames(stills: ServiceContext['stills'], reads: readonly Read[]): Promise<AnalysisFrame[]> {
   const frames: AnalysisFrame[] = [];
   await forEachSerial(reads, async ({ mediaId, sourceFrames }) => {
     const decoded = await stills.analysisFrames(mediaId, sourceFrames);
@@ -194,13 +194,13 @@ async function colourFrames(stills: ServiceContext['stills'], reads: readonly Re
 function whiteBalanceValues({ owner, values }: GradeTarget, balance: WhiteBalance): EditCommand[] {
   const settings = (['temperature', 'tint'] as const).filter((setting) => !hasLayerKeys(values, setting));
   if (!settings.length || owner.kind !== 'clip') return [];
-  const colour = { ...values.colour };
-  for (const setting of settings) colour[setting] = balance[setting];
-  return [{ type: 'colour', clipIds: [owner.clipId], colour }];
+  const color = { ...values.color };
+  for (const setting of settings) color[setting] = balance[setting];
+  return [{ type: 'color', clipIds: [owner.clipId], color }];
 }
 
 const tooUniform = (): ServiceError =>
-  invalid('These frames are too dark, clipped or uniform to analyse; try other frames.');
+  invalid('These frames are too dark, clipped or uniform to analyze; try other frames.');
 
 interface Estimated {
   fields: object;
@@ -222,7 +222,7 @@ async function estimateWhiteBalance(
   { reads, grade }: Target,
   input: Input,
 ): Promise<Estimated> {
-  const balance = poolWhiteBalance((await colourFrames(context.stills, reads)).map(frameIlluminant));
+  const balance = poolWhiteBalance((await colorFrames(context.stills, reads)).map(frameIlluminant));
   if (!balance) throw tooUniform();
   const fields = { whiteBalance: balance };
   if (!grade) return { fields, commands: [], unchanged: [] };
@@ -237,7 +237,7 @@ async function estimateWhiteBalance(
 }
 
 async function estimateAutoAdjust(context: ServiceContext, { reads, grade }: Target, input: Input): Promise<Estimated> {
-  const fitted = analyseAutoAdjust(await colourFrames(context.stills, reads));
+  const fitted = analyzeAutoAdjust(await colorFrames(context.stills, reads));
   if (!fitted) throw tooUniform();
   const intensity = input.intensity / 100;
   const fields = { correction: scaleCorrection(fitted, intensity) };
@@ -258,7 +258,7 @@ const estimators = {
   'auto-adjust': estimateAutoAdjust,
 } satisfies Record<Input['kind'], (context: ServiceContext, target: Target, input: Input) => Promise<Estimated>>;
 
-type ShotValues = Partial<Record<ScalarColourSetting, number>>;
+type ShotValues = Partial<Record<ScalarColorSetting, number>>;
 
 /**
  * Each shot's values written into its clip's grade, which applies before any adjustment and stays with the
@@ -266,13 +266,13 @@ type ShotValues = Partial<Record<ScalarColourSetting, number>>;
  */
 export function shotCommands(shots: readonly { clip: PlacedClip; values: ShotValues }[]): EditCommand[] {
   return shots.map(({ clip, values }) => ({
-    type: 'colour',
+    type: 'color',
     clipIds: [clip.clip.id],
-    colour: { ...structuredClone(clip.clip.grade.colour), ...values },
+    color: { ...structuredClone(clip.clip.grade.color), ...values },
   }));
 }
 
-/** Each clip analysed whole on its own: its result, and the detail edits or clip grades applying them. */
+/** Each clip analyzed whole on its own: its result, and the detail edits or clip grades applying them. */
 async function estimateClips(context: ServiceContext, clips: readonly PlacedClip[], input: Input) {
   const results: { clipId: string; frames: number }[] = [];
   const commands: EditCommand[] = [];
@@ -293,7 +293,7 @@ async function estimateClips(context: ServiceContext, clips: readonly PlacedClip
   });
   commands.push(...shotCommands(shots));
   const clipsWord = clips.length === 1 ? `clip ${clips[0]!.clip.id}` : `${clips.length} clips`;
-  return { analysed: { description: `each of the ${clipsWord} on its own, whole`, frames }, results, commands };
+  return { analyzed: { description: `each of the ${clipsWord} on its own, whole`, frames }, results, commands };
 }
 
 export const runEstimate: OperationRunner<typeof estimate> = async (context, input) => {
@@ -301,11 +301,11 @@ export const runEstimate: OperationRunner<typeof estimate> = async (context, inp
   checkChoice(input);
   const clips = separateClips(project, input);
   if (clips) {
-    const { analysed, results, commands } = await estimateClips(context, clips, input);
+    const { analyzed, results, commands } = await estimateClips(context, clips, input);
     return {
       revision: project.revision,
       kind: input.kind,
-      analysed,
+      analyzed,
       unchanged: [],
       commands: input.commands ? commands : [],
       clips: results,
@@ -322,7 +322,7 @@ export const runEstimate: OperationRunner<typeof estimate> = async (context, inp
   return {
     revision: project.revision,
     kind: input.kind,
-    analysed: { description: target.description, frames },
+    analyzed: { description: target.description, frames },
     unchanged,
     commands: input.commands ? commands : [],
     ...fields,

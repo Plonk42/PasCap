@@ -147,15 +147,15 @@
   padding-bottom: 4px;
 }
 
-.editor-inspector .colour-controls {
+.editor-inspector .color-controls {
   gap: 9px;
 }
 
-.editor-inspector .colour-control-actions .icon-button {
+.editor-inspector .color-control-actions .icon-button {
   opacity: 0;
 }
 
-.editor-inspector .colour-control:is(:hover, :focus-within) .colour-control-actions .icon-button {
+.editor-inspector .color-control:is(:hover, :focus-within) .color-control-actions .icon-button {
   opacity: 1;
 }
 
@@ -547,7 +547,7 @@
   .editor-media .media-item .add-media-new-track,
   .editor-media .media-item .media-remove,
   .editor-media .media-music-item .media-remove,
-  .editor-inspector .colour-control-actions .icon-button {
+  .editor-inspector .color-control-actions .icon-button {
     opacity: 1;
   }
 }

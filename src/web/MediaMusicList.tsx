@@ -55,12 +55,12 @@ export function MediaMusicList({
   const clips = (id: string): number => musicClips(project?.music ?? []).filter((clip) => clip.mediaId === id).length;
   const remove = (id: string): void => {
     const index = music.findIndex((asset) => asset.id === id);
-    const neighbour = music[index + 1] ?? music[index - 1];
+    const neighbor = music[index + 1] ?? music[index - 1];
     setRemoving(null);
     if (!onRemove([id])) return;
     requestAnimationFrame(() => {
-      const target = neighbour
-        ? document.querySelector<HTMLElement>(`[data-music-media-id="${CSS.escape(neighbour.id)}"] .media-remove`)
+      const target = neighbor
+        ? document.querySelector<HTMLElement>(`[data-music-media-id="${CSS.escape(neighbor.id)}"] .media-remove`)
         : document.querySelector<HTMLElement>('[aria-label="Search media"]');
       target?.focus();
     });

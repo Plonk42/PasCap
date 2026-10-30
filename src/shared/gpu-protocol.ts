@@ -1,4 +1,4 @@
-import type { ColourSettings } from './colour.js';
+import type { ColorSettings } from './color.js';
 import type { DetailSettings } from './detail.js';
 import type { SpatialPose } from './spatial.js';
 
@@ -35,9 +35,9 @@ export interface GpuFrameSource {
   /** Fitted content rectangle, the uploaded texture. */
   width: number;
   height: number;
-  /** The clip's own grade, applied before the adjustment's Colour. */
-  grade: ColourSettings;
-  colour: ColourSettings;
+  /** The clip's own grade, applied before the adjustment's Color. */
+  grade: ColorSettings;
+  color: ColorSettings;
   spatial: SpatialPose;
   detail: DetailSettings;
   originalWidth: number;

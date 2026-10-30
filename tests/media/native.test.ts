@@ -12,9 +12,9 @@ import {
   encode709,
   generateCube,
   gradePixel,
-  NEUTRAL_COLOUR,
-  type ColourSettings,
-} from '../../src/shared/colour.js';
+  NEUTRAL_COLOR,
+  type ColorSettings,
+} from '../../src/shared/color.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { gradeChainPixel, sourceGrades } from '../../src/shared/grade.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
@@ -45,27 +45,27 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
   });
 
   it('CPU and native 65³ LUT match every control and a combined grade numerically', async () => {
-    const gainGrades: ColourSettings[] = [
-      { ...NEUTRAL_COLOUR, temperature: 1 },
-      { ...NEUTRAL_COLOUR, temperature: -1 },
-      { ...NEUTRAL_COLOUR, tint: 1 },
-      { ...NEUTRAL_COLOUR, tint: -1 },
+    const gainGrades: ColorSettings[] = [
+      { ...NEUTRAL_COLOR, temperature: 1 },
+      { ...NEUTRAL_COLOR, temperature: -1 },
+      { ...NEUTRAL_COLOR, tint: 1 },
+      { ...NEUTRAL_COLOR, tint: -1 },
       ...[-1, 1].flatMap((temperature) =>
-        [-1, 1].map((tint) => ({ ...NEUTRAL_COLOUR, temperature, tint, exposure: -1 })),
+        [-1, 1].map((tint) => ({ ...NEUTRAL_COLOR, temperature, tint, exposure: -1 })),
       ),
     ];
-    const controls: ColourSettings[] = [
-      { ...NEUTRAL_COLOUR },
+    const controls: ColorSettings[] = [
+      { ...NEUTRAL_COLOR },
       ...gainGrades,
-      { ...NEUTRAL_COLOUR, exposure: 0.75 },
-      { ...NEUTRAL_COLOUR, brightness: 0.04 },
-      { ...NEUTRAL_COLOUR, contrast: 1.25 },
-      { ...NEUTRAL_COLOUR, hue: 31 },
-      { ...NEUTRAL_COLOUR, saturation: 1.3 },
-      { ...NEUTRAL_COLOUR, whites: -0.4 },
-      { ...NEUTRAL_COLOUR, blacks: 0.3 },
+      { ...NEUTRAL_COLOR, exposure: 0.75 },
+      { ...NEUTRAL_COLOR, brightness: 0.04 },
+      { ...NEUTRAL_COLOR, contrast: 1.25 },
+      { ...NEUTRAL_COLOR, hue: 31 },
+      { ...NEUTRAL_COLOR, saturation: 1.3 },
+      { ...NEUTRAL_COLOR, whites: -0.4 },
+      { ...NEUTRAL_COLOR, blacks: 0.3 },
       {
-        ...NEUTRAL_COLOUR,
+        ...NEUTRAL_COLOR,
         temperature: 0.8,
         tint: -0.6,
         exposure: 0.6,
@@ -83,7 +83,7 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
       pixels[index * 3 + 1] = (index * 157) % 256;
       pixels[index * 3 + 2] = (index * 29) % 256;
     }
-    [0, 16, 64, 96, 127, 128, 192, 254, 255].forEach((grey, index) => pixels.fill(grey, index * 3, index * 3 + 3));
+    [0, 16, 64, 96, 127, 128, 192, 254, 255].forEach((gray, index) => pixels.fill(gray, index * 3, index * 3 + 3));
     await writeFile(path.join(directory, 'pixels.rgb'), pixels);
     for (const settings of controls) {
       await writeFile(path.join(directory, 'grade.cube'), generateCube(settings));
@@ -130,7 +130,7 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
           settings,
         );
         for (let channel = 0; channel < 3; channel++) {
-          // Independently pin normalization, intentional grey tinting and no
+          // Independently pin normalization, intentional gray tinting and no
           // clipping before negative exposure, not just CPU/native agreement.
           if (gainGrades.includes(settings)) {
             const linear =
@@ -151,7 +151,7 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
   });
 
   for (const type of ['cut', 'fade-through-black', 'cross-dissolve'] as const) {
-    it(`renders ${type} with exact frame count, colour, and true black edge fades`, async () => {
+    it(`renders ${type} with exact frame count, color, and true black edge fades`, async () => {
       let document = applyCommand(fixture.document, {
         type: 'transition',
         transition:
@@ -160,9 +160,9 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
             : { leftId: 'clip-a', rightId: 'clip-b', type, duration: 18 },
       });
       document = applyCommand(document, {
-        type: 'colour',
+        type: 'color',
         clipIds: ['clip-a', 'clip-b'],
-        colour: { ...NEUTRAL_COLOUR, brightness: 0.05, blacks: 0.1 },
+        color: { ...NEUTRAL_COLOR, brightness: 0.05, blacks: 0.1 },
       });
       document = applyCommand(document, { type: 'fades', layerId: document.layers[0]!.id, opening: 6, closing: 6 });
       const job = startReference(document, fixture.library);
@@ -172,7 +172,7 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
       const duration = calculateLayout(document).duration;
       const receipt = JSON.parse(await readFile(path.join(directory, 'renders', job.id, 'receipt.json'), 'utf8'));
       expect(receipt.verification.frameCount).toBe(duration);
-      expect(receipt.verification.colourSpace).toBe('bt709');
+      expect(receipt.verification.colorSpace).toBe('bt709');
       for (const frame of [0, duration - 1, ...(type === 'fade-through-black' ? [89, 90] : [])]) {
         const pixels = await extractComparisonFrame(config, filename, frame, 'tv');
         expect(pixels.reduce((total, pixel) => total + pixel, 0) / pixels.length).toBeLessThan(1);
@@ -187,12 +187,12 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
             config,
             source.sourcePath,
             layer.sourceFrame,
-            source.metadata.colourRange,
+            source.metadata.colorRange,
           );
           for (let index = 0; index < pixels.length; index += 3) {
             const graded = gradeChainPixel(
               [pixels[index]! / 255, pixels[index + 1]! / 255, pixels[index + 2]! / 255],
-              sourceGrades(layer.grade, layer.colour).stages,
+              sourceGrades(layer.grade, layer.color).stages,
             );
             for (let channel = 0; channel < 3; channel++)
               expected[index + channel]! += graded[channel]! * 255 * layer.weight;

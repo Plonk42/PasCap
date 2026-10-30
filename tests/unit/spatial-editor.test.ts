@@ -135,7 +135,7 @@ describe('per-setting track Transform editor', () => {
     expect(edited.keyframes[1]).toMatchObject({ frame: 30, reset: true, values: { scale: 2 } });
   });
 
-  it('resets like Colour: the whole base when unanimated, else only the keyframe at the playhead', () => {
+  it('resets like Color: the whole base when unanimated, else only the keyframe at the playhead', () => {
     const base = editSpatialPose(editSpatialPose(createSpatialSettings(), null, 'scale', 2), null, 'rotation', 30);
     expect(resetSpatial(base, 0)).toEqual(createSpatialSettings());
     expect(resetSpatial(createSpatialSettings(), 0)).toBeNull();
@@ -197,7 +197,7 @@ describe('per-setting track Transform editor', () => {
     expect(released.commit).toBeNull();
     expect(released.state.draft).toBe(1.456789);
     expect(released.state.error).toContain('keyframe');
-    expect(syncValueControlState(state, { ...context, resetKey: 'two:5' }).pointer?.cancelled).toBe(true);
+    expect(syncValueControlState(state, { ...context, resetKey: 'two:5' }).pointer?.canceled).toBe(true);
   });
 
   it('bounds explicit capture at 256 keys', () => {

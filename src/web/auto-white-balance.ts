@@ -1,9 +1,9 @@
-import { keyframeLimitReason } from '../shared/auto-colour.js';
+import { keyframeLimitReason } from '../shared/auto-color.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
 import type { PlacedClip, TimelineLayout } from '../shared/timeline.js';
 import { whiteBalanceWindow } from '../shared/white-balance.js';
-import { gradeOwnerOf, sourceFrameAt } from './colour-owner.js';
+import { gradeOwnerOf, sourceFrameAt } from './color-owner.js';
 import { mediaReady } from './display.js';
 
 export interface WhiteBalanceTarget {
@@ -11,7 +11,7 @@ export interface WhiteBalanceTarget {
   asset: MediaAsset;
   /** The source frame the clip shows at the playhead, where Temperature and Tint are keyed. */
   frame: number;
-  /** Project frames analysed around the playhead, and the source frame each one shows. */
+  /** Project frames analyzed around the playhead, and the source frame each one shows. */
   projectFrames: number[];
   sourceFrames: number[];
 }
@@ -26,7 +26,7 @@ export function readyAsset(assets: readonly MediaAsset[], mediaId: string): Medi
     : null;
 }
 
-/** What Auto white balance would analyse around the playhead in the graded clip, or why it cannot run there. */
+/** What Auto white balance would analyze around the playhead in the graded clip, or why it cannot run there. */
 export function whiteBalanceTarget(
   project: ProjectDocument,
   clipId: string,

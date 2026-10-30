@@ -1,19 +1,19 @@
 import { z } from 'zod';
 import {
-  COLOUR_CONTROLS,
-  colourSchema,
+  COLOR_CONTROLS,
+  colorSchema,
   compileGradeInto,
-  createColourSettings,
-  isNeutralAdvancedColour,
-  isNeutralColour,
+  createColorSettings,
+  isNeutralAdvancedColor,
+  isNeutralColor,
   isNeutralLocalTone,
-  isNeutralScalarColour,
+  isNeutralScalarColor,
   LOCAL_TONE_SETTINGS,
-  type ColourSettings,
+  type ColorSettings,
   type PixelGrade,
   type RGB,
-  type ScalarColourSetting,
-} from './colour.js';
+  type ScalarColorSetting,
+} from './color.js';
 import { described } from './described.js';
 import type { LocalTone } from './detail.js';
 import {
@@ -29,8 +29,8 @@ import {
 
 /** Keyframes of one clip grade; see docs/design/CLIP_GRADES_AND_ADJUSTMENTS.md. */
 export const MAX_GRADE_KEYFRAMES = 64;
-export const GRADE_SETTINGS: readonly ScalarColourSetting[] = COLOUR_CONTROLS.map(({ key }) => key);
-export const gradeSettingSchema = z.enum(GRADE_SETTINGS as [ScalarColourSetting, ...ScalarColourSetting[]]);
+export const GRADE_SETTINGS: readonly ScalarColorSetting[] = COLOR_CONTROLS.map(({ key }) => key);
+export const gradeSettingSchema = z.enum(GRADE_SETTINGS as [ScalarColorSetting, ...ScalarColorSetting[]]);
 
 const gradeKeyValuesSchema = layerKeyValuesSchema.omit({ opacity: true });
 export type GradeKeyValues = z.infer<typeof gradeKeyValuesSchema>;
@@ -47,7 +47,7 @@ function gradeKeyframeSchemaFor(frame: z.ZodNumber, empty: string) {
       frame,
       values: described(
         gradeKeyValuesSchema,
-        'The value of each Colour setting keyed here, or null for a setting not keyed here; at least one is a number.',
+        'The value of each Color setting keyed here, or null for a setting not keyed here; at least one is a number.',
       ),
       easing: described(easingSchema(GRADE_SETTINGS), 'The Easing of each keyed setting toward its next keyframe.'),
       reset: described(
@@ -71,9 +71,9 @@ export type GradeKeyframe = z.infer<typeof gradeKeyframeSchema>;
 
 export const clipGradeSchema = z
   .object({
-    colour: described(
-      colourSchema,
-      'Colour of the clip: twelve scalar settings, hdr, localContrast, hsl and curves. Keyed settings follow their keyframes.',
+    color: described(
+      colorSchema,
+      'Color of the clip: twelve scalar settings, hdr, localContrast, hsl and curves. Keyed settings follow their keyframes.',
     ),
     keyframes: described(
       z
@@ -87,7 +87,7 @@ export const clipGradeSchema = z
 export type ClipGrade = z.infer<typeof clipGradeSchema>;
 
 export function createClipGrade(): ClipGrade {
-  return { colour: createColourSettings(), keyframes: [] };
+  return { color: createColorSettings(), keyframes: [] };
 }
 
 /** Adjustment items of a project; see docs/design/CLIP_GRADES_AND_ADJUSTMENTS.md. */
@@ -105,9 +105,9 @@ export const adjustmentSchema = z
       z.number().int().positive().max(LAST_FRAME),
       'Frames it grades from its start; it never extends the project.',
     ),
-    colour: described(
-      colourSchema,
-      'Colour of every video track within its range: twelve scalar settings, hdr, localContrast, hsl and curves.',
+    color: described(
+      colorSchema,
+      'Color of every video track within its range: twelve scalar settings, hdr, localContrast, hsl and curves.',
     ),
     keyframes: described(
       z
@@ -148,7 +148,7 @@ export const adjustmentsSchema = z
   );
 
 export function createAdjustment(id: string, start: number, duration: number): Adjustment {
-  return adjustmentSchema.parse({ id, start, duration, colour: createColourSettings(), keyframes: [] });
+  return adjustmentSchema.parse({ id, start, duration, color: createColorSettings(), keyframes: [] });
 }
 
 /** The adjustment grading a project frame, if any. */
@@ -156,17 +156,17 @@ export function adjustmentAt(items: readonly Adjustment[], frame: number): Adjus
   return items.find((item) => frame >= item.start && frame < item.start + item.duration);
 }
 
-/** An adjustment's Colour at a project frame; its keyframes count from its start. */
-export function adjustmentColourAt(item: Adjustment, frame: number): ColourSettings {
-  return gradeColourAt(item, frame - item.start);
+/** An adjustment's Color at a project frame; its keyframes count from its start. */
+export function adjustmentColorAt(item: Adjustment, frame: number): ColorSettings {
+  return gradeColorAt(item, frame - item.start);
 }
 
-/** The Colour of a grade at a frame of its keyframes: a source frame of a clip, a frame of an adjustment. */
-export function gradeColourAt(grade: Pick<ClipGrade, 'colour' | 'keyframes'>, sourceFrame: number): ColourSettings {
-  const colour = { ...grade.colour };
+/** The Color of a grade at a frame of its keyframes: a source frame of a clip, a frame of an adjustment. */
+export function gradeColorAt(grade: Pick<ClipGrade, 'color' | 'keyframes'>, sourceFrame: number): ColorSettings {
+  const color = { ...grade.color };
   for (const setting of GRADE_SETTINGS)
-    colour[setting] = evaluateLayerSetting(grade, setting, sourceFrame, grade.colour[setting]);
-  return colour;
+    color[setting] = evaluateLayerSetting(grade, setting, sourceFrame, grade.color[setting]);
+  return color;
 }
 
 /** A clip grade keyframe in the track keyframe shape, so track keyframe tools can show and edit it. */
@@ -179,44 +179,44 @@ export function layerKeyAsGradeKey(key: LayerKeyframe): GradeKeyframe {
   return {
     frame: key.frame,
     values,
-    easing: easing as Record<ScalarColourSetting, Interpolation | null>,
+    easing: easing as Record<ScalarColorSetting, Interpolation | null>,
     reset: key.reset,
   };
 }
 
 /** A grade with no effect at any frame. */
-export function isNeutralClipGrade(grade: Pick<ClipGrade, 'colour' | 'keyframes'>): boolean {
-  return grade.keyframes.length === 0 && isNeutralColour(grade.colour);
+export function isNeutralClipGrade(grade: Pick<ClipGrade, 'color' | 'keyframes'>): boolean {
+  return grade.keyframes.length === 0 && isNeutralColor(grade.color);
 }
 
 /** Whether any frame of the clip can evaluate a nonzero Shadows, Highlights, HDR or Local contrast. */
-export function gradeUsesLocalTone(grade: Pick<ClipGrade, 'colour' | 'keyframes'>): boolean {
+export function gradeUsesLocalTone(grade: Pick<ClipGrade, 'color' | 'keyframes'>): boolean {
   return LOCAL_TONE_SETTINGS.some(
-    (setting) => grade.colour[setting] !== 0 || grade.keyframes.some((key) => (key.values[setting] ?? 0) !== 0),
+    (setting) => grade.color[setting] !== 0 || grade.keyframes.some((key) => (key.values[setting] ?? 0) !== 0),
   );
 }
 
 /** A grade the static export can bake into each clip's LUT: unkeyed, scalar-only and without local tone. */
 export function isStaticClipGrade(grade: ClipGrade): boolean {
-  return grade.keyframes.length === 0 && isNeutralLocalTone(grade.colour) && isNeutralAdvancedColour(grade.colour);
+  return grade.keyframes.length === 0 && isNeutralLocalTone(grade.color) && isNeutralAdvancedColor(grade.color);
 }
 
 /** A grade stage that changes encoded pixels; local tone runs in the detail kernel instead. */
-export function gradesPixels(colour: ColourSettings): boolean {
-  return !isNeutralScalarColour(colour) || !isNeutralAdvancedColour(colour);
+export function gradesPixels(color: ColorSettings): boolean {
+  return !isNeutralScalarColor(color) || !isNeutralAdvancedColor(color);
 }
 
 /** What one source's grades do, in order: the clip grade, then the adjustment at that frame. */
 export interface SourceGrades {
   /** The grades that change pixels, applied one after another to the encoded output of the previous one. */
-  stages: ColourSettings[];
+  stages: ColorSettings[];
   /** Local tone of both grades, summed and clamped, selecting tones after their summed Exposure. */
   tone: LocalTone;
 }
 
 const clampTo = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
-export function sourceGrades(clip: ColourSettings, track: ColourSettings): SourceGrades {
+export function sourceGrades(clip: ColorSettings, track: ColorSettings): SourceGrades {
   return {
     stages: [clip, track].filter(gradesPixels),
     tone: {
@@ -235,8 +235,8 @@ export function isNeutralTone(tone: LocalTone): boolean {
 }
 
 /** Grades applied one after another, each on the previous one's encoded output. */
-export function compileGradeChain(stages: readonly ColourSettings[]): PixelGrade {
-  if (stages.length <= 1) return compileGradeInto(stages[0] ?? createColourSettings());
+export function compileGradeChain(stages: readonly ColorSettings[]): PixelGrade {
+  if (stages.length <= 1) return compileGradeInto(stages[0] ?? createColorSettings());
   const [first, ...rest] = stages.map(compileGradeInto);
   return {
     encoded(rgb) {
@@ -250,7 +250,7 @@ export function compileGradeChain(stages: readonly ColourSettings[]): PixelGrade
   };
 }
 
-export function gradeChainPixel(rgb: RGB, stages: readonly ColourSettings[]): RGB {
+export function gradeChainPixel(rgb: RGB, stages: readonly ColorSettings[]): RGB {
   if (!stages.length) return rgb;
   const triple = Float64Array.from(rgb);
   compileGradeChain(stages).encoded(triple);

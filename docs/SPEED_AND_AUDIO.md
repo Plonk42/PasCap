@@ -1,14 +1,14 @@
 # Speed and audio contract
 
-Colour belongs to clip grades and adjustments, never to video tracks. Twelve scalar Colour
+Color belongs to clip grades and adjustments, never to video tracks. Twelve scalar Color
 settings include Temperature/Tint (−2…2 and −1…1, neutral 0),
 whose normalized linear gains precede Exposure. Positive Temperature warms;
-positive Tint adds magenta; nonzero settings intentionally colour greys. They
+positive Tint adds magenta; nonzero settings intentionally color grays. They
 can be keyed independently, which is appearance-only and
 never changes timing. See [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
-Static HSL and master/RGB colour curves follow scalar grading in each grade and precede
+Static HSL and master/RGB color curves follow scalar grading in each grade and precede
 black fades/coverage. They remain active with scalar keyframes, add no animation
-channels and are unrelated to speed curves. The Original preview bypasses all Colour
+channels and are unrelated to speed curves. The Original preview bypasses all Color
 without changing retiming, geometry, Opacity or music. Required data/resources:
 [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md). The keyable HDR look and Local contrast are
 likewise appearance-only; see [detail filters](design/DETAIL_FILTERS.md#hdr-look).
@@ -45,7 +45,7 @@ maximum subdivision depth 14; inverse queries use bounded binary search. Storage
 is proportional to keyframes, not source or output duration.
 
 Only the final output duration is rounded, once, to at least one integer frame;
-its clock is normalised once to that duration, and mapped source positions are
+its clock is normalized once to that duration, and mapped source positions are
 floored within source IN/OUT (OUT exclusive). Slow motion repeats recorded frames
 and fast motion drops them; no optical-flow frames are generated. Native decode
 still checks every selected original frame, even when output sampling skips it.
@@ -57,8 +57,8 @@ deep copies. Every retained piece compiles/rounds its own duration once, so a sp
 can change the total by one frame. There is no optional fallback or data migration;
 a mode/preset change is a deliberate editing command, not a conversion on load.
 
-Presets **Flat, Ramp up, Ramp down, Accelerate, Decelerate, Slow centre and Fast
-centre** deliberately replace the clip's keyframes with Smooth-eased keyframes spread
+Presets **Flat, Ramp up, Ramp down, Accelerate, Decelerate, Slow center and Fast
+center** deliberately replace the clip's keyframes with Smooth-eased keyframes spread
 evenly across the selected source range. Ramp up and Ramp down place two keyframes
 at source IN and OUT: 0.5×→2× and 2×→0.5×. Choosing **Custom curve** for a constant
 clip creates a flat curve at its rate; choosing **Constant speed** returns to
@@ -174,11 +174,11 @@ not guaranteed. Originals and full proxies remain unchanged.
 Playback rates use the shared native slider plus an adjacent exact `NumberField`,
 bounded to **0.1×–8×**: the main **Speed ×** row and a selected curve keyframe's rate.
 Modes, presets and the curve graph remain
-separate controls. Pointer sliding changes only a transient local value draft (only Colour, HSL and Transform sliders, Opacity included, also preview it in the image); release applies one validated document edit and updates the image. Escape, pointer cancellation, lost capture or window blur restores the starting value without save/history. Each keyboard slider adjustment is an individual validated edit.
+separate controls. Pointer sliding changes only a transient local value draft (only Color, HSL and Transform sliders, Opacity included, also preview it in the image); release applies one validated document edit and updates the image. Escape, pointer cancellation, lost capture or window blur restores the starting value without save/history. Each keyboard slider adjustment is an individual validated edit.
 Numeric entry retains full precision, applies on Enter/blur and restores on Escape;
 invalid drafts remain editable without clamping or rounding.
 
-**Clip → Speed** follows the Colour/Transform pattern, with no Animate toggle or
+**Clip → Speed** follows the Color/Transform pattern, with no Animate toggle or
 stored preference. While expanded, its keyframe line shows **N keyframes**, one
 native **Previous/Next** pair and **Reset** (constant 1×, removing the keyframes);
 the line is hidden while collapsed. Below it come the source → output duration
@@ -198,7 +198,7 @@ successive keyframes even
 when several preview the same image. Stored source time stays distinct from the
 actual displayed source frame. Navigation is editor-only, preserving the Properties panel
 tab/focus without an edit, history or save. Speed has a single setting, so this
-pair is its only keyframe navigation: unlike Colour and Transform, whose settings
+pair is its only keyframe navigation: unlike Color and Transform, whose settings
 share keyframes, there are no second per-setting arrows beside its diamond.
 
 In the **Speed ×** row, double-clicking the name resets the editable rate to 1×.
@@ -215,7 +215,7 @@ frame; it then edits that keyframe's rate and preview follows the keyframe.
 Sliders never create keyframes. Each accepted edit is one Undo step; timing
 conflicts remain inline errors.
 
-Clip grade and adjustment keyframes contain only Colour settings, and track
+Clip grade and adjustment keyframes contain only Color settings, and track
 Transform keyframes only pose settings and Opacity; none affects speed or duration. Storing or
 moving one outside the footage or the duration does not extend the
 sequence; actual clip retiming or a music clip's OUT can change project duration.
@@ -245,16 +245,16 @@ Numeric fields retain full entered decimal precision and commit on Enter/blur; i
 out-of-original positions and timing conflicts retain the draft with inline
 errors. They do not automatically seek. Escape restores the field. Easing belongs
 to the left keyframe; the last rate holds without a next interval.
-Custom clip-speed, Colour and Transform keyframe selectors all visibly read
+Custom clip-speed, Color and Transform keyframe selectors all visibly read
 **Easing**, retaining contextual accessible names such as **Clip keyframe easing N**.
-Clip-speed and Colour keyframe selectors retain
+Clip-speed and Color keyframe selectors retain
 the same compact selected-shape graph and accessible description. It illustrates
 the existing progress function, not a new rate or interpolation rule.
 Selection remains native and commits once, with one Undo step.
 
 Graph-keyframe dragging is separate from the release-only value slider. Drag a keyframe
 horizontally to change its integer source frame and vertically to change its speed,
-quantised to **0.001×** for pointer movement only. Capture-relative
+quantized to **0.001×** for pointer movement only. Capture-relative
 geometry does not drift as duration changes. Valid drafts preview the complete
 new layout while retaining the displayed original source position, but do not
 enter committed history/autosave. Valid release is **one Undo**. Red collision/
@@ -355,7 +355,7 @@ track and its clips. Import never implicitly places music. Selection is editor-o
 edits, recording changes and removal leave other music tracks, video tracks, keyframes,
 adjustments and bin membership untouched. Each music track and clip retains independent
 drafts; selection never applies one's text to another. Each accepted add/edit/remove or
-completed gesture is one Undo step; invalid or cancelled gestures restore atomically
+completed gesture is one Undo step; invalid or canceled gestures restore atomically
 without a committed edit/history/save.
 
 Every clip has explicit source IN/OUT, timeline start/duration and loop flag; its track
@@ -393,7 +393,7 @@ zero fade is absent. Outside its placement the clip contributes
 silence. Sum all active sources linearly **after per-clip gain/fades**, then
 hard-clamp to **[−1, 1] once after the complete sum**, separately for each channel.
 Never clamp a source or intermediate sum: opposite-polarity contributions must
-remain able to cancel. No normalisation, ducking, effects or hidden gain compensation.
+remain able to cancel. No normalization, ducking, effects or hidden gain compensation.
 Source-video audio stays disabled; clip speed, grades, adjustments and Opacity are unchanged.
 
 The preview streams **PCM16 48 kHz stereo** in exact bounded HTTP byte ranges into
@@ -408,7 +408,7 @@ The rendering thread owns consecutive mixed samples and their context-frame
 receipts. Its first real rendered mixed sample supplies the clock origin; video starts
 only once the output device reaches that origin. Project time follows the audio
 output timestamp, not graph processing ahead of the speakers.
-Elapsed rendering before acknowledgement is retained.
+Elapsed rendering before acknowledgment is retained.
 Consumption receipts independently check the unchanged one-project-frame drift
 bound. Actual processor failures, range errors and empty-queue underruns remain
 explicit; a source underrun freezes consumption instead of inventing successful
@@ -432,12 +432,12 @@ or per-track queues. Audio-buffer bounds do not scale with song/project duration
 or track count; music metadata is bounded by eight tracks of eight clips.
 Missing active-source data is an explicit failure, never an omitted clip or
 successful silence. Pause/seek/edit/cancellation invalidate the whole mix epoch.
-Target-browser long-run A/V/audio behaviour still needs
+Target-browser long-run A/V/audio behavior still needs
 qualification; synthetic music regressions are not full Firefox qualification.
 Short loop selections are reused only within one block; each refill still performs
 a fresh guarded range read, rather than reading originals again for every wrap.
 Startup/prefill has a ten-second operation deadline; a blocked module, missing
-output acknowledgement or failed range cannot remain busy indefinitely.
+output acknowledgment or failed range cannot remain busy indefinitely.
 
 Preparation uses the existing one-heavy-job worker and writes only the versioned
 `pcm16-48k-stereo-mono-unity-v3` cache (about 11.52 MB per minute). Earlier AAC
@@ -445,7 +445,7 @@ preview caches remain unchanged but are not current playback input. Missing curr
 PCM caches appear as an explicit **Prepare** action on the file in Media → Music;
 startup/library reads never prepare, rewrite or delete them. Prepare deliberately
 to create the current cache, retaining originals and older generated files. Project
-documents follow the current schema; the music and video registries are version 2 (`music.json`,
+documents follow the current schema; the music registry is version 2 and the video registry version 3 (`music.json`,
 `videos.json`, with full-content checksums), while video-proxy and PCM cache formats
 are unchanged. Native export
 still reads original audio, not the preview transport.
@@ -453,7 +453,7 @@ still reads original audio, not the preview transport.
 Native mixing decodes **one original at a time** to exact selected **48 kHz stereo
 s16 PCM**, then serially places/loops/envelopes it and pairwise-sums with the previous
 **Float64 stereo accumulator**. The next full-project accumulator preserves amplitudes
-outside −1–1: no intermediate clipping/normalisation. At most **two intermediate
+outside −1–1: no intermediate clipping/normalization. At most **two intermediate
 audio inputs**, **one native audio child per pass** and **three audio scratch files**
 (selected PCM + old/new accumulators) coexist; consumed inputs are deleted before
 the next music clip. One final mixed input is hard-clamped once before **48 kHz AAC**.
@@ -497,7 +497,7 @@ in music with or without a pulse: places for a single cut or reveal.
 - **Even grid.** Each tracked beat sits on the strongest onset within ±20 ms, so a note played
   slightly early or late moved its beat with it (gaps of 444–497 ms, 10th to 90th percentile,
   on a steady 128 BPM song). Each beat then moves onto the straightest line, against the beat
-  number, through itself and its 8 neighbours before it, around it or after it, whichever
+  number, through itself and its 8 neighbors before it, around it or after it, whichever
   fits best, so the grid is even (457–481 ms there, as regular as madmom's) while a tempo
   change keeps its corner.
 - **Downbeats.** Each beat's salience is the standard score of its kick-band level plus that
@@ -547,12 +547,12 @@ The result is cached as `music-v4.json` beside `playback.pcm`, positions in PCM 
 tied to the original's content checksum and the cache file's size and modification time:
 re-preparing the cache makes it stale (ignored, never rewritten silently). Results of
 earlier analyses (`music-v1.json` to `music-v3.json`, which had accents instead of hits) are
-ignored, never deleted. Music analysed before this
-version, or whose analysis is stale, failed or was cancelled, shows
-**Tempo and beats not analysed** with **Analyse music** under **Recording** in
+ignored, never deleted. Music analyzed before this
+version, or whose analysis is stale, failed or was canceled, shows
+**Tempo and beats not analyzed** with **Analyze music** under **Recording** in
 **Audio → Music**; otherwise that line shows the tempo, meter and beat count, or the job's
 progress. `GET /api/audio/<id>/analysis` returns `{ analysis, job }`;
-`POST /api/audio/<id>/analysis` queues the job. A cancelled or failed analysis leaves the
+`POST /api/audio/<id>/analysis` queues the job. A canceled or failed analysis leaves the
 PCM cache and playback untouched. Beats and hits map to project frames through each music
 clip's placement, source range and loops (`musicBeatFrames`, `musicHitFrames`). Unit tests use
 synthetic click tracks, modulated noise, swing, a tempo change, a soft passage under an
@@ -582,7 +582,7 @@ The key agrees with librosa's constant-Q chroma and the same profiles (an indepe
 reference) on two of the three songs (C minor, G♯ major); on the third it reports the
 relative major (C major for A minor). On those songs the swells follow the loudness: a
 99 s crescendo of 25 dB, a sudden 20 dB cut-off before the end. Instruments, voice and
-lyrics are not analysed ([#257](https://github.com/Plonk42/PasCap/issues/257)).
+lyrics are not analyzed ([#257](https://github.com/Plonk42/PasCap/issues/257)).
 
 Hits on the same songs, compared with madmom's CNN onset detector (an independent reference,
 used only for evaluation, onsets with an activation of at least 0.5), agreeing within 50 ms;
@@ -602,16 +602,16 @@ and 63–100% of high hits. Limits: soft onsets without a level jump, such as a 
 pad, are not hits; a click in a loud mix counts only when the waveform's peak rises; strong
 means strong within its passage, so a quiet song still has strong hits.
 
-Each analysed music clip shows its beats as ticks and its hits as marks, and **Snap to beats**
+Each analyzed music clip shows its beats as ticks and its hits as marks, and **Snap to beats**
 in the timeline toolbar snaps every snapping gesture to its beats, downbeats or strong hits
 ([snap to beats](TIMELINE_EDITING.md#snap-to-beats)).
 
 The editor also shows the rest of the analysis, display only (nothing is saved). Music
-lanes are 80 pixels tall. On each analysed music clip, at the positions they play after
+lanes are 80 pixels tall. On each analyzed music clip, at the positions they play after
 its placement, source range and loops:
 
-- **Sections** tint the clip behind its waveform, with a coloured top edge: **quiet**
-  blue-grey, **build** amber, **peak** pink, **release** teal, labelled at their top
+- **Sections** tint the clip behind its waveform, with a colored top edge: **quiet**
+  blue-gray, **build** amber, **peak** pink, **release** teal, labeled at their top
   right when at least 40 pixels wide;
 - **Swells** are hairpins along the top: a crescendo opens to the right, a decrescendo
   closes; a sudden one is a filled wedge, drawn at least 6 pixels wide, while gradual
@@ -621,7 +621,7 @@ its placement, source range and loops:
   (green) and high (from 4 kHz, blue), each brighter where that band is louder, over the
   40 dB below its loudest second, in six steps, sampled every 3 pixels (at most 600
   columns per clip);
-- **Hits** are short marks standing on the tone strip, in the colour of their band: strong
+- **Hits** are short marks standing on the tone strip, in the color of their band: strong
   hits 12 pixels tall and opaque, light ones 6 pixels and paler. When hits are closer than
   4 pixels on average only the strong ones are drawn, then none, like beat ticks.
 
@@ -633,7 +633,7 @@ there. Under **Recording**, the analysis line adds the key and the hit count (**
 and a **Music structure** disclosure lists the selected clip's sections (with their loudness
 and average tone), swells (with their change in dB), silences and strong hits (with their
 band), each with its timeline position as a button that moves the playhead there: the
-keyboard and screen-reader route to the same information. Unanalysed music shows only the
+keyboard and screen-reader route to the same information. Unanalyzed music shows only the
 analysis line.
 
 ### Music waveform
@@ -666,7 +666,7 @@ remains an image named **Waveform for music track…**.
 ## Versioning
 
 The current project schema requires explicit `media.videoIds` and `media.audioIds` arrays,
-unique and limited to 10,000 IDs each, plus a complete `grade` on every clip (Colour with
+unique and limited to 10,000 IDs each, plus a complete `grade` on every clip (Color with
 Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves, and 0–64
 source-frame keyframes with all fourteen nullable value fields), the `adjustments` array, clip
 constant or 1–256-keyframe custom-curve
@@ -677,19 +677,19 @@ source OUT. `music` is a required 0–8 array of music tracks with unique requir
 and clip IDs, each with gain, Ripple, opening/closing fades, 1–8 clips and one transition
 per adjacent pair; `[]` is the sole no-music representation, not null
 or a compatibility default. Every video track also requires `ripple`, `transitions`, `openingFade` and
-`closingFade`, and has no `colour`, `opacity` or `keyframes`. Its Transform `opacity` starts at
+`closingFade`, and has no `color`, `opacity` or `keyframes`. Its Transform `opacity` starts at
 1 on a new track; that is not a default for missing saved fields. Transitions/fades are track-local, with
 no special first-track identity. Video tracks display and composite in their saved bottom-to-top array order.
 Opacity keyframes override the Transform base on every clip of the track,
 including both dissolve sources. The fourteen nullable grade keyframe channels are the twelve
-scalar colour settings (including `temperature`, `tint`, `vibrance`, `whites` and `blacks`),
+scalar color settings (including `temperature`, `tint`, `vibrance`, `whites` and `blacks`),
 `hdr` and `localContrast`. Missing saved bases/channels are invalid, not defaulted.
 Saved `clip.opacity` is rejected, not defaulted.
 New projects have empty video/music bins. Standalone audio imports belong
 to the open project's bin; every music track's references also count as membership.
 Global registered music/proxies are reusable on deliberate import, never automatically
 inherited by a new project. Projects and export receipt snapshots saved before the current
-schema, with track Colour, are rejected with the reason and left unchanged. There is no
+schema, with track Color or British spelling, are rejected with the reason and left unchanged. There is no
 compatibility reader, null fallback, default-field
 injection or automatic deletion; recreate such projects and import their media to reuse
 registered assets/verified ready proxies. Confirmed project deletion affects only
@@ -710,7 +710,7 @@ untouched; no singular/null reader or automatic conversion is permitted.
 
 Stored-keyframe inspection remains editor-only, never a persisted field or migration.
 Synthetic correctness checks do not qualify intended-GPU preview,
-long-flight throughput or long-run audio behaviour. Those acceptance requirements
+long-flight throughput or long-run audio behavior. Those acceptance requirements
 are tracked in [#6](https://github.com/Plonk42/PasCap/issues/6),
 [#7](https://github.com/Plonk42/PasCap/issues/7) and
 [#8](https://github.com/Plonk42/PasCap/issues/8); real preparation/rendering needs

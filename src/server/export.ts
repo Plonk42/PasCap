@@ -1,7 +1,7 @@
 import { mkdir, open, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { audioAssetSchema, type AudioAsset } from '../shared/audio.js';
-import { generateCube } from '../shared/colour.js';
+import { generateCube } from '../shared/color.js';
 import type { ExportPreflight } from '../shared/export-space.js';
 import {
   EXPORT_PROFILES,
@@ -87,7 +87,7 @@ export interface ExportReceipt {
     codec: 'h264';
     codecProfile: 'high';
     pixelFormat: 'yuv420p';
-    colour: 'limited BT.709 SDR';
+    color: 'limited BT.709 SDR';
     frameRate: typeof PROJECT_FPS;
     timeBase: '1/30000';
     lutInterpolation: 'tetrahedral';
@@ -113,8 +113,8 @@ function freezeSnapshot<T>(value: T): T {
   }
   return value;
 }
-function checkCancelled(context: JobContext): void {
-  if (context.signal.aborted) throw new ServiceError('Job cancelled.', 499);
+function checkCanceled(context: JobContext): void {
+  if (context.signal.aborted) throw new ServiceError('Job canceled.', 499);
 }
 function validateVideo(clipId: string, sourceOut: number, asset: MediaAsset): void {
   const metadata = asset.metadata;
@@ -128,10 +128,10 @@ function validateVideo(clipId: string, sourceOut: number, asset: MediaAsset): vo
   }
   if (
     metadata.pixelFormat !== 'yuv420p' ||
-    metadata.colourSpace !== 'bt709' ||
-    metadata.colourPrimaries !== 'bt709' ||
-    metadata.colourTransfer !== 'bt709' ||
-    !['tv', 'pc'].includes(metadata.colourRange)
+    metadata.colorSpace !== 'bt709' ||
+    metadata.colorPrimaries !== 'bt709' ||
+    metadata.colorTransfer !== 'bt709' ||
+    !['tv', 'pc'].includes(metadata.colorRange)
   ) {
     throw new ServiceError(`Clip ${clipId} must be explicitly tagged 8-bit BT.709 SDR.`, 422);
   }
@@ -303,11 +303,11 @@ async function retimeClip(
   const lut = `clip-${index}.cube`;
   const filename = `clip-${index}.nut`;
   await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
-  checkCancelled(context);
-  await atomicWrite(path.join(directory, lut), generateCube([clip.grade.colour], EXPORT_RESOURCES.lutSize));
+  checkCanceled(context);
+  await atomicWrite(path.join(directory, lut), generateCube([clip.grade.color], EXPORT_RESOURCES.lutSize));
   const decodeFilter =
     `scale=${target.width}:${target.height}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:` +
-    `in_color_matrix=bt709:out_color_matrix=bt709:in_range=${asset.metadata.colourRange}:out_range=pc,` +
+    `in_color_matrix=bt709:out_color_matrix=bt709:in_range=${asset.metadata.colorRange}:out_range=pc,` +
     `format=gbrp,lut3d=file=${lut}:interp=tetrahedral,` +
     `pad=${target.width}:${target.height}:(ow-iw)/2:(oh-ih)/2:black,setsar=1,format=rgb24`;
   const encodeFilter = [
@@ -409,7 +409,7 @@ async function retimeClip(
     throw new ServiceError('Static retiming did not emit/decode its exact captured frame counts.', 422);
   await rm(path.join(directory, lut));
   await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
-  checkCancelled(context);
+  checkCanceled(context);
   return { filename, report };
 }
 
@@ -433,7 +433,7 @@ async function encodeChunk(
   onProgress: (frames: number) => void,
 ): Promise<void> {
   const { target, library, directory, context } = environment;
-  checkCancelled(context);
+  checkCanceled(context);
   await runProcess(
     library.config.ffmpeg,
     [
@@ -571,19 +571,19 @@ async function prepareMixedMusic(
   if (!music.length) return null;
   let accumulator: string | null = null;
   await forEachSerial(music, async (track, index) => {
-    checkCancelled(context);
+    checkCanceled(context);
     if (!track.activeSamples) return;
     const asset = sources.find((source) => source.id === track.mediaId);
     if (!asset) throw new ServiceError('Music mix lost a captured registered original.', 500);
     await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
-    checkCancelled(context);
+    checkCanceled(context);
     context.update(
       0.83 + (0.02 * index) / music.length,
       `Trimming original music instance ${index + 1} / ${music.length} to exact PCM`,
     );
     await prepareMusic(asset, track, library, directory, context);
     await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
-    checkCancelled(context);
+    checkCanceled(context);
     const filename = `music-accumulator-${index}.wav`;
     const args = [...BASE_ARGS, '-xerror', '-err_detect', 'explode'];
     if (accumulator) args.push('-threads', '2', '-i', accumulator);
@@ -621,17 +621,17 @@ async function prepareMixedMusic(
       0.83 + (0.02 * (index + 0.5)) / music.length,
       `Mixing music instance ${index + 1} / ${music.length} without normalization or clipping`,
     );
-    checkCancelled(context);
+    checkCanceled(context);
     await runProcess(library.config.ffmpeg, args, { cwd: directory, signal: context.signal });
     await verifyMusicAccumulator(filename, track.videoSamples, library, directory, context);
-    checkCancelled(context);
+    checkCanceled(context);
     await rm(path.join(directory, 'music.wav'));
     if (accumulator) await rm(path.join(directory, accumulator));
     accumulator = filename;
   });
   if (accumulator === null) {
     const filename = 'music-silence.wav';
-    checkCancelled(context);
+    checkCanceled(context);
     await runProcess(
       library.config.ffmpeg,
       [
@@ -798,13 +798,13 @@ async function verifyExport(
     video.height !== target.height ||
     video.codec !== 'h264' ||
     video.pixelFormat !== 'yuv420p' ||
-    video.colourRange !== 'tv' ||
+    video.colorRange !== 'tv' ||
     video.frameCount !== inputs.plan.duration ||
     !sameRate(video.frameRate, inputs.snapshot.frameRate) ||
     video.hasAudio !== inputs.snapshot.music.length > 0
   ) {
     throw new ServiceError(
-      'Export verification failed: dimensions, frame count, codec, colour, rate or audio differs from the snapshot.',
+      'Export verification failed: dimensions, frame count, codec, color, rate or audio differs from the snapshot.',
       422,
     );
   }
@@ -887,7 +887,7 @@ async function renderClips(
   const retiming: RawRetimingReport[] = [];
   await forEachSerial(inputs.plan.clips, async (clip, ordinal) => {
     const index = clip.index;
-    checkCancelled(context);
+    checkCanceled(context);
     progress(0, `Generating clip ${ordinal + 1} / ${inputs.plan.clips.length} LUT`);
     const result = await retimeClip(inputs, index, environment, (frames) =>
       progress(
@@ -971,7 +971,7 @@ async function renderVideo(
       filename,
     ],
   });
-  checkCancelled(context);
+  checkCanceled(context);
   return { chunks: result.chunks, retiming: result.retiming, layered: result.report };
 }
 
@@ -981,7 +981,7 @@ async function renderCapturedExport(
   context: JobContext,
   resolveAudio?: AudioResolver,
 ): Promise<void> {
-  checkCancelled(context);
+  checkCanceled(context);
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(context.id))
     throw new ServiceError('Export job directories require a UUID.', 422);
   const directory = path.join(library.config.dataDir, 'renders', context.id);
@@ -993,7 +993,7 @@ async function renderCapturedExport(
     // A queued job may start long after the dialog check; re-read free space before ownership/native work.
     context.update(0, 'Checking available export storage');
     requireExportReserve(await readExportSpace(library.config.dataDir, inputs.snapshot, inputs.profile));
-    checkCancelled(context);
+    checkCanceled(context);
     await mkdir(path.dirname(directory), { recursive: true, mode: 0o700 });
     // EEXIST deliberately fails, and never grants cleanup ownership of an older export.
     await mkdir(directory, { mode: 0o700 });
@@ -1005,17 +1005,17 @@ async function renderCapturedExport(
     const audioById = new Map<string, AudioAsset>();
     const tracks = musicTracks(inputs.snapshot.music);
     await forEachSerial(tracks, async (track) => {
-      checkCancelled(context);
+      checkCanceled(context);
       const asset = audioById.get(track.mediaId) ?? (await resolveRequiredAudio(track.mediaId, resolveAudio));
       audioById.set(track.mediaId, validateExportAudio(track, asset));
     });
     const musicSources = [...audioById.values()];
     await checkSources([], musicSources);
     const music = tracks.map((track) => planExportMusic(track, inputs.plan.duration));
-    checkCancelled(context);
+    checkCanceled(context);
     const target = EXPORT_PROFILES[inputs.profile];
     const { chunks, retiming, layered } = await renderVideo(inputs, { library, directory: work, context, target });
-    checkCancelled(context);
+    checkCanceled(context);
     const mixedMusic = await prepareMixedMusic(music, musicSources, library, work, context);
     context.update(0.85, 'Assembling exact-clock H.264 chunks without re-encoding video');
     await muxExport(inputs, chunks, mixedMusic, library, work, partial, context);
@@ -1023,7 +1023,7 @@ async function renderCapturedExport(
     const verification = await verifyExport(partial, inputs, library, context);
     context.update(0.97, 'Rechecking original fingerprints before publishing');
     await checkSources(uniqueAssets, musicSources);
-    checkCancelled(context);
+    checkCanceled(context);
     const receipt: ExportReceipt = {
       kind: 'export',
       schemaVersion: 1,
@@ -1047,7 +1047,7 @@ async function renderCapturedExport(
         codec: 'h264',
         codecProfile: 'high',
         pixelFormat: 'yuv420p',
-        colour: 'limited BT.709 SDR',
+        color: 'limited BT.709 SDR',
         frameRate: PROJECT_FPS,
         timeBase: '1/30000',
         lutInterpolation: 'tetrahedral',
@@ -1063,7 +1063,7 @@ async function renderCapturedExport(
           : 'One static CPU-reference 65³ LUT per instance, native tetrahedral interpolation before output-frame black fades',
         scratchPolicy: layered
           ? 'At most three full lossless timeline representations (a span collection counts as one) and two RGB clip files. Each track is graded once into a premultiplied RGBA16 group, then source-overed onto the lower accumulator without regrading. Delete lower/group after their bounded composition pass and clip files immediately after their last span. The last pass encodes H.264 directly (final source-over, or the span chunks of a single track), without a lossless copy of the finished timeline. No LUT files. Audio retains at most one selected PCM16 file and two stereo Float64 accumulators, deleting consumed inputs after each serial pass. Disk scales with duration, not a fixed GB limit. All owned scratch/partials removed on failure/cancel; successful exports never overwritten.'
-          : 'At most two complete lossless clips; delete the previous clip immediately after its tail. Keep compressed chunks until mux/verification. Audio retains at most one selected PCM16 file and two stereo Float64 accumulators, deleting consumed inputs after each serial pass. Peak disk scales with two clips + chunks + bounded audio files + final MP4, not all originals. All scratch removed before publication; failed/cancelled job directory removed.',
+          : 'At most two complete lossless clips; delete the previous clip immediately after its tail. Keep compressed chunks until mux/verification. Audio retains at most one selected PCM16 file and two stereo Float64 accumulators, deleting consumed inputs after each serial pass. Peak disk scales with two clips + chunks + bounded audio files + final MP4, not all originals. All scratch removed before publication; failed/canceled job directory removed.',
         audio: music,
         audioPlacement:
           '48 kHz stereo AAC (mono duplicated without attenuation), independent identified instances, linear afade, explicit gain, selected-range loop; streamed silence prefixes and pad/trim to full project duration, max(video OUTs, music OUTs), including music-only black tails; serial pairwise floating accumulation with Float64 files, normalize=0, one final [-1,1] clamp before AAC; one mixed audio input, no source-video audio',
@@ -1071,9 +1071,9 @@ async function renderCapturedExport(
     };
     await atomicWrite(path.join(directory, 'receipt.json'), `${JSON.stringify(receipt, null, 2)}\n`);
     await rm(work, { recursive: true, force: true });
-    checkCancelled(context);
+    checkCanceled(context);
     await rename(partial, path.join(directory, 'export.mp4'));
-    checkCancelled(context);
+    checkCanceled(context);
     context.update(0.99, 'Export verified and ready');
     succeeded = true;
   } catch (cause) {

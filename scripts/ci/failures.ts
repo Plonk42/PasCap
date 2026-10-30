@@ -38,7 +38,7 @@ const runs = (
   }
 ).workflow_runs;
 const grouped = new Map<string, { signature: FailureSignature; runs: string[] }>();
-const unrecognised: string[] = [];
+const unrecognized: string[] = [];
 await forEachSerial(runs, async (run) => {
   const label = `${run.head_branch} ${run.created_at.slice(0, 16)} #${run.id}`;
   const { jobs } = (await (await github(`actions/runs/${run.id}/jobs?per_page=100`)).json()) as { jobs: Job[] };
@@ -48,7 +48,7 @@ await forEachSerial(runs, async (run) => {
       async (response) => failureSignatures(await response.text()),
       () => null,
     );
-    if (!signatures?.length) unrecognised.push(`${job.name}${signatures ? '' : ' (logs unavailable)'} · ${label}`);
+    if (!signatures?.length) unrecognized.push(`${job.name}${signatures ? '' : ' (logs unavailable)'} · ${label}`);
     for (const signature of signatures ?? []) {
       const key = `${signature.kind} ${signature.test}`;
       const entry = grouped.get(key) ?? { signature, runs: [] };
@@ -65,7 +65,7 @@ for (const { signature, runs: seen } of [...grouped.values()].sort(
   console.log(`${seen.length}× ${signature.kind}: ${signature.test}`);
   for (const run of seen) console.log(`     ${run}`);
 }
-if (unrecognised.length) {
-  console.log('\nFailed jobs without a recognised test failure (setup, infrastructure or expired logs):');
-  for (const job of unrecognised) console.log(`     ${job}`);
+if (unrecognized.length) {
+  console.log('\nFailed jobs without a recognized test failure (setup, infrastructure or expired logs):');
+  for (const job of unrecognized) console.log(`     ${job}`);
 }

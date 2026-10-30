@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createColourSettings, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { createColorSettings, NEUTRAL_COLOR } from '../../src/shared/color.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
-import { adjustmentColour, compositePixel, opacityAt } from '../../src/shared/composition.js';
+import { adjustmentColor, compositePixel, opacityAt } from '../../src/shared/composition.js';
 import {
-  adjustmentColourAt,
+  adjustmentColorAt,
   createAdjustment,
   gradeKeyAsLayerKey,
   layerKeyAsGradeKey,
@@ -29,7 +29,7 @@ import {
 } from '../../src/shared/spatial.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 
-/** A Colour keyframe of an adjustment or clip grade. */
+/** A Color keyframe of an adjustment or clip grade. */
 function point(frame: number, values: Partial<GradeKeyValues>, interpolation: Interpolation = 'linear'): GradeKeyframe {
   return layerKeyAsGradeKey(layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation));
 }
@@ -46,8 +46,8 @@ function transformKey(
   return { ...uniformKeyframe(frame, { ...NO_SETTINGS, ...values }, interpolation), reset: false };
 }
 /** An adjustment from project frame 0, so its keyframe frames are project frames. */
-function look(keyframes: GradeKeyframe[] = [], colour = createColourSettings()): Adjustment {
-  return { ...createAdjustment('look', 0, 1_000), colour, keyframes };
+function look(keyframes: GradeKeyframe[] = [], color = createColorSettings()): Adjustment {
+  return { ...createAdjustment('look', 0, 1_000), color, keyframes };
 }
 function layered() {
   let project = applyCommand(createProject('flight', 'Flight'), {
@@ -161,7 +161,7 @@ describe('layer layout, compositing and edit commands', () => {
   });
   it('layer deletion is one undoable operation restoring its clips/grades/keys', () => {
     const project = layered();
-    project.clips[1]!.grade.colour = { ...NEUTRAL_COLOUR, exposure: 0.7, saturation: 0.4 };
+    project.clips[1]!.grade.color = { ...NEUTRAL_COLOR, exposure: 0.7, saturation: 0.4 };
     project.layers[1]!.transform.keyframes = [
       transformKey(20, { opacity: 0.3, rotation: 45 }, 'smooth'),
       transformKey(100, { opacity: 0.8 }),
@@ -179,7 +179,7 @@ describe('layer layout, compositing and edit commands', () => {
     const project = layered();
     project.layers[1]!.transform.keyframes = [transformKey(20, { opacity: 0.75 }, 'smooth')];
     project.adjustments = [look([point(20, { exposure: 0.4 }, 'smooth')])];
-    project.clips[1]!.grade.colour.contrast = 1.3;
+    project.clips[1]!.grade.color.contrast = 1.3;
     const history = new EditHistory(project);
     const original = history.current.clips[1]!;
     history.commit({ type: 'duplicate', clipId: original.id, newClipId: 'copy' });
@@ -190,10 +190,10 @@ describe('layer layout, compositing and edit commands', () => {
     expect(sampleTimeline(history.current, 150)[0]).toMatchObject({
       clipId: 'copy',
       grade: { contrast: 1.3 },
-      colour: { exposure: 0.4 },
+      color: { exposure: 0.4 },
       opacity: 0.75,
     });
-    expect(copy).not.toHaveProperty('colour');
+    expect(copy).not.toHaveProperty('color');
     expect(copy).not.toHaveProperty('correction');
     expect(history.current.adjustments).toEqual(project.adjustments);
     history.undo();
@@ -225,7 +225,7 @@ describe('layer layout, compositing and edit commands', () => {
       clipId: 'top',
       sourceFrame: 0,
       opacity: 1,
-      colour: { hue: 90 },
+      color: { hue: 90 },
     });
   });
   it.each([-1, 0.5, 2, Number.NaN, Number.POSITIVE_INFINITY])(
@@ -266,13 +266,13 @@ describe('project-frame adjustment and Transform settings', () => {
   });
   it('interpolates grading parameters, not independently graded endpoint pixels', () => {
     const item = look([point(0, { exposure: -1, saturation: 0.5 }), point(80, { exposure: 1, saturation: 1.5 })]);
-    expect(adjustmentColour({ adjustments: [item] }, 40)).toEqual(NEUTRAL_COLOUR);
+    expect(adjustmentColor({ adjustments: [item] }, 40)).toEqual(NEUTRAL_COLOR);
   });
-  it('keeps the static Colour and unkeyed settings independent of keyed ones', () => {
+  it('keeps the static Color and unkeyed settings independent of keyed ones', () => {
     const layer = createLayer('video-1', 'Track 1');
     layer.transform.base.opacity = 0.7;
     const item = look([], {
-      ...NEUTRAL_COLOUR,
+      ...NEUTRAL_COLOR,
       temperature: 0.2,
       tint: -0.3,
       exposure: 0.7,
@@ -284,18 +284,18 @@ describe('project-frame adjustment and Transform settings', () => {
       shadows: -0.2,
     });
     for (const frame of [-10, 0, 50, 500]) {
-      expect(adjustmentColourAt(item, frame)).toEqual(item.colour);
+      expect(adjustmentColorAt(item, frame)).toEqual(item.color);
       expect(opacityAt(layer, frame)).toBe(0.7);
     }
     item.keyframes = [point(0, { exposure: -1 }), point(25, { hue: 90 }, 'hold'), point(100, { exposure: 1 })];
     layer.transform.keyframes = [transformKey(0, { opacity: 0 }), transformKey(100, { opacity: 1 })];
-    expect(adjustmentColourAt(item, 50)).toEqual({ ...item.colour, exposure: 0, hue: 90 });
+    expect(adjustmentColorAt(item, 50)).toEqual({ ...item.color, exposure: 0, hue: 90 });
     expect(opacityAt(layer, 50)).toBe(0.5);
     expect(layer.transform.base.opacity).toBe(0.7);
-    expect(item.colour.exposure).toBe(0.7);
-    expect(item.colour.hue).toBe(30);
+    expect(item.color.exposure).toBe(0.7);
+    expect(item.color.hue).toBe(30);
   });
-  it('Opacity and Colour keyframes survive trim/restoration/split at their absolute project frames', () => {
+  it('Opacity and Color keyframes survive trim/restoration/split at their absolute project frames', () => {
     let project = applyCommand(createProject('p', 'P'), {
       type: 'insert',
       clip: createClip('a', 'source', 0, 100),
@@ -303,9 +303,9 @@ describe('project-frame adjustment and Transform settings', () => {
     });
     project = applyCommand(project, { type: 'adjustment-add', adjustmentId: 'look', start: 0, duration: 1_000 });
     project = applyCommand(project, {
-      type: 'colour',
+      type: 'color',
       adjustmentId: 'look',
-      colour: { ...NEUTRAL_COLOUR, brightness: 0.1 },
+      color: { ...NEUTRAL_COLOR, brightness: 0.1 },
     });
     project = applyCommand(project, {
       type: 'transform',

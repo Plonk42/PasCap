@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { colourCurveSchema, curvesSchema, hslBandSchema, hslSchema } from './advanced-colour.js';
-import { COLOUR_CONTROLS, colourSchema, NEUTRAL_COLOUR, type ScalarColourSetting } from './colour.js';
+import { colorCurveSchema, curvesSchema, hslBandSchema, hslSchema } from './advanced-color.js';
+import { COLOR_CONTROLS, colorSchema, NEUTRAL_COLOR, type ScalarColorSetting } from './color.js';
 import { described } from './described.js';
 import { detailSchema } from './detail.js';
 import { gradeKeyValuesPatchSchema, gradeSettingSchema } from './grade.js';
@@ -25,9 +25,9 @@ function command<const T extends string, S extends z.ZodRawShape>(type: T, descr
 const clipId = described(idSchema, 'ID of an existing video clip.');
 const layerId = described(idSchema, 'ID of an existing video track.');
 const adjustmentId = described(idSchema, 'ID of an existing adjustment.');
-const colourAdjustmentId = described(idSchema.optional(), 'Adjustment ID; or clipId.');
+const colorAdjustmentId = described(idSchema.optional(), 'Adjustment ID; or clipId.');
 const gradeClipId = described(idSchema.optional(), 'Clip ID, for its grade; or adjustmentId.');
-const colourOwner = { clipId: gradeClipId, adjustmentId: colourAdjustmentId };
+const colorOwner = { clipId: gradeClipId, adjustmentId: colorAdjustmentId };
 const newClipId = (use: string) =>
   described(idSchema, `Unused clip ID (letters, digits, "_" and "-", at most 100) for ${use}.`);
 const sourceIn = described(frameSchema, 'First kept source frame of the recording (inclusive).');
@@ -38,15 +38,15 @@ const frameTerms = 'source frame (clip), or from its start (adjustment)';
 const keyFrame = described(gradeFrame, `Frame of the existing keyframe: ${frameTerms}.`);
 const ownerFrame = described(gradeFrame, `Frame of the keyframe: ${frameTerms}.`);
 const trackName = described(z.string().trim().min(1).max(100), 'Track name, 1–100 characters.');
-const neutralNotZero = COLOUR_CONTROLS.filter((control) => NEUTRAL_COLOUR[control.key] !== 0).map(
-  (control) => `${control.key} ${NEUTRAL_COLOUR[control.key]}`,
+const neutralNotZero = COLOR_CONTROLS.filter((control) => NEUTRAL_COLOR[control.key] !== 0).map(
+  (control) => `${control.key} ${NEUTRAL_COLOR[control.key]}`,
 );
-/** Each scalar Colour setting's bounds and neutral value, which is not always 0. */
-const colourRanges = COLOUR_CONTROLS.map((control) => `${control.key} ${control.min}–${control.max}`).join(', ');
-const colourBounds = `Bounds: ${colourRanges}. Neutral (no change): ${neutralNotZero.join(', ')}, every other 0; Saturation 0 is greyscale.`;
+/** Each scalar Color setting's bounds and neutral value, which is not always 0. */
+const colorRanges = COLOR_CONTROLS.map((control) => `${control.key} ${control.min}–${control.max}`).join(', ');
+const colorBounds = `Bounds: ${colorRanges}. Neutral (no change): ${neutralNotZero.join(', ')}, every other 0; Saturation 0 is grayscale.`;
 const keyframeSetting = described(
   gradeSettingSchema,
-  'Scalar Colour setting; bounds and neutral values as in colour-setting.',
+  'Scalar Color setting; bounds and neutral values as in color-setting.',
 );
 const easingPatch = interpolationSchema.or(z.partialRecord(gradeSettingSchema, interpolationSchema));
 const mediaId = described(idSchema, 'ID of a video recording of the project.');
@@ -54,9 +54,9 @@ const selectRanges = described(
   z.array(selectRangeSchema).max(MAX_SELECTS),
   `Kept source ranges (OUT exclusive), ascending and separated by at least one frame, at most ${MAX_SELECTS}.`,
 );
-const colourSetting = described(
-  z.enum(COLOUR_CONTROLS.map((control) => control.key) as [ScalarColourSetting, ...ScalarColourSetting[]]),
-  `Scalar Colour setting. ${colourBounds}`,
+const colorSetting = described(
+  z.enum(COLOR_CONTROLS.map((control) => control.key) as [ScalarColorSetting, ...ScalarColorSetting[]]),
+  `Scalar Color setting. ${colorBounds}`,
 );
 const settingValue = described(z.number(), "New base value, within the setting's bounds.");
 
@@ -119,35 +119,32 @@ export const editCommandSchema = z.discriminatedUnion('type', [
     { clipId, newClipId: newClipId('the copy') },
   ),
   command(
-    'colour',
-    "Replace the whole Colour of clips' grades or of an adjustment; keyed settings follow their keyframes.",
+    'color',
+    "Replace the whole Color of clips' grades or of an adjustment; keyed settings follow their keyframes.",
     {
       clipIds: described(z.array(idSchema).min(1).optional(), 'Clips whose grade to set, each once; or adjustmentId.'),
-      adjustmentId: colourAdjustmentId,
-      colour: described(
-        colourSchema,
-        'Every Colour setting: twelve scalar settings, hdr, localContrast, hsl and curves.',
-      ),
+      adjustmentId: colorAdjustmentId,
+      color: described(colorSchema, 'Every Color setting: twelve scalar settings, hdr, localContrast, hsl and curves.'),
     },
   ),
   command(
-    'colour-setting',
-    "Set one scalar Colour setting of a clip's grade or an adjustment, keeping the others. Rejected while the setting has keyframes there: change those with layer-key-value.",
-    { ...colourOwner, setting: colourSetting, value: settingValue },
+    'color-setting',
+    "Set one scalar Color setting of a clip's grade or an adjustment, keeping the others. Rejected while the setting has keyframes there: change those with layer-key-value.",
+    { ...colorOwner, setting: colorSetting, value: settingValue },
   ),
   command('hsl-band', "Set one HSL range of a clip's grade or an adjustment, keeping the rest.", {
-    ...colourOwner,
-    band: described(hslSchema.keyof(), 'Colour range: red, orange, yellow, green, cyan, blue, purple or magenta.'),
+    ...colorOwner,
+    band: described(hslSchema.keyof(), 'Color range: red, orange, yellow, green, cyan, blue, purple or magenta.'),
     values: described(
       hslBandSchema,
       'Hue shift −30–30°, saturation −1–1 and lightness −0.5–0.5 of the range; all 0 is neutral.',
     ),
   }),
-  command('colour-curve', "Replace one curve of a clip's grade or an adjustment, keeping the rest.", {
-    ...colourOwner,
+  command('color-curve', "Replace one curve of a clip's grade or an adjustment, keeping the rest.", {
+    ...colorOwner,
     channel: described(curvesSchema.keyof(), 'Curve: master, red, green or blue.'),
     points: described(
-      colourCurveSchema,
+      colorCurveSchema,
       '2–16 control nodes {x, y} in 0–1 with inputs strictly ascending from 0 to 1; identity is (0,0), (0.5,0.5), (1,1).',
     ),
   }),
@@ -207,7 +204,7 @@ export const editCommandSchema = z.discriminatedUnion('type', [
     'layer-key-toggle',
     'Enable a setting at a keyframe with value, creating the keyframe if needed; or disable it if enabled, removing the keyframe with its last setting.',
     {
-      ...colourOwner,
+      ...colorOwner,
       frame: ownerFrame,
       setting: keyframeSetting,
       value: described(z.number(), "Value to key, within the setting's bounds; checked even when disabling."),
@@ -217,11 +214,11 @@ export const editCommandSchema = z.discriminatedUnion('type', [
     'layer-key-set',
     'Create or change the keyframe at frame in one command: each listed setting is keyed at its value (or disabled with null), others keep theirs, and a keyframe left without settings is removed. Rejected as a whole on an out-of-bounds value, an Easing for a setting not keyed there, or a keyframe beyond 64.',
     {
-      ...colourOwner,
+      ...colorOwner,
       frame: ownerFrame,
       values: described(
         gradeKeyValuesPatchSchema,
-        `Settings to key at their value, or null to disable them here; at least one. ${colourBounds}`,
+        `Settings to key at their value, or null to disable them here; at least one. ${colorBounds}`,
       ),
       easing: described(
         easingPatch.optional(),
@@ -234,31 +231,31 @@ export const editCommandSchema = z.discriminatedUnion('type', [
     },
   ),
   command('layer-key-value', 'Change the value of a setting already enabled at a keyframe.', {
-    ...colourOwner,
+    ...colorOwner,
     frame: keyFrame,
     setting: keyframeSetting,
     value: described(z.number(), "New value, within the setting's bounds."),
   }),
   command('layer-key-move', 'Move a whole keyframe to another frame; an occupied frame rejects the edit.', {
-    ...colourOwner,
+    ...colorOwner,
     frame: keyFrame,
     nextFrame: described(gradeFrame, 'Destination frame, in the same terms as frame.'),
   }),
   command('layer-key-remove', 'Remove a whole keyframe.', {
-    ...colourOwner,
+    ...colorOwner,
     frame: keyFrame,
   }),
   command(
     'layer-key-default',
-    'Add a default keyframe, returning every Colour setting to neutral from its frame on, or remove the one there. Rejected where an ordinary keyframe exists.',
-    { ...colourOwner, frame: ownerFrame },
+    'Add a default keyframe, returning every Color setting to neutral from its frame on, or remove the one there. Rejected where an ordinary keyframe exists.',
+    { ...colorOwner, frame: ownerFrame },
   ),
   command('layer-key-easing', "Set the Easing of a keyframe's settings toward their next keyframes.", {
-    ...colourOwner,
+    ...colorOwner,
     frame: keyFrame,
     setting: described(
       gradeSettingSchema.nullable(),
-      'Scalar Colour setting whose Easing to change; null sets every enabled setting.',
+      'Scalar Color setting whose Easing to change; null sets every enabled setting.',
     ),
     interpolation: described(interpolationSchema, 'Easing: hold, linear, ease-in, ease-out or smooth.'),
   }),
@@ -345,7 +342,7 @@ export const editCommandSchema = z.discriminatedUnion('type', [
       duration: described(frameSchema.min(1), 'Frames it grades from start.'),
       settings: described(
         z.partialRecord(gradeSettingSchema, z.number()).optional(),
-        'Its scalar Colour settings, as in colour-setting; others neutral.',
+        'Its scalar Color settings, as in color-setting; others neutral.',
       ),
     },
   ),

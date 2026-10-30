@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
+import { COLOR_CONTROLS } from '../../src/shared/color.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import {
@@ -154,7 +154,7 @@ for (const target of ['video-1', 'empty'] as const) {
     });
     await expect(placement.locator('input[aria-label*="Opacity"]')).toHaveCount(0);
     await expect(page.locator('.layer-control input[aria-label*="Opacity"]')).toHaveCount(0);
-    // Colour grades never carry Opacity: it belongs to the track Transform alone.
+    // Color grades never carry Opacity: it belongs to the track Transform alone.
     await expect(page.locator('input[aria-label="Opacity"]')).toHaveCount(0);
     await expect(transformSection.locator('input[aria-label="Transform Opacity"]')).toHaveCount(2);
     await expect(opacity.locator('..').getByRole('spinbutton', { name: 'Transform Opacity', exact: true })).toHaveValue(
@@ -223,7 +223,7 @@ test('setting tooltips and accessible descriptions explain the editable keyframe
       await expect(field).toHaveAccessibleDescription(`${hint} ${sliderInstructions}`);
       if (frame === 10) await expect(field).toBeEnabled();
       else await expect(field).toBeDisabled();
-      const cue = page.locator('.colour-control').filter({ has: field }).locator('.setting-locked-cue');
+      const cue = page.locator('.color-control').filter({ has: field }).locator('.setting-locked-cue');
       if (frame === 10) await expect(cue).toHaveCount(0);
       else await expect(cue).toHaveText('Add a keyframe ◇ to edit');
       if (frame === 0) await expect(cue).toBeVisible();
@@ -294,7 +294,7 @@ test('the first hollow diamond creates one adjustment keyframe; same-frame setti
   await baseRate.press('Enter');
   const bases = await current(page);
   expect(bases.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-  expect(bases.adjustments[0]!.colour.tint).toBe(0.7);
+  expect(bases.adjustments[0]!.color.tint).toBe(0.7);
   expect(bases.clips.every((clip) => !('opacity' in clip))).toBe(true);
   expect(bases.adjustments[0]?.keyframes).toEqual([]);
   await expect(
@@ -330,9 +330,9 @@ test('the first hollow diamond creates one adjustment keyframe; same-frame setti
   expect(keyed.adjustments[0]?.keyframes).toEqual([expected]);
   expect(keyed.clips).toEqual(bases.clips);
   expect(Object.keys(keyed.adjustments[0]!.keyframes[0]!.values).sort()).toEqual(
-    COLOUR_CONTROLS.map((control) => control.key).sort(),
+    COLOR_CONTROLS.map((control) => control.key).sort(),
   );
-  for (const control of COLOUR_CONTROLS.filter((control) => !['exposure', 'tint'].includes(control.key))) {
+  for (const control of COLOR_CONTROLS.filter((control) => !['exposure', 'tint'].includes(control.key))) {
     await expect(diamond(page, control.label)).toBeEnabled();
     await expect(diamond(page, control.label)).toHaveAttribute('aria-pressed', 'false');
     expect(keyed.adjustments[0]!.keyframes[0]!.values[control.key]).toBeNull();
@@ -341,7 +341,7 @@ test('the first hollow diamond creates one adjustment keyframe; same-frame setti
   const saturated = await current(page);
   expect(saturated.adjustments[0]?.keyframes).toEqual([gradePoint(20, { exposure: 0.4, tint: 0.7, saturation: 1 })]);
   await expect(page.locator('.layer-keyframe-controls')).toHaveCount(1);
-  await expect(page.getByRole('checkbox', { name: 'Animate colour adjustments', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('checkbox', { name: 'Animate color adjustments', exact: true })).toHaveCount(0);
   const row = await editAdjustmentPoint(page, 20);
   await expect(row.locator('.layer-keyframe-dependencies .layer-keyframe-chip')).toHaveText([
     'Tint',
@@ -415,7 +415,7 @@ test('between points keyed controls are read-only until their own diamond explic
   expect(await current(page)).toEqual(document);
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.3');
   const staticChange = await current(page);
-  expect(staticChange.adjustments[0]?.colour.saturation).toBe(1.3);
+  expect(staticChange.adjustments[0]?.color.saturation).toBe(1.3);
   expect(staticChange.clips).toEqual(document.clips);
   expect(staticChange.clips[1]).toEqual(document.clips[1]);
   expect(staticChange.adjustments[0]?.keyframes.map((point) => point.frame)).toEqual([10, 90]);
@@ -545,8 +545,8 @@ test('adjustment and Transform curves continue across different clips and their 
   page,
 }) => {
   let document = await current(page);
-  document.adjustments[0]!.colour = {
-    ...document.adjustments[0]!.colour,
+  document.adjustments[0]!.color = {
+    ...document.adjustments[0]!.color,
     exposure: -0.3,
     contrast: 1.3,
     saturation: 0.6,
@@ -580,9 +580,9 @@ test('adjustment and Transform curves continue across different clips and their 
   const exposureAtOverlap = -0.5 + (2 * overlap) / 80;
   const simultaneous = sampleTimeline(document, overlap);
   expect(simultaneous).toHaveLength(2);
-  expect(simultaneous[0]?.colour.exposure).toBeCloseTo(exposureAtOverlap);
-  expect(simultaneous[1]?.colour.exposure).toBeCloseTo(exposureAtOverlap);
-  expect(simultaneous.map((sample) => sample.colour.saturation)).toEqual([0.6, 0.6]);
+  expect(simultaneous[0]?.color.exposure).toBeCloseTo(exposureAtOverlap);
+  expect(simultaneous[1]?.color.exposure).toBeCloseTo(exposureAtOverlap);
+  expect(simultaneous.map((sample) => sample.color.saturation)).toEqual([0.6, 0.6]);
   expect(simultaneous.map((sample) => sample.sourceFrame)).toEqual([
     overlap * 2,
     layout.clips[1]!.retiming.sourceAt(overlap - layout.clips[1]!.start),
@@ -594,10 +594,10 @@ test('adjustment and Transform curves continue across different clips and their 
     expect(captured.state.decoderCount).toBe(2);
     const progress = frame / 80;
     for (const sample of sampleTimeline(document, frame)) {
-      expect(sample.colour.exposure).toBeCloseTo(-0.5 + 2 * progress);
+      expect(sample.color.exposure).toBeCloseTo(-0.5 + 2 * progress);
       expect(sample.opacity).toBeCloseTo(0.2 + 0.6 * progress);
-      expect(sample.colour.contrast).toBe(document.adjustments[0]!.colour.contrast);
-      expect(sample.colour.saturation).toBe(document.adjustments[0]!.colour.saturation);
+      expect(sample.color.contrast).toBe(document.adjustments[0]!.color.contrast);
+      expect(sample.color.saturation).toBe(document.adjustments[0]!.color.saturation);
       expect(sample).not.toHaveProperty('correction');
       const slot = captured.state.assignedClipIds.indexOf(sample.clipId);
       expect(slot).toBeGreaterThanOrEqual(0);
@@ -648,7 +648,7 @@ for (const rate of [0.25, 4]) {
       expect(slot).toBeGreaterThanOrEqual(0);
       expect(captured.sourceFrames[slot]).toBe(Math.floor(frame * rate));
       expect(sample.sourceFrame).toBe(Math.floor(frame * rate));
-      expect(sample.colour.exposure).toBe(-0.75 + frame * 0.5);
+      expect(sample.color.exposure).toBe(-0.75 + frame * 0.5);
       await settingTab(page, 'Exposure');
       await expect(diamond(page, 'Exposure')).toHaveAttribute('aria-pressed', 'true');
       captures.push(captured);
@@ -658,7 +658,7 @@ for (const rate of [0.25, 4]) {
     await seek(page, 0);
     await inspectorTab(page, 'Adjustment');
     for (const frame of [1, 2, 3]) {
-      await page.getByRole('button', { name: 'Next Colour keyframe', exact: true }).click();
+      await page.getByRole('button', { name: 'Next Color keyframe', exact: true }).click();
       await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
       await expect(adjustmentKeyframes(page).locator('.keyframe-row.current')).toHaveAttribute(
         'data-keyframe-frame',
@@ -884,7 +884,7 @@ test('numeric trim, mapped split, duplicate and overlay moves keep absolute adju
   expect(saved.adjustments).toEqual(document.adjustments);
   expect(saved.clips).toEqual(moved.clips);
   for (const point of saved.adjustments[0]!.keyframes)
-    expect(Object.keys(point.values).sort()).toEqual(COLOUR_CONTROLS.map((control) => control.key).sort());
+    expect(Object.keys(point.values).sort()).toEqual(COLOR_CONTROLS.map((control) => control.key).sort());
   for (const clip of saved.clips) expect(clip).not.toHaveProperty('animation');
   await page.reload();
   await ready(page, saved);

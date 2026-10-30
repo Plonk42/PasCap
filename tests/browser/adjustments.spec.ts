@@ -39,7 +39,7 @@ test.beforeEach(async ({ page, request }) => {
   memory = await memoryProjects(page, document);
   await expandedInspectorPreferences(page);
   await page.goto(`/?project=${document.id}`);
-  await inspectorTab(page, 'Colour');
+  await inspectorTab(page, 'Color');
 });
 
 test('an adjustment created over a clip grades only its range, refuses an overlap and undoes in one step', async ({
@@ -51,13 +51,13 @@ test('an adjustment created over a clip grades only its range, refuses an overla
   const add = page.getByRole('button', { name: 'Add adjustment', exact: true });
   await expect(add).toHaveAttribute('title', 'Add an adjustment over the selected clip, 00:00:00 – 00:01:10');
   await add.click();
-  await expect(inspector(page).locator('.colour-target')).toContainText('Adjustment 00:00:00 – 00:01:10');
+  await expect(inspector(page).locator('.color-target')).toContainText('Adjustment 00:00:00 – 00:01:10');
   await expect.poll(async () => (await current(page)).adjustments).toMatchObject([{ start: 0, duration: 40 }]);
 
   const saturation = page.getByRole('spinbutton', { name: 'Saturation', exact: true });
   await saturation.fill('0');
   await saturation.press('Enter');
-  await expect.poll(async () => (await current(page)).adjustments[0]!.colour.saturation).toBe(0);
+  await expect.poll(async () => (await current(page)).adjustments[0]!.color.saturation).toBe(0);
   const edited = await current(page);
   expect(edited.layers).toEqual(document.layers);
   expect(edited.clips.map((clip) => clip.grade)).toEqual(document.clips.map((clip) => clip.grade));
@@ -79,7 +79,7 @@ test('an adjustment created over a clip grades only its range, refuses an overla
 
 test('Original with Alt bypasses adjustments only, and with Shift clip grades only', async ({ page }) => {
   const look = createAdjustment('look', 0, 80);
-  look.colour.saturation = 0;
+  look.color.saturation = 0;
   const start = await current(page);
   await page.evaluate((next) => window.pascapLab!.setDocument(next), { ...start, adjustments: [look] });
   await expect.poll(async () => (await current(page)).adjustments).toHaveLength(1);

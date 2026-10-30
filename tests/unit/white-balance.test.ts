@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { encode709, temperatureTintGains } from '../../src/shared/colour.js';
+import { encode709, temperatureTintGains } from '../../src/shared/color.js';
 import {
   frameIlluminant,
   neutralisingWhiteBalance,
@@ -32,7 +32,7 @@ function frame(width: number, height: number, pixel: (x: number, y: number) => L
   return { width, height, data };
 }
 
-/** Grey ground: 6-pixel patches of varied lightness with fine texture, so it has plenty of edges. */
+/** Gray ground: 6-pixel patches of varied lightness with fine texture, so it has plenty of edges. */
 function groundLevel(x: number, y: number, seed = 0): number {
   const patch = hash(Math.floor(x / 6), Math.floor(y / 6), seed);
   return (0.03 + 0.45 * patch ** 1.5) * (0.96 + 0.08 * hash(x, y, seed + 1));
@@ -62,7 +62,7 @@ const PERMUTATIONS = [
 ] as const;
 
 /** Saturated objects cycling through every channel order, so the scene as a whole is balanced. */
-function colourful(seed = 0): AnalysisFrame {
+function colorful(seed = 0): AnalysisFrame {
   const base = [0.5, 0.22, 0.08] as const;
   return frame(320, 180, (x, y) => {
     const index = Math.floor(x / 10) + 32 * Math.floor(y / 10) + seed;
@@ -72,7 +72,7 @@ function colourful(seed = 0): AnalysisFrame {
   });
 }
 
-/** Corrected light of a cast: the cast times the gains of a Temperature/Tint, normalised to green. */
+/** Corrected light of a cast: the cast times the gains of a Temperature/Tint, normalized to green. */
 function corrected(gains: Linear, balance: { temperature: number; tint: number }): Linear {
   const correction = temperatureTintGains(balance);
   const light = gains.map((gain, channel) => gain * correction[channel]!);
@@ -86,15 +86,15 @@ function estimate(input: AnalysisFrame): IlluminantEstimate {
 }
 
 describe('automatic white balance estimator', () => {
-  it('maps a measured light to the Temperature and Tint whose gains neutralise it exactly', () => {
+  it('maps a measured light to the Temperature and Tint whose gains neutralize it exactly', () => {
     for (const light of [
       [1.3, 1, 0.7],
       [0.8, 1.1, 1.25],
       [1, 0.85, 1],
     ] as const) {
-      const neutralised = corrected(light, neutralisingWhiteBalance(light));
-      expect(neutralised[0]).toBeCloseTo(1, 12);
-      expect(neutralised[2]).toBeCloseTo(1, 12);
+      const neutralized = corrected(light, neutralisingWhiteBalance(light));
+      expect(neutralized[0]).toBeCloseTo(1, 12);
+      expect(neutralized[2]).toBeCloseTo(1, 12);
     }
   });
 
@@ -103,8 +103,8 @@ describe('automatic white balance estimator', () => {
     expect(poolWhiteBalance([estimate(neutral())])).toEqual({ temperature: 0, tint: 0 });
   });
 
-  it('stays near zero for a colourful scene that is balanced as a whole', () => {
-    const result = poolWhiteBalance([estimate(colourful(1)), estimate(colourful(2)), estimate(colourful(3))])!;
+  it('stays near zero for a colorful scene that is balanced as a whole', () => {
+    const result = poolWhiteBalance([estimate(colorful(1)), estimate(colorful(2)), estimate(colorful(3))])!;
     expect(Math.abs(result.temperature)).toBeLessThan(0.05);
     expect(Math.abs(result.tint)).toBeLessThan(0.05);
   });
@@ -114,12 +114,12 @@ describe('automatic white balance estimator', () => {
     { name: 'blue', gains: [0.75, 1, 1.3] as const, temperature: 1, tint: 1 },
     { name: 'magenta', gains: [1, 0.85, 1] as const, temperature: 0, tint: -1 },
     { name: 'green', gains: [0.9, 1.15, 0.9] as const, temperature: 0, tint: 1 },
-  ])('measures a $name cast that its Temperature and Tint neutralise', ({ gains, temperature, tint }) => {
+  ])('measures a $name cast that its Temperature and Tint neutralize', ({ gains, temperature, tint }) => {
     const raw = estimate(cast(gains));
     expect(raw.confidence).toBeGreaterThan(0.95);
-    const neutralised = corrected(gains, raw);
-    expect(neutralised[0]).toBeCloseTo(1, 2);
-    expect(neutralised[2]).toBeCloseTo(1, 2);
+    const neutralized = corrected(gains, raw);
+    expect(neutralized[0]).toBeCloseTo(1, 2);
+    expect(neutralized[2]).toBeCloseTo(1, 2);
     const result = poolWhiteBalance([raw])!;
     // Signs: positive Temperature warms (a cool cast), positive Tint adds magenta (a green cast).
     if (temperature === 0) expect(Math.abs(result.temperature)).toBeLessThan(0.01);
@@ -175,7 +175,7 @@ describe('automatic white balance estimator', () => {
     expect(pooled.temperature).toBeLessThan(0.6 * steady.temperature);
   });
 
-  it('does not drag a sky-dominated frame to grey', () => {
+  it('does not drag a sky-dominated frame to gray', () => {
     const horizon = 117;
     const sky = frame(320, 180, (x, y) => {
       if (y < horizon) {
@@ -194,8 +194,8 @@ describe('automatic white balance estimator', () => {
       for (let index = channel; index < sky.data.length; index += 4) sum += (sky.data[index]! / 255) ** 2.2;
       return sum;
     });
-    const greyWorld = Math.log2(means[2]! / means[0]!);
-    expect(greyWorld).toBeGreaterThan(0.6);
+    const grayWorld = Math.log2(means[2]! / means[0]!);
+    expect(grayWorld).toBeGreaterThan(0.6);
     const result = poolWhiteBalance([estimate(sky)])!;
     expect(Math.abs(result.temperature)).toBeLessThan(0.15);
   });

@@ -1,5 +1,5 @@
 import type { MediaAsset } from '../shared/media.js';
-import { createColourSettings } from '../shared/colour.js';
+import { createColorSettings } from '../shared/color.js';
 import { NEUTRAL_DETAIL } from '../shared/detail.js';
 import type { LumaFrame } from '../shared/detail-estimate.js';
 import type { ProjectDocument } from '../shared/model.js';
@@ -10,7 +10,7 @@ import { analysisSize, type AnalysisFrame } from '../shared/white-balance.js';
 import type { AssistantImageBudget, ServiceConfig } from './config.js';
 import { ServiceError } from './errors.js';
 import type { JobQueue } from './jobs.js';
-import { ColourLutCache } from './layered-colour.js';
+import { ColorLutCache } from './layered-color.js';
 import { sourceOverGroup } from './layered-export.js';
 import { composeLayerFrame, fittedContent, type LayerFrameSource } from './layered-frame.js';
 import { CompositorPool } from './layered-pool.js';
@@ -100,10 +100,10 @@ function decodeArgs(proxy: string, sourceFrame: number, filter: string): string[
 export interface ComposeContext {
   assetOf: (mediaId: string) => MediaAsset;
   decode: DecodeFrame;
-  cache: ColourLutCache;
+  cache: ColorLutCache;
   signal: AbortSignal;
   pool?: CompositorPool | null;
-  /** Without any Colour or clip Detail, as the editor's Original preview: geometry, Opacity and fades remain. */
+  /** Without any Color or clip Detail, as the editor's Original preview: geometry, Opacity and fades remain. */
   ungraded?: boolean;
 }
 
@@ -129,7 +129,7 @@ export async function composeProjectFrame(
   const group = allocate(PIXELS * 8);
   const samples = sampleTimeline(document, frame, layout).map((sample) =>
     ungraded
-      ? { ...sample, grade: createColourSettings(), colour: createColourSettings(), detail: { ...NEUTRAL_DETAIL } }
+      ? { ...sample, grade: createColorSettings(), color: createColorSettings(), detail: { ...NEUTRAL_DETAIL } }
       : sample,
   );
   const slots = sampleSlots(document, frame, layout);
@@ -194,7 +194,7 @@ function scaledHeight(width: number, source: { width: number; height: number }):
 
 /** Serial still and contact-sheet rendering from verified proxies; never decodes an original. */
 export class StillRenderer {
-  readonly #cache = new ColourLutCache();
+  readonly #cache = new ColorLutCache();
   #tail: Promise<unknown> = Promise.resolve();
   #pending = 0;
   constructor(

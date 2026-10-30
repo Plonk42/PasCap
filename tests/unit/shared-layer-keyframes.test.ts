@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
-  COLOUR_CONTROLS,
-  createColourSettings,
+  COLOR_CONTROLS,
+  createColorSettings,
   gradePixel,
-  NEUTRAL_COLOUR,
-  type ColourSettings,
-  type ScalarColourSetting,
-} from '../../src/shared/colour.js';
+  NEUTRAL_COLOR,
+  type ColorSettings,
+  type ScalarColorSetting,
+} from '../../src/shared/color.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
-import { adjustmentColour, compositePixel, opacityAt } from '../../src/shared/composition.js';
+import { adjustmentColor, compositePixel, opacityAt } from '../../src/shared/composition.js';
 import {
-  adjustmentColourAt,
+  adjustmentColorAt,
   createAdjustment,
   gradeKeyAsLayerKey,
   layerKeyAsGradeKey,
@@ -69,13 +69,13 @@ function row(): VideoLayer {
   return createLayer(BASE_LAYER_ID, 'Track 1');
 }
 /** An adjustment from project frame 0, so its keyframe frames are project frames. */
-function look(keyframes: GradeKeyframe[] = [], colour: ColourSettings = createColourSettings()): Adjustment {
-  return { ...createAdjustment('look', 0, 1_000_000), colour, keyframes };
+function look(keyframes: GradeKeyframe[] = [], color: ColorSettings = createColorSettings()): Adjustment {
+  return { ...createAdjustment('look', 0, 1_000_000), color, keyframes };
 }
 function adjusted(keyframes: GradeKeyframe[] = []): ProjectDocument {
   return projectSchema.parse({ ...createProject('adjusted', 'Adjusted'), adjustments: [look(keyframes)] });
 }
-/** Its keyframes as the Colour controls read them. */
+/** Its keyframes as the Color controls read them. */
 function view(project: ProjectDocument): { keyframes: LayerKeyframe[] } {
   return { keyframes: project.adjustments[0]!.keyframes.map(gradeKeyAsLayerKey) };
 }
@@ -114,9 +114,9 @@ function overlay(
     index: 0,
   });
 }
-const colourKeys = (): GradeKeyframe[] => [grade(0, { exposure: 1 }, 'hold'), grade(100, { hue: 20 })];
+const colorKeys = (): GradeKeyframe[] => [grade(0, { exposure: 1 }, 'hold'), grade(100, { hue: 20 })];
 describe('strict current-schema keyframes and independently enabled settings', () => {
-  it('exports an ordered immutable fifteen-setting catalogue and explicit all-null template', () => {
+  it('exports an ordered immutable fifteen-setting catalog and explicit all-null template', () => {
     const settings = [
       'opacity',
       'temperature',
@@ -194,7 +194,7 @@ describe('strict current-schema keyframes and independently enabled settings', (
     const opaque = { ...key, values: { ...key.values, opacity: 0.5 }, easing: { ...key.easing, opacity: 'linear' } };
     expect(clipSchema.safeParse({ ...clip, grade: { ...clip.grade, keyframes: [key] } }).success).toBe(true);
     expect(clipSchema.safeParse({ ...clip, grade: { ...clip.grade, keyframes: [opaque] } }).success).toBe(false);
-    expect(clipSchema.safeParse({ ...clip, animation: { opacity: [], colour: [] } }).success).toBe(false);
+    expect(clipSchema.safeParse({ ...clip, animation: { opacity: [], color: [] } }).success).toBe(false);
     expect(
       speedSchema.safeParse({ mode: 'keyframes', keys: [{ frame: 0, value: 1, interpolation: 'linear' }] }).success,
     ).toBe(false);
@@ -330,10 +330,10 @@ describe('strict current-schema keyframes and independently enabled settings', (
 
   it('keeps a separate Easing per setting, defaulting a joining setting to the agreed one', () => {
     let project = adjusted();
-    const toggle = (frame: number, setting: ScalarColourSetting, value: number): void => {
+    const toggle = (frame: number, setting: ScalarColorSetting, value: number): void => {
       project = applyCommand(project, { type: 'layer-key-toggle', adjustmentId: 'look', frame, setting, value });
     };
-    const ease = (frame: number, setting: ScalarColourSetting | null, interpolation: Interpolation): void => {
+    const ease = (frame: number, setting: ScalarColorSetting | null, interpolation: Interpolation): void => {
       project = applyCommand(project, {
         type: 'layer-key-easing',
         adjustmentId: 'look',
@@ -353,7 +353,7 @@ describe('strict current-schema keyframes and independently enabled settings', (
     // Exposure holds while Contrast eases in across the same interval.
     expect(evaluateLayerSetting(item, 'exposure', 10, 0)).toBe(0);
     expect(evaluateLayerSetting(item, 'contrast', 10, 1)).toBe(1.25);
-    expect(adjustmentColourAt(item, 10)).toMatchObject({ exposure: 0, contrast: 1.25 });
+    expect(adjustmentColorAt(item, 10)).toMatchObject({ exposure: 0, contrast: 1.25 });
     // Mixed settings give a joining setting Linear; agreed settings give it theirs.
     toggle(0, 'hue', 10);
     expect(project.adjustments[0]!.keyframes[0]!.easing.hue).toBe('linear');
@@ -387,14 +387,14 @@ describe('strict current-schema keyframes and independently enabled settings', (
       highlights: -0.2,
       shadows: 0.25,
       blacks: -0.1,
-    } satisfies Partial<Record<ScalarColourSetting, number>>;
+    } satisfies Partial<Record<ScalarColorSetting, number>>;
     let toggled = adjusted();
     for (const [setting, value] of Object.entries(values))
       toggled = applyCommand(toggled, {
         type: 'layer-key-toggle',
         adjustmentId: 'look',
         frame: 30,
-        setting: setting as ScalarColourSetting,
+        setting: setting as ScalarColorSetting,
         value,
       });
     toggled = applyCommand(toggled, {
@@ -420,7 +420,7 @@ describe('strict current-schema keyframes and independently enabled settings', (
     // reset makes it a default keyframe; disabling every setting removes the keyframe.
     project = set(project, { adjustmentId: 'look', frame: 30, values: { hdr: 0 }, reset: true });
     expect(project.adjustments[0]!.keyframes[0]!.reset).toBe(true);
-    const all = Object.fromEntries(COLOUR_CONTROLS.map((setting) => [setting.key, null]));
+    const all = Object.fromEntries(COLOR_CONTROLS.map((setting) => [setting.key, null]));
     expect(set(project, { adjustmentId: 'look', frame: 30, values: all }).adjustments[0]!.keyframes).toEqual([]);
   });
 
@@ -454,7 +454,7 @@ describe('strict current-schema keyframes and independently enabled settings', (
   it('adds a default keyframe that holds defaults from its frame without reaching back', () => {
     let project = projectSchema.parse({
       ...createProject('default', 'Default keyframe'),
-      adjustments: [look([grade(10, { exposure: 1 })], { ...createColourSettings(), exposure: 0.5, contrast: 1.4 })],
+      adjustments: [look([grade(10, { exposure: 1 })], { ...createColorSettings(), exposure: 0.5, contrast: 1.4 })],
     });
     const toggle = (frame: number): void => {
       project = applyCommand(project, { type: 'layer-key-default', adjustmentId: 'look', frame });
@@ -462,7 +462,7 @@ describe('strict current-schema keyframes and independently enabled settings', (
     toggle(50);
     const reset = project.adjustments[0]!.keyframes[1]!;
     expect(reset.reset).toBe(true);
-    expect(keySettings(gradeKeyAsLayerKey(reset))).toEqual(COLOUR_CONTROLS.map((setting) => setting.key));
+    expect(keySettings(gradeKeyAsLayerKey(reset))).toEqual(COLOR_CONTROLS.map((setting) => setting.key));
     expect(new Set(Object.values(reset.easing))).toEqual(new Set(['hold']));
     expect(reset.values).toMatchObject({ exposure: 0, contrast: 1, saturation: 1, hdr: 0 });
     expect(reset.values).not.toHaveProperty('opacity');
@@ -472,8 +472,8 @@ describe('strict current-schema keyframes and independently enabled settings', (
     expect(evaluateLayerSetting(keyed, 'exposure', 30, 0.5)).toBe(0.5);
     expect(evaluateLayerSetting(keyed, 'exposure', 80, 0.5)).toBe(0);
     // Unanimated settings keep their saved values until the default keyframe.
-    expect(adjustmentColourAt(keyed, 49).contrast).toBe(1.4);
-    expect(adjustmentColourAt(keyed, 50).contrast).toBe(1);
+    expect(adjustmentColorAt(keyed, 49).contrast).toBe(1.4);
+    expect(adjustmentColorAt(keyed, 50).contrast).toBe(1);
     // It moves and loses settings like any keyframe, staying a default keyframe.
     project = applyCommand(project, { type: 'layer-key-move', adjustmentId: 'look', frame: 50, nextFrame: 60 });
     project = applyCommand(project, {
@@ -493,9 +493,9 @@ describe('strict current-schema keyframes and independently enabled settings', (
     expect(layerKeyframeSchema.safeParse(withoutKind).success).toBe(false);
   });
 
-  it('can independently toggle all fourteen Colour settings at one frame', () => {
+  it('can independently toggle all fourteen Color settings at one frame', () => {
     let project = adjusted();
-    for (const setting of COLOUR_CONTROLS)
+    for (const setting of COLOR_CONTROLS)
       project = applyCommand(project, {
         type: 'layer-key-toggle',
         adjustmentId: 'look',
@@ -505,9 +505,9 @@ describe('strict current-schema keyframes and independently enabled settings', (
       });
     expect(project.adjustments[0]!.keyframes).toHaveLength(1);
     expect(keySettings(gradeKeyAsLayerKey(project.adjustments[0]!.keyframes[0]!))).toEqual(
-      COLOUR_CONTROLS.map((setting) => setting.key),
+      COLOR_CONTROLS.map((setting) => setting.key),
     );
-    for (const setting of COLOUR_CONTROLS)
+    for (const setting of COLOR_CONTROLS)
       project = applyCommand(project, {
         type: 'layer-key-toggle',
         adjustmentId: 'look',
@@ -571,7 +571,7 @@ describe('strict current-schema keyframes and independently enabled settings', (
           type: 'layer-key-toggle',
           adjustmentId: 'look',
           frame: 10,
-          setting: setting as ScalarColourSetting,
+          setting: setting as ScalarColorSetting,
           value: 0,
         }),
       ).toThrow('Unknown keyframe setting');
@@ -657,23 +657,23 @@ describe('independent adjustment interpolation and unchanged CPU composition', (
         grade(50, { shadows: -0.4 }, 'hold'),
         grade(100, { exposure: 1, saturation: 1.5 }),
       ],
-      { ...NEUTRAL_COLOUR, brightness: 0.12, hue: 30, contrast: 1.2 },
+      { ...NEUTRAL_COLOR, brightness: 0.12, hue: 30, contrast: 1.2 },
     );
-    const middle = adjustmentColourAt(item, 50);
-    expect(middle).toEqual({ ...item.colour, exposure: 0, saturation: 1, shadows: -0.4 });
-    expect(item.colour.shadows).toBe(0);
+    const middle = adjustmentColorAt(item, 50);
+    expect(middle).toEqual({ ...item.color, exposure: 0, saturation: 1, shadows: -0.4 });
+    expect(item.color.shadows).toBe(0);
     const pixel = gradePixel([0.4, 0.3, 0.2], middle);
-    const first = gradePixel([0.4, 0.3, 0.2], adjustmentColourAt(item, 0));
-    const last = gradePixel([0.4, 0.3, 0.2], adjustmentColourAt(item, 100));
+    const first = gradePixel([0.4, 0.3, 0.2], adjustmentColorAt(item, 0));
+    const last = gradePixel([0.4, 0.3, 0.2], adjustmentColorAt(item, 100));
     expect(pixel[0]).not.toBeCloseTo((first[0] + last[0]) / 2, 5);
   });
 
-  it('overrides Transform Opacity uniformly while both dissolve sources share the adjustment colour', () => {
+  it('overrides Transform Opacity uniformly while both dissolve sources share the adjustment color', () => {
     let project = sequence([grade(0, { exposure: -1 }), grade(100, { exposure: 1 })], [100, 100]);
     project = applyCommand(project, {
-      type: 'colour',
+      type: 'color',
       adjustmentId: 'look',
-      colour: { ...NEUTRAL_COLOUR, brightness: 0.1, saturation: 1.4 },
+      color: { ...NEUTRAL_COLOR, brightness: 0.1, saturation: 1.4 },
     });
     project = applyCommand(project, {
       type: 'transform-setting',
@@ -693,13 +693,13 @@ describe('independent adjustment interpolation and unchanged CPU composition', (
     const samples = sampleTimeline(project, 90);
     expect(samples).toHaveLength(2);
     expect(samples.map((sample) => sample.sourceFrame)).toEqual([90, 10]);
-    expect(samples.map((sample) => sample.colour.exposure)).toEqual([0.8, 0.8]);
-    expect(samples.map((sample) => sample.colour.brightness)).toEqual([0.1, 0.1]);
-    expect(samples.map((sample) => sample.colour.saturation)).toEqual([1.4, 1.4]);
+    expect(samples.map((sample) => sample.color.exposure)).toEqual([0.8, 0.8]);
+    expect(samples.map((sample) => sample.color.brightness)).toEqual([0.1, 0.1]);
+    expect(samples.map((sample) => sample.color.saturation)).toEqual([1.4, 1.4]);
     expect(samples.map((sample) => sample.opacity)).toEqual([0.4, 0.4]);
-    expect(adjustmentColour(project, 90)).toEqual(samples[0]!.colour);
-    const unkeyed = look([], { ...NEUTRAL_COLOUR, exposure: 0.3 });
-    expect(adjustmentColourAt(unkeyed, 90)).toEqual(unkeyed.colour);
+    expect(adjustmentColor(project, 90)).toEqual(samples[0]!.color);
+    const unkeyed = look([], { ...NEUTRAL_COLOR, exposure: 0.3 });
+    expect(adjustmentColorAt(unkeyed, 90)).toEqual(unkeyed.color);
     const staticLayer = row();
     staticLayer.transform.base.opacity = 0.9;
     expect(opacityAt(staticLayer, 90)).toBe(0.9);
@@ -737,7 +737,7 @@ describe('independent adjustment interpolation and unchanged CPU composition', (
 
 describe('fixed clip durations through trims, splits, duplicates and fixed adjustment key times', () => {
   it('keeps primary IN start fixed while rippling downstream clips', () => {
-    const original = sequence(colourKeys());
+    const original = sequence(colorKeys());
     const keys = original.adjustments[0]!.keyframes;
     const command = trimOnTimeline(original, 'clip-0', 'in', 20, 200, 'output');
     expect(command).toEqual({ type: 'trim', clipId: 'clip-0', sourceIn: 20, sourceOut: 120 });
@@ -852,7 +852,7 @@ describe('fixed clip durations through trims, splits, duplicates and fixed adjus
     expect(split.clips[1]).not.toHaveProperty('animation');
     expect(split.adjustments[0]!.keyframes).toEqual(keys);
     expect(layout.clips[1]!.duration).toBe(11);
-    const sequenceProject = applyCommand(sequence(colourKeys()), {
+    const sequenceProject = applyCommand(sequence(colorKeys()), {
       type: 'transition',
       transition: { leftId: 'clip-0', rightId: 'clip-1', type: 'cross-dissolve', duration: 10 },
     });
@@ -880,7 +880,7 @@ describe('fixed clip durations through trims, splits, duplicates and fixed adjus
   });
 
   it('rounds split-piece durations independently without silently sliding adjustment keyframes', () => {
-    const original = applyCommand(sequence(colourKeys(), [120]), {
+    const original = applyCommand(sequence(colorKeys(), [120]), {
       type: 'speed',
       clipId: 'clip-0',
       speed: { mode: 'constant', rate: 8 },
@@ -905,7 +905,7 @@ describe('fixed clip durations through trims, splits, duplicates and fixed adjus
     expect(history.current.clips[1]).toEqual({ ...original.clips[0]!, id: 'copy', start: 69 });
     expect(history.current.adjustments).toEqual(original.adjustments);
     expect(history.undo()).toEqual(original);
-    const primary = applyCommand(sequence(colourKeys(), [120]), {
+    const primary = applyCommand(sequence(colorKeys(), [120]), {
       type: 'duplicate',
       clipId: 'clip-0',
       newClipId: 'copy',
@@ -914,7 +914,7 @@ describe('fixed clip durations through trims, splits, duplicates and fixed adjus
       [0, 120],
       [120, 120],
     ]);
-    expect(primary.adjustments[0]!.keyframes).toEqual(colourKeys());
+    expect(primary.adjustments[0]!.keyframes).toEqual(colorKeys());
   });
 
   it('keeps the clip duration through placement and hidden layers, leaving adjustment keys at fixed frames', () => {

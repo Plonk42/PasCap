@@ -53,7 +53,7 @@ test.beforeEach(async ({ page, request }) => {
   // Clips keep their own starts, so a moved selection changes nothing else.
   document.layers[0]!.ripple = false;
   const desaturated = createAdjustment('b', 50, 10);
-  desaturated.colour.saturation = 0.4;
+  desaturated.color.saturation = 0.4;
   document.adjustments = [createAdjustment('a', 10, 20), desaturated];
   document = applyCommand(document, {
     type: 'layer-key-toggle',
@@ -70,7 +70,7 @@ test.beforeEach(async ({ page, request }) => {
   await seek(page, 0);
 });
 
-test('adjustments sit on a pinned track above the video tracks; a click selects one and opens its Colour', async ({
+test('adjustments sit on a pinned track above the video tracks; a click selects one and opens its Color', async ({
   page,
 }) => {
   const lane = page.locator('.adjustment-lane');
@@ -84,8 +84,8 @@ test('adjustments sit on a pinned track above the video tracks; a click selects 
 
   await body(page, 'a').click();
   await expect(body(page, 'a')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.locator('#inspector-pane .colour-target strong')).toHaveText('Adjustment 00:00:10 – 00:01:00');
+  await expect(page.getByRole('tab', { name: 'Color', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#inspector-pane .color-target strong')).toHaveText('Adjustment 00:00:10 – 00:01:00');
   const frame = await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame);
   expect(frame).toBeGreaterThanOrEqual(10);
   expect(frame).toBeLessThan(30);
@@ -123,11 +123,11 @@ test('dragging moves or trims an adjustment in one Undo step, refusing overlaps 
   await expect(item(page, 'a')).toHaveAttribute('data-adjustment-start', '10');
   expect(await ranges(page)).toContainEqual({ id: 'a', start: 10, duration: 20 });
 
-  const cancelled = await press(page, body(page, 'a'), 5);
+  const canceled = await press(page, body(page, 'a'), 5);
   await expect(item(page, 'a')).toHaveAttribute('data-adjustment-start', '15');
   await page.keyboard.press('Escape');
   await expect(item(page, 'a')).toHaveAttribute('data-adjustment-start', '10');
-  await cancelled();
+  await canceled();
   expect(await ranges(page)).toContainEqual({ id: 'a', start: 10, duration: 20 });
 
   // Trimming the start keeps each keyframe on its project frame.
@@ -174,7 +174,7 @@ test('an adjustment keyframe slides within its adjustment', async ({ page }) => 
   await expect(page.locator('.timeline-bottom')).toContainText('Adjustment keyframe · 00:00:18');
   await release();
   await expect.poll(async () => (await current(page)).adjustments[0]!.keyframes.map((key) => key.frame)).toEqual([8]);
-  await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Color', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(body(page, 'a')).toHaveAttribute('aria-pressed', 'true');
 
   const outside = item(page, 'a').locator('[data-adjustment-keyframe="8"]');
@@ -239,7 +239,7 @@ test('drawing on the empty track creates a selected adjustment; an overlap is re
     ]);
   const created = (await current(page)).adjustments[1]!;
   await expect(body(page, created.id)).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('#inspector-pane .colour-target strong')).toHaveText('Adjustment 00:01:02 – 00:01:15');
+  await expect(page.locator('#inspector-pane .color-target strong')).toHaveText('Adjustment 00:01:02 – 00:01:15');
   await page.keyboard.press('Control+z');
   await expect.poll(() => ranges(page)).toHaveLength(2);
 
@@ -274,7 +274,7 @@ test('Add adjustment covers the ruler range or the selected clip, with the reaso
   await expect(add).toHaveAttribute('title', 'Add an adjustment over the selected range, 00:02:02 – 00:02:15');
   await add.click();
   await expect.poll(() => ranges(page)).toContainEqual(expect.objectContaining({ start: 62, duration: 13 }));
-  await expect(page.locator('#inspector-pane .colour-target strong')).toHaveText('Adjustment 00:02:02 – 00:02:15');
+  await expect(page.locator('#inspector-pane .color-target strong')).toHaveText('Adjustment 00:02:02 – 00:02:15');
 });
 
 test('Split and Delete act on the selected adjustment, each piece keeping its grade and its keyframes', async ({
@@ -323,9 +323,9 @@ async function selectTwoAndB(page: Page): Promise<void> {
   await expect(page.locator('[data-clip-id="two"]')).toHaveClass(/\bselected\b/);
 }
 
-test('Ctrl-click selects clips and adjustments together: Colour edits neither, a drag moves both', async ({ page }) => {
+test('Ctrl-click selects clips and adjustments together: Color edits neither, a drag moves both', async ({ page }) => {
   await selectTwoAndB(page);
-  await page.getByRole('tab', { name: 'Colour', exact: true }).click();
+  await page.getByRole('tab', { name: 'Color', exact: true }).click();
   await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .inspector-empty')).toHaveText(
     '1 clip and 1 adjustment are selected: select one to edit its grade. Paste grade sets the same grade on all of them.',
   );
@@ -389,7 +389,7 @@ test('Copy grade and Paste grade work between clips and adjustments from the con
   await page.getByRole('button', { name: 'Copy grade of this adjustment' }).click();
   await page.locator('[data-clip-id="one"] .timeline-clip-body').click({ button: 'right' });
   await page.getByRole('button', { name: 'Paste grade on this clip' }).click();
-  await expect.poll(async () => (await current(page)).clips[0]!.grade.colour.saturation).toBe(0.4);
+  await expect.poll(async () => (await current(page)).clips[0]!.grade.color.saturation).toBe(0.4);
 
   // Pasting on a selected item pastes on the whole selection, keyframes removed, in one Undo step.
   await selectTwoAndB(page);
@@ -398,9 +398,9 @@ test('Copy grade and Paste grade work between clips and adjustments from the con
   await page.getByRole('button', { name: 'Paste grade on 1 clip and 2 adjustments' }).click();
   await expect.poll(async () => (await current(page)).adjustments[0]!.keyframes).toEqual([]);
   const pasted = await current(page);
-  expect(pasted.clips[1]!.grade.colour.saturation).toBe(0.4);
-  expect(pasted.adjustments[0]!.colour.saturation).toBe(0.4);
+  expect(pasted.clips[1]!.grade.color.saturation).toBe(0.4);
+  expect(pasted.adjustments[0]!.color.saturation).toBe(0.4);
   await page.keyboard.press('Control+z');
   await expect.poll(async () => (await current(page)).adjustments[0]!.keyframes).toHaveLength(1);
-  expect((await current(page)).clips[1]!.grade.colour.saturation).toBe(1);
+  expect((await current(page)).clips[1]!.grade.color.saturation).toBe(1);
 });

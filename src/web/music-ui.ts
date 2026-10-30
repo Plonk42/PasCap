@@ -79,7 +79,7 @@ export function musicClipEdit(
 
 /**
  * The music clip selected after an edit: a newly added clip, else the selected one, else (when it was
- * removed) its neighbour on the same track, else the first clip.
+ * removed) its neighbor on the same track, else the first clip.
  */
 export function nextMusicSelection(
   previous: ProjectDocument | null,

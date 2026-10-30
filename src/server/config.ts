@@ -72,9 +72,9 @@ function validateMediaRoots(value: unknown): string[] {
       !path.isAbsolute(directory)
     )
       throw new Error(issue);
-    const normalised = path.resolve(directory);
-    if (roots.includes(normalised)) throw new Error(issue);
-    roots.push(normalised);
+    const normalized = path.resolve(directory);
+    if (roots.includes(normalized)) throw new Error(issue);
+    roots.push(normalized);
   }
   return roots;
 }

@@ -394,7 +394,7 @@ test('each row has its own boundary button and Sequence edits target only the se
       .evaluate((element) => Number.parseFloat((element as HTMLElement).style.top));
     expect(buttonTop - laneTop).toBe(9);
     await boundary.click();
-    // Boundary controls sit above the seam, but the trim handle's centre
+    // Boundary controls sit above the seam, but the trim handle's center
     // must still be a real pointer target rather than covered by the button.
     for (const [clipId, edge] of [
       [`left-${index}`, 'out'],

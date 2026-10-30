@@ -827,7 +827,7 @@ function SourceRangeEditor({
     }
     const initial = active.edge === 'in' ? active.base.sourceIn : active.base.sourceOut;
     const boundary = initial + Math.round(((clientX - active.startX) * count) / active.width);
-    // A handle stops one frame from the neighbouring kept ranges instead of failing on release.
+    // A handle stops one frame from the neighboring kept ranges instead of failing on release.
     const limited = active.edge === 'in' ? Math.max(bounds.minIn, boundary) : Math.min(bounds.maxOut, boundary);
     active.candidate = moveMediaSelectionEdge(active.base, active.edge, limited, count);
     setDraft(active.candidate);

@@ -1,6 +1,6 @@
 import { Children, isValidElement, type ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
+import { COLOR_CONTROLS } from '../../src/shared/color.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
@@ -84,30 +84,30 @@ describe('locally drafted native value controls', () => {
 
   it.each(['Escape', 'pointercancel', 'lostpointercapture', 'window blur'])('%s restores without an edit', () => {
     const moved = change(begin().state, 4).state;
-    const cancelled = transitionValueControl(moved, { type: 'cancel' });
-    expect(cancelled.commit).toBeNull();
-    expect(cancelled.state.draft).toBe(1);
-    expect(cancelled.state.error).toBeNull();
-    expect(change(cancelled.state, 5).state).toBe(cancelled.state);
-    const released = finish(cancelled.state);
+    const canceled = transitionValueControl(moved, { type: 'cancel' });
+    expect(canceled.commit).toBeNull();
+    expect(canceled.state.draft).toBe(1);
+    expect(canceled.state.error).toBeNull();
+    expect(change(canceled.state, 5).state).toBe(canceled.state);
+    const released = finish(canceled.state);
     expect(released.commit).toBeNull();
     expect(released.state).toEqual(createValueControlState(context()));
     expect(change(released.state, 2).commit).toBe(2);
   });
 
-  it('permits a fresh gesture after a cancelled pointer never delivers its release', () => {
-    const cancelled = transitionValueControl(change(begin().state, 4).state, { type: 'cancel' }).state;
-    const captured = transitionValueControl(cancelled, { type: 'begin', pointerId: 9 });
+  it('permits a fresh gesture after a canceled pointer never delivers its release', () => {
+    const canceled = transitionValueControl(change(begin().state, 4).state, { type: 'cancel' }).state;
+    const captured = transitionValueControl(canceled, { type: 'begin', pointerId: 9 });
     const moved = change(captured.state, 2);
     expect(moved.commit).toBeNull();
     expect(transitionValueControl(moved.state, { type: 'finish', pointerId: 9 }).commit).toBe(2);
   });
 
   it('permits precise entry after cancellation while suppressing the obsolete native gesture', () => {
-    const cancelled = transitionValueControl(change(begin().state, 4).state, { type: 'cancel' }).state;
-    const exact = transitionValueControl(cancelled, { type: 'exact', value: 1.23456789 });
+    const canceled = transitionValueControl(change(begin().state, 4).state, { type: 'cancel' }).state;
+    const exact = transitionValueControl(canceled, { type: 'exact', value: 1.23456789 });
     expect(exact.commit).toBe(1.23456789);
-    expect(exact.state.pointer).toEqual({ id: 7, cancelled: true });
+    expect(exact.state.pointer).toEqual({ id: 7, canceled: true });
     const synced = syncValueControlState(exact.state, context({ value: 1.23456789 }));
     expect(change(synced, 5).state).toBe(synced);
     expect(finish(synced).commit).toBeNull();
@@ -183,7 +183,7 @@ describe('locally drafted native value controls', () => {
     const synced = syncValueControlState(moved, nextContext);
     expect(synced.draft).toBe(nextContext.value);
     expect(synced.error).toBeNull();
-    expect(synced.pointer).toEqual({ id: 7, cancelled: true });
+    expect(synced.pointer).toEqual({ id: 7, canceled: true });
     expect(change(synced, 4).commit).toBeNull();
     expect(finish(synced).commit).toBeNull();
     expect(finish(synced).state).toEqual(createValueControlState(nextContext));
@@ -205,7 +205,7 @@ describe('locally drafted native value controls', () => {
 
 describe('shared exact values and contextual validation', () => {
   it.each(KEYFRAME_SETTINGS)(
-    'preserves $label bounds and exact decimal precision without step quantisation',
+    'preserves $label bounds and exact decimal precision without step quantization',
     (setting) => {
       const constraints = { min: setting.min, max: setting.max };
       for (const value of [setting.min, setting.max])
@@ -276,9 +276,9 @@ describe('shared exact values and contextual validation', () => {
       const moved = change(begin(initial).state, 35, props.validate);
       expect(moved.commit).toBeNull();
       expect(moved.state.draft).toBe(35);
-      const cancelled = transitionValueControl(moved.state, { type: 'cancel' });
-      expect(cancelled.state.draft).toBe(75);
-      expect(finish(cancelled.state, props.validate).commit).toBeNull();
+      const canceled = transitionValueControl(moved.state, { type: 'cancel' });
+      expect(canceled.state.draft).toBe(75);
+      expect(finish(canceled.state, props.validate).commit).toBeNull();
       expect(onCommit).not.toHaveBeenCalled();
       const released = finish(change(begin(initial).state, 35, props.validate).state, props.validate);
       expect(released.commit).toBe(35);
@@ -289,8 +289,8 @@ describe('shared exact values and contextual validation', () => {
     },
   );
 
-  it('uses all nine colour bounds and gains from −60 to 12 dB', () => {
-    for (const setting of COLOUR_CONTROLS)
+  it('uses all nine color bounds and gains from −60 to 12 dB', () => {
+    for (const setting of COLOR_CONTROLS)
       expect(KEYFRAME_SETTINGS.find((item) => item.key === setting.key)).toMatchObject({
         min: setting.min,
         max: setting.max,
@@ -390,7 +390,7 @@ describe('shared exact values and contextual validation', () => {
   it('updates only an existing clip grade keyframe setting when its slider release emits a command', () => {
     const project = createProject('grade', 'Grade');
     const clip = createClip('clip', 'source', 0, 120);
-    clip.grade.colour.exposure = 0.75;
+    clip.grade.color.exposure = 0.75;
     clip.grade.keyframes = [layerKeyAsGradeKey(layerKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.25 }, 'smooth'))];
     project.clips = [clip];
     const released = finish(
@@ -406,7 +406,7 @@ describe('shared exact values and contextual validation', () => {
       setting: 'exposure',
       value: released.commit!,
     });
-    expect(next.clips[0]!.grade.colour.exposure).toBe(0.75);
+    expect(next.clips[0]!.grade.color.exposure).toBe(0.75);
     expect(next.clips[0]!.grade.keyframes).toEqual([
       { ...clip.grade.keyframes[0], values: { ...clip.grade.keyframes[0]!.values, exposure: 0.137123456789 } },
     ]);

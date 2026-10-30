@@ -231,16 +231,16 @@ test('retryable autosave failures keep the draft and require an explicit retry w
   await page.evaluate(() => window.pascapLab!.flush());
   await expect(page.getByRole('button', { name: 'Retry save' })).toBeVisible();
   expect(writes).toBe(1);
-  expect(saved.clips[0]?.grade.colour.exposure).toBe(0);
+  expect(saved.clips[0]?.grade.color.exposure).toBe(0);
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.4');
   await page.evaluate(() => window.pascapLab!.flush());
   expect(writes).toBe(1);
-  expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.grade.colour.exposure)).toBe(0.6);
+  expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.grade.color.exposure)).toBe(0.6);
   failure = 0;
   await page.getByRole('button', { name: 'Retry save' }).click();
   await expect(page.getByRole('status', { name: 'Saved on this device' })).toContainText('Saved locally');
   expect(writes).toBe(2);
-  expect(saved.clips[0]?.grade.colour).toMatchObject({ exposure: 0.6, saturation: 1.4 });
+  expect(saved.clips[0]?.grade.color).toMatchObject({ exposure: 0.6, saturation: 1.4 });
   expect(saved.revision).toBe(1);
 });
 
@@ -260,7 +260,7 @@ test('conflicts never overwrite or auto-rebase: download and confirmed reload pr
   await expect(page.getByRole('dialog', { name: 'Recover an unsaved project' })).toBeVisible();
   await page.getByRole('button', { name: 'Keep editing this draft' }).click();
   expect(writes).toBe(1);
-  expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.grade.colour.exposure)).toBe(0.4);
+  expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.grade.color.exposure)).toBe(0.4);
   await page.getByRole('button', { name: 'Review latest save' }).click();
   await page.getByRole('button', { name: 'Discard local changes and reload' }).click();
   await expect(page.getByRole('textbox', { name: 'Project title', exact: true })).toHaveValue('Other tab save');
@@ -353,7 +353,7 @@ test('denied browser preference storage does not prevent opening/editing a proje
   await closeOptions(page);
   await inspectorTab(page, 'Clip grade');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.3');
-  expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.grade.colour.exposure)).toBe(0.3);
+  expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.grade.color.exposure)).toBe(0.3);
   await collapsePanel(page, 'Properties').click();
   await expect(page.getByRole('status').filter({ hasText: 'Layout changed for this session' })).toBeVisible();
 });

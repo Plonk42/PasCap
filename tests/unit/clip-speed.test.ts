@@ -172,15 +172,15 @@ describe('precise bounded curve integration and immutable shared maps', () => {
 });
 
 describe('presets, exact key edits and existing timeline operations', () => {
-  it('offers Ramp up/down as two-key smooth presets at the excerpt edges, in catalogue order', () => {
+  it('offers Ramp up/down as two-key smooth presets at the excerpt edges, in catalog order', () => {
     expect(CLIP_SPEED_PRESETS.map(({ id }) => id)).toEqual([
       'flat',
       'ramp-up',
       'ramp-down',
       'accelerate',
       'decelerate',
-      'slow-centre',
-      'fast-centre',
+      'slow-center',
+      'fast-center',
     ]);
     expect(clipSpeedPreset({ sourceIn: 30, sourceOut: 90 }, 'ramp-up')).toEqual(
       curve(key(30, 0.5, 'smooth'), key(90, 2, 'smooth')),
@@ -188,7 +188,7 @@ describe('presets, exact key edits and existing timeline operations', () => {
     expect(clipSpeedPreset({ sourceIn: 30, sourceOut: 90 }, 'ramp-down')).toEqual(
       curve(key(30, 2, 'smooth'), key(90, 0.5, 'smooth')),
     );
-    expect(clipSpeedPreset({ sourceIn: 10, sourceOut: 17 }, 'slow-centre').keyframes.map(({ frame }) => frame)).toEqual(
+    expect(clipSpeedPreset({ sourceIn: 10, sourceOut: 17 }, 'slow-center').keyframes.map(({ frame }) => frame)).toEqual(
       [10, 12, 14, 15, 17],
     );
   });

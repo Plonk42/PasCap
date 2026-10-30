@@ -12,7 +12,7 @@ import type { GpuComparison, GpuCompositionComparison } from '../preview/composi
 import type { OriginalMode, PreviewDiagnostics, PreviewEngine } from '../preview/engine.js';
 import type { AudioAsset } from '../shared/audio.js';
 import type { Brief } from '../shared/assistant-session.js';
-import type { ColourSettings } from '../shared/colour.js';
+import type { ColorSettings } from '../shared/color.js';
 import { applyCommand, EditHistory, type EditCommand } from '../shared/commands.js';
 import type { ExportProfile } from '../shared/export.js';
 import { needsLayeredExport } from '../shared/export.js';
@@ -100,7 +100,7 @@ import {
 interface EditorDebug {
   engine: PreviewEngine;
   project: () => ProjectDocument | null;
-  verifyColour: (settings: ColourSettings) => GpuComparison;
+  verifyColor: (settings: ColorSettings) => GpuComparison;
   verifyComposition: () => GpuCompositionComparison;
   /** The pixels automatic analyses read from a recording's proxy, keyed by source frame. */
   sampleFrames: (mediaId: string, frames: readonly number[]) => Promise<Map<number, AnalysisFrame>>;
@@ -123,7 +123,7 @@ const HandOffDialog = lazy(() => import('./HandOff.js').then((module) => ({ defa
 /** The Properties tab holding each section a timeline marker or boundary opens. */
 const INSPECTOR_TABS: Record<InspectorSectionTarget, InspectorMode> = {
   speed: 'clip',
-  colour: 'colour',
+  color: 'color',
   transform: 'track',
   transition: 'track',
 };
@@ -143,7 +143,7 @@ function timingKey(project: ProjectDocument): string {
   return JSON.stringify({
     id: project.id,
     frameRate: project.frameRate,
-    colourProfile: project.colourProfile,
+    colorProfile: project.colorProfile,
     layers: project.layers
       .filter((layer) => project.clips.some((clip) => clip.layerId === layer.id))
       .map((layer) => ({
@@ -304,7 +304,7 @@ export function App() {
   const playAfterSeek = useRef(false);
   const [inspectorMode, setInspectorMode] = useState<InspectorMode>(() => {
     const saved = readPreference('pascap-inspector-tab');
-    return saved === 'colour' || saved === 'track' || saved === 'audio' ? saved : 'clip';
+    return saved === 'color' || saved === 'track' || saved === 'audio' ? saved : 'clip';
   });
   useEffect(() => {
     writePreference('pascap-inspector-tab', inspectorMode);
@@ -1031,7 +1031,7 @@ export function App() {
         window.pascapLab = {
           engine: preview,
           project: () => current.current,
-          verifyColour: module.verifyGpuColour,
+          verifyColor: module.verifyGpuColor,
           verifyComposition: module.verifyLayerComposition,
           sampleFrames: (mediaId, frames) =>
             module.sampleProxyFrames(proxyUrl(mediaId), frames, new AbortController().signal),
@@ -1059,7 +1059,7 @@ export function App() {
   useEffect(() => {
     const controller = new AbortController();
     setConnection({ state: 'connecting', message: 'Connecting to the local service…' });
-    const initialise = async (): Promise<void> => {
+    const initialize = async (): Promise<void> => {
       await waitForService(controller.signal, (attempt, max) => {
         if (!controller.signal.aborted)
           setConnection({
@@ -1096,7 +1096,7 @@ export function App() {
       }
       setConnection({ state: 'ready', message: 'Connected to the local service' });
     };
-    void initialise().catch((cause: unknown) => {
+    void initialize().catch((cause: unknown) => {
       if (!controller.signal.aborted)
         setConnection({
           state: 'error',
@@ -1134,7 +1134,7 @@ export function App() {
         setError(message(cause, 'Cannot update the preview appearance. Retry preview without changing your project.'));
       }
       if (draft && draft.frame !== engine.current.diagnostics().frame) {
-        // An appearance-only draft (e.g. a sliding Colour keyframe) still previews its own frame.
+        // An appearance-only draft (e.g. a sliding Color keyframe) still previews its own frame.
         void engine.current
           .seek(draft.frame)
           .catch((cause: unknown) => setError(message(cause, 'Cannot preview this draft.')));
@@ -1372,7 +1372,7 @@ export function App() {
       clipGroup.set([]);
       setBoundaryId(null);
       setViewerMode('timeline');
-      openInspectorSection('colour');
+      openInspectorSection('color');
     },
     [clipGroup.set, adjustmentGroup.set, openInspectorSection],
   );
@@ -2242,7 +2242,7 @@ export function App() {
                 {(Diagnostics) => (
                   <Diagnostics
                     diagnostics={diagnostics}
-                    colour={visible.clips.find((clip) => clip.id === selectedId)?.grade.colour ?? null}
+                    color={visible.clips.find((clip) => clip.id === selectedId)?.grade.color ?? null}
                     canRenderReference={
                       !needsLayeredExport(visible) &&
                       visible.clips.length === 2 &&

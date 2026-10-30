@@ -1,18 +1,18 @@
 import { Readable, Writable } from 'node:stream';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as files from '../../src/server/files.js';
-import { ColourLutCache, sampleColourLut } from '../../src/server/layered-colour.js';
+import { ColorLutCache, sampleColorLut } from '../../src/server/layered-color.js';
 import { renderLayeredExport } from '../../src/server/layered-export.js';
 import { composeLayerFrame, fittedContent, type LayerFrameSource } from '../../src/server/layered-frame.js';
 import { RawFrameReader, RawVideoPass } from '../../src/server/raw-process.js';
 import * as retime from '../../src/server/retime-process.js';
 import {
-  createColourSettings,
+  createColorSettings,
   gradePixel,
-  NEUTRAL_COLOUR,
-  type ColourSettings,
+  NEUTRAL_COLOR,
+  type ColorSettings,
   type RGB,
-} from '../../src/shared/colour.js';
+} from '../../src/shared/color.js';
 import { LAYERED_EXPORT_RESOURCES, planLayeredExport } from '../../src/shared/export.js';
 import { createAdjustment } from '../../src/shared/grade.js';
 import { mediaAssetSchema } from '../../src/shared/media.js';
@@ -33,7 +33,7 @@ vi.mock('node:fs/promises', async (importOriginal) => ({
 afterEach(() => vi.restoreAllMocks());
 
 const signal = (): AbortSignal => new AbortController().signal;
-const mild: ColourSettings = { ...NEUTRAL_COLOUR, exposure: 0.2, blacks: 0.08, whites: -0.06 };
+const mild: ColorSettings = { ...NEUTRAL_COLOR, exposure: 0.2, blacks: 0.08, whites: -0.06 };
 
 function sample(pose: Partial<SpatialPose> = {}, overrides: Partial<PreviewLayer> = {}): PreviewLayer {
   return {
@@ -44,8 +44,8 @@ function sample(pose: Partial<SpatialPose> = {}, overrides: Partial<PreviewLayer
     sourcePosition: 7.5,
     spatial: { ...NEUTRAL_SPATIAL_POSE, ...pose },
     detail: { ...NEUTRAL_DETAIL },
-    grade: createColourSettings(),
-    colour: { ...NEUTRAL_COLOUR },
+    grade: createColorSettings(),
+    color: { ...NEUTRAL_COLOR },
     weight: 1,
     blendWeight: 1,
     brightness: 1,
@@ -116,17 +116,17 @@ function referenceRgb(
 }
 
 describe('native spatial sampling without transformed frame storage', () => {
-  it.each([NEUTRAL_COLOUR, mild])(
+  it.each([NEUTRAL_COLOR, mild])(
     'preserves the neutral legacy byte-index path, including opaque ungraded letterbox',
-    async (colour) => {
+    async (color) => {
       const target = { width: 8, height: 6 };
       const source = patternedSource(
         target,
         { width: 13, height: 7 },
-        sample({}, { colour, opacity: 0.65, brightness: 0.4 }),
+        sample({}, { color, opacity: 0.65, brightness: 0.4 }),
       );
-      const cache = new ColourLutCache();
-      const lut = await cache.get(colour, signal());
+      const cache = new ColorLutCache();
+      const lut = await cache.get(color, signal());
       const buffer = Buffer.alloc(target.width * target.height * 8);
       const expected = Buffer.alloc(buffer.length);
       rgba(buffer).fill(12345);
@@ -139,13 +139,7 @@ describe('native spatial sampling without transformed frame storage', () => {
           const pixel = y * target.width + x;
           graded.fill(0);
           if (x >= bounds.x && x < bounds.x + bounds.width && y >= bounds.y && y < bounds.y + bounds.height)
-            sampleColourLut(
-              lut,
-              source.rgb[pixel * 3]!,
-              source.rgb[pixel * 3 + 1]!,
-              source.rgb[pixel * 3 + 2]!,
-              graded,
-            );
+            sampleColorLut(lut, source.rgb[pixel * 3]!, source.rgb[pixel * 3 + 1]!, source.rgb[pixel * 3 + 2]!, graded);
           for (let channel = 0; channel < 3; channel++)
             output[pixel * 4 + channel] = Math.round(graded[channel]! * 0.65 * 0.4 * 65535 + 12345 * 0.35);
           output[pixel * 4 + 3] = Math.round(0.65 * 65535 + 12345 * 0.35);
@@ -187,7 +181,7 @@ describe('native spatial sampling without transformed frame storage', () => {
     const source = patternedSource(target, { width: 13, height: 7 }, sample(pose));
     const before = { sample: structuredClone(source.sample), rgb: Buffer.from(source.rgb) };
     const buffer = Buffer.alloc(target.width * target.height * 8);
-    await composeLayerFrame(buffer, target, [source], new ColourLutCache(), signal());
+    await composeLayerFrame(buffer, target, [source], new ColorLutCache(), signal());
     const output = rgba(buffer);
     let covered = 0;
     for (let y = 0; y < target.height; y++) {
@@ -213,7 +207,7 @@ describe('native spatial sampling without transformed frame storage', () => {
     const source = patternedSource(target, original, sample({ scale: 1.37, translateY: 0.07 }));
     const wrongAspect = { ...source, original: { width: source.bounds.width, height: source.bounds.height } };
     const output = Buffer.alloc(8 * 6 * 8);
-    await composeLayerFrame(output, target, [source], new ColourLutCache(), signal());
+    await composeLayerFrame(output, target, [source], new ColorLutCache(), signal());
     let differences = 0;
     for (let y = 0; y < 6; y++) {
       for (let x = 0; x < 8; x++) {
@@ -233,7 +227,7 @@ describe('native spatial sampling without transformed frame storage', () => {
     for (let y = edge.bounds.y; y < edge.bounds.y + edge.bounds.height; y++)
       for (let x = edge.bounds.x; x < edge.bounds.x + edge.bounds.width; x++)
         edge.rgb.fill(60, (y * 8 + x) * 3, (y * 8 + x) * 3 + 3);
-    await composeLayerFrame(output.fill(0), target, [edge], new ColourLutCache(), signal());
+    await composeLayerFrame(output.fill(0), target, [edge], new ColorLutCache(), signal());
     for (let pixel = 0; pixel < 48; pixel++) {
       const offset = pixel * 4;
       const covered = rgba(output)[offset + 3] !== 0;
@@ -245,7 +239,7 @@ describe('native spatial sampling without transformed frame storage', () => {
     const target = { width: 8, height: 6 };
     const source = patternedSource(target, { width: 13, height: 7 }, sample({ translateX: Number.EPSILON }));
     const output = Buffer.alloc(48 * 8);
-    await composeLayerFrame(output, target, [source], new ColourLutCache(), signal());
+    await composeLayerFrame(output, target, [source], new ColorLutCache(), signal());
     expect([...rgba(output).subarray(0, 4)]).toEqual([0, 0, 0, 0]);
   });
 
@@ -266,7 +260,7 @@ describe('native spatial sampling without transformed frame storage', () => {
     );
     const output = Buffer.alloc(48 * 8);
     rgba(output).fill(20000);
-    await composeLayerFrame(output, target, [neutral, transformed], new ColourLutCache(), signal());
+    await composeLayerFrame(output, target, [neutral, transformed], new ColorLutCache(), signal());
     expect([...rgba(output).subarray(0, 4)]).toEqual([16000, 16000, 16000, Math.round(0.2 * 65535 + 16000)]);
   });
 
@@ -275,7 +269,7 @@ describe('native spatial sampling without transformed frame storage', () => {
     const source = patternedSource(target, target, sample({ scale: 1.37, translateX: 0.07 }));
     source.rgb.fill(255);
     const output = Buffer.alloc(48 * 8);
-    const cache = new ColourLutCache();
+    const cache = new ColorLutCache();
     await composeLayerFrame(output, target, [source], cache, signal());
     expect([...rgba(output)]).toEqual(Array<number>(48 * 4).fill(65535));
     const before = Buffer.from(output);
@@ -293,7 +287,7 @@ describe('native spatial sampling without transformed frame storage', () => {
         { cropRight: 0.25 },
         {
           clipId: 'left',
-          colour: mild,
+          color: mild,
           opacity: 0.6,
           blendWeight: 0.4,
           brightness: 0.2,
@@ -307,14 +301,14 @@ describe('native spatial sampling without transformed frame storage', () => {
         { cropLeft: 0.5 },
         {
           clipId: 'right',
-          colour: { ...NEUTRAL_COLOUR, exposure: -1 },
+          color: { ...NEUTRAL_COLOR, exposure: -1 },
           opacity: 0.6,
           blendWeight: 0.6,
           brightness: 0,
         },
       ),
     );
-    const cache = new ColourLutCache();
+    const cache = new ColorLutCache();
     const lut = await cache.get(mild, signal());
     const graded = new Float64Array(3);
     const buffer = Buffer.alloc(16 * 8);
@@ -325,7 +319,7 @@ describe('native spatial sampling without transformed frame storage', () => {
       const leftMask = column < 3 ? 1 : 0;
       const rightMask = column >= 2 ? 1 : 0;
       const alpha = 0.6 * (0.4 * leftMask + 0.6 * rightMask);
-      sampleColourLut(lut, left.rgb[pixel * 3]!, left.rgb[pixel * 3 + 1]!, left.rgb[pixel * 3 + 2]!, graded);
+      sampleColorLut(lut, left.rgb[pixel * 3]!, left.rgb[pixel * 3 + 1]!, left.rgb[pixel * 3 + 2]!, graded);
       for (let channel = 0; channel < 3; channel++)
         expect(rgba(buffer)[pixel * 4 + channel]).toBe(
           Math.round(graded[channel]! * 0.6 * 0.4 * 0.2 * leftMask * 65535 + 20000 * (1 - alpha)),
@@ -369,14 +363,14 @@ describe('native spatial sampling without transformed frame storage', () => {
   it('reuses the accumulator, preserves lower pixels outside coverage and responds at the existing pixel-batch yield', async () => {
     const target = { width: 256, height: 512 };
     const source = patternedSource(target, target, sample({ cropLeft: 0.25 }));
-    const cache = new ColourLutCache();
-    await cache.get(source.sample.colour, signal());
+    const cache = new ColorLutCache();
+    await cache.get(source.sample.color, signal());
     const buffer = Buffer.alloc(target.width * target.height * 8);
     rgba(buffer).fill(10000);
     const controller = new AbortController();
     const pending = composeLayerFrame(buffer, target, [source], cache, controller.signal);
     setImmediate(() => controller.abort());
-    await expect(pending).rejects.toThrow('cancelled');
+    await expect(pending).rejects.toThrow('canceled');
     expect(rgba(buffer)[(100 * 256 + 100) * 4 + 3]).toBe(65535);
     expect(rgba(buffer)[(400 * 256 + 100) * 4 + 3]).toBe(10000);
     const backing = buffer.buffer;
@@ -387,7 +381,7 @@ describe('native spatial sampling without transformed frame storage', () => {
     const before = Buffer.from(buffer);
     const aborted = new AbortController();
     aborted.abort();
-    await expect(composeLayerFrame(buffer, target, [source], cache, aborted.signal)).rejects.toThrow('cancelled');
+    await expect(composeLayerFrame(buffer, target, [source], cache, aborted.signal)).rejects.toThrow('canceled');
     expect(buffer).toEqual(before);
   });
 
@@ -400,7 +394,7 @@ describe('native spatial sampling without transformed frame storage', () => {
           Buffer.alloc(128),
           target,
           [{ ...source, original: { width, height: 4 } }],
-          new ColourLutCache(),
+          new ColorLutCache(),
           signal(),
         ),
       ).rejects.toThrow('dimensions');
@@ -409,7 +403,7 @@ describe('native spatial sampling without transformed frame storage', () => {
         Buffer.alloc(128),
         target,
         [{ ...source, bounds: { x: 3, y: 0, width: 2, height: 4 } }],
-        new ColourLutCache(),
+        new ColorLutCache(),
         signal(),
       ),
     ).rejects.toThrow('content rectangle');
@@ -418,7 +412,7 @@ describe('native spatial sampling without transformed frame storage', () => {
 
 describe('fractional tetrahedral grade after RGB interpolation', () => {
   it('keeps fractions and endpoints without rounding, across all six tetrahedral orderings', async () => {
-    const lut = await new ColourLutCache().get(NEUTRAL_COLOUR, signal());
+    const lut = await new ColorLutCache().get(NEUTRAL_COLOR, signal());
     const out = new Float64Array(3);
     for (const rgb of [
       [100.1, 100.2, 100.3],
@@ -430,14 +424,14 @@ describe('fractional tetrahedral grade after RGB interpolation', () => {
       [0, 255, 0.00001],
       [254.99999, 0, 255],
     ]) {
-      sampleColourLut(lut, rgb[0]!, rgb[1]!, rgb[2]!, out);
+      sampleColorLut(lut, rgb[0]!, rgb[1]!, rgb[2]!, out);
       for (let channel = 0; channel < 3; channel++) expect(out[channel]).toBeCloseTo(rgb[channel]! / 255, 7);
     }
     for (const invalid of [NaN, Infinity, -Infinity, -0.00001, 255.00001])
       for (const channel of [0, 1, 2]) {
         const rgb = [10.1, 20.2, 30.3];
         rgb[channel] = invalid;
-        expect(() => sampleColourLut(lut, rgb[0]!, rgb[1]!, rgb[2]!, out)).toThrow('finite RGB');
+        expect(() => sampleColorLut(lut, rgb[0]!, rgb[1]!, rgb[2]!, out)).toThrow('finite RGB');
       }
   });
 
@@ -446,10 +440,10 @@ describe('fractional tetrahedral grade after RGB interpolation', () => {
     const source = patternedSource(
       target,
       { width: 13, height: 7 },
-      sample({ scale: 1.37, rotation: 13, translateX: 0.09 }, { colour: mild }),
+      sample({ scale: 1.37, rotation: 13, translateX: 0.09 }, { color: mild }),
     );
     const buffer = Buffer.alloc(target.width * target.height * 8);
-    await composeLayerFrame(buffer, target, [source], new ColourLutCache(), signal());
+    await composeLayerFrame(buffer, target, [source], new ColorLutCache(), signal());
     let error = 0;
     let channels = 0;
     for (let y = 0; y < target.height; y++)
@@ -468,14 +462,14 @@ describe('fractional tetrahedral grade after RGB interpolation', () => {
 
   it('grades the interpolated RGB, not an interpolation of already graded taps', async () => {
     const target = { width: 4, height: 2 };
-    const colour = { ...NEUTRAL_COLOUR, contrast: 2, brightness: 0.4 };
-    const source = patternedSource(target, target, sample({ translateX: 0.125 }, { colour }));
+    const color = { ...NEUTRAL_COLOR, contrast: 2, brightness: 0.4 };
+    const source = patternedSource(target, target, sample({ translateX: 0.125 }, { color }));
     for (let pixel = 0; pixel < 8; pixel++) source.rgb.fill(pixel % 2 ? 255 : 0, pixel * 3, pixel * 3 + 3);
     const output = Buffer.alloc(8 * 8);
-    await composeLayerFrame(output, target, [source], new ColourLutCache(), signal());
-    const expected = gradePixel([0.5, 0.5, 0.5], colour);
-    const black = gradePixel([0, 0, 0], colour);
-    const white = gradePixel([1, 1, 1], colour);
+    await composeLayerFrame(output, target, [source], new ColorLutCache(), signal());
+    const expected = gradePixel([0.5, 0.5, 0.5], color);
+    const black = gradePixel([0, 0, 0], color);
+    const white = gradePixel([1, 1, 1], color);
     for (let channel = 0; channel < 3; channel++) {
       expect(Math.abs(rgba(output)[4 + channel]! - Math.round(expected[channel]! * 65535))).toBeLessThanOrEqual(1);
       expect(Math.abs(expected[channel]! - (black[channel]! + white[channel]!) / 2)).toBeGreaterThan(0.1);
@@ -505,10 +499,10 @@ describe('layered renderer metadata and continuous retiming ownership with memor
         frameRate: PROJECT_FPS,
         frameCount: 20,
         durationSeconds: framesToSeconds(20),
-        colourRange: 'tv',
-        colourSpace: 'bt709',
-        colourPrimaries: 'bt709',
-        colourTransfer: 'bt709',
+        colorRange: 'tv',
+        colorSpace: 'bt709',
+        colorPrimaries: 'bt709',
+        colorTransfer: 'bt709',
         hasAudio: false,
       },
       status: 'registered',
@@ -591,7 +585,7 @@ describe('layered renderer metadata and continuous retiming ownership with memor
     const placed = timeline.calculateLayout(fixture.document).clips[0]!;
     expect([0, 1, 2, 3].map((frame) => placed.retiming.sourcePositionAt(frame))).toEqual([7, 7.5, 8, 8.5]);
     const expected = Buffer.alloc(48 * 8);
-    await composeLayerFrame(expected, fixture.target, [fixture.source], new ColourLutCache(), signal());
+    await composeLayerFrame(expected, fixture.target, [fixture.source], new ColorLutCache(), signal());
     for (const frame of fixture.frames) expect(frame).toEqual(expected);
     expect(fixture.document).toEqual(before);
   });
@@ -615,7 +609,7 @@ describe('layered renderer metadata and continuous retiming ownership with memor
     expect(first.spatial).not.toEqual(held.spatial);
     expect(fixture.frames[0]).not.toEqual(fixture.frames[1]);
     const expected = Buffer.alloc(48 * 8);
-    const cache = new ColourLutCache();
+    const cache = new ColorLutCache();
     for (let frame = 0; frame < 4; frame++) {
       const current = timeline.sampleTimeline(fixture.document, frame, layout)[0]!;
       await composeLayerFrame(
@@ -647,14 +641,14 @@ describe('layered renderer metadata and continuous retiming ownership with memor
     const detailed = await progressAtFirstComposedFrame((document) => {
       document.clips[0]!.detail.sharpen = 0.3;
       const look = createAdjustment('look', 0, timeline.calculateLayout(document).duration);
-      look.colour.hdr = 0.27;
+      look.color.hdr = 0.27;
       document.adjustments = [look];
     });
     expect(detailed).toBeCloseTo(0.04 + (0.78 * (4 + 20.2)) / (4 + 4 * 20.2), 12);
     // The same HDR on the clip's own grade costs the same.
     const graded = await progressAtFirstComposedFrame((document) => {
       document.clips[0]!.detail.sharpen = 0.3;
-      document.clips[0]!.grade.colour.hdr = 0.27;
+      document.clips[0]!.grade.color.hdr = 0.27;
     });
     expect(graded).toBeCloseTo(detailed, 12);
   });

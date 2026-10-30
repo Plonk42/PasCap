@@ -1,5 +1,5 @@
 import { setImmediate as yieldToEvents } from 'node:timers/promises';
-import { colourSchema, type ColourSettings, type PixelGrade } from '../shared/colour.js';
+import { colorSchema, type ColorSettings, type PixelGrade } from '../shared/color.js';
 import { compileGradeChain, gradesPixels } from '../shared/grade.js';
 import { LAYERED_EXPORT_RESOURCES } from '../shared/export.js';
 import { forEachSerial } from '../shared/serial.js';
@@ -19,7 +19,7 @@ for (let value = 0; value < 256; value++) {
 }
 
 export function checkLayeredCancellation(signal: AbortSignal): void {
-  if (signal.aborted) throw new ServiceError('Job cancelled.', 499);
+  if (signal.aborted) throw new ServiceError('Job canceled.', 499);
 }
 
 function* blueSlices(count: number): Generator<number> {
@@ -27,7 +27,7 @@ function* blueSlices(count: number): Generator<number> {
 }
 
 /** Fill whole blue slices [blueStart, blueEnd); red is the fastest-moving coordinate. */
-export function fillColourLut(buffer: Float32Array, grade: PixelGrade, blueStart: number, blueEnd: number): void {
+export function fillColorLut(buffer: Float32Array, grade: PixelGrade, blueStart: number, blueEnd: number): void {
   const rgb = new Float64Array(3);
   let offset = blueStart * BLUE_STEP;
   for (let blue = blueStart; blue < blueEnd; blue++) {
@@ -50,7 +50,7 @@ export function fillColourLut(buffer: Float32Array, grade: PixelGrade, blueStart
  * parameter values. Tetrahedral approximation, not bitwise CPU/shader parity.
  * No endpoint-grade blending, FFmpeg eq approximation, or per-frame .cube files.
  */
-export class ColourLutCache {
+export class ColorLutCache {
   readonly #entries = new Map<string, Float32Array>();
   readonly #buffers: Float32Array[] = [];
   #building = false;
@@ -67,7 +67,7 @@ export class ColourLutCache {
   }
   /** One grade, or grades applied one after another (a clip's, then its adjustment's). */
   async get(
-    settings: ColourSettings | readonly ColourSettings[],
+    settings: ColorSettings | readonly ColorSettings[],
     signal: AbortSignal,
     pool: CompositorPool | null = null,
   ): Promise<Float32Array> {
@@ -76,7 +76,7 @@ export class ColourLutCache {
       throw new Error('LUT generation is sequential; concurrent requests would invalidate borrowed LUTs.');
     // Stages that change no pixel share the identity LUT, however they were listed.
     const value = (Array.isArray(settings) ? settings : [settings])
-      .map((stage) => colourSchema.parse(stage))
+      .map((stage) => colorSchema.parse(stage))
       .filter(gradesPixels);
     const key = JSON.stringify(value);
     const cached = this.#entries.get(key);
@@ -104,7 +104,7 @@ export class ColourLutCache {
         const grade = compileGradeChain(value);
         // Cancellation remains responsive while building a changing grade.
         await forEachSerial(blueSlices(SIZE), async (blue) => {
-          fillColourLut(buffer, grade, blue, blue + 1);
+          fillColorLut(buffer, grade, blue, blue + 1);
           await yieldToEvents();
           checkLayeredCancellation(signal);
         });
@@ -131,7 +131,7 @@ function lutFraction(value: number, low: number): number {
 }
 
 /** Four vertices in the enclosing tetrahedron; destination is a tiny reusable triple. */
-export function sampleColourLut(
+export function sampleColorLut(
   lut: Float32Array,
   red: number,
   green: number,

@@ -13,7 +13,7 @@ inherit the shared media registry. Importing the same original into another proj
 deliberately adds it to that project's bin and reuses eligible verified proxies.
 Removing a clip or music track does not remove the imported recording.
 
-Projects use **a strict current format**. Every clip has its own **grade** (complete Colour with
+Projects use **a strict current format**. Every clip has its own **grade** (complete Color with
 Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves, plus keyframes
 at source frames of its recording); the project has a required `adjustments` array of up to 1,024
 **adjustments**, each a grade of every video track over a range of the timeline; every video
@@ -24,11 +24,11 @@ Grade keyframes have fourteen nullable channels, in control order:
 `temperature`, `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`,
 `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`, `localContrast`. Clip speed is constant or a 1–256-keyframe custom curve,
 and every clip requires a boolean `reverse`.
-Missing fields and saved clip colour, correction or opacity are invalid, not ignored or defaulted.
+Missing fields and saved clip color, correction or opacity are invalid, not ignored or defaulted.
 Projects saved by this or a later PasCap version keep opening: an update that
 changes the project format upgrades a project when it opens and, on its first save,
 keeps the original file beside it (`<id>.json.schema-N.bak`). Projects and receipt snapshots
-saved before the current schema use track Colour, which PasCap replaced with clip grades
+saved before the current schema use track Color, which PasCap replaced with clip grades
 and adjustments: they are refused with that reason and left unchanged on disk, with no upgrade,
 repair or deletion. A project saved by a newer PasCap version
 is refused until you update. Export receipts
@@ -37,7 +37,7 @@ Finished videos remain
 untouched. **Delete project** requires confirmation and deletes only the saved
 project document, not originals, the shared registry/proxy cache or exports/receipts.
 Proxy and current PCM cache formats are unchanged; the video and music registries are
-version 2 (`videos.json`, `music.json`, with full-content checksums), so recordings
+`videos.json` version 3 and `music.json` version 2, with full-content checksums, so recordings
 from older registries must be imported again.
 
 ### Project files
@@ -86,7 +86,7 @@ data separately.
    ready assets and queued/running work are reused rather than encoded twice.
 4. A complete import closes the dialog. Otherwise its report lists what was not
    imported or queued, and those recordings stay selected: accepted registrations are
-   kept. Check Media/Activity before repeating an uncertain request. Failed, cancelled
+   kept. Check Media/Activity before repeating an uncertain request. Failed, canceled
    or interrupted preparation needs explicit **Prepare**; **Prepare selected**
    confirms a manual multi-recording batch.
 5. To take a recording out of this project, use its trash button (or the trash on
@@ -108,8 +108,8 @@ of ready Media into Timeline is supported.
 
 MP4/MOV/M4V extensions are not a guarantee of compatibility. Current source checks
 require one unrotated video stream, constant **30000/1001 fps**, unambiguous zero-start
-timestamps/frame counts, 8-bit `yuv420p`, and explicit SDR BT.709 colour/range tags.
-HDR, untagged colour and ambiguous timing are rejected, not silently normalised.
+timestamps/frame counts, 8-bit `yuv420p`, and explicit SDR BT.709 color/range tags.
+HDR, untagged color and ambiguous timing are rejected, not silently normalized.
 See [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ### Damaged recordings
@@ -188,7 +188,7 @@ movement (drag it); the green bands mark steady ranges, the suggested one strong
 Stretches where the camera does not move at all, such as a hover, are left out.
 Hover to read the values at that moment; click or drag to scrub. Below the IN/OUT
 fields, **Camera motion** gives the **Best steady range**, what it shows, its length and IN–OUT, and **Use best**
-sets IN and OUT to it. The best one favours an orbit (the picture turns, or slides sideways while the
+sets IN and OUT to it. The best one favors an orbit (the picture turns, or slides sideways while the
 drone flies) or a reveal (a climb or a pull out), then other camera moves, then an approach (only
 pushing in) and nearly still footage, each counting its length up to 10 s.
 **Use all N** keeps every steady range instead, in recording order and in one
@@ -197,7 +197,7 @@ Move **Allowed movement** left for only very steady footage,
 right to accept more movement. **Flight data** adds or removes lanes: flight and
 vertical speed, height, distance from home, ISO, shutter speed, exposure bias and digital
 zoom, for example to spot a climb or an exposure jump. The chevron hides the lanes and
-controls, keeping the suggestion. Recordings prepared earlier offer **Analyse camera
+controls, keeping the suggestion. Recordings prepared earlier offer **Analyze camera
 motion** to measure them once. Straight-ahead speed changes barely move the picture: the
 flight speed lane shows them, so check the start of forward flights yourself.
 
@@ -259,7 +259,7 @@ original exclusive OUT. Source review keeps its independent numeric IN/OUT pair 
   it. While a range is selected, Play
   replays only that range, stopping on its last frame; the start/end buttons and
   **Home/End** go to the range's first and last frame.
-  Ripple-on cuts close the gap on that track; off keeps the removed gap and fixed neighbours.
+  Ripple-on cuts close the gap on that track; off keeps the removed gap and fixed neighbors.
 - **Duplicate** (right-click the clip) or **Ctrl+D** makes an independent clip. Timeline
   Delete removes a clip, not its original or project-bin membership.
 
@@ -295,11 +295,11 @@ are saved with the project but never rendered or exported. Details:
 [bookmarks](TIMELINE_EDITING.md#bookmarks).
 
 To cut on the music, turn on **Snap to beats** (metronome icon beside **Snap**): every
-snapping gesture then also lands on the analysed beats of the music clips, wherever they
+snapping gesture then also lands on the analyzed beats of the music clips, wherever they
 are placed, and the ruler shows those beats as ticks. Its arrow chooses **Beats**,
 **Downbeats only**, **Hits** (the strong hits: a kick, a snare or a crash that stands out,
-also in music without a steady beat) or **Beats and hits**. Analysed music clips also show
-their hits as marks coloured by band (low, mid, high; strong ones taller), sections (quiet,
+also in music without a steady beat) or **Beats and hits**. Analyzed music clips also show
+their hits as marks colored by band (low, mid, high; strong ones taller), sections (quiet,
 build, peak, release), swells, silences and a low/mid/high tone strip; hover one for a
 readout, or open **Audio → Music structure** for a list with the key and the strong hits.
 Details: [snap to beats](TIMELINE_EDITING.md#snap-to-beats) and
@@ -327,26 +327,26 @@ stored but dormant on empty tracks. A closing fade ends at its last video clip's
 OUT, not a later music OUT; after all video ends the picture is black, never a
 frozen last image. Details: [TIMELINE_EDITING.md](TIMELINE_EDITING.md).
 
-## Colour, speed and keyframes
+## Color, speed and keyframes
 
 Each clip has independent constant or custom-curve speed; speed
 is clip-only, never a track setting.
-Colour is graded twice: by the clip's own **grade**, then by the **adjustment** covering that
+Color is graded twice: by the clip's own **grade**, then by the **adjustment** covering that
 moment of the film, if any, which grades every video track there (see
 [Grade a clip or a stretch of the film](#grade-a-clip-or-a-stretch-of-the-film)). Video tracks have
-no Colour: Transform, including **Opacity**, belongs to the video track
+no Color: Transform, including **Opacity**, belongs to the video track
 ([Crop, scale, translate and rotate a track](#crop-scale-translate-and-rotate-a-track)).
-The **Colour** tab groups its sliders
+The **Color** tab groups its sliders
 under small headings, each with a **Reset** icon that resets the group's editable settings in
-one Undo step: **Colour** (Temperature, Tint, Hue, Saturation, Vibrance); **Light**
+one Undo step: **Color** (Temperature, Tint, Hue, Saturation, Vibrance); **Light**
 (Exposure, Brightness, Contrast, Highlights, Shadows, Whites, Blacks); **Effects** (HDR, Local contrast).
-**Vibrance** saturates muted colours more than strong ones: raise it to bring out a hazy
-sky or dull foliage without making faces or bright colours garish; lower it to mute the
-weakest colours first.
+**Vibrance** saturates muted colors more than strong ones: raise it to bring out a hazy
+sky or dull foliage without making faces or bright colors garish; lower it to mute the
+weakest colors first.
 **Shadows** and **Highlights** work on areas, like Lightroom's: raise Shadows to open up
 a shaded slope or a backlit subject, lower Highlights to bring back a bright sky. Each
 area is brightened or darkened as a whole according to its overall brightness, so dark
-texture in a sunlit field and the contrast inside the lifted area are kept, and mid-grey
+texture in a sunlit field and the contrast inside the lifted area are kept, and mid-gray
 never moves. They choose tones after Exposure. Nonzero or keyed Shadows or Highlights
 make export use the slower composited path. Details:
 [local Shadows and Highlights](design/DETAIL_FILTERS.md#local-shadows-and-highlights).
@@ -369,11 +369,11 @@ and incompatible fades/transitions/overlaps reject the edit rather than being sh
 
 ### Grade a clip or a stretch of the film
 
-The **Colour** Properties tab edits the grade of what you select on the timeline. Its pinned
+The **Color** Properties tab edits the grade of what you select on the timeline. Its pinned
 header names it.
 
 - A selected **clip**: its own **grade**. The header names the clip and its place, such as
-  **Clip 2 of 3 · Track 1 · this clip only**. A small palette icon (the Colour tab's) before a clip's
+  **Clip 2 of 3 · Track 1 · this clip only**. A small palette icon (the Color tab's) before a clip's
   name on the timeline shows that it has a grade of its own.
 - A selected **adjustment**: one grade of every video track over a stretch of the film, after
   each clip's own grade. The header names it by its range, such as **Adjustment 01:12:05 –
@@ -396,7 +396,7 @@ moves it, and it never makes the project longer. Its keyframes count from its st
 **Adjustment keyframes** list shows **Frame in adjustment**). Adjustments sit on the adjustment
 track, pinned under the time ruler: drag across an empty stretch to draw one, or use **+** in its
 header to cover the selected ruler range or clip (adjustments never overlap, and at most 1,024 exist;
-otherwise **+** is unavailable and says why); click one to edit it in the Colour tab, drag it
+otherwise **+** is unavailable and says why); click one to edit it in the Color tab, drag it
 to move it with its keyframes (amber ◆ markers inside it), drag its edges to trim it, press **S** to
 split it at the playhead and Delete to remove it. When a clip is selected, the adjustment grading it
 at the playhead has a dashed ring. Ctrl-click (Cmd-click) selects clips and adjustments together, to
@@ -410,18 +410,18 @@ everything selected.
 
 ### Animation controls
 
-Colour, Speed and Transform always show their capture diamonds while the section is expanded, Colour and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown.
+Color, Speed and Transform always show their capture diamonds while the section is expanded, Color and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown.
 
-Colour and Transform capture buttons have adjacent per-setting **Previous/Next** buttons
+Color and Transform capture buttons have adjacent per-setting **Previous/Next** buttons
 because not every setting is enabled at every keyframe; Speed has a single setting, so its
-keyframe line's pair is enough. Each section's keyframe line counts the keyframes its single **Previous/Next** pair visits. Colour visits any scalar
-colour, HDR or Local contrast keyframe of the clip grade or adjustment it edits. Speed visits **all retained custom
+keyframe line's pair is enough. Each section's keyframe line counts the keyframes its single **Previous/Next** pair visits. Color visits any scalar
+color, HDR or Local contrast keyframe of the clip grade or adjustment it edits. Speed visits **all retained custom
 speed source keyframes of the selected clip**, including off-trim keyframes and the
 original exclusive OUT, previewing the nearest mapped image.
 Speed keeps a clip-local stored-source selection, so several stored keyframes can be visited
 even when they preview the same first/last image. Transform visits all the track's Transform keyframes,
 including those after the duration, with its own track-local selection. Enabled setting chips
-in stored Colour keyframe rows retain their per-channel arrows too. All main and stored
+in stored Color keyframe rows retain their per-channel arrows too. All main and stored
 per-channel arrows visit only strictly earlier/later keyframes where that setting is nonnull,
 including zero: the main arrows from the playhead, a chip's from its own row. Main capture always
 uses the real displayed project/source frame, not a stored keyframe's time.
@@ -432,15 +432,15 @@ and interpolation remain unchanged.
 
 ### Temperature and Tint
 
-In the **Colour** tab, **Temperature** and **Tint** open the Colour group, for a clip grade or an
+In the **Color** tab, **Temperature** and **Tint** open the Color group, for a clip grade or an
 adjustment alike. They use
 normalized **−2…2** and **−1…1**, neutral **0**, not Kelvin.
 Positive Temperature warms, negative cools; positive Tint adds magenta, negative
-adds green. Nonzero settings intentionally colour greys. The common gain formula
+adds green. Nonzero settings intentionally color grays. The common gain formula
 runs in linear RGB before Exposure; it preserves neutral-white linear luminance
-before clipping only, not final brightness or arbitrary coloured pixels.
+before clipping only, not final brightness or arbitrary colored pixels.
 
-**Auto white balance**, under Tint in a clip's grade, removes a colour cast at the playhead: it
+**Auto white balance**, under Tint in a clip's grade, removes a color cast at the playhead: it
 measures the light in sixteen frames around it (up to a second each side, within the clip) and
 keyframes the grade's Temperature and Tint at the image shown there, exactly as their diamonds
 would, in one Undo step. Where the light changes during a flight, run it again further
@@ -450,36 +450,36 @@ barely count. Rerun at a keyframe, it replaces only these two values. It needs t
 the clip and its recording prepared; Escape cancels it.
 
 Sliders, exact fields and the **Reset** icon beside each setting's name (or double-click the name) reset it to 0 and use the same main/stored
-control rules as other scalar Colour settings. Main diamonds come with adjacent per-setting Previous/Next buttons; the keyframe line visits
-every Colour keyframe, while main and stored-setting chip arrows visit individual
+control rules as other scalar Color settings. Main diamonds come with adjacent per-setting Previous/Next buttons; the keyframe line visits
+every Color keyframe, while main and stored-setting chip arrows visit individual
 channels. Without keyframes, the sliders edit the grade's own values. With
 keyframes, capture explicitly at the playhead before editing a setting that is not enabled there.
 Removing the final keyed setting reveals the unchanged saved value. Slider
 movement stays local until release; valid edits make one Undo step, invalid or
-cancelled edits apply nothing. Numeric entry retains its precision.
+canceled edits apply nothing. Numeric entry retains its precision.
 
-The **HSL ranges** and **Colour curves** sections, below Colour in the Colour tab, belong to the
+The **HSL ranges** and **Color curves** sections, below Color in the Color tab, belong to the
 same clip grade or adjustment, but remain
-static, with no animation diamonds. Pick a range or curve channel with its coloured
-square; Colour curves shows all four curves together, editing only the selected one.
-Colour curves pass smoothly through their control
-nodes without overshooting them. They follow scalar grading, so HSL's grey
-protection does not undo Temperature/Tint colouring. The Original preview bypasses
-all these Colour stages, retaining Opacity and geometry. Exact processing:
+static, with no animation diamonds. Pick a range or curve channel with its colored
+square; Color curves shows all four curves together, editing only the selected one.
+Color curves pass smoothly through their control
+nodes without overshooting them. They follow scalar grading, so HSL's gray
+protection does not undo Temperature/Tint coloring. The Original preview bypasses
+all these Color stages, retaining Opacity and geometry. Exact processing:
 [Temperature/Tint](design/TEMPERATURE_AND_TINT.md) and
 [HSL/curves](design/HSL_AND_CURVES.md).
 
 ### Auto adjust
 
-**Auto**, at the end of the Colour keyframe line of a clip's grade, suggests a balanced
+**Auto**, at the end of the Color keyframe line of a clip's grade, suggests a balanced
 correction for the clip: it balances white, exposure, contrast, black and white points and
-colour, restoring footage shot flat, and opens dark shadow areas with Shadows. It raises
-colour with Saturation and Vibrance, which lifts muted colours more than strong ones; where
-strong colours such as a blue sky fill much of the frame, it relies on Vibrance so they stay
-close to how they were. It lowers only very colourful footage, with Saturation.
-First choose its **Source**, what it analyses: **Playhead** (the second around it, with the
+color, restoring footage shot flat, and opens dark shadow areas with Shadows. It raises
+color with Saturation and Vibrance, which lifts muted colors more than strong ones; where
+strong colors such as a blue sky fill much of the frame, it relies on Vibrance so they stay
+close to how they were. It lowers only very colorful footage, with Saturation.
+First choose its **Source**, what it analyzes: **Playhead** (the second around it, with the
 playhead on the clip), **This clip** (16 frames spread over the whole clip) or **Every clip on** the track (each clip
-analysed on its own, so each gets its own correction; Apply then reads **Apply to N clips**).
+analyzed on its own, so each gets its own correction; Apply then reads **Apply to N clips**).
 Keyframes always go to the selected clip only, at the playhead. Then choose how to **Apply as**:
 
 - **Grade values** sets Temperature, Tint, Saturation, Vibrance, Exposure, Brightness,
@@ -501,25 +501,25 @@ or reorder clips. Adjustments have no Auto: set their sliders yourself. See
 
 ### HDR
 
-**HDR**, in the Effects group of the **Colour** tab, opens shadows and recovers highlights
+**HDR**, in the Effects group of the **Color** tab, opens shadows and recovers highlights
 over large areas, like a tone-mapped look, while keeping local detail as it is; **0** is off
 and **1** is the strongest.
-It is an SDR effect, not HDR output, and can be keyframed like the other Colour
+It is an SDR effect, not HDR output, and can be keyframed like the other Color
 settings. Nonzero or keyed HDR makes export use the slower composited path.
 The Original preview bypasses it. Details: [detail filters](design/DETAIL_FILTERS.md#hdr-look).
 
-**Local contrast**, just below HDR, raises or lowers the contrast between neighbouring
+**Local contrast**, just below HDR, raises or lowers the contrast between neighboring
 areas and their surroundings, without changing their overall brightness; flat areas never
 move. Together with HDR it gives the classic tone-mapped look. **0** is off, **+1** the strongest and
 **−1** flattens each area towards its surroundings. It can be keyframed like the other
-Colour settings; nonzero or keyed Local contrast makes export use the slower composited
+Color settings; nonzero or keyed Local contrast makes export use the slower composited
 path, and the Original preview bypasses it. Details:
 [local contrast](design/DETAIL_FILTERS.md#local-contrast).
 
 ### Show the original image
 
 The **Timeline preview** heading has a native **Original** button, accessible as
-**Show original preview**. The preview shows the image without Colour and Detail
+**Show original preview**. The preview shows the image without Color and Detail
 (with an **Original** badge) only while you hold it: press and hold the pointer, or
 hold Enter/Space on the focused button, while paused or playing. Hold **Shift** as you
 press it to bypass only clip grades (and Detail), or **Alt** for only adjustments;
@@ -529,7 +529,7 @@ graded preview. There is no global shortcut. **Source preview** is unchanged.
 
 Original means the **composed timeline preview without grading**, not the untouched
 recording, an original-resolution view or an isolated selected clip. It neutralizes all evaluated
-colour settings across enabled video tracks, including clip grades, adjustments
+color settings across enabled video tracks, including clip grades, adjustments
 and both dissolve sources, and every clip's Sharpen, Clarity and Denoise. Exact observed source frames, retiming, track Opacity,
 spatial geometry/coverage (Transform), visibility, black fades, stacking and music remain unchanged.
 
@@ -553,8 +553,8 @@ Speed keyframes belong only to the selected clip, not to every clip in its video
 - In constant mode the **Speed ×** slider/field edits the rate. In curve mode it is
   read-only (dimmed, **Add a keyframe ◇ to edit**) unless a keyframe exists at the
   displayed source frame; it then edits that keyframe's rate. Sliders never create keyframes.
-- Curve presets **Flat / Ramp up / Ramp down / Accelerate / Decelerate / Slow centre /
-  Fast centre** replace this clip's keyframes. Ramp up and Ramp down place two
+- Curve presets **Flat / Ramp up / Ramp down / Accelerate / Decelerate / Slow center /
+  Fast center** replace this clip's keyframes. Ramp up and Ramp down place two
   keyframes at source IN and OUT: 0.5×→2× and 2×→0.5×.
 - Drag graph keyframes horizontally for original source time and vertically for speed. The graph
   has a logarithmic 0.1×–8× axis; the vertical line is the displayed source frame.
@@ -600,14 +600,14 @@ Details: [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md#reverse).
 Select a video track (or one of its clips) and open **Track → Transform** (collapsed
 initially, the first Track section). Transform belongs to the whole track, applies to every
 clip on it (both sources of a dissolve too) and works on an empty track; its controls work like
-the Colour section's. Its nine
+the Color section's. Its nine
 controls are **Crop left / Crop right / Crop top / Crop bottom / Scale / Translate X /
 Translate Y / Rotation ° / Opacity**, each with a native slider and exact number field.
 Scale preserves aspect and accepts **0.1–8**. Translation accepts **−2–2** as
 fractions of the whole output width/height, not source pixels. Rotation is
-clockwise, **−180°–180°**, around each image's centre. Crop fractions each
+clockwise, **−180°–180°**, around each image's center. Crop fractions each
 stay within 0–1; a crop of 1, or opposite crops that meet or cross, display nothing. Cropping never refits or
-recentres the retained image. Uncovered pixels from nonneutral transforms reveal
+recenters the retained image. Uncovered pixels from nonneutral transforms reveal
 lower tracks; exact neutral geometry retains the old opaque black letterbox, whatever the
 Opacity. **Opacity** reads **0–100%**, neutral **100%** (saved as 0–1), and its slider runs
 from a checkerboard to solid: lower it to reveal the tracks below. It is coverage, not part of
@@ -626,10 +626,10 @@ any grade, and black fades never reduce it.
   numerically, not by shortest arc: +170° to −170° passes through 0°.
 - **Add default Transform keyframe** in the keyframe line adds a default keyframe at the
   playhead (neutral pose with Opacity 100%, Hold), or removes the one there, exactly like the
-  Colour default keyframe: it returns the pose to neutral from its frame without changing
+  Color default keyframe: it returns the pose to neutral from its frame without changing
   earlier frames.
 - At the end of the section, below the nine settings, a **Keyframes** list shows one row per
-  Transform keyframe, exactly like Colour's list: click anywhere on a row (or its timecode) to
+  Transform keyframe, exactly like Color's list: click anywhere on a row (or its timecode) to
   seek the nearest available frame; **Default** and **Outside duration** badges where they
   apply, a trash and its enabled settings, each with Previous/Next arrows. The keyframe
   line's **Previous/Next** pair and the rows reach all keyframes, including those after the
@@ -640,7 +640,7 @@ any grade, and black fades never reduce it.
   **Easing** sets every setting of the keyframe at once; when they should differ, choose
   **Per setting** and pick each one. Differing settings read **Mixed** and keep their
   per-setting choices visible. A setting added to a keyframe takes the Easing its other
-  settings share, or Linear. The same applies to clip grade and adjustment keyframes in Colour's
+  settings share, or Linear. The same applies to clip grade and adjustment keyframes in Color's
   keyframe list.
 - Numeric Enter/blur applies exact values; Escape restores. Collisions,
   fractional frames and out-of-bounds values stay
@@ -648,7 +648,7 @@ any grade, and black fades never reduce it.
   capture loss or window blur cancels a slider drag without saving; keyboard adjustments
   are individual validated edits.
 - A row's trash removes that whole keyframe. Removing a setting's last
-  keyframe reveals its unchanged base. **Reset transform** works like Colour's Reset:
+  keyframe reveals its unchanged base. **Reset transform** works like Color's Reset:
   without keyframes it restores the neutral base (Opacity 100%); with keyframes it resets the
   enabled settings of the keyframe at the playhead, in one Undo step.
 
@@ -664,7 +664,7 @@ Details: [spatial transforms](design/SPATIAL_TRANSFORMS.md).
 
 Select a clip and open **Clip → Detail** (collapsed initially, after Speed).
 **Sharpen** (0–2) crisps fine edges without bright or dark outlines, **Clarity** (−1–1) adds midtone local contrast without halos along strong edges
-or, below zero, softens it, and **Denoise** (0–1) smooths grain, and colour blotches more
+or, below zero, softens it, and **Denoise** (0–1) smooths grain, and color blotches more
 strongly, while keeping strong
 edges. Each has a native slider and an exact field; 0 leaves the clip untouched.
 Dragging a slider previews the result live in the image; releasing commits one Undo
@@ -675,15 +675,15 @@ follow it to another track and are copied by Split, Cut range and Duplicate.
 The filters work on the recording before the clip's grade, scaled to the image
 height, so the 720p preview shows what both export profiles produce: a 4K export sharpens
 what the preview sharpens, not grain finer than the preview can show. **Original**
-hides them together with Colour. Any detail setting renders through the composited
+hides them together with Color. Any detail setting renders through the composited
 exporter and makes it slower, especially in 4K. Details:
 [detail filters](design/DETAIL_FILTERS.md).
 
 ### Seek keyframes from the timeline
 
 Inside each clip rectangle, a clip grade's keyframes are amber **◆** markers on the footage the
-clip shows (keyframes on trimmed-off footage stay in the Colour list only). Click or focus one and
-press Enter/Space to select its clip, seek that image and open the **Colour** tab on **Clip**.
+clip shows (keyframes on trimmed-off footage stay in the Color list only). Click or focus one and
+press Enter/Space to select its clip, seek that image and open the **Color** tab on **Clip**.
 Drag it, or press ←/→ on it (Shift for ten), to move the keyframe with all its settings to
 another source frame; a valid release is one Undo step, Escape or an occupied frame restores it,
 and Delete removes it.
@@ -703,14 +703,14 @@ selects the track, seeks and opens **Track → Transform**; drag or ←/→ (Shi
 one project frame, one Undo step per release. Adjustments sit on the pinned adjustment track
 under the ruler, with their keyframes as amber markers inside them.
 
-### Animate Colour with keyframes
+### Animate Color with keyframes
 
-The stored **Keyframes** list at the end of the **Colour** section belongs to the clip grade or
+The stored **Keyframes** list at the end of the **Color** section belongs to the clip grade or
 adjustment the tab edits: **Clip keyframes** count in source frames of the recording,
 **Adjustment keyframes** from the adjustment's start. It shows one row per keyframe with its
-enabled-setting chips; Colour's keyframe line counts and visits the same keyframes. **Animation
+enabled-setting chips; Color's keyframe line counts and visits the same keyframes. **Animation
 help** beside its heading combines animation and keyframe-timing guidance. Fourteen settings can
-be keyed independently: the twelve scalar colour controls, including
+be keyed independently: the twelve scalar color controls, including
 Temperature, Tint, Vibrance, Whites and Blacks, HDR (`hdr`) and Local contrast (`localContrast`).
 HSL/curves remain static, Speed is clip-only and Opacity is keyed in **Track → Transform**. At
 most 64 keyframes are allowed per clip grade or adjustment.
@@ -730,20 +730,20 @@ most 64 keyframes are allowed per clip grade or adjustment.
   that interval. A single keyframe therefore overrides that channel across the whole clip or
   adjustment.
 - To return to the default look at a frame, press **Add default keyframe** (the amber
-  diamond with a return arrow) in Colour's keyframe line. Every Colour setting
+  diamond with a return arrow) in Color's keyframe line. Every Color setting
   returns to its default there and holds until its next keyframe; earlier frames keep their
   values. Change its Easing to blend out of it instead of holding, or press the button again
   at that frame to remove it. On a clip, its timeline marker is filled amber.
-- The per-channel native **Previous/Next** arrows beside main diamonds and on enabled setting chips in stored Colour keyframe rows visit only that
+- The per-channel native **Previous/Next** arrows beside main diamonds and on enabled setting chips in stored Color keyframe rows visit only that
   channel's strictly earlier/later keyframes where it is nonnull, including zero-valued
-  ones. They are disabled without a neighbour/project or during a document draft.
+  ones. They are disabled without a neighbor/project or during a document draft.
   Navigation keeps the chosen Properties tab and the activated button's focus; it
   does not save or create Undo history.
 
 ### Move and edit keyframes
 
 A clip grade keyframe moves with its clip; drag its amber marker, or use the **Edit** disclosure
-on its row of Colour's keyframe list, to change its source frame. An adjustment keyframe moves
+on its row of Color's keyframe list, to change its source frame. An adjustment keyframe moves
 with its adjustment; its row's **Frame in adjustment** field changes its place, counted from the
 adjustment's start. Transform keyframes move by dragging their blue markers: all enabled
 settings, values and easing move together, and a valid release is one Undo step. With Snap on,
@@ -782,7 +782,7 @@ Trim, cut, move, split, duplicate and ripple **never copy or shift Transform key
 adjustments**; clip grade keyframes stay on their footage.
 
 Current animation semantics: [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
-Grading equations: [COLOUR_AND_TIMING.md](COLOUR_AND_TIMING.md#colour).
+Grading equations: [COLOR_AND_TIMING.md](COLOR_AND_TIMING.md#color).
 Retiming: [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md).
 
 ## Add music and export
@@ -816,12 +816,12 @@ start/duration and **Loop selected source range**. Without looping, duration mus
 source range; looping repeats only it. Between clips, **Transitions** choose a **Cut**, a
 **Crossfade** (the clips overlap, one fading out while the other fades in), a **Fade through silence** or a **Fade through silence with pause** (a **Fade** length, then a silent **Pause** before the next clip starts), with its length; the boundary button on the timeline opens it.
 Independent drafts never apply to another clip or track.
-Each accepted edit or completed gesture is one Undo step; invalid/cancelled edits
+Each accepted edit or completed gesture is one Undo step; invalid/canceled edits
 are atomic and never silently clamp timing, save a draft or change other tracks.
 
 Overlapping music sums linearly after each clip's gain/fades, with **one hard
 clamp to −1–1 after the complete sum**, not per track. There is no loudness
-normalisation, ducking, effect or video-speed retiming of music. Preview uses one
+normalization, ducking, effect or video-speed retiming of music. Preview uses one
 AudioContext/worklet/output clock and one bounded mixed PCM queue, not full-file
 buffers or per-track clocks/queues. Selected-range loops continue without a
 music restart; genuine video buffering or audio read/processor failures stay explicit.
@@ -854,7 +854,7 @@ control characters). It never chooses a folder or overwrites a file: each export
 keeps its own output directory. Activity exposes progress, a rough
 time remaining for a running export ("about 5 min left", shown once enough progress has
 been observed, never a guarantee), cancellation and verified MP4/receipt links.
-**Cancelling…** is pending until
+**Canceling…** is pending until
 confirmed; a failed status read keeps known jobs and never resubmits the export.
 Successful outputs survive later failures/restarts; interrupted exports are not
 resumed or published as finished. Long 4K/composited renders can need substantial
@@ -876,7 +876,7 @@ anything. Before editing, the assistant starts a session on the project: PasCap 
 checkpoint of the project as it was, and only the assistant can save it until it finishes or
 you take the project back. You can also start it yourself with **Hand off** in the header:
 write what you want, optionally pick the music track, length, allowed camera movement and
-number of clips, and check what the assistant can use (prepare or analyse missing
+number of clips, and check what the assistant can use (prepare or analyze missing
 recordings there). Meanwhile a banner says **An assistant is editing this project** and
 the editor follows its changes without letting you edit, moving the preview to what it just
 changed; **Take over** ends the session and
@@ -889,8 +889,8 @@ assistant adds stay inside the ranges you kept in Source preview.
 ## Workspace and keyboard
 
 Use **Clip** for the selected clip's **Speed**, **Detail**, **Range** and **Placement**;
-**Colour** for the grade of the selected clip or adjustment (Colour, HSL ranges,
-Colour curves and their keyframes); **Track** for what the whole video track owns (Transform
+**Color** for the grade of the selected clip or adjustment (Color, HSL ranges,
+Color curves and their keyframes); **Track** for what the whole video track owns (Transform
 with Opacity, transitions and fades); and **Audio** for music. Each tab names its scope at the top.
 Selecting a clip or a populated/empty video track preserves the chosen tab and updates
 its context safely. Switching tabs hides rather than unmounts content, retaining
@@ -901,19 +901,19 @@ Explicit boundary buttons open Track with that boundary expanded.
 Viewer and Properties tabs share one native-button appearance and retain their
 arrow/Home/End navigation.
 Trash icons delete; × closes or dismisses. Icon-only actions keep accessible names
-and tooltips. See the [editor control catalogue](design/EDITOR_CONTROLS.md#vocabulary) for
+and tooltips. See the [editor control catalog](design/EDITOR_CONTROLS.md#vocabulary) for
 control conventions and vocabulary.
 
 **Expand all / Collapse all** is an icon button on the Properties panel tab bar for the
-visible tab: Clip's **Speed**, **Detail**, **Range** and **Placement**; Colour's
-**Colour**, **HSL ranges** and **Colour curves**; Track's **Transform**, **Transitions** and
+visible tab: Clip's **Speed**, **Detail**, **Range** and **Placement**; Color's
+**Color**, **HSL ranges** and **Color curves**; Track's **Transform**, **Transitions** and
 **Fades**; Audio's **Music**. Other
 tabs, nested disclosures and help remain unchanged.
 
 The header directly exposes keyboard help. **Workspace options** holds Reset layout
 and Diagnostics. Media and the Properties panel collapse to the side with the panel icon at
 the right of their heading (**Collapse Media panel** / **Collapse Properties panel**),
-leaving a slim labelled strip that expands them again.
+leaving a slim labeled strip that expands them again.
 Panels are bordered tiles separated by 6 px gutters, including below the header and above the Activity bar, that are also the resize dividers.
 Drag panel dividers or use focused arrows; double-click/Home resets a divider and
 Escape cancels its drag. PasCap is designed for browser windows of at least
@@ -921,9 +921,9 @@ Escape cancels its drag. PasCap is designed for browser windows of at least
 Layout/section preferences do not change rendering. Numbers/titles apply on
 Enter/blur, Escape restores, and invalid text remains editable. Numeric values retain
 full entered precision, independent of slider steps, without clamping or rounding.
-Colour, Opacity/Transform, playback rates and gain use a native slider with one adjacent exact
+Color, Opacity/Transform, playback rates and gain use a native slider with one adjacent exact
 numeric field in both main and stored controls, not read-only outputs or number-only
-layouts. Dragging a Colour, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Properties change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) keep their release-only image update. Each keyboard slider
+layouts. Dragging a Color, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Properties change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) keep their release-only image update. Each keyboard slider
 adjustment is an individual validated edit. **Clip → Range** uses the full-original
 bar and exact timecode text fields described above. Other integer source/timeline
 frames, durations and fades retain exact native numeric steppers and timecode
@@ -933,7 +933,7 @@ a pair on Enter or when focus leaves both fields; Escape restores unapplied draf
 Clip shows the selected clip/video track first; section readouts and dots
 indicate adjusted settings without expanding everything. Animated channels use
 an amber curve/diamond: dashed between keyframes, filled when the setting is enabled
-at the playhead. **Animation help** beside Colour's **Keyframes** heading explains scope,
+at the playhead. **Animation help** beside Color's **Keyframes** heading explains scope,
 capture and keyframe timing; there is no separate Keyframe timing help button.
 All fourteen grade settings and the nine Transform settings retain their unkeyed values, explicit
 capture and stored-keyframe editing.
@@ -946,19 +946,19 @@ and is absent while the bin is empty.
 
 Inline help is a small **? button**, not an expandable text section. Find it
 beside the relevant title—**Speed**, **Range**, **Placement**,
-**Colour**, **Transitions**, **Fades**
+**Color**, **Transitions**, **Fades**
 or **Placement & fades**—even when that section is collapsed. Help and expansion
 are separate buttons; no scrolling to the end of a section is needed. Startup
 details are next to **Preview needs attention**.
 
 Each help is two short sentences plus a tip: what the setting does and what to try.
-Exact behaviour lives in this guide, reached from the **Learn more** link that ends
+Exact behavior lives in this guide, reached from the **Learn more** link that ends
 every help except startup details.
 
 Hover or focus to preview it; click, Enter or Space to keep it open while moving away.
 You can move the pointer into the help to read it, or press Down arrow to focus
 and scroll its text. Escape or a click elsewhere closes it; Escape closes help
-before cancelling an input draft. Hovering help never applies a field or edits
+before canceling an input draft. Hovering help never applies a field or edits
 the project. A deliberate click away from a number still applies a valid draft
 once, as usual. Settings, each keyframe's nested **Edit**, music placement and
 storage/render breakdowns remain their existing expandable controls, not help buttons.

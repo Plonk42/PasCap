@@ -36,7 +36,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
   let service: Awaited<ReturnType<typeof createApp>>;
   let tonePath: string;
   let silencePath: string;
-  let cancelledPath: string;
+  let canceledPath: string;
   let changedPath: string;
   let original: Buffer;
   let tone: AudioAsset | null = null;
@@ -47,7 +47,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     await mkdir(sources);
     tonePath = path.join(sources, 'tone.wav');
     silencePath = path.join(sources, 'silence.wav');
-    cancelledPath = path.join(sources, 'cancelled.wav');
+    canceledPath = path.join(sources, 'canceled.wav');
     changedPath = path.join(sources, 'changed.wav');
     config = createConfig({
       dataDir: path.join(directory, 'cache'),
@@ -88,7 +88,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       '2',
       silencePath,
     ]);
-    await copyFile(tonePath, cancelledPath);
+    await copyFile(tonePath, canceledPath);
     await copyFile(tonePath, changedPath);
     original = await readFile(tonePath);
     service = await createApp(config);
@@ -141,7 +141,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     expect(asset.waveform.every((peak) => Number.isFinite(peak) && peak >= 0 && peak <= 1)).toBe(true);
     expect(Math.max(...asset.waveform)).toBeGreaterThan(0.03);
     expect(await readFile(tonePath)).toEqual(original);
-    expect((await readdir(sources)).sort()).toEqual(['cancelled.wav', 'changed.wav', 'silence.wav', 'tone.wav']);
+    expect((await readdir(sources)).sort()).toEqual(['canceled.wav', 'changed.wav', 'silence.wav', 'tone.wav']);
     expect(service.library.list()).toEqual([]);
     expect(service.audio.jobs).toBe(service.jobs);
   });
@@ -234,7 +234,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     const queue = new JobQueue();
     try {
       const reloaded = new AudioLibrary(config, queue);
-      await reloaded.initialise();
+      await reloaded.initialize();
       expect(reloaded.get(asset.id)).toEqual(asset);
       expect(queue.list()).toEqual([]);
       const external = reloaded.get(asset.id);
@@ -268,7 +268,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
       release();
     }
     await service.jobs.wait(blocker.id);
-    expect((await service.jobs.wait(queuedId)).state).toBe('cancelled');
+    expect((await service.jobs.wait(queuedId)).state).toBe('canceled');
     expect(service.audio.get(asset.id).status).toBe('error');
     expect(service.audio.get(asset.id).waveform).toEqual([]);
     const retry = await service.app.inject({
@@ -290,13 +290,13 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
 
   it('cancels a running native encode, removes partial output, persists the error and can retry', async () => {
     const actualRunProcess = processes.runProcess;
-    let cancelled = false;
+    let canceled = false;
     const spy = vi.spyOn(processes, 'runProcess').mockImplementation((binary, args, options) => {
       const result = actualRunProcess(binary, args, options);
       if (binary === config.ffmpeg && args.includes('pcm_s16le')) {
         const running = service.jobs.list().find((job) => job.kind === 'audio' && job.state === 'running');
         if (running) {
-          cancelled = true;
+          canceled = true;
           service.jobs.cancel(running.id);
         }
       }
@@ -304,17 +304,17 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     });
     let asset: AudioAsset;
     try {
-      const registered = await service.audio.register(cancelledPath);
+      const registered = await service.audio.register(canceledPath);
       const finished = await service.jobs.wait(registered.job.id);
-      expect(cancelled).toBe(true);
-      expect(finished.state, finished.message).toBe('cancelled');
+      expect(canceled).toBe(true);
+      expect(finished.state, finished.message).toBe('canceled');
       asset = service.audio.get(registered.asset.id);
       expect(asset.status).toBe('error');
       expect(asset.waveform).toEqual([]);
       expect(await readdir(service.audio.assetDir(asset))).toEqual([]);
       const saved = JSON.parse(await readFile(path.join(config.dataDir, 'music.json'), 'utf8'));
       expect(saved.assets.find((entry: AudioAsset) => entry.id === asset.id).status).toBe('error');
-      expect(await readFile(cancelledPath)).toEqual(original);
+      expect(await readFile(canceledPath)).toEqual(original);
     } finally {
       spy.mockRestore();
     }
@@ -660,7 +660,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     const queue = new JobQueue();
     try {
       const reloaded = new AudioLibrary(config, queue);
-      await reloaded.initialise();
+      await reloaded.initialize();
       expect(reloaded.get(previous.id)).toEqual(previous);
       expect(reloaded.get(imported.id)).toEqual(imported);
       expect(queue.list()).toEqual([]);
@@ -727,7 +727,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     expect(service.jobs.list()).toEqual(before);
   });
 
-  it('analyses prepared music in the background, ignores a stale analysis and survives a cancelled one', async () => {
+  it('analyzes prepared music in the background, ignores a stale analysis and survives a canceled one', async () => {
     // 12 s of 120 BPM clicks at 44.1 kHz mono, written directly as a WAV file.
     const rate = 44_100;
     const samples = new Int16Array(12 * rate);
@@ -783,7 +783,7 @@ describe.skipIf(!enabled)('registered music · disposable lavfi audio only', () 
     const running = jobSchema.parse(started.json().job);
     await vi.waitUntil(() => service.jobs.get(running.id).state !== 'queued', { timeout: 5_000, interval: 5 });
     service.jobs.cancel(running.id);
-    expect((await service.jobs.wait(running.id)).state).toBe('cancelled');
+    expect((await service.jobs.wait(running.id)).state).toBe('canceled');
     expect((await read()).analysis).toBeNull();
     await expect(service.audio.assertReady(asset.id)).resolves.toMatchObject({ status: 'ready' });
     expect((await service.app.inject({ url: `/api/audio/${asset.id}/playback`, headers })).statusCode).toBe(200);

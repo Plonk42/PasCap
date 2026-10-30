@@ -1,7 +1,7 @@
-import { NEUTRAL_COLOUR, type ColourSettings } from './colour.js';
-import { adjustmentColour } from './composition.js';
+import { NEUTRAL_COLOR, type ColorSettings } from './color.js';
+import { adjustmentColor } from './composition.js';
 import { NEUTRAL_DETAIL, type DetailSettings } from './detail.js';
-import { gradeColourAt } from './grade.js';
+import { gradeColorAt } from './grade.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from './model.js';
 import { musicClips, validateMusicLane } from './music-lanes.js';
 import { evaluateSpatial, type SpatialPose } from './spatial.js';
@@ -36,10 +36,10 @@ export interface PreviewLayer {
   sourcePosition: number;
   spatial: SpatialPose;
   detail: DetailSettings;
-  /** The clip's own Colour at the source frame shown, applied first. */
-  grade: ColourSettings;
-  /** The Colour of the adjustment at the project frame, applied after the clip's; neutral without one. */
-  colour: ColourSettings;
+  /** The clip's own Color at the source frame shown, applied first. */
+  grade: ColorSettings;
+  /** The Color of the adjustment at the project frame, applied after the clip's; neutral without one. */
+  color: ColorSettings;
   weight: number;
   blendWeight: number;
   brightness: number;
@@ -280,7 +280,7 @@ export function sampleTimeline(
 ): PreviewLayer[] {
   if (!Number.isInteger(frame) || frame < 0 || frame >= layout.duration) return [];
   const active = layout.clips.filter((placed) => frame >= placed.start && frame < placed.end);
-  const adjustment = adjustmentColour(project, frame);
+  const adjustment = adjustmentColor(project, frame);
   return active.flatMap((placed) => {
     const layer = project.layers.find((item) => item.id === placed.clip.layerId)!;
     if (!layer.enabled) return [];
@@ -297,8 +297,8 @@ export function sampleTimeline(
         sourcePosition,
         spatial,
         detail: placed.clip.detail,
-        grade: gradeColourAt(placed.clip.grade, gradePosition(placed, frame - placed.start)),
-        colour: structuredClone(adjustment),
+        grade: gradeColorAt(placed.clip.grade, gradePosition(placed, frame - placed.start)),
+        color: structuredClone(adjustment),
         weight: blendWeight * brightness,
         blendWeight,
         brightness,
@@ -334,8 +334,8 @@ export function sampleSlots(
         sourcePosition: left.retiming.sourcePositionAt(last),
         spatial,
         detail: { ...NEUTRAL_DETAIL },
-        grade: structuredClone(NEUTRAL_COLOUR),
-        colour: structuredClone(NEUTRAL_COLOUR),
+        grade: structuredClone(NEUTRAL_COLOR),
+        color: structuredClone(NEUTRAL_COLOR),
         weight: 0,
         blendWeight: 1,
         brightness: 0,

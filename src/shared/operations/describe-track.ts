@@ -99,7 +99,7 @@ export const trackDescriptionSchema = z
                   })
                   .strict()
                   .optional(),
-                'The adjustment grading every track at this frame, if any, and its scalar Colour settings (or those asked for), applied after the clip grades.',
+                'The adjustment grading every track at this frame, if any, and its scalar Color settings (or those asked for), applied after the clip grades.',
               ),
               transform: described(
                 spatialPoseSchema.partial(),
@@ -150,7 +150,7 @@ export const describeTrack = defineOperation({
           .array(z.union([gradeSettingSchema, spatialChannelSchema]))
           .min(1)
           .optional(),
-        'Report only these Colour and Transform (Opacity included) settings in at; all when omitted.',
+        'Report only these Color and Transform (Opacity included) settings in at; all when omitted.',
       ),
     })
     .strict(),

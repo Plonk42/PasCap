@@ -57,16 +57,16 @@ export async function closeOptions(page: Page): Promise<void> {
   await forEachSerial(await opened.all(), (trigger) => trigger.click());
 }
 
-type InspectorTab = 'Clip' | 'Colour' | 'Track' | 'Audio';
-// Colour edits what is selected on the timeline: 'Adjustment' selects the adjustment at the playhead, 'Clip grade' a
+type InspectorTab = 'Clip' | 'Color' | 'Track' | 'Audio';
+// Color edits what is selected on the timeline: 'Adjustment' selects the adjustment at the playhead, 'Clip grade' a
 // clip there unless one is selected alone; Sequence lives in the Track tab.
 const TAB_FOR: Record<InspectorTab | 'Adjustment' | 'Clip grade' | 'Sequence', InspectorTab> = {
   Clip: 'Clip',
-  Colour: 'Colour',
+  Color: 'Color',
   Track: 'Track',
   Audio: 'Audio',
-  Adjustment: 'Colour',
-  'Clip grade': 'Colour',
+  Adjustment: 'Color',
+  'Clip grade': 'Color',
   Sequence: 'Track',
 };
 
@@ -74,7 +74,7 @@ export async function inspectorTab(page: Page, name: keyof typeof TAB_FOR): Prom
   if (name === 'Clip') await reselectClip(page);
   const tab = page.getByRole('tab', { name: TAB_FOR[name], exact: true });
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.click();
-  if (name === 'Adjustment' || name === 'Clip grade') await colourTarget(page, name === 'Clip grade' ? 'Clip' : name);
+  if (name === 'Adjustment' || name === 'Clip grade') await colorTarget(page, name === 'Clip grade' ? 'Clip' : name);
 }
 
 /** The adjustment and the clips under the playhead, in track order. */
@@ -103,10 +103,10 @@ async function selectClipAtPlayhead(page: Page): Promise<void> {
 }
 
 /**
- * The Colour tab edits the selected clip's grade or the selected adjustment. Selects, like a click on the timeline,
+ * The Color tab edits the selected clip's grade or the selected adjustment. Selects, like a click on the timeline,
  * the adjustment at the playhead or, unless a clip is selected alone, the first clip there.
  */
-export async function colourTarget(page: Page, target: 'Clip' | 'Adjustment'): Promise<void> {
+export async function colorTarget(page: Page, target: 'Clip' | 'Adjustment'): Promise<void> {
   const { adjustment } = await atPlayhead(page);
   const selectedClips = page.locator('.timeline-clip.selected');
   const selectedAdjustments = page.locator('.adjustment-item.selected');
@@ -122,25 +122,25 @@ export async function colourTarget(page: Page, target: 'Clip' | 'Adjustment'): P
   } else if ((await selectedClips.count()) !== 1 || (await selectedAdjustments.count()) !== 0) {
     await selectClipAtPlayhead(page);
   }
-  const tab = page.getByRole('tab', { name: 'Colour', exact: true });
+  const tab = page.getByRole('tab', { name: 'Color', exact: true });
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.dispatchEvent('click');
-  await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .colour-target > span')).toHaveText(
+  await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .color-target > span')).toHaveText(
     target === 'Clip' ? / · this clip only$/ : 'Every track within this range',
   );
 }
 
-/** Selecting an adjustment for Colour left no clip for the Clip tab: select the first clip at the playhead again. */
+/** Selecting an adjustment for Color left no clip for the Clip tab: select the first clip at the playhead again. */
 async function reselectClip(page: Page): Promise<void> {
   if ((await page.locator('.adjustment-item.selected').count()) === 0) return;
   if ((await page.locator('.timeline-clip.selected').count()) > 0) return;
   if ((await atPlayhead(page)).clips.length) await selectClipAtPlayhead(page);
 }
 
-/** Speed is clip-owned (Clip tab); Transform and Opacity are the track's (Track tab); Colour edits the adjustment. */
+/** Speed is clip-owned (Clip tab); Transform and Opacity are the track's (Track tab); Color edits the adjustment. */
 export async function settingTab(page: Page, label: string): Promise<void> {
-  const name = { Speed: 'Clip', Transform: 'Track', Opacity: 'Track' }[label] ?? 'Colour';
-  if (name === 'Colour') {
-    await colourTarget(page, 'Adjustment');
+  const name = { Speed: 'Clip', Transform: 'Track', Opacity: 'Track' }[label] ?? 'Color';
+  if (name === 'Color') {
+    await colorTarget(page, 'Adjustment');
     return;
   }
   if (name === 'Clip') await reselectClip(page);
@@ -171,7 +171,7 @@ export async function expandedInspectorPreferences(page: Page): Promise<void> {
       'speed',
       'transform',
       'detail',
-      'colour',
+      'color',
       'transition',
       'fades',
       'music',
@@ -199,7 +199,7 @@ export function sharedPoint(
   return layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, interpolation);
 }
 
-/** A clip grade or adjustment keyframe: every Colour setting present, only the given ones keyed. */
+/** A clip grade or adjustment keyframe: every Color setting present, only the given ones keyed. */
 export function gradePoint(
   frame: number,
   values: Partial<GradeKeyValues>,
@@ -224,7 +224,7 @@ export function transformPoint(
   return { ...uniformKeyframe(frame, { ...NO_TRANSFORM_VALUES, ...values }, interpolation), reset: false };
 }
 
-/** The Colour tab's stored keyframe list of the adjustment at the playhead. */
+/** The Color tab's stored keyframe list of the adjustment at the playhead. */
 export function adjustmentKeyframes(page: Page): Locator {
   return page.getByRole('group', { name: /^Adjustment keyframes / });
 }

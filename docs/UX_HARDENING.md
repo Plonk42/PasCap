@@ -17,25 +17,25 @@ This guide is not a delivery ledger or a fresh validation result.
   the normal treatment; main capture diamonds are always visible: hollow when the setting is not enabled at the real playhead,
   filled when enabled. **Animation help** explains the states once. Titles and screen-reader descriptions retain
   each setting's scope and capture instructions.
-- Each main scalar Colour diamond and Transform triangle retains adjacent per-setting **Previous/Next** buttons
+- Each main scalar Color diamond and Transform triangle retains adjacent per-setting **Previous/Next** buttons
   because not every setting is enabled at every keyframe.
 - Each expanded section's keyframe line shows the keyframe count, one **Previous/Next** pair and Reset.
-  Colour visits the keyframes of the clip grade or adjustment it edits; Speed visits
+  Color visits the keyframes of the clip grade or adjustment it edits; Speed visits
   all retained custom speed source keyframes of the selected clip (its single
   **Keyframe Speed** circle has no extra per-setting arrows). Speed stored
   navigation includes off-trim/original-exclusive-OUT keyframes, previewing the
   nearest mapped image with a clip-local stored-source cursor; Transform visits its
   stored track keyframes, including those after the duration, with a track-local
   cursor previewing the nearest available frame. Successive stored keyframes stay reachable even
-  when they preview the same image; Colour keeps no such cursor. Enabled setting chips in stored
-  Colour keyframe rows retain their per-channel arrows. All main and stored per-channel
+  when they preview the same image; Color keeps no such cursor. Enabled setting chips in stored
+  Color keyframe rows retain their per-channel arrows. All main and stored per-channel
   arrows visit strictly earlier/later keyframes where that channel is nonnull
   (zero is enabled).
   Main capture uses the real displayed frame; navigation never edits or saves.
   Timeline speed markers still
   omit off-trim keyframes, with exclusive OUT represented by a boundary marker.
-- The **Colour** tab edits the grade of the clip or adjustment selected on the timeline; video
-  tracks have no Colour. **Track → Transform**
+- The **Color** tab edits the grade of the clip or adjustment selected on the timeline; video
+  tracks have no Color. **Track → Transform**
   contains the **Opacity** slider/triangle/navigation after Rotation, initially **100%**.
   Without Opacity keyframes it edits the Transform base, including on an empty track; keyed
   Opacity overrides that value on every clip and both dissolve sources. Sliders never create
@@ -44,31 +44,31 @@ This guide is not a delivery ledger or a fresh validation result.
   controls composition coverage, not SDR RGB grading. **Placement** contains
   placement only. There is no sidebar duplicate; Track options contains only
   rename, Ripple, ordering and deletion, with visibility separate in the sidebar.
-- **Temperature / Tint** are normalized scalar Colour settings of clip grades and adjustments (Temperature −2…2, Tint −1…1),
+- **Temperature / Tint** are normalized scalar Color settings of clip grades and adjustments (Temperature −2…2, Tint −1…1),
   neutral/reset 0, with the same exact field, release-only slider, explicit capture
   and channel-navigation pattern. Positive Temperature
-  warms; positive Tint adds magenta. Nonzero values intentionally colour greys;
+  warms; positive Tint adds magenta. Nonzero values intentionally color grays;
   normalized linear gains precede Exposure, preserving neutral-white luminance
   before clipping only. Static HSL/curves add no channels. See
   [Temperature and Tint](design/TEMPERATURE_AND_TINT.md).
 - Timeline tools form **edit** and **marked-range removal** groups. Temporary
   IN/OUT state appears on the buttons and timeline selection rather than adding
-  another toolbar. Compact windows use labelled, focusable icon controls;
+  another toolbar. Compact windows use labeled, focusable icon controls;
   shortcuts, accessible names and explanatory titles remain available.
 - Media **Add** stays visible. Search and active filters have direct clear
   actions; partial selection uses the native mixed checkbox state. Readiness has
-  an icon and accessible status, not only a colour dot.
+  an icon and accessible status, not only a color dot.
 - Export quality uses two **native radio cards**. Storage has a meter, explicit
   uncertainty, errors/recheck and disclosed location/assumptions. Snapshot and
   native processing details remain available in **Rendering details**.
 
-The current schema requires a complete grade on every clip (Colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local
-contrast, static HSL/curves and keyframes with fourteen nullable channels: twelve scalar colour
+The current schema requires a complete grade on every clip (Color with Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local
+contrast, static HSL/curves and keyframes with fourteen nullable channels: twelve scalar color
 settings, `hdr` and `localContrast`), the project's `adjustments`,
 video track Transform base/per-setting project-frame keyframes with Opacity (1 on new tracks),
 a boolean clip `reverse` and uses a
 required 0–8 `music` array with unique required music track IDs and
-uniform video tracks with required Ripple/transitions/fades and no Colour, Opacity or
+uniform video tracks with required Ripple/transitions/fades and no Color, Opacity or
 keyframes of their own. Video tracks
 follow saved bottom-to-top composition order. Track options exposes default-on
 Ripple: enabling closes gaps from the first current start in one Undo; while on,
@@ -87,11 +87,11 @@ $w_i$ dissolve weight and $m_i$ spatial pixel coverage. Exact neutral geometry
 preserves opaque black letterboxing after grading, whatever the Opacity; nonneutral uncovered pixels
 reveal lower footage. Each source uses the same evaluated Transform Opacity at that
 project frame, from the base or its keyframes.
-Projects and receipt snapshots saved before the current schema, with track Colour, are
+Projects and receipt snapshots saved before the current schema, with track Color or British spelling, are
 rejected with the reason and left unchanged, without defaults or automatic deletion.
 Saved `clip.opacity` is invalid.
-Proxy/current PCM formats do not change; the registries are version 2 (full-content
-checksums). Version-1 export receipts require
+Proxy/current PCM formats do not change; the registries are version 3 (videos) and 2 (music),
+with full-content checksums. Version-1 export receipts require
 strict current-schema snapshots and captured audio-source/instance-plan arrays, rejecting
 invalid arrays/older snapshots without rewriting successful exports. No null
 fallback or old-format reader is permitted. Source-copy prohibition,
@@ -115,7 +115,7 @@ track** list of ready files and selected-track trash deletion. Ready recordings 
 reused by independent music tracks; import never implicitly places one. Selection
 is editor-only; edits/removal leave other music tracks and bin membership intact.
 Independent drafts never apply to another selection. Each valid commit/completed
-gesture is one Undo step; invalid/cancelled operations remain atomic.
+gesture is one Undo step; invalid/canceled operations remain atomic.
 Project duration is maximum video OUT or music start + duration. Music can extend
 it: closing video fades end at their clip OUT, followed by opaque black while
 music continues/fades at its own OUT, never a frozen image. Music-only preview is
@@ -151,15 +151,15 @@ A moved copy can only be verified against a checksum taken while the original wa
 readable, so the first preparation job (proxy for video, PCM for music) records
 `content` while it already reads the original; until then it is `null`. Projects
 refer to asset IDs, not source paths, and proxy/thumbnail/PCM caches are keyed by
-those IDs, so a location change keeps them. The registries are version 2
-(`videos.json`, `music.json`); version-1 files are neither read nor modified.
+those IDs, so a location change keeps them. The registries are version 3 (`videos.json`)
+and 2 (`music.json`); version-1 files are neither read nor modified.
 
 [Relinking](design/SOURCE_RELINK.md) is explicit: a recording whose original is
 missing shows **Relink** in Media. A serial job checks the candidate's size and full
 checksum, rejects any difference and only then updates name, path and fingerprint
 atomically. Recordings without `content` cannot be relinked and must be imported
 again. **Relink folder…** applies the same check to every missing recording found in a
-chosen folder and its subfolders, in one job. Timing/colour metadata and matching filenames are never accepted as evidence;
+chosen folder and its subfolders, in one job. Timing/color metadata and matching filenames are never accepted as evidence;
 there is no whole-filesystem search or hidden reassociation.
 
 ## Issue #3: export storage and recovery
@@ -203,7 +203,7 @@ Below the 16 MiB start reserve, submission and worker startup fail clearly befor
 native work. That reserve is **not enough for the complete render**. Submission
 and worker start both re-read free space, since a queued job can start much later.
 Permission/mount/check failures disable submission until an explicit recheck;
-stale or cancelled profile reads cannot replace the current result.
+stale or canceled profile reads cannot replace the current result.
 
 ### Disk-full recovery and applicable validation
 
@@ -227,7 +227,7 @@ Audio processes **one original at a time** into selected s16 PCM and serially
 pairwise-sums with a **Float64 stereo accumulator**. At most **two intermediate
 audio inputs**, **one native audio child per pass** and **three audio scratch files**
 (selected PCM + old/new accumulators) coexist, deleting consumed inputs before the
-next music clip. Apply each clip's track gain and fades, sum without normalisation or
+next music clip. Apply each clip's track gain and fades, sum without normalization or
 intermediate clipping, then hard-clamp once before final AAC. There is no ducking,
 effect or video audio. These audio allocations are additional to the unchanged
 video bounds above and remain duration-dependent on disk.

@@ -351,7 +351,7 @@ body {
   background: #202d24;
   font-size: 12px;
   color: #eef5ee;
-  /* It edits like a field: text cursor and field focus colour. */
+  /* It edits like a field: text cursor and field focus color. */
   cursor: text;
 }
 
@@ -414,7 +414,7 @@ body {
   z-index: 4;
 }
 
-/* The 6px gutter plus 2px into each neighbour. */
+/* The 6px gutter plus 2px into each neighbor. */
 .workspace-resizer::before {
   content: '';
   position: absolute;
@@ -549,8 +549,8 @@ body {
   scroll-padding-top: 45px;
 }
 
-/* ...and in the Colour tab, its pinned header of up to three lines. */
-.product-workspace .inspector-panel:has(> [role='tabpanel']:not([hidden]) > .colour-target) {
+/* ...and in the Color tab, its pinned header of up to three lines. */
+.product-workspace .inspector-panel:has(> [role='tabpanel']:not([hidden]) > .color-target) {
   scroll-padding-top: 125px;
 }
 
@@ -625,7 +625,7 @@ body {
 .product-workspace .music-loop,
 .product-workspace .boundary-inspector > p,
 .product-workspace .transition-keep-cut,
-.product-workspace .animate-colour {
+.product-workspace .animate-color {
   font-size: 12px;
 }
 
@@ -636,12 +636,12 @@ body {
   font-size: 13px;
 }
 
-.product-workspace .colour-control > span,
-.product-workspace .colour-control output {
+.product-workspace .color-control > span,
+.product-workspace .color-control output {
   font-size: 12px;
 }
 
-.product-workspace .colour-control input[type='range'] {
+.product-workspace .color-control input[type='range'] {
   height: 20px;
 }
 

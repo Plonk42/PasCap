@@ -150,12 +150,12 @@ export function MusicTimeline(props: Readonly<Props>) {
   const name = `music track ${index + 1}${clipLabel}: ${recording}`;
   const { phase } = useMusicAnalysis(asset);
   const clipScale = drag.current?.scale ?? scale;
-  const analysed = phase.kind === 'ready' ? phase.analysis : null;
-  const ticks = useMemo(() => beatTicks(music, analysed?.beats ?? null, clipScale), [music, analysed, clipScale]);
-  const hitMarks = useMemo(() => hitTicks(music, analysed?.hits ?? null, clipScale), [music, analysed, clipScale]);
+  const analyzed = phase.kind === 'ready' ? phase.analysis : null;
+  const ticks = useMemo(() => beatTicks(music, analyzed?.beats ?? null, clipScale), [music, analyzed, clipScale]);
+  const hitMarks = useMemo(() => hitTicks(music, analyzed?.hits ?? null, clipScale), [music, analyzed, clipScale]);
   const structure = useMemo(
-    () => analysed && <MusicStructure music={music} analysis={analysed} scale={clipScale} />,
-    [music, analysed, clipScale],
+    () => analyzed && <MusicStructure music={music} analysis={analyzed} scale={clipScale} />,
+    [music, analyzed, clipScale],
   );
   const wave = useWaveform(asset);
   const columns = wave ? waveformColumnCount(wave, music.duration, music.duration * clipScale) : 0;
@@ -315,10 +315,10 @@ export function MusicTimeline(props: Readonly<Props>) {
   const handlers = { onPointerMove: move, onPointerUp: finish, onPointerCancel: cancel, onLostPointerCapture: cancel };
   function readout(event: PointerEvent<HTMLButtonElement>): void {
     const clip = event.currentTarget.parentElement;
-    if (!analysed || !clip || event.currentTarget.className !== 'music-body') return setHover(null);
+    if (!analyzed || !clip || event.currentTarget.className !== 'music-body') return setHover(null);
     const x = event.clientX - clip.getBoundingClientRect().left;
     const at = music.start + Math.max(0, Math.min(music.duration - 1, Math.floor(x / clipScale)));
-    setHover({ x, text: describeMusicMoment(music, analysed, at, Math.max(0, Math.floor(HIT_HOVER_PX / clipScale))) });
+    setHover({ x, text: describeMusicMoment(music, analyzed, at, Math.max(0, Math.floor(HIT_HOVER_PX / clipScale))) });
   }
   return (
     <div

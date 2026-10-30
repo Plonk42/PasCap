@@ -6,15 +6,15 @@ import { z } from 'zod';
 import { assistantEditCommandSchema } from '../src/shared/command-schema.js';
 import { operations } from '../src/shared/operations/index.js';
 
-export const CATALOGUE_DOCUMENT = path.join(
+export const CATALOG_DOCUMENT = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   '..',
   'docs',
   'design',
   'ASSISTANT_MCP.md',
 );
-const START = '<!-- operation-catalogue:start -->';
-const END = '<!-- operation-catalogue:end -->';
+const START = '<!-- operation-catalog:start -->';
+const END = '<!-- operation-catalog:end -->';
 
 type Json = { type?: string; items?: Json; enum?: unknown[]; const?: unknown; anyOf?: Json[]; oneOf?: Json[] };
 
@@ -50,8 +50,8 @@ function fieldRows(schema: z.ZodType): string[] {
   );
 }
 
-/** The generated Markdown between the catalogue markers. */
-export function operationCatalogue(): string {
+/** The generated Markdown between the catalog markers. */
+export function operationCatalog(): string {
   const sections = operations.map((operation) =>
     [
       `#### ${code(operation.name)}`,
@@ -73,7 +73,7 @@ export function operationCatalogue(): string {
   return [
     START,
     '',
-    '<!-- Generated from src/shared/operations by `npm run operations:catalogue`; edit the definitions, not this text. -->',
+    '<!-- Generated from src/shared/operations by `npm run operations:catalog`; edit the definitions, not this text. -->',
     '',
     ...sections.flatMap((section) => [section, '']),
     '#### Edit commands',
@@ -88,15 +88,15 @@ export function operationCatalogue(): string {
   ].join('\n');
 }
 
-/** The document with its catalogue section regenerated and the whole file formatted like the repository. */
-export async function withCatalogue(document: string, filename = CATALOGUE_DOCUMENT): Promise<string> {
+/** The document with its catalog section regenerated and the whole file formatted like the repository. */
+export async function withCatalog(document: string, filename = CATALOG_DOCUMENT): Promise<string> {
   const start = document.indexOf(START);
   const end = document.indexOf(END);
-  if (start < 0 || end < start) throw new Error(`${filename} has no operation catalogue markers.`);
-  const next = document.slice(0, start) + operationCatalogue() + document.slice(end + END.length);
+  if (start < 0 || end < start) throw new Error(`${filename} has no operation catalog markers.`);
+  const next = document.slice(0, start) + operationCatalog() + document.slice(end + END.length);
   return format(next, { ...(await resolveConfig(filename)), filepath: filename });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  await writeFile(CATALOGUE_DOCUMENT, await withCatalogue(await readFile(CATALOGUE_DOCUMENT, 'utf8')));
+  await writeFile(CATALOG_DOCUMENT, await withCatalog(await readFile(CATALOG_DOCUMENT, 'utf8')));
 }

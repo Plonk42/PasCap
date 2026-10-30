@@ -8,7 +8,7 @@ import { createConfig } from '../../src/server/config.js';
 import { restoreExports } from '../../src/server/export-archive.js';
 import { JobQueue } from '../../src/server/jobs.js';
 import { audioAssetSchema } from '../../src/shared/audio.js';
-import { createColourSettings } from '../../src/shared/colour.js';
+import { createColorSettings } from '../../src/shared/color.js';
 import { planExportMusic } from '../../src/shared/export.js';
 import { createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
@@ -225,9 +225,9 @@ describe('durable export receipts', () => {
 
   const invalidReceipts: { name: string; change: (receipt: ReceiptFixture) => void }[] = [
     {
-      name: 'saved track colour',
+      name: 'saved track color',
       change: (receipt) => {
-        Object.assign(receipt.snapshot.layers[0]!, { colour: createColourSettings() });
+        Object.assign(receipt.snapshot.layers[0]!, { color: createColorSettings() });
       },
     },
     {
@@ -245,13 +245,13 @@ describe('durable export receipts', () => {
     {
       name: 'forbidden clip correction',
       change: (receipt) => {
-        Object.assign(receipt.snapshot.clips[0]!, { correction: createColourSettings() });
+        Object.assign(receipt.snapshot.clips[0]!, { correction: createColorSettings() });
       },
     },
     {
-      name: 'old clip colour',
+      name: 'old clip color',
       change: (receipt) => {
-        Object.assign(receipt.snapshot.clips[0]!, { colour: createColourSettings() });
+        Object.assign(receipt.snapshot.clips[0]!, { color: createColorSettings() });
       },
     },
     {

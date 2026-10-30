@@ -5,8 +5,8 @@ import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
 import type { TimelineLayout } from '../shared/timeline.js';
 import {
-  analysedFrames,
-  analyseTarget,
+  analyzedFrames,
+  analyzeTarget,
   animatedParts,
   clipsKeepingAnimated,
   autoAdjustCommands,
@@ -42,10 +42,10 @@ interface Props {
   onEdit: (commands: readonly EditCommand[]) => void;
 }
 
-const TITLE = 'Analyse this clip and suggest a balanced correction for its grade';
+const TITLE = 'Analyze this clip and suggest a balanced correction for its grade';
 /** The initial Intensity, in percent: the correction as suggested. */
 const BALANCED = Math.round(AUTO_ADJUST.balancedIntensity * 100);
-/** The scope each source covers, named by what it analyses rather than by its container. */
+/** The scope each source covers, named by what it analyzes rather than by its container. */
 function sources(
   trackName: string,
 ): readonly { source: AutoAdjustSource; label: string; name: string; hint: string }[] {
@@ -56,7 +56,7 @@ function sources(
       source: 'track',
       label: 'Every clip',
       name: `Every clip on ${trackName}`,
-      hint: `on ${trackName}, each analysed on its own`,
+      hint: `on ${trackName}, each analyzed on its own`,
     },
   ];
 }
@@ -65,12 +65,12 @@ const APPLIES: readonly { apply: AutoAdjustApply; label: string; name: string; h
   { apply: 'keyframe', label: 'Keyframe', name: 'Keyframe at playhead', hint: 'at playhead' },
 ];
 
-/** Colour → Auto (clip grade): analyses the graded clip, or each clip of its track, and writes their grades. */
+/** Color → Auto (clip grade): analyzes the graded clip, or each clip of its track, and writes their grades. */
 export function AutoAdjust({ project, clipId, layout, assets, playhead, disabled, onEdit }: Readonly<Props>) {
   const hintId = useId();
   const context: AutoAdjustContext = { project, clipId, layout, assets, playhead };
   const availability = autoAdjustTarget(context);
-  const blocked = disabled ? 'Colour cannot be edited right now.' : availability.reason;
+  const blocked = disabled ? 'Color cannot be edited right now.' : availability.reason;
   if (blocked !== null || !availability.target)
     return (
       <span className="auto-adjust">
@@ -110,7 +110,7 @@ function keyframeUnavailable(source: AutoAdjustSource): { hint: string; title: s
   if (source === 'playhead') return null;
   return source === 'track'
     ? { hint: 'this clip only', title: 'Keyframes go to this clip only, at the playhead.' }
-    : { hint: 'needs Playhead', title: 'Analyse the playhead to key it.' };
+    : { hint: 'needs Playhead', title: 'Analyze the playhead to key it.' };
 }
 
 function applyHint(option: (typeof APPLIES)[number], source: AutoAdjustSource): string {
@@ -120,7 +120,7 @@ function applyHint(option: (typeof APPLIES)[number], source: AutoAdjustSource): 
 
 type Phase =
   | { kind: 'idle' }
-  | { kind: 'analysing'; key: string; done: number; total: number }
+  | { kind: 'analyzing'; key: string; done: number; total: number }
   | { kind: 'failed'; key: string; message: string }
   | { kind: 'ready'; key: string; corrections: ReadonlyMap<string, AutoCorrection> };
 
@@ -160,10 +160,10 @@ function AutoAdjustPopover({
     }
     const abort = new AbortController();
     setPercent(BALANCED);
-    const total = analysedFrames(target);
-    setPhase({ kind: 'analysing', key, done: 0, total });
-    analyseTarget(target, abort.signal, (done) => {
-      if (!abort.signal.aborted) setPhase({ kind: 'analysing', key, done, total });
+    const total = analyzedFrames(target);
+    setPhase({ kind: 'analyzing', key, done: 0, total });
+    analyzeTarget(target, abort.signal, (done) => {
+      if (!abort.signal.aborted) setPhase({ kind: 'analyzing', key, done, total });
     }).then(
       (corrections) => {
         if (abort.signal.aborted) return;
@@ -221,7 +221,7 @@ function AutoAdjustPopover({
   const clips = applyAs === 'values' ? (target?.parts.length ?? 1) : 1;
   const keeping = clips > 1 && target ? clipsKeepingAnimated(context.project, target) : 0;
   const nothing = ready !== null && commandsAt(percent).length === 0;
-  const analysed = available.target?.label ?? availabilities.clip.target?.label ?? '';
+  const analyzed = available.target?.label ?? availabilities.clip.target?.label ?? '';
   return (
     <span className="auto-adjust">
       <Popover
@@ -246,8 +246,8 @@ function AutoAdjustPopover({
           };
           return (
             <div className="auto-adjust-panel" onKeyDownCapture={escape}>
-              <p className="auto-adjust-source" title={analysed}>
-                From {shortName(analysed)}
+              <p className="auto-adjust-source" title={analyzed}>
+                From {shortName(analyzed)}
               </p>
               <fieldset className="auto-adjust-mode">
                 <legend>Source</legend>
@@ -298,9 +298,9 @@ function AutoAdjustPopover({
                 })}
               </fieldset>
               {reason !== null && <p className="auto-adjust-error">{reason}</p>}
-              {current?.kind === 'analysing' && (
+              {current?.kind === 'analyzing' && (
                 <output className="auto-adjust-progress">
-                  Analysing {current.done}/{current.total} frames…
+                  Analyzing {current.done}/{current.total} frames…
                 </output>
               )}
               {current?.kind === 'failed' && (
@@ -310,7 +310,7 @@ function AutoAdjustPopover({
               )}
               {ready && (
                 <>
-                  <div className="colour-control auto-adjust-intensity">
+                  <div className="color-control auto-adjust-intensity">
                     <span>
                       <ResetLabel
                         htmlFor={id}

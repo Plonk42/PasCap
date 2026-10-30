@@ -90,7 +90,7 @@ function LayerName({
             if (event.key === 'Escape') {
               event.preventDefault();
               event.stopPropagation();
-              // Returning focus closes the popover and blurs synchronously; do not submit the cancelled draft.
+              // Returning focus closes the popover and blurs synchronously; do not submit the canceled draft.
               cancelBlur.current = true;
               restore();
               onCancel();
@@ -199,7 +199,7 @@ export function Layers({
           className="layer-sidebar-adjustments"
           title="Adjustments grade every video track over their range, after each clip's own grade"
         >
-          <Icon name="colour" size={14} />
+          <Icon name="color" size={14} />
           <span className="layer-sidebar-title">Adjustments · {project.adjustments.length}</span>
           <button
             className="text-button layer-add"

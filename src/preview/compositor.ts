@@ -1,18 +1,18 @@
 import {
-  colourCurveSlopes,
+  colorCurveSlopes,
   CURVE_CHANNELS,
   HSL_BANDS,
   isIdentityCurve,
   isNeutralHsl,
-} from '../shared/advanced-colour.js';
+} from '../shared/advanced-color.js';
 import {
-  type ColourSettings,
-  createColourSettings,
+  type ColorSettings,
+  createColorSettings,
   gradePixel,
-  NEUTRAL_COLOUR,
+  NEUTRAL_COLOR,
   type RGB,
   temperatureTintGains,
-} from '../shared/colour.js';
+} from '../shared/color.js';
 import { compositePixel } from '../shared/composition.js';
 import {
   DETAIL_REFERENCE_LINES,
@@ -97,9 +97,9 @@ const STAGE_UNIFORMS = gradeUniforms('first_');
 
 export interface CompositeClip {
   slot: number;
-  /** The clip's own grade, applied before `settings`, the adjustment's Colour; absent is neutral. */
-  grade?: ColourSettings;
-  settings: ColourSettings;
+  /** The clip's own grade, applied before `settings`, the adjustment's Color; absent is neutral. */
+  grade?: ColorSettings;
+  settings: ColorSettings;
   aspect: number;
   spatial: SpatialPose;
   detail: DetailSettings;
@@ -150,11 +150,11 @@ function createProgram(gl: WebGL2RenderingContext, source = fragmentShader): Web
 }
 
 /** What one source's two grades need from a program, and what to upload as each stage. */
-function sourceStages(source: CompositeClip): { stages: ColourSettings[]; tone: LocalTone } {
-  const { stages, tone } = sourceGrades(source.grade ?? NEUTRAL_COLOUR, source.settings);
+function sourceStages(source: CompositeClip): { stages: ColorSettings[]; tone: LocalTone } {
+  const { stages, tone } = sourceGrades(source.grade ?? NEUTRAL_COLOR, source.settings);
   return { stages, tone };
 }
-const isAdvancedStage = (settings: ColourSettings): boolean =>
+const isAdvancedStage = (settings: ColorSettings): boolean =>
   !isNeutralHsl(settings.hsl) || CURVE_CHANNELS.some((channel) => !isIdentityCurve(settings.curves[channel]));
 
 /** Owns GPU resources, but never media clocks or React state. */
@@ -367,7 +367,7 @@ export class Compositor {
     }
   }
   /** One stage's grade uniforms, `p` '' for the last (track) grade and 'first_' for the clip grade before it. */
-  #uploadStage(p: string, index: number, settings: ColourSettings): void {
+  #uploadStage(p: string, index: number, settings: ColorSettings): void {
     const gl = this.gl;
     const gains = temperatureTintGains(settings);
     gl.uniform4f(this.#location(`${p}correction${index}`), gains[0], gains[1], gains[2], settings.blacks);
@@ -388,7 +388,7 @@ export class Compositor {
     this.#curveUniform.fill(0);
     CURVE_CHANNELS.forEach((channel, at) => {
       const points = settings.curves[channel];
-      const slopes = colourCurveSlopes(points);
+      const slopes = colorCurveSlopes(points);
       points.forEach((point, position) => {
         this.#curveUniform.set([point.x, point.y, slopes[position]!], at * 48 + position * 3);
       });
@@ -422,7 +422,7 @@ export class Compositor {
     gl.uniform4f(this.#location(`detailStep${index}`), stepU, stepV, shiftV / aspect, -shiftV);
     gl.uniform4f(this.#location(`localTone${index}`), tone.shadows, tone.highlights, tone.hdr, tone.exposure);
   }
-  #uploadNeutralHsl(prefix: '' | 'first_', grades: readonly ColourSettings[]): void {
+  #uploadNeutralHsl(prefix: '' | 'first_', grades: readonly ColorSettings[]): void {
     this.gl.uniform2f(
       this.#location(`${prefix}neutralHsl`),
       Number(isNeutralHsl(grades[0]!.hsl)),
@@ -435,7 +435,7 @@ export class Compositor {
     const gl = this.gl;
     const empty: CompositeClip = {
       slot: group.clips[0]!.slot,
-      settings: { ...NEUTRAL_COLOUR },
+      settings: { ...NEUTRAL_COLOR },
       aspect: this.canvas.width / this.canvas.height,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
       detail: { ...NEUTRAL_DETAIL },
@@ -448,8 +448,8 @@ export class Compositor {
     const sources = [group.clips[0]!, group.clips[1] ?? empty];
     const graded = sources.map(sourceStages);
     // One stage uploads as the program's only grade; two put the clip grade first.
-    const last = graded.map(({ stages }) => stages.at(-1) ?? NEUTRAL_COLOUR);
-    const first = graded.map(({ stages }) => (stages.length > 1 ? stages[0]! : NEUTRAL_COLOUR));
+    const last = graded.map(({ stages }) => stages.at(-1) ?? NEUTRAL_COLOR);
+    const first = graded.map(({ stages }) => (stages.length > 1 ? stages[0]! : NEUTRAL_COLOR));
     const staged = graded.some(({ stages }) => stages.length > 1);
     const advanced = [...last, ...first].some(isAdvancedStage);
     const advancedPath = group.clips.length === 1 ? 'single' : 'full';
@@ -540,7 +540,7 @@ export interface GpuCompositionComparison extends GpuComparison {
 }
 
 /** Numeric GPU/CPU parity test, separate from browser video conversion and H.264 error; `grade` is a clip grade before `settings`. */
-export function verifyGpuColour(settings: ColourSettings, grade: ColourSettings = NEUTRAL_COLOUR): GpuComparison {
+export function verifyGpuColor(settings: ColorSettings, grade: ColorSettings = NEUTRAL_COLOR): GpuComparison {
   const canvas = document.createElement('canvas');
   canvas.width = 17;
   canvas.height = 17;
@@ -597,10 +597,10 @@ export function verifyGpuColour(settings: ColourSettings, grade: ColourSettings 
   }
 }
 
-function comparisonColour(test: number, random: () => number): ColourSettings {
-  if (test < 7) return { ...NEUTRAL_COLOUR };
+function comparisonColor(test: number, random: () => number): ColorSettings {
+  if (test < 7) return { ...NEUTRAL_COLOR };
   return {
-    ...NEUTRAL_COLOUR,
+    ...NEUTRAL_COLOR,
     exposure: random() * 1.4 - 0.7,
     brightness: random() * 0.16 - 0.08,
     contrast: 0.7 + random() * 0.6,
@@ -618,7 +618,7 @@ function comparisonSource(
   source: number,
   progress: number,
   opacity: number,
-  settings: ColourSettings,
+  settings: ColorSettings,
   random: () => number,
 ): { layer: PreviewLayer; clip: CompositeClip } {
   const slot = (group + source) % 2;
@@ -639,8 +639,8 @@ function comparisonSource(
       sourcePosition: 0,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
       detail: { ...NEUTRAL_DETAIL },
-      grade: createColourSettings(),
-      colour: settings,
+      grade: createColorSettings(),
+      color: settings,
       opacity,
       blendWeight,
       brightness,
@@ -673,7 +673,7 @@ function comparisonGroup(
   if (test === 4) progress = 0;
   if (test === 6) progress = 1;
   const dissolve = group === 0 && test % 2 === 0;
-  const settings = comparisonColour(test, random);
+  const settings = comparisonColor(test, random);
   const sources = Array.from({ length: dissolve ? 2 : 1 }, (_, source) =>
     comparisonSource(test, group, source, progress, opacity, settings, random),
   );
@@ -712,7 +712,7 @@ export function verifyLayerComposition(): GpuCompositionComparison {
   let maximum = 0;
   try {
     for (let test = 0; test < cases; test++) {
-      const colours: RGB[] = [];
+      const colors: RGB[] = [];
       for (const slot of [0, 1] as const) {
         const bytes = new Uint8Array([
           Math.floor(random() * 256),
@@ -721,7 +721,7 @@ export function verifyLayerComposition(): GpuCompositionComparison {
           255,
         ]);
         compositor.uploadPixels(slot, bytes, 1, 1);
-        colours.push([bytes[0]! / 255, bytes[1]! / 255, bytes[2]! / 255]);
+        colors.push([bytes[0]! / 255, bytes[1]! / 255, bytes[2]! / 255]);
       }
       let count = 1 + (test % 8);
       if (test < 6) count = 2;
@@ -730,7 +730,7 @@ export function verifyLayerComposition(): GpuCompositionComparison {
       compositor.drawFrame(fixtures.map((fixture) => fixture.group));
       const expected = compositePixel(
         fixtures.flatMap((fixture) => fixture.layers),
-        (layer) => colours[Number(layer.mediaId)]!,
+        (layer) => colors[Number(layer.mediaId)]!,
       );
       const error = constantPixelError(compositor.readPixels(), expected);
       sum += error.sum;

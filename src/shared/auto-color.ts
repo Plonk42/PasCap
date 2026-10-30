@@ -7,7 +7,7 @@ import {
   type AutoCorrection,
 } from './auto-adjust.js';
 import type { EditCommand } from './commands.js';
-import type { ColourSettings } from './colour.js';
+import type { ColorSettings } from './color.js';
 import { MAX_GRADE_KEYFRAMES } from './grade.js';
 import { activeLayerSetting, hasLayerKeys, type KeyframeSetting, type LayerKeyframe } from './keyframes.js';
 import type { PlacedClip } from './timeline.js';
@@ -18,9 +18,9 @@ import type { WhiteBalance } from './white-balance.js';
 /** What an edit changes: a clip's grade (keyframes at source frames) or an adjustment (frames from its start). */
 export type AutoOwner = { kind: 'clip'; clipId: string } | { kind: 'adjustment'; adjustmentId: string };
 
-/** A grade's Colour and keyframes, in the track keyframe shape the keyframe tools read. */
+/** A grade's Color and keyframes, in the track keyframe shape the keyframe tools read. */
 export interface GradeValues {
-  colour: ColourSettings;
+  color: ColorSettings;
   keyframes: readonly LayerKeyframe[];
 }
 
@@ -67,7 +67,7 @@ export function animatedSettings(grade: GradeValues): AutoAdjustSetting[] {
 }
 
 /**
- * The one Colour edit Auto applies: the correction at `intensity` (0–1) replaces the owner's values of the eleven
+ * The one Color edit Auto applies: the correction at `intensity` (0–1) replaces the owner's values of the eleven
  * settings, except animated ones. Null when every one of them is animated.
  */
 export function autoAdjustCommand(
@@ -80,11 +80,11 @@ export function autoAdjustCommand(
   const settings = AUTO_ADJUST_SETTINGS.filter((setting) => !animated.has(setting));
   if (!settings.length) return null;
   const scaled = scaleCorrection(correction, intensity);
-  const colour = { ...grade.colour };
-  for (const setting of settings) colour[setting] = scaled[setting];
+  const color = { ...grade.color };
+  for (const setting of settings) color[setting] = scaled[setting];
   return owner.kind === 'clip'
-    ? { type: 'colour', clipIds: [owner.clipId], colour }
-    : { type: 'colour', adjustmentId: owner.adjustmentId, colour };
+    ? { type: 'color', clipIds: [owner.clipId], color }
+    : { type: 'color', adjustmentId: owner.adjustmentId, color };
 }
 
 /** Source frames shown at the project frames within 1 s of `frame` in `clip`, each once. */
@@ -96,7 +96,7 @@ export function windowSourceFrames(clip: PlacedClip, frame: number): number[] {
 
 /**
  * Every clip of the track laid end to end in timeline order, with up to AUTO_ADJUST.frames output frames at the
- * centres of equal slices: each clip is analysed in proportion to its duration on screen.
+ * centers of equal slices: each clip is analyzed in proportion to its duration on screen.
  */
 export function trackSamples(clips: readonly PlacedClip[]): { clip: PlacedClip; sourceFrame: number }[] {
   const ordered = [...clips].sort((left, right) => left.start - right.start);

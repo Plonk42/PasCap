@@ -146,13 +146,13 @@
   min-width: 0;
 }
 
-.colour-control-actions {
+.color-control-actions {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-.colour-control-actions .icon-button {
+.color-control-actions .icon-button {
   width: 28px;
   height: 28px;
 }

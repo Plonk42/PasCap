@@ -1,5 +1,5 @@
 import {
-  analyseAutoAdjust,
+  analyzeAutoAdjust,
   autoAdjustFrames,
   scaleCorrection,
   type AutoAdjustSetting,
@@ -12,8 +12,8 @@ import {
   keyframeLimitReason,
   windowSourceFrames,
   type AutoOwner,
-} from '../shared/auto-colour.js';
-import { COLOUR_CONTROLS } from '../shared/colour.js';
+} from '../shared/auto-color.js';
+import { COLOR_CONTROLS } from '../shared/color.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
@@ -22,15 +22,15 @@ import type { PlacedClip, TimelineLayout } from '../shared/timeline.js';
 import { frameIlluminant, type AnalysisFrame, type IlluminantEstimate } from '../shared/white-balance.js';
 import { proxyUrl } from './api.js';
 import { readyAsset } from './auto-white-balance.js';
-import { gradeOwnerOf, sourceFrameAt } from './colour-owner.js';
+import { gradeOwnerOf, sourceFrameAt } from './color-owner.js';
 import { shortName } from './display.js';
 
-/** What Auto analyses: 1 s around the playhead or the whole graded clip, or each clip of its track on its own. */
+/** What Auto analyzes: 1 s around the playhead or the whole graded clip, or each clip of its track on its own. */
 export type AutoAdjustSource = 'playhead' | 'clip' | 'track';
-/** How Auto applies its correction: each analysed clip's grade values, or a keyframe of the grade at the playhead. */
+/** How Auto applies its correction: each analyzed clip's grade values, or a keyframe of the grade at the playhead. */
 export type AutoAdjustApply = 'values' | 'keyframe';
 
-/** One clip analysed on its own, whose grade takes its correction. */
+/** One clip analyzed on its own, whose grade takes its correction. */
 export interface AutoAdjustPart {
   clip: PlacedClip;
   /** How errors name it, among the track's clips. */
@@ -41,7 +41,7 @@ export interface AutoAdjustPart {
 
 export interface AutoAdjustTarget {
   source: AutoAdjustSource;
-  /** What the popover names as analysed: a recording, or the track's clips. */
+  /** What the popover names as analyzed: a recording, or the track's clips. */
   label: string;
   /** One analysis: the clips, recordings as prepared and source frames it reads. */
   key: string;
@@ -63,7 +63,7 @@ const preparedAt = (asset: MediaAsset): string => asset.prepared?.verification.v
 const clipOwner = (clipId: string): AutoOwner => ({ kind: 'clip', clipId });
 const unavailable = (reason: string): AutoAdjustAvailability => ({ target: null, reason });
 
-/** What Auto would analyse from `source` for the graded clip, or why it cannot. */
+/** What Auto would analyze from `source` for the graded clip, or why it cannot. */
 export function autoAdjustTarget(
   context: AutoAdjustContext,
   source: AutoAdjustSource = 'clip',
@@ -81,7 +81,7 @@ export function autoAdjustTarget(
   });
   if (source === 'clip') return target(['clip', ...prefix], autoAdjustFrames(sourceIn, sourceOut));
   if (sourceFrameAt(placed, context.playhead) === null)
-    return unavailable('Move the playhead over this clip to analyse 1 s around it.');
+    return unavailable('Move the playhead over this clip to analyze 1 s around it.');
   const sourceFrames = windowSourceFrames(placed, context.playhead);
   return target(['playhead', ...prefix, context.playhead, sourceFrames.join(',')], sourceFrames);
 }
@@ -120,7 +120,7 @@ function trackTarget(context: AutoAdjustContext, graded: PlacedClip): AutoAdjust
 /** Why a keyframe cannot take the correction from `source` at the playhead, or null. */
 export function keyframeReason(context: AutoAdjustContext, source: AutoAdjustSource): string | null {
   if (source === 'track') return 'Keyframes go to this clip only, at the playhead.';
-  if (source !== 'playhead') return 'A keyframe takes the light at the playhead: analyse the playhead.';
+  if (source !== 'playhead') return 'A keyframe takes the light at the playhead: analyze the playhead.';
   const owner = gradeOwnerOf(context.project, context.clipId);
   const placed = context.layout.clips.find((item) => item.clip.id === context.clipId);
   const frame = placed ? sourceFrameAt(placed, context.playhead) : null;
@@ -138,10 +138,10 @@ export function initialChoice(context: AutoAdjustContext): { source: AutoAdjustS
 }
 
 export function settingLabel(setting: AutoAdjustSetting): string {
-  return COLOUR_CONTROLS.find((control) => control.key === setting)!.label;
+  return COLOR_CONTROLS.find((control) => control.key === setting)!.label;
 }
 
-/** The settings each analysed clip's grade animates, which applying values leaves unchanged, with how many clips. */
+/** The settings each analyzed clip's grade animates, which applying values leaves unchanged, with how many clips. */
 export function animatedParts(
   project: ProjectDocument,
   target: AutoAdjustTarget,
@@ -154,7 +154,7 @@ export function animatedParts(
   return [...counts].map(([setting, clips]) => ({ setting, clips }));
 }
 
-/** How many analysed clips' grades animate a setting Auto sets, which applying values leaves unchanged there. */
+/** How many analyzed clips' grades animate a setting Auto sets, which applying values leaves unchanged there. */
 export function clipsKeepingAnimated(project: ProjectDocument, target: AutoAdjustTarget): number {
   return target.parts.filter((part) => {
     const owner = gradeOwnerOf(project, part.clip.clip.id);
@@ -163,7 +163,7 @@ export function clipsKeepingAnimated(project: ProjectDocument, target: AutoAdjus
 }
 
 /**
- * The edit Auto applies in one Undo step: each analysed clip's grade values, or a keyframe of all eleven settings at
+ * The edit Auto applies in one Undo step: each analyzed clip's grade values, or a keyframe of all eleven settings at
  * the source frame the graded clip shows at the playhead.
  */
 export function autoAdjustCommands(
@@ -189,7 +189,7 @@ export function autoAdjustCommands(
 }
 
 export interface AutoAdjustAnalysis {
-  /** Each analysed clip's correction, by clip. */
+  /** Each analyzed clip's correction, by clip. */
   corrections: ReadonlyMap<string, AutoCorrection>;
   /** The intensity last applied, 0–100%. */
   percent: number;
@@ -217,20 +217,20 @@ function nextTask(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-export const analysedFrames = (target: AutoAdjustTarget): number =>
+export const analyzedFrames = (target: AutoAdjustTarget): number =>
   target.parts.reduce((sum, part) => sum + part.sourceFrames.length, 0);
 
 /**
  * Decodes each clip's frames from its proxy, one temporary reader at a time, and fits each clip's correction on its
- * own; a clip that cannot be analysed fails the whole analysis, naming it.
+ * own; a clip that cannot be analyzed fails the whole analysis, naming it.
  */
-export async function analyseTarget(
+export async function analyzeTarget(
   target: AutoAdjustTarget,
   signal: AbortSignal,
   onProgress: (done: number, total: number) => void,
 ): Promise<Map<string, AutoCorrection>> {
   const { sampleProxyFrames } = await import('../preview/frame-sampler.js');
-  const total = analysedFrames(target);
+  const total = analyzedFrames(target);
   const corrections = new Map<string, AutoCorrection>();
   let before = 0;
   await forEachSerial(target.parts, async ({ clip, name, asset, sourceFrames }) => {
@@ -252,8 +252,8 @@ export async function analyseTarget(
       await nextTask();
       signal.throwIfAborted();
     });
-    const correction = analyseAutoAdjust(frames, illuminants);
-    if (!correction) throw new Error(named('These frames are too dark or too uniform to analyse.'));
+    const correction = analyzeAutoAdjust(frames, illuminants);
+    if (!correction) throw new Error(named('These frames are too dark or too uniform to analyze.'));
     corrections.set(clip.clip.id, correction);
   });
   return corrections;

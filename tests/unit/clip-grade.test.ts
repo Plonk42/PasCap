@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { ColourLutCache } from '../../src/server/layered-colour.js';
+import { ColorLutCache } from '../../src/server/layered-color.js';
 import { composeLayerFrame } from '../../src/server/layered-frame.js';
 import {
-  createColourSettings,
+  createColorSettings,
   generateCube,
   gradePixel,
-  NEUTRAL_COLOUR,
-  type ColourSettings,
+  NEUTRAL_COLOR,
+  type ColorSettings,
   type RGB,
-} from '../../src/shared/colour.js';
+} from '../../src/shared/color.js';
 import { compositePixel } from '../../src/shared/composition.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { needsLayeredExport } from '../../src/shared/export.js';
@@ -21,7 +21,7 @@ import {
   createAdjustment,
   createClipGrade,
   gradeChainPixel,
-  gradeColourAt,
+  gradeColorAt,
   gradeKeyAsLayerKey,
   layerKeyAsGradeKey,
   MAX_GRADE_KEYFRAMES,
@@ -33,7 +33,7 @@ import { gradeSummary } from '../../src/shared/operations/grade-summary.js';
 import { validateSourceRanges } from '../../src/shared/source-range.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout, sampleTimeline, type PreviewLayer } from '../../src/shared/timeline.js';
-import { clipColourOwner, displayedColour, gradeValuePosition } from '../../src/web/colour-owner.js';
+import { clipColorOwner, displayedColor, gradeValuePosition } from '../../src/web/color-owner.js';
 
 const gradeKey = (frame: number, values: Partial<typeof EMPTY_KEY_VALUES>, curve: 'linear' | 'hold' = 'linear') =>
   layerKeyAsGradeKey(layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, curve));
@@ -53,9 +53,9 @@ function project(): ProjectDocument {
 
 describe('clip grade data', () => {
   it('gives every new clip a neutral grade with no keyframes', () => {
-    expect(createClip('c', 'rec', 0, 10).grade).toEqual({ colour: NEUTRAL_COLOUR, keyframes: [] });
+    expect(createClip('c', 'rec', 0, 10).grade).toEqual({ color: NEUTRAL_COLOR, keyframes: [] });
     expect(createClipGrade()).toEqual(createClipGrade());
-    expect(createClipGrade().colour).not.toBe(createClipGrade().colour);
+    expect(createClipGrade().color).not.toBe(createClipGrade().color);
   });
 
   it('rejects Opacity, unordered keyframes and more than 64 keyframes', () => {
@@ -78,19 +78,19 @@ describe('clip grade data', () => {
 
   it('evaluates keyframes at source frames, holding endpoints, with a default keyframe never reaching back', () => {
     const grade = {
-      colour: { ...createColourSettings(), exposure: 0.5, contrast: 1.2 },
+      color: { ...createColorSettings(), exposure: 0.5, contrast: 1.2 },
       keyframes: [gradeKey(10, { exposure: 0 }), gradeKey(30, { exposure: 1 })],
     };
-    expect(gradeColourAt(grade, 0).exposure).toBe(0);
-    expect(gradeColourAt(grade, 20).exposure).toBeCloseTo(0.5);
-    expect(gradeColourAt(grade, 40).exposure).toBe(1);
-    expect(gradeColourAt(grade, 20).contrast).toBe(1.2);
+    expect(gradeColorAt(grade, 0).exposure).toBe(0);
+    expect(gradeColorAt(grade, 20).exposure).toBeCloseTo(0.5);
+    expect(gradeColorAt(grade, 40).exposure).toBe(1);
+    expect(gradeColorAt(grade, 20).contrast).toBe(1.2);
     const reset = layerKeyAsGradeKey({
       ...layerKeyframe(10, { ...EMPTY_KEY_VALUES, contrast: 1 }, 'hold'),
       reset: true,
     });
-    expect(gradeColourAt({ ...grade, keyframes: [reset] }, 5).contrast).toBe(1.2);
-    expect(gradeColourAt({ ...grade, keyframes: [reset] }, 10).contrast).toBe(1);
+    expect(gradeColorAt({ ...grade, keyframes: [reset] }, 5).contrast).toBe(1.2);
+    expect(gradeColorAt({ ...grade, keyframes: [reset] }, 10).contrast).toBe(1);
   });
 
   it('refuses grade keyframes beyond the recording', () => {
@@ -102,16 +102,16 @@ describe('clip grade data', () => {
 });
 
 describe('source grades', () => {
-  const clip = { ...createColourSettings(), exposure: 0.4, shadows: 0.6, hdr: 0.7, localContrast: -0.3 };
-  const track = { ...createColourSettings(), saturation: 1.3, shadows: 0.7, hdr: 0.5, exposure: -0.1 };
+  const clip = { ...createColorSettings(), exposure: 0.4, shadows: 0.6, hdr: 0.7, localContrast: -0.3 };
+  const track = { ...createColorSettings(), saturation: 1.3, shadows: 0.7, hdr: 0.5, exposure: -0.1 };
 
   it('applies only the grades that change pixels, clip first, and sums local tone within its bounds', () => {
-    expect(sourceGrades(NEUTRAL_COLOUR, NEUTRAL_COLOUR).stages).toEqual([]);
-    expect(sourceGrades(clip, NEUTRAL_COLOUR).stages).toEqual([clip]);
-    expect(sourceGrades(NEUTRAL_COLOUR, track).stages).toEqual([track]);
+    expect(sourceGrades(NEUTRAL_COLOR, NEUTRAL_COLOR).stages).toEqual([]);
+    expect(sourceGrades(clip, NEUTRAL_COLOR).stages).toEqual([clip]);
+    expect(sourceGrades(NEUTRAL_COLOR, track).stages).toEqual([track]);
     expect(sourceGrades(clip, track).stages).toEqual([clip, track]);
     // Local tone alone grades no pixels: it runs in the detail kernel.
-    expect(sourceGrades({ ...createColourSettings(), hdr: 0.5 }, NEUTRAL_COLOUR).stages).toEqual([]);
+    expect(sourceGrades({ ...createColorSettings(), hdr: 0.5 }, NEUTRAL_COLOR).stages).toEqual([]);
     expect(sourceGrades(clip, track).tone).toEqual({
       shadows: 1,
       highlights: 0,
@@ -119,7 +119,7 @@ describe('source grades', () => {
       localContrast: -0.3,
       exposure: 0.4 - 0.1,
     });
-    expect(sourceGrades(NEUTRAL_COLOUR, track).tone).toEqual({
+    expect(sourceGrades(NEUTRAL_COLOR, track).tone).toEqual({
       shadows: 0.7,
       highlights: 0,
       hdr: 0.5,
@@ -129,7 +129,7 @@ describe('source grades', () => {
   });
 
   it('chains grades on encoded output, exactly like grading twice', () => {
-    const second = { ...createColourSettings(), contrast: 1.4, hue: 20 };
+    const second = { ...createColorSettings(), contrast: 1.4, hue: 20 };
     for (const rgb of [
       [0, 0, 0],
       [0.2, 0.5, 0.9],
@@ -162,7 +162,7 @@ describe('source grades', () => {
     const [first] = sampleTimeline(document, 0);
     expect(first!.sourceFrame).toBe(59);
     expect(first!.grade.exposure).toBe(1);
-    expect(first!.colour).toEqual(NEUTRAL_COLOUR);
+    expect(first!.color).toEqual(NEUTRAL_COLOR);
     const [last] = sampleTimeline(document, 59);
     expect(last!.sourceFrame).toBe(0);
     expect(last!.grade.exposure).toBe(0);
@@ -188,15 +188,15 @@ describe('source grades', () => {
       gradeKey(10, { exposure: 1 }),
     ];
     const placed = calculateLayout(document).clips[0]!;
-    const owner = clipColourOwner(clip, 'clip 1');
+    const owner = clipColorOwner(clip, 'clip 1');
     // Project frame 3 holds source frame 1 at position 1.5: no key there, so the controls show the image.
     expect(gradeValuePosition(placed, 3)).toBe(1.5);
-    const between = displayedColour(owner, 1, gradeValuePosition(placed, 3));
+    const between = displayedColor(owner, 1, gradeValuePosition(placed, 3));
     expect(between.exposure).toBeCloseTo(sampleTimeline(document, 3)[0]!.grade.exposure, 12);
     expect(between.exposure).toBeCloseTo(0.15, 12);
     expect(between.contrast).toBe(1.5);
     // Project frame 1 holds source frame 0 at position 0.5: its Exposure keyframe shows its own value, to edit.
-    const keyed = displayedColour(owner, 0, gradeValuePosition(placed, 1));
+    const keyed = displayedColor(owner, 0, gradeValuePosition(placed, 1));
     expect(keyed.exposure).toBe(0);
     expect(sampleTimeline(document, 1)[0]!.grade.exposure).toBeCloseTo(0.05, 12);
     expect(keyed.contrast).toBe(1.5);
@@ -204,23 +204,23 @@ describe('source grades', () => {
 });
 
 describe('clip grade commands', () => {
-  it('sets Colour on clips keeping their keyframes, naming its target once', () => {
-    const colour = { ...createColourSettings(), exposure: 0.3 };
+  it('sets Color on clips keeping their keyframes, naming its target once', () => {
+    const color = { ...createColorSettings(), exposure: 0.3 };
     const keyed = applyCommand(project(), {
       type: 'layer-key-set',
       clipId: 'a',
       frame: 4,
       values: { tint: 0.2 },
     });
-    const next = applyCommand(keyed, { type: 'colour', clipIds: ['a', 'b'], colour });
-    expect(next.clips.map((clip) => clip.grade.colour.exposure)).toEqual([0.3, 0.3]);
+    const next = applyCommand(keyed, { type: 'color', clipIds: ['a', 'b'], color });
+    expect(next.clips.map((clip) => clip.grade.color.exposure)).toEqual([0.3, 0.3]);
     expect(next.clips[0]!.grade.keyframes).toHaveLength(1);
     expect(next.layers).toEqual(keyed.layers);
     expect(next.adjustments).toEqual([]);
-    expect(() => applyCommand(keyed, { type: 'colour', clipIds: ['a', 'a'], colour })).toThrow('each clip once');
-    expect(() => applyCommand(keyed, { type: 'colour', clipIds: ['gone'], colour })).toThrow('gone no longer exists');
-    expect(() => applyCommand(keyed, { type: 'colour', colour })).toThrow('Give either clipIds');
-    expect(() => applyCommand(keyed, { type: 'colour', adjustmentId: 'look', clipIds: ['a'], colour })).toThrow(
+    expect(() => applyCommand(keyed, { type: 'color', clipIds: ['a', 'a'], color })).toThrow('each clip once');
+    expect(() => applyCommand(keyed, { type: 'color', clipIds: ['gone'], color })).toThrow('gone no longer exists');
+    expect(() => applyCommand(keyed, { type: 'color', color })).toThrow('Give either clipIds');
+    expect(() => applyCommand(keyed, { type: 'color', adjustmentId: 'look', clipIds: ['a'], color })).toThrow(
       'Give either clipIds',
     );
   });
@@ -235,11 +235,11 @@ describe('clip grade commands', () => {
     });
     expect(next.clips[1]!.grade.keyframes).toEqual([gradeKey(120, { exposure: 1 })]);
     expect(next.layers).toEqual(project().layers);
-    expect(() => applyCommand(next, { type: 'colour-setting', clipId: 'b', setting: 'exposure', value: 0 })).toThrow(
+    expect(() => applyCommand(next, { type: 'color-setting', clipId: 'b', setting: 'exposure', value: 0 })).toThrow(
       'follows 1 clip keyframe on clip b',
     );
-    next = applyCommand(next, { type: 'colour-setting', clipId: 'b', setting: 'contrast', value: 1.5 });
-    expect(next.clips[1]!.grade.colour.contrast).toBe(1.5);
+    next = applyCommand(next, { type: 'color-setting', clipId: 'b', setting: 'contrast', value: 1.5 });
+    expect(next.clips[1]!.grade.color.contrast).toBe(1.5);
     // Opacity belongs to the track Transform: no grade keyframe can hold it.
     const opacityKey = { type: 'layer-key-toggle', clipId: 'b', frame: 120, setting: 'opacity', value: 0.5 };
     expect(editCommandSchema.safeParse(opacityKey).success).toBe(false);
@@ -276,7 +276,7 @@ describe('clip grade commands', () => {
       values: { hue: 5, saturation: 0.1, lightness: 0 },
     });
     next = applyCommand(next, {
-      type: 'colour-curve',
+      type: 'color-curve',
       clipId: 'a',
       channel: 'master',
       points: [
@@ -284,13 +284,13 @@ describe('clip grade commands', () => {
         { x: 1, y: 1 },
       ],
     });
-    expect(next.clips[0]!.grade.colour.hsl.blue).toEqual({ hue: 5, saturation: 0.1, lightness: 0 });
-    expect(next.clips[0]!.grade.colour.curves.master).toHaveLength(2);
+    expect(next.clips[0]!.grade.color.hsl.blue).toEqual({ hue: 5, saturation: 0.1, lightness: 0 });
+    expect(next.clips[0]!.grade.color.curves.master).toHaveLength(2);
     expect(next.layers).toEqual(project().layers);
   });
 
   it('keeps the grade with the footage through trims, moves, splits and duplicates', () => {
-    let next = applyCommand(project(), { type: 'colour-setting', clipId: 'a', setting: 'exposure', value: 0.5 });
+    let next = applyCommand(project(), { type: 'color-setting', clipId: 'a', setting: 'exposure', value: 0.5 });
     next = applyCommand(next, { type: 'layer-key-set', clipId: 'a', frame: 40, values: { tint: 0.3 } });
     const grade = next.clips[0]!.grade;
     next = applyCommand(next, { type: 'trim', clipId: 'a', sourceIn: 10, sourceOut: 50 });
@@ -305,28 +305,28 @@ describe('clip grade commands', () => {
 });
 
 describe('clip grades for the assistant', () => {
-  it('summarises a grade by what differs from neutral: settings, HSL ranges, curves and a keyframe count', () => {
+  it('summarizes a grade by what differs from neutral: settings, HSL ranges, curves and a keyframe count', () => {
     expect(gradeSummary(createClipGrade())).toEqual({ settings: {}, keyframes: 0 });
-    const colour = createColourSettings();
-    colour.contrast = 1.1;
-    colour.hsl.blue = { hue: -5, saturation: 0.2, lightness: 0 };
-    colour.curves.master = [
+    const color = createColorSettings();
+    color.contrast = 1.1;
+    color.hsl.blue = { hue: -5, saturation: 0.2, lightness: 0 };
+    color.curves.master = [
       { x: 0, y: 0.05 },
       { x: 1, y: 1 },
     ];
-    expect(gradeSummary({ colour, keyframes: [{}, {}] })).toEqual({
+    expect(gradeSummary({ color, keyframes: [{}, {}] })).toEqual({
       settings: { contrast: 1.1 },
       hsl: { blue: { hue: -5, saturation: 0.2, lightness: 0 } },
-      curves: { master: colour.curves.master },
+      curves: { master: color.curves.master },
       keyframes: 2,
     });
   });
   it('reads each clip grade on its track, the grade shown at a frame and the adjustment there', async () => {
-    let document = applyCommand(project(), { type: 'colour-setting', clipId: 'a', setting: 'saturation', value: 1.3 });
+    let document = applyCommand(project(), { type: 'color-setting', clipId: 'a', setting: 'saturation', value: 1.3 });
     document = applyCommand(document, { type: 'layer-key-set', clipId: 'a', frame: 10, values: { tint: 0.2 } });
     document = projectSchema.parse({
       ...document,
-      adjustments: [{ ...createAdjustment('look', 60, 40), colour: { ...NEUTRAL_COLOUR, saturation: 1.2 } }],
+      adjustments: [{ ...createAdjustment('look', 60, 40), color: { ...NEUTRAL_COLOR, saturation: 1.2 } }],
     });
     document = applyCommand(document, {
       type: 'layer-key-set',
@@ -394,11 +394,11 @@ describe('copy and paste grade', () => {
     expect(copyGradeBlocked(document, clip('b'))).toContain('has keyframes');
     expect(pasteTargets(clip('a'), [clip('a'), clip('b')])).toEqual([clip('a'), clip('b')]);
     expect(pasteTargets(clip('a'), [clip('b')])).toEqual([clip('a')]);
-    const colour = { ...createColourSettings(), exposure: 0.4, hue: 12 };
-    const pasted = pasteGradeCommands(document, [clip('a'), clip('b')], colour).reduce(applyCommand, document);
+    const color = { ...createColorSettings(), exposure: 0.4, hue: 12 };
+    const pasted = pasteGradeCommands(document, [clip('a'), clip('b')], color).reduce(applyCommand, document);
     expect(pasted.clips.map((clip) => clip.grade)).toEqual([
-      { colour, keyframes: [] },
-      { colour, keyframes: [] },
+      { color, keyframes: [] },
+      { color, keyframes: [] },
     ]);
   });
 });
@@ -407,7 +407,7 @@ describe('clip grades in composited export', () => {
   const target = { width: 8, height: 4 };
   const pixels = target.width * target.height;
   const bounds = { x: 0, y: 0, ...target };
-  const sample = (id: string, grade: ColourSettings, colour: ColourSettings, blendWeight: number): PreviewLayer => ({
+  const sample = (id: string, grade: ColorSettings, color: ColorSettings, blendWeight: number): PreviewLayer => ({
     clipId: id,
     mediaId: id,
     layerId: 'video-1',
@@ -416,7 +416,7 @@ describe('clip grades in composited export', () => {
     spatial: { ...NEUTRAL_SPATIAL_POSE },
     detail: { ...NEUTRAL_DETAIL },
     grade,
-    colour,
+    color,
     weight: blendWeight,
     blendWeight,
     brightness: 1,
@@ -431,16 +431,16 @@ describe('clip grades in composited export', () => {
     }
     return rgb;
   };
-  const adjustment = { ...createColourSettings(), contrast: 1.3, saturation: 1.2 };
-  const warm = { ...createColourSettings(), temperature: 0.6, exposure: 0.3 };
+  const adjustment = { ...createColorSettings(), contrast: 1.3, saturation: 1.2 };
+  const warm = { ...createColorSettings(), temperature: 0.6, exposure: 0.3 };
   const ranged = {
-    ...createColourSettings(),
+    ...createColorSettings(),
     exposure: -0.2,
-    hsl: { ...createColourSettings().hsl, red: { hue: 12, saturation: 0.3, lightness: 0.05 } },
+    hsl: { ...createColorSettings().hsl, red: { hue: 12, saturation: 0.3, lightness: 0.05 } },
   };
 
   for (const [name, left, right] of [
-    ['scalar clip grades through one LUT each', warm, createColourSettings()],
+    ['scalar clip grades through one LUT each', warm, createColorSettings()],
     ['an HSL clip grade exactly', ranged, warm],
   ] as const)
     it(`grades each dissolve source by its clip, then the adjustment: ${name}`, async () => {
@@ -451,7 +451,7 @@ describe('clip grades in composited export', () => {
         buffer,
         target,
         samples.map((current) => ({ sample: current, rgb: input.get(current.clipId)!, bounds, original: target })),
-        new ColourLutCache(),
+        new ColorLutCache(),
         new AbortController().signal,
       );
       const output = new Uint16Array(buffer.buffer, buffer.byteOffset, pixels * 4);
@@ -466,7 +466,7 @@ describe('clip grades in composited export', () => {
       }
       expect(error / (pixels * 3)).toBeLessThan(name.startsWith('an HSL') ? 0.05 : 1);
       // The clip grade really changes the picture.
-      const adjustmentOnly = compositePixel([{ ...samples[0]!, grade: createColourSettings() }], () => [0.5, 0.3, 0.2]);
+      const adjustmentOnly = compositePixel([{ ...samples[0]!, grade: createColorSettings() }], () => [0.5, 0.3, 0.2]);
       expect(compositePixel([samples[0]!], () => [0.5, 0.3, 0.2])).not.toEqual(adjustmentOnly);
     });
 
@@ -475,21 +475,21 @@ describe('clip grades in composited export', () => {
     document.layers = [{ ...document.layers[0]!, transitions: [] }];
     document.clips = [document.clips[0]!];
     expect(needsLayeredExport(document)).toBe(false);
-    document.clips[0]!.grade.colour = warm;
+    document.clips[0]!.grade.color = warm;
     expect(needsLayeredExport(document)).toBe(false);
     expect(
-      needsLayeredExport({ ...document, clips: [{ ...document.clips[0]!, grade: { colour: ranged, keyframes: [] } }] }),
+      needsLayeredExport({ ...document, clips: [{ ...document.clips[0]!, grade: { color: ranged, keyframes: [] } }] }),
     ).toBe(true);
     expect(
       needsLayeredExport({
         ...document,
-        clips: [{ ...document.clips[0]!, grade: { colour: { ...warm, hdr: 0.2 }, keyframes: [] } }],
+        clips: [{ ...document.clips[0]!, grade: { color: { ...warm, hdr: 0.2 }, keyframes: [] } }],
       }),
     ).toBe(true);
     expect(
       needsLayeredExport({
         ...document,
-        clips: [{ ...document.clips[0]!, grade: { colour: warm, keyframes: [gradeKey(4, { tint: 0.1 })] } }],
+        clips: [{ ...document.clips[0]!, grade: { color: warm, keyframes: [gradeKey(4, { tint: 0.1 })] } }],
       }),
     ).toBe(true);
     expect(needsLayeredExport({ ...document, adjustments: [createAdjustment('look', 0, 10)] })).toBe(true);

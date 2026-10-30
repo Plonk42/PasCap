@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import path from 'node:path';
-import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
+import { COLOR_CONTROLS } from '../../src/shared/color.js';
 import { joiningEasing } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import {
@@ -165,7 +165,7 @@ async function unchanged(page: Page, before: Awaited<ReturnType<typeof checkpoin
 function edited(document: ProjectDocument, setting: Setting, value: number, frame?: number) {
   const expected = structuredClone(document);
   const adjustment = expected.adjustments[0]!;
-  if (frame === undefined) adjustment.colour[setting] = value;
+  if (frame === undefined) adjustment.color[setting] = value;
   else {
     const point = adjustment.keyframes.find((item) => item.frame === frame)!;
     // A capture that enables the setting adopts the Easing the keyframe's settings agree on.
@@ -173,7 +173,7 @@ function edited(document: ProjectDocument, setting: Setting, value: number, fram
       point.easing[setting] = joiningEasing(
         adjustment.keyframes,
         point,
-        COLOUR_CONTROLS.map((item) => item.key),
+        COLOR_CONTROLS.map((item) => item.key),
       );
     point.values[setting] = value;
   }
@@ -263,8 +263,8 @@ test('adjustment native controls preserve exact precision, invalid drafts, indiv
 }) => {
   const document = await current(page);
   for (const clip of document.clips) {
-    clip.grade.colour.temperature = 0.4;
-    clip.grade.colour.tint = -0.6;
+    clip.grade.color.temperature = 0.4;
+    clip.grade.color.tint = -0.6;
   }
   await fixture(page, document);
   // Selecting the adjustment shows it rather than the clips' own grades.
@@ -350,7 +350,7 @@ test('adjustment native controls preserve exact precision, invalid drafts, indiv
   }
   const resetBefore = await checkpoint(page);
   const neutral = edited(edited(resetBefore.document, 'temperature', 0), 'tint', 0);
-  await page.getByRole('button', { name: 'Reset colour', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset color', exact: true }).click();
   for (const { label } of channels) await expect(controls(page, label).exact).toHaveValue('0');
   await editAndUndo(page, resetBefore, neutral);
   const finished = await current(page);
@@ -366,7 +366,7 @@ test('adjustment native controls preserve exact precision, invalid drafts, indiv
   }
   expect(await current(page)).toEqual(finished);
   for (const clip of finished.clips) {
-    expect(clip).not.toHaveProperty('colour');
+    expect(clip).not.toHaveProperty('color');
     expect(clip).not.toHaveProperty('temperature');
     expect(clip).not.toHaveProperty('tint');
   }
@@ -395,13 +395,13 @@ test('main and stored native pointer drafts cancel safely, then release as one s
         : setting === 'temperature'
           ? 'Escape'
           : 'windowblur';
-      const cancelled = await beginDrag(page, slider);
-      await moveDrag(page, cancelled, 0.8);
+      const canceled = await beginDrag(page, slider);
+      await moveDrag(page, canceled, 0.8);
       expect(await slider.inputValue()).not.toBe(initialSlider);
       await expect(exact).toHaveValue(await slider.inputValue());
       await expect(exact).toBeDisabled();
       await unchanged(page, before);
-      await cancelDrag(page, slider, cancelled, cancellation);
+      await cancelDrag(page, slider, canceled, cancellation);
       await expect(widget).toHaveAttribute('data-pointer-draft', 'false');
       await expect(slider).toHaveValue(initialSlider);
       await expect(exact).toHaveValue(initialExact);
@@ -433,8 +433,8 @@ test('animated missing participants stay read-only until explicit capture; remov
   page,
 }) => {
   const document = await current(page);
-  document.adjustments[0]!.colour.temperature = 0.35;
-  document.adjustments[0]!.colour.tint = -0.25;
+  document.adjustments[0]!.color.temperature = 0.35;
+  document.adjustments[0]!.color.tint = -0.25;
   document.adjustments[0]!.keyframes = [
     gradePoint(10, { temperature: -0.5 }),
     gradePoint(20, { exposure: 0.4 }, 'smooth'),
@@ -511,8 +511,8 @@ test('main and outside-range stored resets edit only existing participants; exac
   page,
 }) => {
   const document = await current(page);
-  document.adjustments[0]!.colour.temperature = 0.3;
-  document.adjustments[0]!.colour.tint = -0.2;
+  document.adjustments[0]!.color.temperature = 0.3;
+  document.adjustments[0]!.color.tint = -0.2;
   document.adjustments[0]!.keyframes = [
     gradePoint(10, { temperature: -0.6, tint: 0.4, exposure: 0.25 }, 'smooth'),
     gradePoint(30, { tint: -0.8 }, 'hold'),
@@ -521,7 +521,7 @@ test('main and outside-range stored resets edit only existing participants; exac
   await fixture(page, document);
   await seek(page, 30);
   await expect(controls(page, 'Temperature').exact).toBeDisabled();
-  for (const action of ['Tint', 'Reset colour']) {
+  for (const action of ['Tint', 'Reset color']) {
     const mainBefore = await checkpoint(page);
     if (action === 'Tint') await resetSetting(page, 'Tint');
     else await page.getByRole('button', { name: action, exact: true }).click();
@@ -602,7 +602,7 @@ test('channel navigation skips unrelated keys and previews a key after the adjus
   await next.press('Enter');
   await previewAt(page, 119);
   await expect(next).toBeFocused();
-  await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: 'Color', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(diamond(page, 'Temperature')).toHaveAttribute('aria-pressed', 'false');
   await expect(diamond(page, 'Temperature')).toHaveAttribute('title', /at frame 119 of adjustment /);
   await expect(controls(page, 'Temperature').exact).toBeDisabled();

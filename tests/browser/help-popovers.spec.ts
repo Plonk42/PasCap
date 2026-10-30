@@ -152,7 +152,7 @@ test('bulk Clip expansion preserves other tabs, mixed state and preferences with
   ).toBe(true);
   expect(
     await page.evaluate(() =>
-      ['source', 'layer-opacity', 'speed', 'transform', 'colour', 'transition', 'fades', 'music'].map((id) =>
+      ['source', 'layer-opacity', 'speed', 'transform', 'color', 'transition', 'fades', 'music'].map((id) =>
         localStorage.getItem(`pascap-section-${id}`),
       ),
     ),
@@ -165,7 +165,7 @@ test('bulk Clip expansion preserves other tabs, mixed state and preferences with
     'aria-expanded',
     'false',
   );
-  await expect(page.getByRole('button', { name: 'Colour section', exact: true, includeHidden: true })).toHaveAttribute(
+  await expect(page.getByRole('button', { name: 'Color section', exact: true, includeHidden: true })).toHaveAttribute(
     'aria-expanded',
     'true',
   );
@@ -174,12 +174,12 @@ test('bulk Clip expansion preserves other tabs, mixed state and preferences with
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
-test('Colour, Track and Audio bulk expansion change only their own sections', async ({ page }) => {
+test('Color, Track and Audio bulk expansion change only their own sections', async ({ page }) => {
   const before = await current(page);
   const sections = (ids: string[]) =>
     page.evaluate((list) => list.map((id) => localStorage.getItem(`pascap-section-${id}`)), ids);
   const tabs = [
-    { tab: 'Colour', ids: ['colour', 'hsl', 'curves'], titles: ['Colour', 'HSL ranges', 'Colour curves'] },
+    { tab: 'Color', ids: ['color', 'hsl', 'curves'], titles: ['Color', 'HSL ranges', 'Color curves'] },
     { tab: 'Track', ids: ['transform', 'transition', 'fades'], titles: ['Transform', 'Transitions', 'Fades'] },
   ] as const;
   const otherIds = ['speed', 'source', 'layer-opacity', 'music'];
@@ -189,7 +189,7 @@ test('Colour, Track and Audio bulk expansion change only their own sections', as
     const closed = ids.map(() => 'closed');
     const rest = await sections(tabs.flatMap((other) => (other.tab === tab ? [] : [...other.ids])));
     await inspectorTab(page, tab);
-    // HSL ranges, Colour curves and Transform start collapsed: a mixed tab offers Collapse all first.
+    // HSL ranges, Color curves and Transform start collapsed: a mixed tab offers Collapse all first.
     await page.getByRole('button', { name: `Collapse all ${tab} sections`, exact: true }).click();
     expect(await sections([...ids])).toEqual(closed);
     await page.getByRole('button', { name: `Expand all ${tab} sections`, exact: true }).click();
@@ -227,7 +227,7 @@ test('Colour, Track and Audio bulk expansion change only their own sections', as
 test('bulk collapse retains invalid drafts, nested disclosure state and reachable heading help at the minimum viewport', async ({
   page,
 }) => {
-  // The selected clip's grade is keyed, so its Colour tab and Clip tab show together.
+  // The selected clip's grade is keyed, so its Color tab and Clip tab show together.
   const keyed = await current(page);
   keyed.clips[0]!.grade.keyframes = [gradePoint(10, { exposure: 0 }), gradePoint(90, { exposure: 0.8 })];
   memory.seed(keyed);
@@ -366,7 +366,7 @@ test('keyboard focus previews, Enter and Space pin, and help keys never fire tim
   expect(memory.saves).toBe(0);
 });
 
-test('Escape closes a hover preview before cancelling an underlying invalid numeric draft', async ({ page }) => {
+test('Escape closes a hover preview before canceling an underlying invalid numeric draft', async ({ page }) => {
   const before = await current(page);
   const input = page.getByRole('textbox', { name: 'Source IN frame', exact: true });
   await input.fill('0.5');
@@ -389,18 +389,18 @@ test('Escape closes a hover preview before cancelling an underlying invalid nume
 
 test('changing Inspector context without clicking dismisses help whose owner becomes hidden', async ({ page }) => {
   const clipTab = page.getByRole('tab', { name: 'Clip', exact: true });
-  const colourTab = page.getByRole('tab', { name: 'Colour', exact: true });
+  const colorTab = page.getByRole('tab', { name: 'Color', exact: true });
   const trackTab = page.getByRole('tab', { name: 'Track', exact: true });
   await clipTab.focus();
   await clipTab.press('ArrowRight');
-  await expect(colourTab).toHaveAttribute('aria-selected', 'true');
-  await expect(colourTab).toBeFocused();
+  await expect(colorTab).toHaveAttribute('aria-selected', 'true');
+  await expect(colorTab).toBeFocused();
   const trigger = page.getByRole('button', { name: 'Animation help', exact: true });
   const panel = await panelFor(page, trigger);
   await trigger.click();
   await expect(panel).toBeVisible();
-  await colourTab.focus();
-  await colourTab.press('ArrowRight');
+  await colorTab.focus();
+  await colorTab.press('ArrowRight');
   await expect(trackTab).toHaveAttribute('aria-selected', 'true');
   await expect(trackTab).toBeFocused();
   await expect(panel).toHaveJSProperty('popover', 'manual');
@@ -453,12 +453,12 @@ const HELP_CONTEXTS = [
   },
   { label: 'Placement timing', tab: 'Clip', text: 'Tip: Opacity is in the Track tab, with Transform.' },
   {
-    label: 'Colour animation',
+    label: 'Color animation',
     tab: 'Clip grade',
     text: 'These settings grade this clip only, before any adjustment',
   },
   {
-    label: 'Colour animation',
+    label: 'Color animation',
     tab: 'Adjustment',
     text: 'These settings grade every video track within this adjustment’s range, after each clip’s own grade',
   },
@@ -486,7 +486,7 @@ const INSPECTOR_HELP_HEADINGS = [
   { title: 'Range', help: 'Source timing', tab: 'Clip' },
   { title: 'Placement', help: 'Placement timing', tab: 'Clip' },
   { title: 'Speed', help: 'Speed timing', tab: 'Clip' },
-  { title: 'Colour', help: 'Colour animation', tab: 'Adjustment' },
+  { title: 'Color', help: 'Color animation', tab: 'Adjustment' },
   { title: 'Transitions', help: 'Transition timing', tab: 'Track' },
   { title: 'Fades', help: 'Fade timing', tab: 'Track' },
 ] as const;

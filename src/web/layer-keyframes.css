@@ -32,7 +32,7 @@
   opacity: 0.4;
 }
 
-/* The ◇/◆/▼ glyphs sit off-centre in common fonts; draw them so they centre in any font. The text stays. */
+/* The ◇/◆/▼ glyphs sit off-center in common fonts; draw them so they center in any font. The text stays. */
 .keyframe-toggle:not(.transform-keyframe-toggle) > [aria-hidden='true'],
 .keyframe-glyph.diamond {
   width: 8px;
@@ -72,7 +72,7 @@
   mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 10'%3E%3Cpath d='M1 1h9L5.5 9z' stroke='black' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
-/* Speed keyframes are circles, distinct from the Colour diamond and Transform triangle. */
+/* Speed keyframes are circles, distinct from the Color diamond and Transform triangle. */
 .keyframe-toggle.speed-keyframe-toggle > [aria-hidden='true'],
 .keyframe-glyph.circle {
   width: 9px;
@@ -99,7 +99,7 @@
   color: #ffc7bb;
 }
 
-/* Transform keyframes use the timeline marker's blue triangle, not the Colour diamond. */
+/* Transform keyframes use the timeline marker's blue triangle, not the Color diamond. */
 .keyframe-toggle.transform-keyframe-toggle {
   font-size: 15px;
 }
@@ -125,14 +125,14 @@
   border-bottom: 1px solid var(--line);
 }
 
-/* Colour and Transform end with their stored keyframe list, below a hairline. */
+/* Color and Transform end with their stored keyframe list, below a hairline. */
 .product-workspace .inspector-panel .layer-keyframe-controls.section-keyframes {
   padding: 10px 0 0;
   border-top: 1px solid var(--line);
   border-bottom: 0;
 }
 
-.inspector-panel .colour-controls + .section-keyframes {
+.inspector-panel .color-controls + .section-keyframes {
   margin: 0 14px 13px;
 }
 
@@ -374,7 +374,7 @@
   margin: 0;
 }
 
-.layer-keyframe-point-values .keyframe-value.colour-control {
+.layer-keyframe-point-values .keyframe-value.color-control {
   display: grid;
   gap: 6px;
   min-width: 0;
@@ -498,7 +498,7 @@
   background: #edc886;
 }
 
-/* Track Transform keys: blue ▼ boxes overlapping the lane's top edge, as Colour's overlap its bottom. */
+/* Track Transform keys: blue ▼ boxes overlapping the lane's top edge, as Color's overlap its bottom. */
 .timeline-transform-key {
   position: absolute;
   z-index: 6;

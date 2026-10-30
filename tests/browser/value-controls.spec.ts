@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import path from 'node:path';
 import type { AudioAsset } from '../../src/shared/audio.js';
-import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
+import { COLOR_CONTROLS } from '../../src/shared/color.js';
 import { applyCommand, type EditCommand } from '../../src/shared/commands.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
@@ -135,7 +135,7 @@ function controls(scope: Page | Locator, name: string) {
   return { slider, exact: scope.getByRole('spinbutton', { name, exact: true }), widget: slider.locator('..') };
 }
 
-/** Track → Transform owns Opacity and stored Transform values; the Colour tab's adjustment owns Colour and its
+/** Track → Transform owns Opacity and stored Transform values; the Color tab's adjustment owns Color and its
  * stored keyframe values; Audio owns gain; Clip owns clip speed. */
 async function showControl(page: Page, name: string): Promise<void> {
   if (name === 'Music gain') await inspectorTab(page, 'Audio');
@@ -210,7 +210,7 @@ async function beginDrag(page: Page, slider: Locator) {
       inset: 5 + Number.parseFloat(getComputedStyle(element).borderLeftWidth),
     };
   });
-  // Native range thumbs inset their centres from the ends of the track.
+  // Native range thumbs inset their centers from the ends of the track.
   await page.mouse.move(
     box.x + geometry.inset + geometry.ratio * (box.width - 2 * geometry.inset),
     box.y + box.height / 2,
@@ -288,9 +288,9 @@ const opacityEdit: ValueEdit = (_document, percent) => ({
   value: percent / 100,
 });
 const exposureEdit: ValueEdit = (document, exposure) => ({
-  type: 'colour',
+  type: 'color',
   adjustmentId: 'adjustment',
-  colour: { ...document.adjustments[0]!.colour, exposure },
+  color: { ...document.adjustments[0]!.color, exposure },
 });
 const constantEdit: ValueEdit = (_document, rate) => ({
   type: 'speed',
@@ -302,7 +302,7 @@ const gainEdit: ValueEdit = (document, gainDb) => ({
   music: document.music.map((track) => (track.id === 'value-music-track' ? { ...track, gainDb } : track)),
 });
 
-test('adjustment Colour captures its base and keeps precise release-only edits identical across clip selection', async ({
+test('adjustment Color captures its base and keeps precise release-only edits identical across clip selection', async ({
   page,
 }) => {
   const document = await current(page);
@@ -317,11 +317,11 @@ test('adjustment Colour captures its base and keeps precise release-only edits i
   await base.press('Enter');
   await page.getByRole('button', { name: 'Keyframe Exposure', exact: true }).click();
   let changed = await current(page);
-  expect(changed.adjustments[0]!.colour.exposure).toBe(0.5);
+  expect(changed.adjustments[0]!.color.exposure).toBe(0.5);
   expect(changed.adjustments[0]!.keyframes[0]!.values.exposure).toBe(0.5);
   expect(changed.clips).toEqual(document.clips);
   await page.getByRole('button', { name: 'Keyframe Exposure', exact: true }).click();
-  expect((await current(page)).adjustments[0]!.colour.exposure).toBe(0.5);
+  expect((await current(page)).adjustments[0]!.color.exposure).toBe(0.5);
   await expect(page.getByRole('button', { name: 'Clip correction', exact: true })).toHaveCount(0);
   await pointerEdit(page, 'Exposure', exposureEdit);
   await preciseEdit(page, 'Exposure', -0.123456789, exposureEdit);
@@ -337,11 +337,11 @@ test('adjustment Colour captures its base and keeps precise release-only edits i
   await inspectorTab(page, 'Adjustment');
   await expect(base).toHaveValue('0.5');
   changed = await current(page);
-  expect(changed.adjustments[0]!.colour.exposure).toBe(0.5);
+  expect(changed.adjustments[0]!.color.exposure).toBe(0.5);
   expect(changed.clips).toEqual(document.clips);
 });
 
-test('an empty timeline exposes every adjustment Colour widget and Transform Opacity, and no clip colour scope', async ({
+test('an empty timeline exposes every adjustment Color widget and Transform Opacity, and no clip color scope', async ({
   page,
 }) => {
   const document = await current(page);
@@ -349,31 +349,31 @@ test('an empty timeline exposes every adjustment Colour widget and Transform Opa
   document.music = [];
   await fixture(page, document);
   await preciseEdit(page, 'Exposure', 0.123456789, exposureEdit);
-  for (const name of COLOUR_CONTROLS.map((control) => control.label)) {
+  for (const name of COLOR_CONTROLS.map((control) => control.label)) {
     await expect(page.getByRole('slider', { name, exact: true })).toBeEnabled();
     await expect(page.getByRole('button', { name: `Keyframe ${name}`, exact: true })).toBeEnabled();
   }
   await expect(page.getByRole('button', { name: 'Clip correction', exact: true })).toHaveCount(0);
-  expect((await current(page)).adjustments[0]!.colour).toEqual(document.adjustments[0]!.colour);
+  expect((await current(page)).adjustments[0]!.color).toEqual(document.adjustments[0]!.color);
   await showControl(page, 'Transform Opacity');
   await expect(page.getByRole('slider', { name: 'Transform Opacity', exact: true })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Keyframe Opacity', exact: true })).toBeEnabled();
 });
 
-test('Colour groups its sliders under labelled headings, each with a one-step group Reset', async ({ page }) => {
+test('Color groups its sliders under labeled headings, each with a one-step group Reset', async ({ page }) => {
   const document = await current(page);
-  Object.assign(document.adjustments[0]!.colour, { exposure: 0.5, shadows: -0.2, hue: 30 });
+  Object.assign(document.adjustments[0]!.color, { exposure: 0.5, shadows: -0.2, hue: 30 });
   await fixture(page, document);
   await inspectorTab(page, 'Adjustment');
   const groups = {
-    Colour: ['Temperature', 'Tint', 'Hue', 'Saturation', 'Vibrance'],
+    Color: ['Temperature', 'Tint', 'Hue', 'Saturation', 'Vibrance'],
     Light: ['Exposure', 'Brightness', 'Contrast', 'Highlights', 'Shadows', 'Whites', 'Blacks'],
     Effects: ['HDR', 'Local contrast'],
   };
-  const colourControls = page.locator('.inspector-panel .colour-controls');
-  await expect(colourControls.getByRole('group')).toHaveCount(3);
+  const colorControls = page.locator('.inspector-panel .color-controls');
+  await expect(colorControls.getByRole('group')).toHaveCount(3);
   for (const [name, sliders] of Object.entries(groups)) {
-    const group = colourControls.getByRole('group', { name, exact: true });
+    const group = colorControls.getByRole('group', { name, exact: true });
     expect(
       await group.getByRole('slider').evaluateAll((items) => items.map((item) => item.getAttribute('aria-label'))),
     ).toEqual(sliders);
@@ -387,24 +387,24 @@ test('Colour groups its sliders under labelled headings, each with a one-step gr
     page,
     before,
     applyCommand(before.document, {
-      type: 'colour',
+      type: 'color',
       adjustmentId: 'adjustment',
-      colour: { ...before.document.adjustments[0]!.colour, exposure: 0, shadows: 0 },
+      color: { ...before.document.adjustments[0]!.color, exposure: 0, shadows: 0 },
     }),
   );
 });
 
-test('all main colour, Opacity, constant-rate and Gain sliders draft locally and release as exactly one edit', async ({
+test('all main color, Opacity, constant-rate and Gain sliders draft locally and release as exactly one edit', async ({
   page,
 }) => {
   // Twelve live-previewed drags: 44 s measured CI-like (software GL, two cores).
   test.setTimeout(240_000);
   await pointerEdit(page, 'Transform Opacity', opacityEdit);
-  for (const control of COLOUR_CONTROLS) {
+  for (const control of COLOR_CONTROLS) {
     await pointerEdit(page, control.label, (document, value) => ({
-      type: 'colour',
+      type: 'color',
       adjustmentId: 'adjustment',
-      colour: { ...document.adjustments[0]!.colour, [control.key]: value },
+      color: { ...document.adjustments[0]!.color, [control.key]: value },
     }));
   }
   await pointerEdit(page, 'Clip speed rate', constantEdit);
@@ -914,8 +914,8 @@ test('common widgets fit 270px inspectors at the default and minimum viewports w
             };
           }),
       );
-      // Clip: speed rate and three Detail values; clip grade: fourteen Colour and three HSL; adjustment: fourteen
-      // Colour, three HSL and three stored values; Track: nine Transform settings including Opacity; Audio: gain.
+      // Clip: speed rate and three Detail values; clip grade: fourteen Color and three HSL; adjustment: fourteen
+      // Color, three HSL and three stored values; Track: nine Transform settings including Opacity; Audio: gain.
       const expected = { Clip: 4, 'Clip grade': 17, Adjustment: 20, Track: 9, Audio: 1 }[tab];
       expect(widgets.length, `${width}px ${tab}`).toBe(expected);
       for (const widget of widgets) {

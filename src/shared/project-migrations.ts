@@ -1,7 +1,7 @@
 import { PROJECT_SCHEMA_VERSION } from './model.js';
 
 /** Oldest saved project schema this build still opens: the first one used for real editing. */
-export const OLDEST_PROJECT_SCHEMA_VERSION: number = 27;
+export const OLDEST_PROJECT_SCHEMA_VERSION: number = 28;
 
 type SavedProject = Record<string, unknown>;
 type Migration = (document: SavedProject) => SavedProject;
@@ -10,10 +10,12 @@ type Migration = (document: SavedProject) => SavedProject;
 const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = {};
 
 /**
- * Schema 27 replaced track Colour, Opacity and keyframes with clip grades, adjustments and Transform
+ * Schema 27 replaced track Color, Opacity and keyframes with clip grades, adjustments and Transform
  * Opacity, without an upgrade (owner decision, #286): earlier projects are rejected and left unchanged.
  */
-const TRACK_COLOUR_REMOVED = 27;
+const TRACK_COLOR_REMOVED = 27;
+/** Schema 28 renamed saved fields to American English (`colour` to `color`), without an upgrade (owner decision, #292). */
+const AMERICAN_SPELLING = 28;
 
 export function supportedProjectVersions(): string {
   return OLDEST_PROJECT_SCHEMA_VERSION === PROJECT_SCHEMA_VERSION
@@ -47,9 +49,12 @@ export function upgradeProject(value: unknown, subject = 'project'): unknown {
     let reason = `Projects older than version ${OLDEST_PROJECT_SCHEMA_VERSION} cannot be upgraded.`;
     if (typeof rawVersion === 'number' && rawVersion > PROJECT_SCHEMA_VERSION)
       reason = 'It was saved by a newer PasCap version; update PasCap to open it.';
-    else if (typeof rawVersion === 'number' && rawVersion < TRACK_COLOUR_REMOVED)
+    else if (typeof rawVersion === 'number' && rawVersion < TRACK_COLOR_REMOVED)
       reason =
-        'It grades with track Colour, which PasCap replaced with clip grades and adjustments; it cannot be upgraded and is left unchanged.';
+        'It grades with track Color, which PasCap replaced with clip grades and adjustments; it cannot be upgraded and is left unchanged.';
+    else if (typeof rawVersion === 'number' && rawVersion < AMERICAN_SPELLING)
+      reason =
+        'It uses British field names such as "colour", which PasCap renamed to American English ("color"); it cannot be upgraded and is left unchanged.';
     throw new Error(
       `Unsupported ${subject} schema version ${version}; this build requires ${supportedProjectVersions()}. ${reason}`,
     );

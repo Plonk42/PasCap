@@ -1,16 +1,16 @@
 import { useId } from 'react';
 import type { EditCommand } from '../shared/commands.js';
-import type { ScalarColourSetting } from '../shared/colour.js';
+import type { ScalarColorSetting } from '../shared/color.js';
 import { activeLayerSetting, hasLayerKeys, isKeyframeFrame } from '../shared/keyframes.js';
 import { ChannelKeyframeNavigation } from './AnimationControls.js';
-import { isClipOwner, ownerTarget, type ColourOwner } from './colour-owner.js';
+import { isClipOwner, ownerTarget, type ColorOwner } from './color-owner.js';
 import './layer-keyframes.css';
 import './keyframe-navigation.css';
 import { useKeyframeNavigation } from './keyframe-navigation.js';
 
 export interface KeyframeToggleProps {
-  layer: ColourOwner;
-  setting: ScalarColourSetting;
+  layer: ColorOwner;
+  setting: ScalarColorSetting;
   label: string;
   frame: number;
   value: number;
@@ -19,7 +19,7 @@ export interface KeyframeToggleProps {
 }
 
 /** The diamond's title and description, for a clip grade's keyframes or an adjustment's. */
-function toggleWording(layer: ColourOwner, label: string, frame: number, state: { active: boolean; valid: boolean }) {
+function toggleWording(layer: ColorOwner, label: string, frame: number, state: { active: boolean; valid: boolean }) {
   const clip = isClipOwner(layer);
   const owner = clip
     ? { scope: 'clip', at: 'source frame', whole: 'clip' }

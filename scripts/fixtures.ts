@@ -95,7 +95,7 @@ export async function preparedFixture(
   }
   const jobs = new JobQueue();
   const library = new MediaLibrary(config, jobs);
-  await library.initialise();
+  await library.initialize();
   if (existing) return { jobs, library, document: existing };
   const sources = await syntheticSources(config);
   let document = createProject(projectId, 'Synthetic preview · disposable');
@@ -165,7 +165,7 @@ if (process.argv.includes('--browser')) {
     musicFile,
   ]);
   const audio = new AudioLibrary(config, fixture.jobs);
-  await audio.initialise();
+  await audio.initialize();
   const registeredMusic = await audio.register(musicFile);
   const preparedMusic = await fixture.jobs.wait(registeredMusic.job.id);
   if (preparedMusic.state !== 'completed') throw new Error(preparedMusic.message);

@@ -30,7 +30,9 @@ importing the moved file is then the only option.
 ## Registries and caches
 
 Registry version 2 adds the required nullable `content` to every video and music
-asset and is stored in `videos.json` and `music.json`. The earlier `library.json`
+asset and is stored in `videos.json` and `music.json`. Video registry version 3 renames the
+metadata fields to American spelling (`colorSpace`…); a version-2 `videos.json` is upgraded when
+read and rewritten as version 3 on the next save. The earlier `library.json`
 and `audio.json` (version 1) are **not read and not modified**; recordings are
 imported again into new projects. Proxy, thumbnail and PCM caches live under
 `assets/<media id>/` and `audio-assets/<audio id>/`, keyed by the immutable asset ID

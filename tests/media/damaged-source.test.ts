@@ -64,7 +64,7 @@ describe.skipIf(!enabled)('damaged originals · disposable native fixtures', () 
     config = createConfig({ dataDir: path.join(root, 'cache') });
     jobs = new JobQueue();
     library = new MediaLibrary(config, jobs);
-    await library.initialise();
+    await library.initialize();
     const filename = path.join(sources, 'damaged.mp4');
     await damagedSource(filename, 0);
     asset = await library.register(filename);

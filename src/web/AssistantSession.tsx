@@ -81,16 +81,16 @@ export function useFollowAssistant({ projectId, revision, idle, load, adopt }: F
   const target = status?.revision ?? null;
   useEffect(() => {
     if (projectId === null || target === null || !followed || target === revision() || !idle()) return;
-    let cancelled = false;
+    let canceled = false;
     void load(projectId)
       .then((document) => {
         const from = revision();
-        if (!cancelled && document.revision !== from && idle())
+        if (!canceled && document.revision !== from && idle())
           adopt(document, latestEditedFrame(session, from, document.revision));
       })
       .catch(() => undefined);
     return () => {
-      cancelled = true;
+      canceled = true;
     };
     // Each poll rechecks, so a revision skipped during a gesture is adopted once the editor is idle.
   }, [projectId, status, session, target, followed, revision, idle, load, adopt]);

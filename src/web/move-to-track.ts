@@ -8,7 +8,7 @@ export function nextLayerName(project: ProjectDocument): string {
   return `Track ${number}`;
 }
 
-/** Colour belongs to the track, so a different look means a new track; the clip keeps its start and order. */
+/** Color belongs to the track, so a different look means a new track; the clip keeps its start and order. */
 export function moveToNewTrack(
   project: ProjectDocument,
   clipId: string,

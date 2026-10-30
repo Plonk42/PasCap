@@ -3,7 +3,7 @@ import { damageLabel, mediaAssetSchema } from '../../src/shared/media.js';
 import { damagedRanges, originalErrorArgs, repairFilter } from '../../src/server/damage.js';
 
 describe('damaged recordings', () => {
-  it('extends undecodable frames to their whole groups of pictures and merges neighbours', () => {
+  it('extends undecodable frames to their whole groups of pictures and merges neighbors', () => {
     const keyframes = [0, 30, 60, 90, 120];
     expect(damagedRanges([31, 33, 32], keyframes, 150)).toEqual([{ start: 30, end: 60 }]);
     expect(damagedRanges([59, 61], keyframes, 150)).toEqual([{ start: 30, end: 90 }]);
@@ -60,10 +60,10 @@ describe('damaged recordings', () => {
         frameRate: { numerator: 30000, denominator: 1001 },
         frameCount: 100,
         durationSeconds: 3.3,
-        colourPrimaries: 'bt709',
-        colourTransfer: 'bt709',
-        colourSpace: 'bt709',
-        colourRange: 'tv',
+        colorPrimaries: 'bt709',
+        colorTransfer: 'bt709',
+        colorSpace: 'bt709',
+        colorRange: 'tv',
         hasAudio: false,
       },
       status: 'registered',

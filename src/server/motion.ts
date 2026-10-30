@@ -19,7 +19,7 @@ const LOG2N = 6;
 const FRAME_BYTES = MOTION_WIDTH * MOTION_HEIGHT;
 /** Frames measured per worker task. */
 const CHUNK_FRAMES = 30;
-/** Block centres covering the frame; each block measures a local shift. */
+/** Block centers covering the frame; each block measures a local shift. */
 const BLOCKS = [40, 90, 140].flatMap((cy) => [40, 120, 200, 280].map((cx) => ({ cx, cy })));
 const MIN_TEXTURE = 3;
 const MIN_PEAK = 8;
@@ -109,11 +109,11 @@ interface Shift {
 const corrRe = new Float64Array(N * N);
 const corrIm = new Float64Array(N * N);
 
-function subpixel(left: number, centre: number, right: number): number {
+function subpixel(left: number, center: number, right: number): number {
   if (left <= 0 || right <= 0) return 0;
   const l = Math.log(left);
   const r = Math.log(right);
-  const curvature = l - 2 * Math.log(centre) + r;
+  const curvature = l - 2 * Math.log(center) + r;
   return curvature < 0 ? (0.5 * (l - r)) / curvature : 0;
 }
 
@@ -149,12 +149,12 @@ export function correlate(a: Spectrum, b: Spectrum): Shift {
   const px = best % N;
   const py = Math.trunc(best / N);
   const at = (x: number, y: number): number => corrRe[((y + N) % N) * N + ((x + N) % N)]!;
-  const centre = at(px, py);
-  let dx = px + subpixel(at(px - 1, py), centre, at(px + 1, py));
-  let dy = py + subpixel(at(px, py - 1), centre, at(px, py + 1));
+  const center = at(px, py);
+  let dx = px + subpixel(at(px - 1, py), center, at(px + 1, py));
+  let dy = py + subpixel(at(px, py - 1), center, at(px, py + 1));
   if (dx > N / 2) dx -= N;
   if (dy > N / 2) dy -= N;
-  return { dx, dy, peak: peakToSidelobe(px, py, centre) };
+  return { dx, dy, peak: peakToSidelobe(px, py, center) };
 }
 
 /** A fixed window biases shifts toward zero: re-measure where the content moved. */
@@ -201,7 +201,7 @@ interface BlockShift extends Shift {
   y: number;
 }
 
-/** Weighted least squares for d = t + zoom·p + rotation·perp(p), p relative to the centre. */
+/** Weighted least squares for d = t + zoom·p + rotation·perp(p), p relative to the center. */
 function fit(shifts: readonly BlockShift[]): number[] | null {
   const normal = Array.from({ length: 4 }, () => [0, 0, 0, 0, 0]);
   for (const s of shifts)
@@ -331,7 +331,7 @@ export async function readTelemetry(
 }
 
 /** Measures every proxy frame against the previous one; the proxy has one frame per source frame. */
-export async function analyseProxy(
+export async function analyzeProxy(
   ffmpeg: string,
   proxy: string,
   frameCount: number,
@@ -374,8 +374,8 @@ export async function analyseProxy(
     child.on('close', resolve);
     child.on('error', () => resolve(null));
   });
-  const cancelled = (): void => {
-    if (signal.aborted) throw new ServiceError('Job cancelled.', 499);
+  const canceled = (): void => {
+    if (signal.aborted) throw new ServiceError('Job canceled.', 499);
   };
   const analysis: Omit<MotionAnalysis, 'telemetry'> = {
     version: MOTION_ANALYSIS_VERSION,
@@ -400,7 +400,7 @@ export async function analyseProxy(
     progress(analysis.tx.length / frameCount);
   };
   try {
-    const reader = RawFrameReader.create(child.stdout, 'Motion analysis decoder', cancelled);
+    const reader = RawFrameReader.create(child.stdout, 'Motion analysis decoder', canceled);
     // Each chunk starts with the last frame of the one before, which its first measurement needs.
     let chunk = new Uint8Array((CHUNK_FRAMES + 1) * FRAME_BYTES);
     let filled = 0;
@@ -447,7 +447,7 @@ export async function analyseProxy(
     await pool?.close();
   }
   const code = await closed;
-  cancelled();
+  canceled();
   if (code !== 0) throw new ServiceError(`Motion analysis could not decode the proxy. ${stderr.trim()}`, 422);
   if (analysis.tx.length !== frameCount)
     throw new ServiceError(

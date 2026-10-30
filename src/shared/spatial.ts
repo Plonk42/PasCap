@@ -14,7 +14,7 @@ const cropFraction = (edge: string) =>
   described(z.number().min(0).max(1), `Fraction of the recording's ${edge} removed, neutral 0.`);
 
 /**
- * Crop removes source coverage; it never refits or moves the original-centre pivot.
+ * Crop removes source coverage; it never refits or moves the original-center pivot.
  * Opposite edges summing to 1 or more simply cover nothing, so no pairwise refinement.
  */
 export const spatialPoseSchema = z
@@ -34,7 +34,7 @@ export const spatialPoseSchema = z
     ),
     rotation: described(
       z.number().min(-180).max(180),
-      'Clockwise rotation in degrees around the picture centre, neutral 0.',
+      'Clockwise rotation in degrees around the picture center, neutral 0.',
     ),
     opacity: described(
       z.number().min(0).max(1),
@@ -46,7 +46,7 @@ export const spatialPoseSchema = z
 export type SpatialPose = z.infer<typeof spatialPoseSchema>;
 export type SpatialChannel = keyof SpatialPose;
 
-/** Ordered control catalogue; every channel animates independently. */
+/** Ordered control catalog; every channel animates independently. */
 export const SPATIAL_CHANNELS = Object.freeze(Object.keys(spatialPoseSchema.shape) as SpatialChannel[]);
 
 const poseShape = spatialPoseSchema.shape;
@@ -156,7 +156,7 @@ function evaluateChannel(
   return from * (1 - progress) + to * progress;
 }
 
-/** The track's pose at an absolute project frame, like its Colour. */
+/** The track's pose at an absolute project frame, like its Color. */
 export function evaluateSpatial(settings: SpatialSettings, projectFrame: number): SpatialPose {
   requireFinite(projectFrame, 'Transform project frame');
   const validated = spatialSettingsSchema.parse(settings);
@@ -215,7 +215,7 @@ export interface SpatialMapping {
   /**
    * Top-left, positive-Y-down normalized output (X,Y) to original source (u,v):
    * u = a*X + b*Y + c; v = d*X + e*Y + f. GPU uniforms can use two vec3 rows.
-   * Pixel centres use X = (column + 0.5)/targetWidth, likewise Y; no implicit half pixel.
+   * Pixel centers use X = (column + 0.5)/targetWidth, likewise Y; no implicit half pixel.
    */
   readonly affine: SpatialAffine;
   readonly targetWidth: number;
@@ -236,7 +236,7 @@ function requireDimension(value: number): void {
 
 /**
  * Bounded inverse geometry, with no image storage. Fit the authoritative original
- * aspect without rounding, then scale/rotate clockwise about its centre and translate
+ * aspect without rounding, then scale/rotate clockwise about its center and translate
  * by fractions of the full output. Invert translation, rotation and uniform scale.
  * Crop is tested separately in original UV space, not stretched to fill the output.
  */
@@ -265,10 +265,10 @@ export function compileSpatialMapping(
   const b = sine * (targetHeight / fittedWidth);
   const d = -sine * (targetWidth / fittedHeight);
   const e = cosine * (targetHeight / fittedHeight);
-  const centreX = 0.5 + validated.translateX;
-  const centreY = 0.5 + validated.translateY;
-  const c = 0.5 - a * centreX - b * centreY;
-  const f = 0.5 - d * centreX - e * centreY;
+  const centerX = 0.5 + validated.translateX;
+  const centerY = 0.5 + validated.translateY;
+  const c = 0.5 - a * centerX - b * centerY;
+  const f = 0.5 - d * centerX - e * centerY;
   const affine: SpatialAffine = Object.freeze([a, b, c, d, e, f]);
   if (!affine.every(Number.isFinite)) throw new Error('Spatial inverse geometry is not finite.');
   return Object.freeze({
@@ -285,7 +285,7 @@ export function compileSpatialMapping(
   });
 }
 
-/** Write original UV into caller-owned storage; x/y are output pixel-centre coordinates. */
+/** Write original UV into caller-owned storage; x/y are output pixel-center coordinates. */
 export function mapSpatialPoint(mapping: SpatialMapping, x: number, y: number, out: Float64Array): Float64Array {
   requireFinite(x, 'Spatial output X');
   requireFinite(y, 'Spatial output Y');

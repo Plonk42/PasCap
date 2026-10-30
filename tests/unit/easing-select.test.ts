@@ -41,7 +41,7 @@ describe('easing selection graphs', () => {
     expect(markup).not.toContain('tabindex');
   });
 
-  it('always offers all five plain-labelled shapes, including Hold, when disabled', () => {
+  it('always offers all five plain-labeled shapes, including Hold, when disabled', () => {
     const markup = renderToStaticMarkup(
       createElement(EasingSelect, {
         value: 'smooth',

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { whiteBalanceCommands } from '../shared/auto-colour.js';
+import { whiteBalanceCommands } from '../shared/auto-color.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
@@ -7,7 +7,7 @@ import type { TimelineLayout } from '../shared/timeline.js';
 import { frameIlluminant, poolWhiteBalance } from '../shared/white-balance.js';
 import { proxyUrl } from './api.js';
 import { whiteBalanceTarget } from './auto-white-balance.js';
-import { gradeOwnerOf } from './colour-owner.js';
+import { gradeOwnerOf } from './color-owner.js';
 import { Icon } from './icons.js';
 import { useDelayedFlag } from './use-delayed-flag.js';
 import './auto-white-balance.css';
@@ -61,8 +61,8 @@ export function AutoWhiteBalance({ project, clipId, layout, assets, playhead, di
   const running = progress !== null && progress.context === context;
   const showProgress = useDelayedFlag(running);
   let blocked: string | null = availability.reason;
-  if (disabled) blocked = 'Colour cannot be edited right now.';
-  else if (running) blocked = 'Analysing the light around the playhead…';
+  if (disabled) blocked = 'Color cannot be edited right now.';
+  else if (running) blocked = 'Analyzing the light around the playhead…';
 
   const start = async (): Promise<void> => {
     if (blocked !== null || !target) return;
@@ -87,7 +87,7 @@ export function AutoWhiteBalance({ project, clipId, layout, assets, playhead, di
       const balance = poolWhiteBalance(target.sourceFrames.map((source) => estimates.get(source) ?? null));
       if (!balance) throw new Error('These frames are too dark, too bright or too uniform to estimate their light.');
       const owner = gradeOwnerOf(latest.current.project, clipId);
-      if (latest.current.disabled || !owner) throw new Error('Colour cannot be edited right now. Try again.');
+      if (latest.current.disabled || !owner) throw new Error('Color cannot be edited right now. Try again.');
       onEdit(whiteBalanceCommands(owner, target.frame, balance, { kind: 'clip', clipId }));
       setAnnouncement(
         `White balance keyframed at source frame ${target.frame}: Temperature ${signed(balance.temperature)}, Tint ${signed(balance.tint)}.`,
@@ -131,7 +131,7 @@ export function AutoWhiteBalance({ project, clipId, layout, assets, playhead, di
       {running && showProgress && (
         <span className="auto-white-balance-status">
           <output className="auto-white-balance-progress">
-            Analysing {progress.done}/{progress.total}…
+            Analyzing {progress.done}/{progress.total}…
           </output>
           <button
             type="button"

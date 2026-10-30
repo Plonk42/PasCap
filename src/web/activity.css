@@ -69,7 +69,7 @@
   color: var(--error);
 }
 
-.activity-footer-result[data-state='cancelled'] {
+.activity-footer-result[data-state='canceled'] {
   color: var(--muted);
 }
 
@@ -208,7 +208,7 @@
 }
 
 .activity-badge.queued,
-.activity-badge.cancelled {
+.activity-badge.canceled {
   color: var(--muted);
 }
 

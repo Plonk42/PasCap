@@ -1,5 +1,5 @@
-import { scalarColourValues } from '../../shared/colour.js';
-import { adjustmentAt, adjustmentColourAt, gradeColourAt, isNeutralClipGrade } from '../../shared/grade.js';
+import { scalarColorValues } from '../../shared/color.js';
+import { adjustmentAt, adjustmentColorAt, gradeColorAt, isNeutralClipGrade } from '../../shared/grade.js';
 import type { Interpolation } from '../../shared/keyframes.js';
 import type { describeTrack } from '../../shared/operations/describe-track.js';
 import { gradeSummary } from '../../shared/operations/grade-summary.js';
@@ -84,7 +84,7 @@ export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
           .filter((item) => frame >= item.start && frame < item.end)
           .map((item) => {
             const sourceFrame = item.retiming.sourceAt(frame - item.start);
-            const values = scalarColourValues(gradeColourAt(item.clip.grade, gradePosition(item, frame - item.start)));
+            const values = scalarColorValues(gradeColorAt(item.clip.grade, gradePosition(item, frame - item.start)));
             return { clipId: item.clip.id, sourceFrame, values: only(values, chosen) };
           });
         const item = adjustmentAt(project.adjustments, frame);
@@ -94,7 +94,7 @@ export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
           ...(item && {
             adjustment: {
               adjustmentId: item.id,
-              values: only(scalarColourValues(adjustmentColourAt(item, frame)), chosen),
+              values: only(scalarColorValues(adjustmentColorAt(item, frame)), chosen),
             },
           }),
           transform: only(evaluateSpatial(track.transform, frame), chosen),

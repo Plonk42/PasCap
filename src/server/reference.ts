@@ -1,6 +1,6 @@
 import { mkdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
-import { generateCube } from '../shared/colour.js';
+import { generateCube } from '../shared/color.js';
 import type { MediaJob } from '../shared/media.js';
 import { projectSchema, type ProjectDocument } from '../shared/model.js';
 import { isNeutralDetail } from '../shared/detail.js';
@@ -100,15 +100,15 @@ export async function renderReference(
   try {
     const assets = clips.map((clip) => library.get(clip.mediaId));
     for (const asset of assets) await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true); // NOSONAR -- read-only checks are deliberately serial.
-    context.update(0.01, 'Generating 65³ LUTs from the CPU colour contract');
+    context.update(0.01, 'Generating 65³ LUTs from the CPU color contract');
     for (const index of clips.keys())
-      await atomicWrite(path.join(directory, `clip-${index}.cube`), generateCube(clips[index]!.grade.colour)); // NOSONAR -- bound CPU LUT generation to one at a time.
+      await atomicWrite(path.join(directory, `clip-${index}.cube`), generateCube(clips[index]!.grade.color)); // NOSONAR -- bound CPU LUT generation to one at a time.
     const transition = layer.transitions[0]!;
     const black = transition.type === 'fade-through-black' ? blackFadeParts(transition.duration) : { out: 0, in: 0 };
     const chains = clips.map((clip, index) => {
       const fadeIn = index === 0 ? layer.openingFade : black.in;
       const fadeOut = index === 1 ? layer.closingFade : black.out;
-      const range = assets[index]!.metadata.colourRange;
+      const range = assets[index]!.metadata.colorRange;
       return (
         `[${index}:v]trim=start_frame=${clip.sourceIn}:end_frame=${clip.sourceOut},setpts=PTS-STARTPTS,` +
         `scale=1280:720:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:in_range=${range}:out_range=pc,` +

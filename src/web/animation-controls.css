@@ -41,15 +41,15 @@
 }
 
 /* Per-setting navigation is not an optional hover-only reset action. */
-.editor-inspector .colour-control-actions .channel-keyframe-navigation .icon-button {
+.editor-inspector .color-control-actions .channel-keyframe-navigation .icon-button {
   opacity: 1;
 }
 
-.editor-inspector .colour-control-actions .channel-keyframe-navigation .icon-button[aria-disabled='true'] {
+.editor-inspector .color-control-actions .channel-keyframe-navigation .icon-button[aria-disabled='true'] {
   opacity: 0.4;
 }
 
-/* Colour's line sits directly in the section content, which has no padding of its own. */
+/* Color's line sits directly in the section content, which has no padding of its own. */
 .inspector-section-content > .section-keyframe-line {
   padding-inline: 14px;
 }

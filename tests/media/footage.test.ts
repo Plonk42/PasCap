@@ -98,7 +98,7 @@ function blockWorker(jobs: JobQueue) {
     async (context) =>
       new Promise<void>((resolve, reject) => {
         const abort = (): void => {
-          reject(new ServiceError('Job cancelled.', 499));
+          reject(new ServiceError('Job canceled.', 499));
         };
         if (context.signal.aborted) {
           abort();

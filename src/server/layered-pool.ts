@@ -1,6 +1,6 @@
 import { availableParallelism } from 'node:os';
 import { Worker } from 'node:worker_threads';
-import type { ColourSettings } from '../shared/colour.js';
+import type { ColorSettings } from '../shared/color.js';
 import type { FrameSource } from './layered-frame.js';
 
 /** CPU compositing threads per export, beside the unchanged native child bounds. */
@@ -8,7 +8,7 @@ export const MAX_COMPOSITOR_THREADS = 8;
 
 export type CompositorTask =
   | { kind: 'rows'; output: Uint16Array; width: number; sources: FrameSource[]; start: number; end: number }
-  | { kind: 'lut'; lut: Float32Array; stages: ColourSettings[]; start: number; end: number };
+  | { kind: 'lut'; lut: Float32Array; stages: ColorSettings[]; start: number; end: number };
 export interface CompositorReply {
   error: string | null;
 }
@@ -75,7 +75,7 @@ export class CompositorPool {
       })),
     );
   }
-  fillLut(lut: Float32Array, stages: ColourSettings[], size: number): Promise<void> {
+  fillLut(lut: Float32Array, stages: ColorSettings[], size: number): Promise<void> {
     requireShared(lut);
     return this.#run(bands(size, this.threads).map(([start, end]) => ({ kind: 'lut', lut, stages, start, end })));
   }

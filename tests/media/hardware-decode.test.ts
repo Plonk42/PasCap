@@ -62,7 +62,7 @@ describe.skipIf(!nvdec)('NVDEC proxy decoding · disposable native fixtures', ()
     });
     const jobs = new JobQueue();
     const library = new MediaLibrary(config, jobs);
-    await library.initialise();
+    await library.initialize();
     libraries.push({ jobs, library });
     return library;
   }

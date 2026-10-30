@@ -83,10 +83,10 @@ function videoAsset(overrides: Partial<MediaAsset['metadata']> = {}): MediaAsset
       frameRate: { ...PROJECT_FPS },
       frameCount: 60,
       durationSeconds: framesToSeconds(60),
-      colourPrimaries: 'bt709',
-      colourTransfer: 'bt709',
-      colourSpace: 'bt709',
-      colourRange: 'tv',
+      colorPrimaries: 'bt709',
+      colorTransfer: 'bt709',
+      colorSpace: 'bt709',
+      colorRange: 'tv',
       hasAudio: true,
       ...overrides,
     },
@@ -220,19 +220,19 @@ describe('strict production export request and immutable validation', () => {
     const snapshot = validateExport(document, fakeLibrary());
     document.title = 'Later edit';
     document.clips[0]!.sourceIn = 10;
-    document.clips[0]!.grade.colour.brightness = 0.2;
-    document.adjustments[0]!.colour.brightness = 0.2;
+    document.clips[0]!.grade.color.brightness = 0.2;
+    document.adjustments[0]!.color.brightness = 0.2;
     document.music[0]!.gainDb = 12;
     document.music[0]!.clips[0]!.start = 9;
     document.music.splice(1, 1);
     expect(snapshot.title).toBe('Export unit');
     expect(snapshot.clips[0]!.sourceIn).toBe(7);
-    expect(snapshot.clips[0]!.grade.colour.brightness).toBe(0);
-    expect(snapshot.adjustments[0]!.colour.brightness).toBe(0);
+    expect(snapshot.clips[0]!.grade.color.brightness).toBe(0);
+    expect(snapshot.adjustments[0]!.color.brightness).toBe(0);
     expect(Object.isFrozen(snapshot)).toBe(true);
     expect(Object.isFrozen(snapshot.clips[0]!.speed)).toBe(true);
-    expect(Object.isFrozen(snapshot.clips[0]!.grade.colour)).toBe(true);
-    expect(Object.isFrozen(snapshot.adjustments[0]!.colour)).toBe(true);
+    expect(Object.isFrozen(snapshot.clips[0]!.grade.color)).toBe(true);
+    expect(Object.isFrozen(snapshot.adjustments[0]!.color)).toBe(true);
     expect(snapshot.music).toHaveLength(2);
     expect(snapshot.music[0]!.gainDb).toBe(-6);
     expect(snapshot.music[0]!.clips[0]!.start).toBe(3);
@@ -263,7 +263,7 @@ describe('strict production export request and immutable validation', () => {
       validateExportAudio(music, { ...audioAsset(), metadata: { ...audioAsset().metadata, durationSeconds: 0.2 } }),
     ).toThrow('source bounds');
   });
-  it('submits export to the same queue and a cancelled queued export never touches existing outputs', async () => {
+  it('submits export to the same queue and a canceled queued export never touches existing outputs', async () => {
     const directory = await temp();
     const library = fakeLibrary();
     library.config.dataDir = directory;
@@ -283,7 +283,7 @@ describe('strict production export request and immutable validation', () => {
       library.jobs.cancel(job.id);
       release();
       await library.jobs.wait(first.id);
-      expect((await library.jobs.wait(job.id)).state).toBe('cancelled');
+      expect((await library.jobs.wait(job.id)).state).toBe('canceled');
       expect(await readdir(path.join(directory, 'renders'))).toEqual(['older-success']);
       expect(await readFile(path.join(old, 'export.mp4'), 'utf8')).toBe('already successful');
     } finally {
@@ -569,7 +569,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
         frameBytes: 6,
         signal: controller.signal,
       }),
-    ).rejects.toThrow('cancelled');
+    ).rejects.toThrow('canceled');
   });
   it('cancels blocked children, including the SIGKILL fallback for ignored SIGTERM', async () => {
     const directory = await temp();
@@ -593,7 +593,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
           controller.abort();
         },
       }),
-    ).rejects.toThrow('cancelled');
+    ).rejects.toThrow('canceled');
     expect(sawProgress).toBe(true);
     expect(Date.now() - started).toBeLessThan(4000);
   });

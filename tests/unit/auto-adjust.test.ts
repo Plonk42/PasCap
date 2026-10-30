@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  analyseAutoAdjust,
+  analyzeAutoAdjust,
   AUTO_ADJUST,
   AUTO_ADJUST_SETTINGS,
   autoAdjustFrames,
@@ -9,7 +9,7 @@ import {
   toneStatistics,
   type AutoCorrection,
 } from '../../src/shared/auto-adjust.js';
-import { decode709, encode709, temperatureTintGains } from '../../src/shared/colour.js';
+import { decode709, encode709, temperatureTintGains } from '../../src/shared/color.js';
 import {
   frameIlluminant,
   poolWhiteBalance,
@@ -57,7 +57,7 @@ const LIGHTNESS = (() => {
 })();
 
 /**
- * A well-exposed, fairly colourful scene of 8-pixel patches with fine texture. Patches come in
+ * A well-exposed, fairly colorful scene of 8-pixel patches with fine texture. Patches come in
  * triples whose hues are 120° apart, so every channel has the same statistics: neutral as a whole.
  */
 function scene(seed: number, { gain = 1, chroma = 0.7, light = [1, 1, 1] as Linear } = {}): Pixel {
@@ -88,8 +88,8 @@ function flat(pixel: Pixel): Pixel {
 const frames = (count: number, pixel: (seed: number) => Pixel): AnalysisFrame[] =>
   Array.from({ length: count }, (_, index) => frame(pixel(index + 1)));
 
-function analyse(input: readonly AnalysisFrame[]): AutoCorrection {
-  const correction = analyseAutoAdjust(input);
+function analyze(input: readonly AnalysisFrame[]): AutoCorrection {
+  const correction = analyzeAutoAdjust(input);
   if (!correction) throw new Error('Expected a correction.');
   return correction;
 }
@@ -168,9 +168,9 @@ const shadowDepth = (input: readonly AnalysisFrame[]): number => {
 };
 
 describe('Auto adjust estimator', () => {
-  it('leaves well-exposed, neutral, fairly colourful footage almost unchanged, but opens its darkest areas', () => {
+  it('leaves well-exposed, neutral, fairly colorful footage almost unchanged, but opens its darkest areas', () => {
     const input = frames(6, (seed) => scene(seed));
-    const correction = analyse(input);
+    const correction = analyze(input);
     expect(Math.abs(correction.temperature)).toBeLessThan(0.03);
     expect(Math.abs(correction.tint)).toBeLessThan(0.03);
     for (const setting of TONE)
@@ -195,12 +195,12 @@ describe('Auto adjust estimator', () => {
       return pixel.map((value) => (value * Math.max(level, floor)) / level) as unknown as Linear;
     });
     expect(shadowDepth(input)).toBeLessThan(AUTO_ADJUST.shadowStops);
-    expect(analyse(input).shadows).toBe(0);
+    expect(analyze(input).shadows).toBe(0);
   });
 
   it('restores the black and white points, midtone contrast and saturation of flat footage', () => {
     const input = frames(6, (seed) => flat(scene(seed)));
-    const correction = analyse(input);
+    const correction = analyze(input);
     expect(correction.blacks).toBeLessThan(0);
     expect(correction.contrast).toBeGreaterThan(1.1);
     expect(correction.saturation).toBeGreaterThan(1.1);
@@ -209,14 +209,14 @@ describe('Auto adjust estimator', () => {
     expect(meanSaturation(saturations(corrected))).toBeGreaterThan(1.2 * meanSaturation(saturations(input)));
     const before = measured(input);
     const after = measured(corrected);
-    // One 8-bit step of tolerance for the corrected frames' quantisation.
+    // One 8-bit step of tolerance for the corrected frames' quantization.
     expect(after.black).toBeGreaterThanOrEqual(AUTO_ADJUST.black[0] - 0.004);
     expect(after.black).toBeLessThanOrEqual(AUTO_ADJUST.black[1] + 0.004);
     expect(after.white).toBeGreaterThanOrEqual(AUTO_ADJUST.white[0] - 0.004);
     expect(after.white).toBeLessThanOrEqual(AUTO_ADJUST.white[1] + 0.004);
     expect(before.black).toBeGreaterThan(0.1);
     expect(before.white).toBeLessThan(0.82);
-    // The output's midtone slope, measured on grey around the log-average, at least 1.3× the input's.
+    // The output's midtone slope, measured on gray around the log-average, at least 1.3× the input's.
     const { temperature, tint, saturation, vibrance, ...tone } = correction;
     const render = renderFlat({ temperature, tint }, tone, { saturation, vibrance });
     const middle = toneStatistics(input, { temperature, tint })!.logAverage;
@@ -230,7 +230,7 @@ describe('Auto adjust estimator', () => {
 
   it('corrects most of an exposure error beyond its half-stop dead zone', () => {
     const exposure = (stops: number): number =>
-      analyse(frames(6, (seed) => scene(seed, { gain: 2 ** stops }))).exposure;
+      analyze(frames(6, (seed) => scene(seed, { gain: 2 ** stops }))).exposure;
     const [under, slightly, little, none, over, overer] = [-1.5, -1, -0.5, 0, 0.5, 1].map(exposure) as [
       number,
       number,
@@ -258,7 +258,7 @@ describe('Auto adjust estimator', () => {
     { name: 'green', light: [0.9, 1.15, 0.9] as const, temperature: 0, tint: 1 },
     { name: 'magenta', light: [1, 0.85, 1] as const, temperature: 0, tint: -1 },
   ])('counters a $name cast with the expected signs and damping', ({ light, temperature, tint }) => {
-    const correction = analyse(frames(6, (seed) => scene(seed, { gain: 0.8, light })));
+    const correction = analyze(frames(6, (seed) => scene(seed, { gain: 0.8, light })));
     if (temperature === 0) expect(Math.abs(correction.temperature)).toBeLessThan(0.05);
     else expect(Math.sign(correction.temperature)).toBe(temperature);
     expect(Math.sign(correction.tint)).toBe(tint);
@@ -267,26 +267,26 @@ describe('Auto adjust estimator', () => {
   });
 
   it('removes more of a cool cast than of an equally strong warm one', () => {
-    const cool = analyse(frames(6, (seed) => scene(seed, { gain: 0.8, light: [0.85, 1, 1.18] })));
-    const warm = analyse(frames(6, (seed) => scene(seed, { gain: 0.8, light: [1.18, 1, 0.85] })));
+    const cool = analyze(frames(6, (seed) => scene(seed, { gain: 0.8, light: [0.85, 1, 1.18] })));
+    const warm = analyze(frames(6, (seed) => scene(seed, { gain: 0.8, light: [1.18, 1, 0.85] })));
     expect(cool.temperature).toBeGreaterThan(0.2);
     expect(-warm.temperature).toBeLessThan(cool.temperature);
   });
 
-  it('is nearly idempotent: analysing its own output changes the image far less', () => {
+  it('is nearly idempotent: analyzing its own output changes the image far less', () => {
     const input = frames(6, (seed) => scene(seed, { gain: 0.5, light: [0.85, 1, 1.18] }));
-    const first = analyse(input);
+    const first = analyze(input);
     const once = input.map((item) => apply(item, first));
-    const second = analyse(once);
+    const second = analyze(once);
     const twice = once.map((item) => apply(item, second));
     expect(change(once, twice)).toBeLessThan(0.2 * change(input, once));
   });
 
   it('settles the tone of flat footage in one pass', () => {
     const input = frames(6, (seed) => flat(scene(seed)));
-    const first = analyse(input);
-    const second = analyse(input.map((item) => apply(item, first)));
-    // Shadows stops at its bound on flat footage and Vibrance spares its stronger colours, so a second pass
+    const first = analyze(input);
+    const second = analyze(input.map((item) => apply(item, first)));
+    // Shadows stops at its bound on flat footage and Vibrance spares its stronger colors, so a second pass
     // would still add some of both, and lower Blacks to keep the black point that Shadows lifts in its band.
     expect(first.shadows).toBe(0.5);
     const settled = ['exposure', 'brightness', 'highlights', 'whites'] as const;
@@ -297,8 +297,8 @@ describe('Auto adjust estimator', () => {
 
   it('is deterministic', () => {
     const input = frames(4, (seed) => flat(scene(seed, { light: [1.1, 1, 0.9] })));
-    const first = analyse(input);
-    const second = analyse(input);
+    const first = analyze(input);
+    const second = analyze(input);
     expect(second).toEqual(first);
     for (const setting of AUTO_ADJUST_SETTINGS) expect(Object.is(second[setting], first[setting])).toBe(true);
   });
@@ -306,8 +306,8 @@ describe('Auto adjust estimator', () => {
   it('lets one outlier frame among sixteen barely move the result', () => {
     const steady = frames(16, (seed) => flat(scene(seed)));
     const flash = frame(() => [0.9, 0.85, 0.7]);
-    const reference = analyse(steady);
-    const disturbed = analyse([...steady.slice(0, 15), flash]);
+    const reference = analyze(steady);
+    const disturbed = analyze([...steady.slice(0, 15), flash]);
     for (const setting of AUTO_ADJUST_SETTINGS) {
       const difference =
         setting === 'contrast' || setting === 'saturation'
@@ -318,7 +318,7 @@ describe('Auto adjust estimator', () => {
   });
 
   it('lowers the black point and adds contrast to hazy footage', () => {
-    const correction = analyse(
+    const correction = analyze(
       frames(6, (seed) => (x, y) => scene(seed)(x, y).map((value) => 0.8 * value + 0.024) as unknown as Linear),
     );
     expect(correction.blacks).toBeLessThan(-0.3);
@@ -333,7 +333,7 @@ describe('Auto adjust estimator', () => {
         : 0.55 + 0.3 * hash(Math.floor(x / 4), Math.floor(y / 4), seed + 3);
       return [level * 0.97, level, level * 1.03];
     });
-    const correction = analyse(snow);
+    const correction = analyze(snow);
     const before = measured(snow);
     const after = measured(snow.map((item) => apply(item, correction)));
     expect(before.middle).toBeGreaterThan(0.6);
@@ -341,19 +341,19 @@ describe('Auto adjust estimator', () => {
     expect(correction.exposure).toBeGreaterThan(-0.2);
   });
 
-  it('does not lift night footage to mid-grey', () => {
+  it('does not lift night footage to mid-gray', () => {
     const night = frames(6, (seed) => (x, y) => {
       const level = 0.001 + 0.03 * hash(Math.floor(x / 6), Math.floor(y / 6), seed + 5) ** 2;
       return [level * 1.1, level, level * 0.8];
     });
-    const correction = analyse(night);
+    const correction = analyze(night);
     expect(measured(night).white).toBeLessThan(encode709(AUTO_ADJUST.lowLight));
     // The low-light guard halves the lift: Exposure stays at most half its bound.
     expect(correction.exposure).toBeLessThanOrEqual(0.75);
     expect(measured(night.map((item) => apply(item, correction))).middle).toBeLessThan(0.25);
   });
 
-  it('does not neutralise a sky- and sea-dominated frame to grey', () => {
+  it('does not neutralize a sky- and sea-dominated frame to gray', () => {
     const view = frames(4, (seed) => (x, y) => {
       if (y < 40) {
         const haze = y / 40;
@@ -366,17 +366,17 @@ describe('Auto adjust estimator', () => {
       const ripple = 0.85 + 0.3 * hash(Math.floor(x / 2), Math.floor(y / 2), seed + 2);
       return [0.03 * ripple, 0.12 * ripple, 0.2 * ripple];
     });
-    const correction = analyse(view);
-    // Grey World would warm this view by its whole blue/red imbalance; Auto keeps it blue.
+    const correction = analyze(view);
+    // Gray World would warm this view by its whole blue/red imbalance; Auto keeps it blue.
     const means = [0, 1, 2].map((channel) => {
       let sum = 0;
       for (const item of view)
         for (let index = channel; index < item.data.length; index += 4) sum += decode709(item.data[index]! / 255);
       return sum;
     });
-    const greyWorld = Math.log2(means[2]! / means[0]!);
-    expect(greyWorld).toBeGreaterThan(1);
-    expect(Math.abs(correction.temperature)).toBeLessThan(0.2 * greyWorld);
+    const grayWorld = Math.log2(means[2]! / means[0]!);
+    expect(grayWorld).toBeGreaterThan(1);
+    expect(Math.abs(correction.temperature)).toBeLessThan(0.2 * grayWorld);
     expect(Math.abs(correction.tint)).toBeLessThan(0.15);
     const [red, , blue] = temperatureTintGains(correction);
     expect((0.78 * blue) / (0.22 * red)).toBeGreaterThan(3);
@@ -391,7 +391,7 @@ describe('Auto adjust estimator', () => {
       const level = (0.03 + 0.45 * hash(Math.floor(x / 6), Math.floor(y / 6), seed) ** 1.5) * 0.15;
       return [level * 1.2, level, level * 0.8];
     });
-    const correction = analyse(sunset);
+    const correction = analyze(sunset);
     expect(correction.temperature).toBeLessThan(0);
     expect(correction.temperature).toBeGreaterThanOrEqual(-WHITE_BALANCE.temperatureLimit);
     const [red, , blue] = temperatureTintGains(correction);
@@ -399,8 +399,8 @@ describe('Auto adjust estimator', () => {
   });
 
   it('gives no correction without usable pixels', () => {
-    expect(analyseAutoAdjust([frame(() => [0, 0, 0])])).toBeNull();
-    expect(analyseAutoAdjust([])).toBeNull();
+    expect(analyzeAutoAdjust([frame(() => [0, 0, 0])])).toBeNull();
+    expect(analyzeAutoAdjust([])).toBeNull();
   });
 
   it('takes the same Temperature and Tint as Auto white balance from the same frames', () => {
@@ -412,29 +412,29 @@ describe('Auto adjust estimator', () => {
     ] as const) {
       const input = frames(16, (seed) => scene(seed, { light }));
       const balance = poolWhiteBalance(input.map(frameIlluminant))!;
-      const correction = analyse(input);
+      const correction = analyze(input);
       expect({ temperature: correction.temperature, tint: correction.tint }, String(light)).toEqual(balance);
     }
   });
 
-  it('raises the colour of muted footage with both Saturation and Vibrance', () => {
+  it('raises the color of muted footage with both Saturation and Vibrance', () => {
     const input = frames(6, (seed) => scene(seed, { chroma: 0.15 }));
-    const correction = analyse(input);
-    // Saturation takes its whole share of the 1.5 gain, Vibrance brings the muted colours to the rest.
+    const correction = analyze(input);
+    // Saturation takes its whole share of the 1.5 gain, Vibrance brings the muted colors to the rest.
     expect(correction.saturation).toBeCloseTo(1.5 ** AUTO_ADJUST.saturationShare, 2);
     expect(correction.vibrance).toBeGreaterThan(0.1);
     const corrected = input.map((item) => apply(item, correction));
     expect(meanSaturation(saturations(corrected))).toBeGreaterThan(1.25 * meanSaturation(saturations(input)));
   });
 
-  it('keeps the colour of monochrome footage', () => {
-    const correction = analyse(frames(6, (seed) => scene(seed, { chroma: 0 })));
+  it('keeps the color of monochrome footage', () => {
+    const correction = analyze(frames(6, (seed) => scene(seed, { chroma: 0 })));
     expect(correction.saturation).toBe(1);
     expect(correction.vibrance).toBe(0);
   });
 
-  it('lowers the Saturation of very colourful footage, without Vibrance', () => {
-    const correction = analyse(frames(6, (seed) => scene(seed, { chroma: 1.6 })));
+  it('lowers the Saturation of very colorful footage, without Vibrance', () => {
+    const correction = analyze(frames(6, (seed) => scene(seed, { chroma: 1.6 })));
     expect(correction.saturation).toBeLessThan(1);
     expect(correction.saturation).toBeGreaterThanOrEqual(AUTO_ADJUST.minimumSaturation);
     expect(correction.vibrance).toBe(0);
@@ -446,13 +446,13 @@ describe('Auto adjust estimator', () => {
       const grain = 0.98 + 0.04 * hash(x, y, seed);
       return [(0.15 + 0.2 * haze) * grain, (0.3 + 0.2 * haze) * grain, (0.7 + 0.05 * haze) * grain];
     });
-    const correction = analyse(sky);
-    // Saturation gives way entirely, and Vibrance as far as the strong colours require.
+    const correction = analyze(sky);
+    // Saturation gives way entirely, and Vibrance as far as the strong colors require.
     expect(correction.saturation).toBe(1);
     const before = saturations(sky);
     const after = saturations(sky.map((item) => apply(item, correction)));
     expect(saturationQuantile(before, AUTO_ADJUST.strongQuantile)).toBeGreaterThan(AUTO_ADJUST.strongCeiling);
-    // Its strongest tenth rises by at most strongMargin (with 8-bit quantisation); its paler, lower part
+    // Its strongest tenth rises by at most strongMargin (with 8-bit quantization); its paler, lower part
     // may rise to strongCeiling. A Saturation of 1.5 took the sky from 0.66 to 0.80 on average.
     expect(saturationQuantile(after, AUTO_ADJUST.strongQuantile)).toBeLessThanOrEqual(
       saturationQuantile(before, AUTO_ADJUST.strongQuantile) + AUTO_ADJUST.strongMargin + 0.01,
@@ -460,7 +460,7 @@ describe('Auto adjust estimator', () => {
     expect(meanSaturation(after) - meanSaturation(before)).toBeLessThan(0.1);
   });
 
-  it('keeps the sky above snow at its saturation while the snow gains colour', () => {
+  it('keeps the sky above snow at its saturation while the snow gains color', () => {
     const isSky = (_x: number, y: number): boolean => y < 18;
     const view = frames(6, (seed) => (x, y) => {
       if (isSky(x, y)) {
@@ -474,7 +474,7 @@ describe('Auto adjust estimator', () => {
         : 0.45 + 0.3 * hash(Math.floor(x / 3), Math.floor(y / 3), seed);
       return [level * 0.97, level, level * 1.04];
     });
-    const correction = analyse(view);
+    const correction = analyze(view);
     // Saturation's share of the 1.39 gain mostly gives way to Vibrance.
     expect(correction.saturation).toBeGreaterThan(1);
     expect(correction.saturation).toBeLessThan(1.1);
@@ -544,7 +544,7 @@ describe('Auto adjust intensity and frames', () => {
     expect([strong.contrast, strong.whites, strong.blacks]).toEqual([2, 1, -1]);
   });
 
-  it('analyses the centres of up to sixteen equal slices of the source range', () => {
+  it('analyzes the centers of up to sixteen equal slices of the source range', () => {
     expect(autoAdjustFrames(100, 420)).toEqual(Array.from({ length: 16 }, (_, index) => 110 + 20 * index));
     expect(autoAdjustFrames(5, 8)).toEqual([5, 6, 7]);
     expect(autoAdjustFrames(7, 8)).toEqual([7]);

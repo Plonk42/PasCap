@@ -14,11 +14,11 @@ function preparation(status: string): Preparation {
 }
 
 async function analysis(job: unknown, read: () => Promise<unknown>): Promise<Analysis> {
-  if (job !== null) return 'analysing';
+  if (job !== null) return 'analyzing';
   try {
-    return (await read()) === null ? 'missing' : 'analysed';
+    return (await read()) === null ? 'missing' : 'analyzed';
   } catch {
-    // An unreadable cache is analysed again like a missing one.
+    // An unreadable cache is analyzed again like a missing one.
     return 'missing';
   }
 }

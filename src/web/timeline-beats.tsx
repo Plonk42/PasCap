@@ -162,7 +162,7 @@ export function BeatSnapControl({ mode, snapping, disabled, onChange }: Readonly
   if (mode !== 'off') lastOn.current = mode;
   const on = mode !== 'off';
   const reason = snapping ? '' : 'Turn on Snap to snap to beats.';
-  let title = 'Snap to the analysed beats of music clips';
+  let title = 'Snap to the analyzed beats of music clips';
   if (mode !== 'off') title = `Snapping to the ${TARGET_NAMES[mode]} of music clips · click to stop`;
   return (
     <fieldset className="timeline-beat-snap rush-quick-actions">
@@ -204,7 +204,7 @@ export function BeatSnapControl({ mode, snapping, disabled, onChange }: Readonly
                 {MODE_LABELS[choice]}
               </label>
             ))}
-            <p>Snaps to the beats or strong hits of analysed music clips while Snap is on; the ruler shows them.</p>
+            <p>Snaps to the beats or strong hits of analyzed music clips while Snap is on; the ruler shows them.</p>
           </div>
         )}
       </Popover>

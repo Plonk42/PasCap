@@ -413,10 +413,10 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
   });
 
   it('cancels a supplied clip map during backpressured native writes without changing the original', async () => {
-    const work = await mkdtemp(path.join(root, 'cancelled-'));
+    const work = await mkdtemp(path.join(root, 'canceled-'));
     const controller = new AbortController();
     try {
-      const project = createProject('cancelled-clip', 'Disposable clip-map cancellation');
+      const project = createProject('canceled-clip', 'Disposable clip-map cancellation');
       project.clips = [
         { ...createClip('slow-clip', 'generated-original', 7, 19), speed: { mode: 'constant', rate: 0.1 } },
       ];
@@ -432,7 +432,7 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
             controller.abort();
           },
         }),
-      ).rejects.toThrow('cancelled');
+      ).rejects.toThrow('canceled');
       expect(progress).toBe(true);
       await unchanged();
     } finally {

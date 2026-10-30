@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOR } from '../../src/shared/color.js';
 import { createAdjustment, layerKeyAsGradeKey, type GradeKeyframe } from '../../src/shared/grade.js';
 import {
   EMPTY_KEY_VALUES,
@@ -135,7 +135,7 @@ describe('activity ordering and summaries', () => {
         progress: 1,
       }),
       job('queued-new', { createdAt: '2026-10-03T11:00:00Z' }),
-      job('cancelled', { state: 'cancelled', createdAt: '2026-10-03T11:00:00Z', finishedAt: '2026-10-03T11:30:00Z' }),
+      job('canceled', { state: 'canceled', createdAt: '2026-10-03T11:00:00Z', finishedAt: '2026-10-03T11:30:00Z' }),
       job('running', { state: 'running', progress: 0.2 }),
       job('queued-old', { createdAt: '2026-10-03T10:30:00Z' }),
       job('failed', { state: 'failed', finishedAt: '2026-10-03T12:30:00Z' }),
@@ -147,12 +147,12 @@ describe('activity ordering and summaries', () => {
       'queued-new',
       'failed',
       'completed',
-      'cancelled',
+      'canceled',
     ]);
     expect(source.map((entry) => entry.id)).toEqual([
       'completed',
       'queued-new',
-      'cancelled',
+      'canceled',
       'running',
       'queued-old',
       'failed',
@@ -174,7 +174,7 @@ describe('activity ordering and summaries', () => {
     expect(orderActivityJobs([job('b'), job('a')]).map((entry) => entry.id)).toEqual(['a', 'b']);
     expect(
       orderActivityJobs([
-        job('unknown', { state: 'cancelled', createdAt: 'unknown' }),
+        job('unknown', { state: 'canceled', createdAt: 'unknown' }),
         job('known', { state: 'completed' }),
       ]).map((entry) => entry.id),
     ).toEqual(['known', 'unknown']);
@@ -188,10 +188,10 @@ describe('activity ordering and summaries', () => {
         job('queued'),
         job('queued-audio', { kind: 'audio' }),
         job('failed', { state: 'failed' }),
-        job('cancelled', { state: 'cancelled', kind: 'audio' }),
+        job('canceled', { state: 'canceled', kind: 'audio' }),
         job('completed', { state: 'completed', kind: 'reference' }),
       ]),
-    ).toBe('1 running · 2 queued · 1 failed · 1 cancelled · 1 completed');
+    ).toBe('1 running · 2 queued · 1 failed · 1 canceled · 1 completed');
   });
 
   it('announces preparation failures/cancellations and completion, but not progress', () => {
@@ -201,8 +201,8 @@ describe('activity ordering and summaries', () => {
     expect(activityResultSummary(job('clip', { state: 'failed', message: 'Cannot prepare proxy' }))).toBe(
       'Video recording preparation failed: clip.mp4. Cannot prepare proxy',
     );
-    expect(activityResultSummary(job('music', { kind: 'audio', state: 'cancelled', message: 'Job cancelled.' }))).toBe(
-      'Music recording preparation cancelled: music.mp4. Job cancelled.',
+    expect(activityResultSummary(job('music', { kind: 'audio', state: 'canceled', message: 'Job canceled.' }))).toBe(
+      'Music recording preparation canceled: music.mp4. Job canceled.',
     );
     const completed = job('render', { kind: 'export', state: 'completed', progress: 1 });
     expect(activityResultSummary(completed)).toBe('Export completed: render.mp4');
@@ -211,7 +211,7 @@ describe('activity ordering and summaries', () => {
 
   it('only treats queued and running jobs as cancellable activity', () => {
     expect(
-      ['queued', 'running', 'completed', 'failed', 'cancelled'].map((state) =>
+      ['queued', 'running', 'completed', 'failed', 'canceled'].map((state) =>
         isActiveJob(job(state, { state: state as MediaJob['state'] })),
       ),
     ).toEqual([true, true, false, false, false]);
@@ -322,7 +322,7 @@ describe('export snapshot summary', () => {
     document.adjustments = [
       {
         ...createAdjustment('look', 0, 60),
-        colour: { ...NEUTRAL_COLOUR, hue: 90 },
+        color: { ...NEUTRAL_COLOR, hue: 90 },
         keyframes: [gradeKey(0, { exposure: 0, brightness: 0 }), gradeKey(60, { exposure: 1, shadows: 0 })],
       },
     ];

@@ -55,10 +55,10 @@ function metadata(): VideoMetadata {
     frameRate: { ...PROJECT_FPS },
     frameCount: 12,
     durationSeconds: framesToSeconds(12),
-    colourPrimaries: 'bt709',
-    colourTransfer: 'bt709',
-    colourSpace: 'bt709',
-    colourRange: 'tv',
+    colorPrimaries: 'bt709',
+    colorTransfer: 'bt709',
+    colorSpace: 'bt709',
+    colorRange: 'tv',
     hasAudio: false,
   };
 }
@@ -105,7 +105,7 @@ async function libraryFixture() {
   const jobs = new JobQueue();
   queues.push(jobs);
   const library = new MediaLibrary(directories.config, jobs);
-  await library.initialise();
+  await library.initialize();
   return { ...directories, library, jobs };
 }
 async function source(directory: string, name = 'Clip 1.mp4'): Promise<string> {
@@ -129,7 +129,7 @@ function blockWorker(jobs: JobQueue) {
     async (context) =>
       new Promise<void>((resolve, reject) => {
         const abort = (): void => {
-          reject(new ServiceError('Job cancelled.', 499));
+          reject(new ServiceError('Job canceled.', 499));
         };
         if (context.signal.aborted) {
           abort();
@@ -1422,7 +1422,12 @@ describe('trusted JSON-only HTTP boundary and retained native registry entries',
     await fs.mkdir(proxyDirectory, { recursive: true });
     const proxy = Buffer.from('seeded verified proxy: exact bytes retained');
     await fs.writeFile(path.join(proxyDirectory, 'proxy.mp4'), proxy);
-    const registry = `${JSON.stringify({ version: 2, assets: [asset] })}\n`;
+    // A version-2 registry, with the British metadata names it used, opens upgraded.
+    const britishMetadata = Object.fromEntries(
+      Object.entries(asset.metadata).map(([key, value]) => [key.replace(/^color/, 'colour'), value]),
+    );
+    expect(Object.keys(britishMetadata)).toContain('colourSpace');
+    const registry = `${JSON.stringify({ version: 2, assets: [{ ...asset, metadata: britishMetadata }] })}\n`;
     await fs.writeFile(path.join(config.dataDir, 'videos.json'), registry);
     await setPermissions(filename, 0o444, 0o600);
     await setPermissions(directory, 0o555);

@@ -93,7 +93,7 @@ test('a default keyframe returns settings to their defaults from its frame, in o
 }) => {
   const { unexpected } = await openMemoryProject(page, request, 'easing-default-keyframe', (document) => {
     const adjustment = adjustmentFrom0(120, [gradePoint(10, { exposure: 0.6 })]);
-    adjustment.colour.contrast = 1.4;
+    adjustment.color.contrast = 1.4;
     document.adjustments = [adjustment];
   });
   await inspectorTab(page, 'Adjustment');

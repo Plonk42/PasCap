@@ -50,7 +50,7 @@ function publish(key: string, phase: MusicAnalysisPhase): void {
 }
 
 function failed(key: string, cause: unknown): void {
-  publish(key, { kind: 'error', message: cause instanceof Error ? cause.message : 'Cannot analyse this music.' });
+  publish(key, { kind: 'error', message: cause instanceof Error ? cause.message : 'Cannot analyze this music.' });
 }
 
 /** Shows a music analysis job's progress, then its result. */
@@ -64,7 +64,7 @@ async function follow(key: string, id: string, job: MediaJob): Promise<void> {
     return poll(next);
   };
   const done = await poll(job);
-  if (done.state === 'cancelled') return publish(key, IDLE);
+  if (done.state === 'canceled') return publish(key, IDLE);
   if (done.state === 'failed') throw new Error(done.message);
   const { analysis } = await api.musicAnalysis(id);
   if (!analysis) throw new Error('The analysis finished but its result is missing. Try again.');
@@ -90,7 +90,7 @@ function load(key: string, id: string): void {
 /** The tempo, beats and sections of a prepared music recording, following its background analysis. */
 export function useMusicAnalysis(asset: AudioAsset | undefined): {
   phase: MusicAnalysisPhase;
-  analyse: () => void;
+  analyze: () => void;
 } {
   const ready = asset?.status === 'ready';
   const id = asset?.id ?? '';
@@ -110,15 +110,15 @@ export function useMusicAnalysis(asset: AudioAsset | undefined): {
     // Preparing again may replace the cache: read its analysis afresh once it is ready.
     else entryFor(key).started = false;
   }, [key, id, ready]);
-  const analyse = useCallback(() => {
+  const analyze = useCallback(() => {
     if (!id) return;
     entryFor(key).started = true;
     api
-      .analyseMusic(id)
+      .analyzeMusic(id)
       .then(({ job }) => follow(key, id, job))
       .catch((cause: unknown) => failed(key, cause));
   }, [id, key]);
-  return { phase, analyse };
+  return { phase, analyze };
 }
 
 function subscribeAny(listener: () => void): () => void {
@@ -152,9 +152,9 @@ function statusText(phase: MusicAnalysisPhase): string {
   if (phase.kind === 'ready') return summary(phase.analysis);
   if (phase.kind === 'checking') return 'Reading the music analysis…';
   if (phase.kind === 'running')
-    return phase.queued ? 'Music analysis queued…' : `Analysing music ${Math.round(phase.progress * 100)}%`;
+    return phase.queued ? 'Music analysis queued…' : `Analyzing music ${Math.round(phase.progress * 100)}%`;
   if (phase.kind === 'error') return phase.message;
-  return 'Tempo and beats not analysed';
+  return 'Tempo and beats not analyzed';
 }
 
 interface StatusProps {
@@ -163,9 +163,9 @@ interface StatusProps {
   onSeek: (frame: number) => void;
 }
 
-/** Under Recording: the analysis summary, its progress or Analyse music, then the music's structure. */
+/** Under Recording: the analysis summary, its progress or Analyze music, then the music's structure. */
 export function MusicAnalysisStatus({ asset, music, onSeek }: Readonly<StatusProps>) {
-  const { phase, analyse } = useMusicAnalysis(asset);
+  const { phase, analyze } = useMusicAnalysis(asset);
   if (asset?.status !== 'ready') return null;
   const text = statusText(phase);
   return (
@@ -178,9 +178,9 @@ export function MusicAnalysisStatus({ asset, music, onSeek }: Readonly<StatusPro
             type="button"
             className="text-button"
             title="Find the tempo, beats, hits and sections of this music in the background"
-            onClick={analyse}
+            onClick={analyze}
           >
-            Analyse music
+            Analyze music
           </button>
         )}
       </div>

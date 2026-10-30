@@ -7,7 +7,7 @@ export interface SeriesSpec {
   label: string;
   /** Readout prefix while hovering. */
   short: string;
-  colour: string;
+  color: string;
   format: (value: number) => string;
   /** Smallest span of the scale, so sensor noise does not fill the lane. */
   minSpan: number;
@@ -20,7 +20,7 @@ export const SERIES: readonly SeriesSpec[] = [
     key: 'horizontalSpeed',
     label: 'Flight speed',
     short: 'Flight',
-    colour: '#7cc4e8',
+    color: '#7cc4e8',
     format: (value) => `${value.toFixed(1)} m/s`,
     minSpan: 2,
   },
@@ -28,7 +28,7 @@ export const SERIES: readonly SeriesSpec[] = [
     key: 'verticalSpeed',
     label: 'Vertical speed',
     short: 'Vertical',
-    colour: '#b9a0ff',
+    color: '#b9a0ff',
     format: (value) => `${signedText(value, 1)} m/s`,
     minSpan: 1,
   },
@@ -36,7 +36,7 @@ export const SERIES: readonly SeriesSpec[] = [
     key: 'height',
     label: 'Height',
     short: 'Height',
-    colour: '#9fe0a8',
+    color: '#9fe0a8',
     format: (value) => `${value.toFixed(0)} m`,
     minSpan: 5,
   },
@@ -44,16 +44,16 @@ export const SERIES: readonly SeriesSpec[] = [
     key: 'distance',
     label: 'Distance from home',
     short: 'Distance',
-    colour: '#ee9fd0',
+    color: '#ee9fd0',
     format: (value) => `${value.toFixed(0)} m`,
     minSpan: 10,
   },
-  { key: 'iso', label: 'ISO', short: 'ISO', colour: '#f08f8f', format: (value) => value.toFixed(0), minSpan: 100 },
+  { key: 'iso', label: 'ISO', short: 'ISO', color: '#f08f8f', format: (value) => value.toFixed(0), minSpan: 100 },
   {
     key: 'shutter',
     label: 'Shutter speed',
     short: 'Shutter',
-    colour: '#e2dc82',
+    color: '#e2dc82',
     format: (value) => `1/${value.toFixed(0)} s`,
     minSpan: 50,
   },
@@ -61,7 +61,7 @@ export const SERIES: readonly SeriesSpec[] = [
     key: 'ev',
     label: 'Exposure bias',
     short: 'EV',
-    colour: '#7fdcd0',
+    color: '#7fdcd0',
     format: (value) => `${signedText(value, 1)} EV`,
     minSpan: 0.7,
   },
@@ -69,7 +69,7 @@ export const SERIES: readonly SeriesSpec[] = [
     key: 'digitalZoom',
     label: 'Digital zoom',
     short: 'Zoom',
-    colour: '#f2f2f2',
+    color: '#f2f2f2',
     format: (value) => `${value.toFixed(1)}×`,
     minSpan: 0.5,
   },

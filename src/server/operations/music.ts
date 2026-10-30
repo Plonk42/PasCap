@@ -49,7 +49,7 @@ async function readAnalysis(audio: ServiceContext['audio'], mediaId: string): Pr
   }
 }
 
-/** The beats, strong hits and every hit of the project's analysed music clips at project frames. */
+/** The beats, strong hits and every hit of the project's analyzed music clips at project frames. */
 async function projectBeats(
   { audio }: ServiceContext,
   project: ProjectDocument,
@@ -75,9 +75,9 @@ function rounded(value: number, digits: number): number {
   return Math.round(value * 10 ** digits) / 10 ** digits;
 }
 
-function analysisState(analysis: MusicAnalysis | null, job: unknown): 'analysed' | 'analysing' | 'missing' {
-  if (analysis) return 'analysed';
-  return job ? 'analysing' : 'missing';
+function analysisState(analysis: MusicAnalysis | null, job: unknown): 'analyzed' | 'analyzing' | 'missing' {
+  if (analysis) return 'analyzed';
+  return job ? 'analyzing' : 'missing';
 }
 
 function describeMusicClip(
@@ -188,7 +188,7 @@ export const runMusicAnalysis: OperationRunner<typeof musicAnalysis> = async (
 function requireBeats({ beats, hits }: { beats: readonly PlacedBeat[]; hits: readonly number[] }): void {
   if (!beats.length && !hits.length)
     throw new ServiceError(
-      'No analysed music beats or hits fall on the timeline: place music and have it analysed in Audio → Music first.',
+      'No analyzed music beats or hits fall on the timeline: place music and have it analyzed in Audio → Music first.',
       409,
     );
 }
@@ -264,7 +264,7 @@ export const runSnapCutsToBeats: OperationRunner<typeof snapOperation> = async (
   const targets = snapTargets(music, prefer);
   if (!targets.length)
     throw new ServiceError(
-      `No analysed music ${prefer === 'hit' ? 'strong hits' : 'beats'} fall on the timeline: place music and have it analysed in Audio → Music first.`,
+      `No analyzed music ${prefer === 'hit' ? 'strong hits' : 'beats'} fall on the timeline: place music and have it analyzed in Audio → Music first.`,
       409,
     );
   const fps = PROJECT_FPS.numerator / PROJECT_FPS.denominator;

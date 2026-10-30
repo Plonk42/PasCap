@@ -310,9 +310,9 @@ test('video rows show previews of visible recordings only, two at a time, with e
   expect(busiest).toBeLessThanOrEqual(2);
 
   // Closing the dialog cancels the read still in progress.
-  const cancelled = page.waitForEvent('requestfailed', (failed) => failed.url().includes('DJI_0079.MP4'));
+  const canceled = page.waitForEvent('requestfailed', (failed) => failed.url().includes('DJI_0079.MP4'));
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await cancelled;
+  await canceled;
   hold();
   expect(posts()).toBe(0);
   expect(memory.snapshot().media.videoIds).toEqual([]);

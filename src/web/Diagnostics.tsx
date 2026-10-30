@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { MAX_VIDEO_DECODERS, verifyGpuColour, type GpuComparison } from '../preview/compositor.js';
+import { MAX_VIDEO_DECODERS, verifyGpuColor, type GpuComparison } from '../preview/compositor.js';
 import type { PreviewDiagnostics } from '../preview/engine.js';
-import { NEUTRAL_COLOUR, type ColourSettings } from '../shared/colour.js';
+import { NEUTRAL_COLOR, type ColorSettings } from '../shared/color.js';
 import { milliseconds } from './display.js';
 
 interface Props {
   diagnostics: PreviewDiagnostics | null;
-  colour: ColourSettings | null;
+  color: ColorSettings | null;
   canRenderReference: boolean;
   referenceBusy: boolean;
   onReference: () => void;
@@ -15,7 +15,7 @@ interface Props {
 
 export function Diagnostics({
   diagnostics,
-  colour,
+  color,
   canRenderReference,
   referenceBusy,
   onReference,
@@ -34,8 +34,8 @@ export function Diagnostics({
           <span>median seek</span>
         </div>
         <div>
-          <strong>{milliseconds(diagnostics?.colourLatencyMs)}</strong>
-          <span>colour response</span>
+          <strong>{milliseconds(diagnostics?.colorLatencyMs)}</strong>
+          <span>color response</span>
         </div>
         <div>
           <strong>{diagnostics?.stalls ?? 0}</strong>
@@ -74,7 +74,7 @@ export function Diagnostics({
           className="secondary-button small"
           onClick={() => {
             try {
-              setGpu(verifyGpuColour(colour ?? { ...NEUTRAL_COLOUR }));
+              setGpu(verifyGpuColor(color ?? { ...NEUTRAL_COLOR }));
             } catch (error) {
               onError(error instanceof Error ? error.message : 'Shader check failed');
             }

@@ -1,14 +1,14 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { ColourLutCache } from '../../src/server/layered-colour.js';
+import { ColorLutCache } from '../../src/server/layered-color.js';
 import { composeLayerFrame, fittedContent, type LayerFrameSource } from '../../src/server/layered-frame.js';
 import { CompositorPool, MAX_COMPOSITOR_THREADS } from '../../src/server/layered-pool.js';
 import {
   compileGradeInto,
-  createColourSettings,
+  createColorSettings,
   gradePixel,
-  NEUTRAL_COLOUR,
-  type ColourSettings,
-} from '../../src/shared/colour.js';
+  NEUTRAL_COLOR,
+  type ColorSettings,
+} from '../../src/shared/color.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../../src/shared/spatial.js';
 
@@ -23,7 +23,7 @@ function shared(bytes: number): Buffer {
 }
 
 function source(
-  colour: ColourSettings,
+  color: ColorSettings,
   pose: Partial<SpatialPose> = {},
   seed = 1,
   blendWeight = 1,
@@ -39,8 +39,8 @@ function source(
       sourcePosition: 3.25,
       spatial: { ...NEUTRAL_SPATIAL_POSE, ...pose },
       detail: { ...NEUTRAL_DETAIL },
-      grade: createColourSettings(),
-      colour,
+      grade: createColorSettings(),
+      color,
       weight: blendWeight,
       blendWeight,
       brightness: 0.8,
@@ -52,7 +52,7 @@ function source(
   };
 }
 
-const advanced = createColourSettings();
+const advanced = createColorSettings();
 Object.assign(advanced, { temperature: -0.4, tint: 0.2, exposure: 0.3, hue: 14, saturation: 1.3, shadows: 0.2 });
 advanced.hsl.blue = { hue: 9, saturation: 1, lightness: -0.05 };
 advanced.curves.master = [
@@ -61,7 +61,7 @@ advanced.curves.master = [
   { x: 0.5, y: 0.8 },
   { x: 1, y: 0.97 },
 ];
-const scalar: ColourSettings = { ...NEUTRAL_COLOUR, temperature: 0.3, exposure: -0.2, contrast: 1.2 };
+const scalar: ColorSettings = { ...NEUTRAL_COLOR, temperature: 0.3, exposure: -0.2, contrast: 1.2 };
 const moved = { translateX: 0.08, translateY: -0.11, rotation: -23, scale: 1.4, cropTop: 0.1 };
 
 describe('worker compositing over shared frame memory', () => {
@@ -74,22 +74,22 @@ describe('worker compositing over shared frame memory', () => {
   });
 
   it.each([
-    ['exact advanced colour, neutral pose', [source(advanced)]],
-    ['exact advanced colour, transformed pose', [source(advanced, moved)]],
-    ['scalar LUT colour, neutral pose', [source(scalar)]],
-    ['scalar LUT colour, transformed pose', [source(scalar, moved)]],
+    ['exact advanced color, neutral pose', [source(advanced)]],
+    ['exact advanced color, transformed pose', [source(advanced, moved)]],
+    ['scalar LUT color, neutral pose', [source(scalar)]],
+    ['scalar LUT color, transformed pose', [source(scalar, moved)]],
     ['dissolve with exact and LUT sources', [source(advanced, {}, 1, 0.35), source(scalar, moved, 7, 0.65)]],
   ])('writes the same RGBA16 bytes as in-process compositing: %s', async (_, sources) => {
     const expected = Buffer.alloc(target.width * target.height * 8, 0x35);
-    await composeLayerFrame(expected, target, sources, new ColourLutCache(), signal);
+    await composeLayerFrame(expected, target, sources, new ColorLutCache(), signal);
     const actual = shared(expected.length).fill(0x35);
-    await composeLayerFrame(actual, target, sources, new ColourLutCache(), signal, pool);
+    await composeLayerFrame(actual, target, sources, new ColorLutCache(), signal, pool);
     expect(actual.equals(expected)).toBe(true);
   });
 
   it('fills the same LUT in worker slices as in process', async () => {
-    const inProcess = await new ColourLutCache().get(scalar, signal);
-    const pooled = await new ColourLutCache().get(scalar, signal, pool);
+    const inProcess = await new ColorLutCache().get(scalar, signal);
+    const pooled = await new ColorLutCache().get(scalar, signal, pool);
     expect(pooled.buffer).toBeInstanceOf(SharedArrayBuffer);
     expect(Buffer.from(pooled.buffer).equals(Buffer.from(inProcess.buffer))).toBe(true);
   });
@@ -101,7 +101,7 @@ describe('worker compositing over shared frame memory', () => {
         shared(target.width * target.height * 8),
         target,
         [unshared],
-        new ColourLutCache(),
+        new ColorLutCache(),
         signal,
         pool,
       ),
@@ -111,7 +111,7 @@ describe('worker compositing over shared frame memory', () => {
         Buffer.alloc(target.width * target.height * 8),
         target,
         [source(advanced)],
-        new ColourLutCache(),
+        new ColorLutCache(),
         signal,
         pool,
       ),
@@ -124,7 +124,7 @@ describe('worker compositing over shared frame memory', () => {
       rgb: new Uint8Array(new SharedArrayBuffer(target.width * target.height * 3)),
       bounds: fittedContent(original, target),
       lut: null,
-      exactColour: null,
+      exactColor: null,
       multiplier: 1,
       coverage: 1,
       mapping: { neutral: true },
@@ -132,7 +132,7 @@ describe('worker compositing over shared frame memory', () => {
     } as never;
     await expect(pool.composeRows(output, target, [broken])).rejects.toThrow();
     const recovered = shared(target.width * target.height * 8);
-    await composeLayerFrame(recovered, target, [source(advanced)], new ColourLutCache(), signal, pool);
+    await composeLayerFrame(recovered, target, [source(advanced)], new ColorLutCache(), signal, pool);
     expect(recovered.some((byte) => byte !== 0)).toBe(true);
   });
 
@@ -144,7 +144,7 @@ describe('worker compositing over shared frame memory', () => {
         shared(target.width * target.height * 8),
         target,
         [source(advanced)],
-        new ColourLutCache(),
+        new ColorLutCache(),
         signal,
         closed,
       ),
@@ -154,7 +154,7 @@ describe('worker compositing over shared frame memory', () => {
 
 describe('tabulated byte grading', () => {
   it('is bitwise identical to grading code / 255, with and without scalar stages', () => {
-    for (const settings of [advanced, scalar, { ...advanced, ...NEUTRAL_COLOUR, hsl: advanced.hsl }]) {
+    for (const settings of [advanced, scalar, { ...advanced, ...NEUTRAL_COLOR, hsl: advanced.hsl }]) {
       const grade = compileGradeInto(settings);
       const fromBytes = new Float64Array(3);
       for (let code = 0; code < 256 * 7; code++) {

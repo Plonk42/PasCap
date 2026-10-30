@@ -1,8 +1,8 @@
-# HSL ranges and colour curves
+# HSL ranges and color curves
 
-Colour belongs to [clip grades and adjustments](ROW_APPEARANCE.md), keyed or unkeyed; video
-tracks have none. Twelve scalar colour settings, including Temperature, Tint, Vibrance, Whites and Blacks,
-can be keyed independently in each grade. HSL ranges and colour curves are
+Color belongs to [clip grades and adjustments](ROW_APPEARANCE.md), keyed or unkeyed; video
+tracks have none. Twelve scalar color settings, including Temperature, Tint, Vibrance, Whites and Blacks,
+can be keyed independently in each grade. HSL ranges and color curves are
 **static settings of each grade**; the fourteen nullable keyframe
 channels are those twelve scalars, HDR and Local contrast (detail-stage settings applied
 before grading; see [detail filters](DETAIL_FILTERS.md#hdr-look)). Animation does not suppress
@@ -12,18 +12,18 @@ neutral 0, and linear gains before Exposure; see
 
 ## Required data and SDR order
 
-Every clip grade and adjustment requires `colour.hsl` with eight named bands: red, orange, yellow, green,
+Every clip grade and adjustment requires `color.hsl` with eight named bands: red, orange, yellow, green,
 cyan, blue, purple and magenta. Each requires hue −30…30 degrees, saturation
-−1…1 (multiplier offset) and lightness −0.5…0.5. Centres are 0, 30, 60, 120, 180,
-240, 270 and 300 degrees. Required `colour.curves` contains master, red,
+−1…1 (multiplier offset) and lightness −0.5…0.5. Centers are 0, 30, 60, 120, 180,
+240, 270 and 300 degrees. Required `color.curves` contains master, red,
 green and blue arrays, each 2…16 strict `{ x, y }` control nodes with finite coordinates
 in 0…1. Inputs strictly ascend, with first x=0 and last x=1. Endpoint outputs are
 editable; nonmonotonic outputs are valid. No control-node IDs or preset fields are saved.
 Neutral factories create independent nested objects/arrays, with each curve starting as three identity nodes (0, 0.5, 1). They are only creators,
 never repairs for missing saved fields. Projects and receipt snapshots saved before the current
-schema, with track Colour, are rejected with the reason and left unchanged. Receipt format remains 1;
-proxy and PCM formats are unchanged; the registries are version 2 (full-content
-checksums). No automatic deletion.
+schema, with track Color or British spelling, are rejected with the reason and left unchanged. Receipt format remains 1;
+proxy and PCM formats are unchanged; the registries are version 3 (videos) and 2 (music),
+with full-content checksums. No automatic deletion.
 
 The exact order is inverse BT.709 → normalized Temperature/Tint linear gains →
 Exposure → Contrast → Brightness → Whites/Blacks → Hue/Saturation/Vibrance → final
@@ -33,18 +33,18 @@ black-fade brightness → grouped coverage and source-over. This is not HDR outp
 scene-linear HSL, automatic white balance or a speed curve.
 Shadows, Highlights, HDR and Local contrast are local stages on source pixels before this grade; see
 [detail filters](DETAIL_FILTERS.md#local-shadows-and-highlights).
-The Original preview bypasses **all** colour stages, retaining
+The Original preview bypasses **all** color stages, retaining
 geometry, timing, visibility, Opacity, black fades and music.
 
 ## HSL mathematics
 
 Derive hue, saturation and lightness once from incoming encoded RGB. Only the two
-neighbouring circular band centres contribute. For interval progress u, right
+neighboring circular band centers contribute. For interval progress u, right
 weight is `u*u*(3-2*u)`, left weight its complement; the magenta→red interval
 wraps through 360 degrees. Never reclassify a pixel after applying one band.
 Multiply weighted offsets by `smoothstep(0, 0.1, max(R,G,B)-min(R,G,B))`.
-Exact incoming greys, black and white therefore remain unchanged by HSL.
-Temperature/Tint precede HSL and intentionally colour greys; HSL grey protection
+Exact incoming grays, black and white therefore remain unchanged by HSL.
+Temperature/Tint precede HSL and intentionally color grays; HSL gray protection
 does not undo those gains or promise a neutral final image. Wrap hue after
 adding its weighted degree offset; multiply saturation by one plus its weighted
 offset and add the lightness offset. Clamp resulting saturation/lightness to gamut,
@@ -54,51 +54,51 @@ returns its input exactly, as do identity curves and an entirely neutral grade.
 Curves are smooth: a monotone cubic Hermite spline (Fritsch–Butland/PCHIP slopes)
 through the control nodes, first master on each encoded component,
 then that component's channel curve. Interior slopes are the weighted harmonic mean
-of the neighbouring secants, zero where those secants change sign or either is flat;
+of the neighboring secants, zero where those secants change sign or either is flat;
 end slopes use the three-node shape-preserving formula, and two nodes give a straight
 line. Each segment therefore stays between its two node outputs (no overshoot, no
 clipping needed), collinear nodes stay a straight line, and nodes are hit exactly.
 CPU, native and GPU evaluate the same spline from the same slopes; the editor graph
 draws it as one cubic Bézier per segment. Outputs need not ascend. Arbitrarily narrow
 valid knees are evaluated analytically in native export, not approximated by a
-65³ advanced-colour LUT. Nonneutral HSL or curves route even otherwise static
+65³ advanced-color LUT. Nonneutral HSL or curves route even otherwise static
 projects through composited export. Each such source evaluates, for each of its two grades in
 sequence, the complete per-pixel scalar stages → HSL → master/RGB curves directly on the sampled fractional RGB,
 before black fades and group composition. A scalar-only LUT followed by exact
 curves is insufficient: a sharp curve can amplify that LUT's scalar error.
 The exact CPU path retains full input precision without minimum control-node spacing,
 rounding or restrictions on valid curve inputs. RGBA16 and final H.264/4:2:0
-quantisation remain measured approximations under the unchanged error gates.
+quantization remain measured approximations under the unchanged error gates.
 
 ## Editing, resets and resource ownership
 
-The **Colour** tab's Colour section contains twelve scalar sliders, HDR and Local contrast, grouped
+The **Color** tab's Color section contains twelve scalar sliders, HDR and Local contrast, grouped
 as in [clip grades and adjustments](ROW_APPEARANCE.md#properties-and-history), for the clip grade
 or adjustment the tab edits. The separate, initially collapsed sections
-**HSL ranges** and **Colour curves** follow it in the same tab and edit the same grade. They choose their band/channel with a row of coloured
-square swatches (a radio group: **HSL range** with eight band-centre colours, **Colour curve channel**
-with master grey, red, green and blue), and contain exact numeric fields and a compact SVG curve graph.
-The graph draws all four curves at once in their channel colours; only the selected channel's curve is
+**HSL ranges** and **Color curves** follow it in the same tab and edit the same grade. They choose their band/channel with a row of colored
+square swatches (a radio group: **HSL range** with eight band-center colors, **Color curve channel**
+with master gray, red, green and blue), and contain exact numeric fields and a compact SVG curve graph.
+The graph draws all four curves at once in their channel colors; only the selected channel's curve is
 full-strength with control nodes and receives pointer, field, Add and Delete edits, while the other three
 are thin, dim, non-interactive lines. Swatch selection is editor-only, never saved or added to history.
 HSL uses native sliders and exact
-fields, with no diamonds; their tracks are drawn in the selected range's own colour
-(see [the control catalogue](EDITOR_CONTROLS.md#control-patterns)). The curve footer is one row: exact Input and Output fields for the selected control
+fields, with no diamonds; their tracks are drawn in the selected range's own color
+(see [the control catalog](EDITOR_CONTROLS.md#control-patterns)). The curve footer is one row: exact Input and Output fields for the selected control
 node, then Add and Delete, followed by Reset channel / Reset all. There is no node select or Previous/Next:
 choose a node by clicking or focusing its graph point. Curve endpoint inputs are locked (their field is
 disabled); outputs remain editable.
 Add inserts a sampled control node; delete removes only an interior control node. Graph dragging
 edits both coordinates from capture-relative geometry, clamped to the 0–1 plot: an interior node stays strictly
-between its neighbours (a margin of at most 0.001 keeps it from merging) and endpoint inputs stay fixed. Drafts never save or enter
-history; release commits one complete validated colour command for that grade. Exact fields still reject invalid
+between its neighbors (a margin of at most 0.001 keeps it from merging) and endpoint inputs stay fixed. Drafts never save or enter
+history; release commits one complete validated color command for that grade. Exact fields still reject invalid
 values. Escape, cancellation, lost
 capture and window blur restore. Keyboard/exact fields remain usable at 270 px.
 
 Band/all-HSL and channel/all-curves resets affect only their respective static
-settings in one Undo step. Colour Reset on an animated grade changes only its current keyed
+settings in one Undo step. Color Reset on an animated grade changes only its current keyed
 scalar settings, never advanced settings or saved bases. Unanimated Reset
-resets the grade's entire Colour, HSL and curves included. Selection/collapse/tab changes
-never apply a former clip's or adjustment's draft to another. Control vocabulary follows the [editor control catalogue](EDITOR_CONTROLS.md#vocabulary).
+resets the grade's entire Color, HSL and curves included. Selection/collapse/tab changes
+never apply a former clip's or adjustment's draft to another. Control vocabulary follows the [editor control catalog](EDITOR_CONTROLS.md#vocabulary).
 
 GPU uses bounded uniforms for two sources: eight HSL vec4 entries and four arrays
 of at most sixteen vec3 (input, output, slope) control nodes per grade, for each source's clip

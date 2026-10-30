@@ -5,7 +5,7 @@ import { median } from './white-balance.js';
  * Measured on proxy luma at its 720-line size, the scale whose units the detail filters use.
  */
 export const DETAIL_ESTIMATE = Object.freeze({
-  /** Source frames measured, at the centres of equal slices of the range. */
+  /** Source frames measured, at the centers of equal slices of the range. */
   frames: 8,
   /** Side of the square blocks noise is measured in, pixels. */
   block: 16,
@@ -16,7 +16,7 @@ export const DETAIL_ESTIMATE = Object.freeze({
   clippedAbove: 0.98,
   /** Taps of the box blur the blur measure compares the picture with. */
   blurTaps: 9,
-  /** Neighbour differences, 0–1 luma, below which a position is not an edge, at least this... */
+  /** Neighbor differences, 0–1 luma, below which a position is not an edge, at least this... */
   edgeStep: 4 / 255,
   /** ...and at least this many noise standard deviations of a difference (√2 of the noise's). */
   edgeNoise: 4 * Math.SQRT2,
@@ -52,7 +52,7 @@ export interface DetailSuggestion {
   denoise: number;
 }
 
-/** Source frames measured: the centres of up to DETAIL_ESTIMATE.frames equal slices of [sourceIn, sourceOut). */
+/** Source frames measured: the centers of up to DETAIL_ESTIMATE.frames equal slices of [sourceIn, sourceOut). */
 export function detailFrames(sourceIn: number, sourceOut: number): number[] {
   const length = sourceOut - sourceIn;
   const count = Math.min(DETAIL_ESTIMATE.frames, length);
@@ -99,7 +99,7 @@ export function frameNoise({ width, height, data }: LumaFrame): number | null {
 }
 
 /**
- * Adds to `sums` the neighbour differences of `line` at edges (above `step`) and the part of each a box blur
+ * Adds to `sums` the neighbor differences of `line` at edges (above `step`) and the part of each a box blur
  * keeps (the smaller of the two differences), and counts those edges.
  */
 function lineVariation(line: Float64Array, step: number, sums: [number, number, number]): void {
@@ -107,10 +107,10 @@ function lineVariation(line: Float64Array, step: number, sums: [number, number, 
   let window = 0;
   for (let index = 0; index < DETAIL_ESTIMATE.blurTaps; index++) window += line[index]!;
   let previous = window / DETAIL_ESTIMATE.blurTaps;
-  for (let centre = radius + 1; centre + radius < line.length; centre++) {
-    window += line[centre + radius]! - line[centre - radius - 1]!;
+  for (let center = radius + 1; center + radius < line.length; center++) {
+    window += line[center + radius]! - line[center - radius - 1]!;
     const blurred = window / DETAIL_ESTIMATE.blurTaps;
-    const original = Math.abs(line[centre]! - line[centre - 1]!);
+    const original = Math.abs(line[center]! - line[center - 1]!);
     if (original > step) {
       sums[0] += original;
       sums[1] += Math.min(original, Math.abs(blurred - previous));
@@ -121,7 +121,7 @@ function lineVariation(line: Float64Array, step: number, sums: [number, number, 
 }
 
 /**
- * Crété-Roffet et al.'s no-reference blur measure: the share of the picture's neighbour differences a 9-tap
+ * Crété-Roffet et al.'s no-reference blur measure: the share of the picture's neighbor differences a 9-tap
  * blur keeps, horizontally and vertically, the larger of the two. A crisp step scores about 0.1; edges w pixels
  * wide about w / (w + 8). Only edges standing out of the `noise` count, so noise does not pass for detail.
  */

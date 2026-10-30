@@ -1,21 +1,21 @@
-.advanced-colour {
+.advanced-color {
   min-width: 0;
   padding: 3px 14px 14px;
 }
-.advanced-colour-tools {
+.advanced-color-tools {
   display: flex;
   gap: 6px;
   align-items: center;
   flex-wrap: wrap;
   margin: 8px 0;
 }
-.colour-swatches {
+.color-swatches {
   display: flex;
   gap: 6px;
   margin: 8px 0;
   padding: 4px;
 }
-.colour-swatch {
+.color-swatch {
   flex: 0 1 26px;
   min-width: 18px;
   aspect-ratio: 1;
@@ -24,16 +24,16 @@
   border-radius: 5px;
   background: var(--swatch);
 }
-.colour-swatch:hover:not(:disabled) {
+.color-swatch:hover:not(:disabled) {
   filter: brightness(1.15);
   transform: scale(1.08);
 }
-.colour-swatch[aria-checked='true'] {
+.color-swatch[aria-checked='true'] {
   box-shadow:
     0 0 0 2px #101512,
     0 0 0 4px #f4f7f5;
 }
-.colour-swatch:focus-visible {
+.color-swatch:focus-visible {
   outline-offset: 5px;
 }
 .advanced-hsl-control {
@@ -44,7 +44,7 @@
   margin-bottom: 4px;
   font-size: 12px;
 }
-.colour-curve-plot {
+.color-curve-plot {
   position: relative;
   height: 150px;
   margin: 16px 14px;
@@ -52,7 +52,7 @@
   background: #101a17;
   touch-action: none;
 }
-.colour-curve-plot svg {
+.color-curve-plot svg {
   width: 100%;
   height: 100%;
   overflow: visible;
@@ -60,22 +60,22 @@
   stroke-width: 2;
   pointer-events: none;
 }
-.colour-curve-plot .colour-curve-grid {
+.color-curve-plot .color-curve-grid {
   stroke: #37463f;
   stroke-width: 0.5;
 }
-.colour-curve-plot .colour-curve-other {
+.color-curve-plot .color-curve-other {
   stroke-width: 1;
   opacity: 0.55;
 }
-.colour-curve-plot .colour-curve-selected {
+.color-curve-plot .color-curve-selected {
   stroke: var(--curve);
 }
-.colour-curve-plot.invalid .colour-curve-selected {
+.color-curve-plot.invalid .color-curve-selected {
   stroke: #ed7777;
   stroke-dasharray: 4 3;
 }
-.colour-curve-point {
+.color-curve-point {
   position: absolute;
   transform: translate(-50%, -50%);
   width: 24px;
@@ -87,23 +87,23 @@
   background: var(--curve);
   touch-action: none;
 }
-.colour-curve-point[aria-pressed='true'] {
+.color-curve-point[aria-pressed='true'] {
   background: #f1d391;
 }
-.colour-curve-point:focus-visible {
+.color-curve-point:focus-visible {
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
-.colour-curve-fields {
+.color-curve-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
   align-items: end;
   gap: 8px;
 }
-.colour-curve-fields label {
+.color-curve-fields label {
   min-width: 0;
   font-size: 12px;
 }
-.colour-curve-fields .number-field {
+.color-curve-fields .number-field {
   margin-top: 4px;
 }

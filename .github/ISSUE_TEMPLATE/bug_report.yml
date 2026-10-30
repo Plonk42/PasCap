@@ -29,7 +29,7 @@ body:
       options:
         - Active data-loss or security risk
         - Core workflow or correctness gate blocked
-        - Incorrect behaviour with a workaround
+        - Incorrect behavior with a workaround
         - Minor or optional improvement
     validations:
       required: true
@@ -37,7 +37,7 @@ body:
     id: problem
     attributes:
       label: What went wrong?
-      description: Describe the expected and actual behaviour.
+      description: Describe the expected and actual behavior.
     validations:
       required: true
   - type: textarea

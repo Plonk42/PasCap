@@ -1,8 +1,8 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
-import type { ColourCurvePoint, CurveChannel, HslBand } from '../../src/shared/advanced-colour.js';
-import type { ColourSettings, ScalarColourSetting } from '../../src/shared/colour.js';
-import { createColourSettings } from '../../src/shared/colour.js';
+import type { ColorCurvePoint, CurveChannel, HslBand } from '../../src/shared/advanced-color.js';
+import type { ColorSettings, ScalarColorSetting } from '../../src/shared/color.js';
+import { createColorSettings } from '../../src/shared/color.js';
 import { editCommandSchema, type EditCommand } from '../../src/shared/commands.js';
 import { assistantEditCommandSchema, referencedEditCommandSchema } from '../../src/shared/command-schema.js';
 import { createDetailSettings, type DetailSettings } from '../../src/shared/detail.js';
@@ -20,15 +20,15 @@ import { createSpatialSettings, type SpatialChannel, type SpatialSettings } from
 import type { SpeedSettings } from '../../src/shared/speed.js';
 
 /**
- * The hand-written union `editCommandSchema` replaced (#228), plus the partial track settings (#252), with Colour
+ * The hand-written union `editCommandSchema` replaced (#228), plus the partial track settings (#252), with Color
  * commands naming a clip grade or an adjustment (#286); the inferred type must stay identical.
  */
 type FormerEditCommand =
   | {
-      type: 'colour-setting';
+      type: 'color-setting';
       clipId?: string | undefined;
       adjustmentId?: string | undefined;
-      setting: ScalarColourSetting;
+      setting: ScalarColorSetting;
       value: number;
     }
   | {
@@ -39,11 +39,11 @@ type FormerEditCommand =
       values: { hue: number; saturation: number; lightness: number };
     }
   | {
-      type: 'colour-curve';
+      type: 'color-curve';
       clipId?: string | undefined;
       adjustmentId?: string | undefined;
       channel: CurveChannel;
-      points: ColourCurvePoint[];
+      points: ColorCurvePoint[];
     }
   | { type: 'transform-setting'; layerId: string; setting: SpatialChannel; value: number }
   | { type: 'insert'; clip: Omit<VideoClip, 'grade'>; index: number }
@@ -55,10 +55,10 @@ type FormerEditCommand =
   | { type: 'remove-source-range'; clipId: string; sourceIn: number; sourceOut: number; newClipId: string }
   | { type: 'duplicate'; clipId: string; newClipId: string }
   | {
-      type: 'colour';
+      type: 'color';
       clipIds?: string[] | undefined;
       adjustmentId?: string | undefined;
-      colour: ColourSettings;
+      color: ColorSettings;
     }
   | { type: 'speed'; clipId: string; speed: SpeedSettings }
   | { type: 'reverse'; clipId: string; reverse: boolean }
@@ -71,7 +71,7 @@ type FormerEditCommand =
       clipId?: string | undefined;
       adjustmentId?: string | undefined;
       frame: number;
-      setting: ScalarColourSetting;
+      setting: ScalarColorSetting;
       value: number;
     }
   | {
@@ -79,8 +79,8 @@ type FormerEditCommand =
       clipId?: string | undefined;
       adjustmentId?: string | undefined;
       frame: number;
-      values: { [K in ScalarColourSetting]?: number | null | undefined };
-      easing?: Interpolation | { [K in ScalarColourSetting]?: Interpolation } | undefined;
+      values: { [K in ScalarColorSetting]?: number | null | undefined };
+      easing?: Interpolation | { [K in ScalarColorSetting]?: Interpolation } | undefined;
       reset?: boolean | undefined;
     }
   | {
@@ -88,7 +88,7 @@ type FormerEditCommand =
       clipId?: string | undefined;
       adjustmentId?: string | undefined;
       frame: number;
-      setting: ScalarColourSetting;
+      setting: ScalarColorSetting;
       value: number;
     }
   | {
@@ -105,7 +105,7 @@ type FormerEditCommand =
       clipId?: string | undefined;
       adjustmentId?: string | undefined;
       frame: number;
-      setting: ScalarColourSetting | null;
+      setting: ScalarColorSetting | null;
       interpolation: Interpolation;
     }
   | { type: 'layer-add'; layer: VideoLayer }
@@ -129,7 +129,7 @@ type FormerEditCommand =
       adjustmentId: string;
       start: number;
       duration: number;
-      settings?: Partial<Record<ScalarColourSetting, number>> | undefined;
+      settings?: Partial<Record<ScalarColorSetting, number>> | undefined;
     }
   | { type: 'adjustment-remove'; adjustmentId: string }
   | { type: 'adjustment-range'; adjustmentId: string; start: number; duration: number; keyframes: 'move' | 'stay' }
@@ -155,16 +155,16 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
     newClipId: 'clip-3',
   },
   duplicate: { type: 'duplicate', clipId: 'clip-1', newClipId: 'clip-3' },
-  colour: { type: 'colour', adjustmentId: 'look', colour: createColourSettings() },
-  'colour-setting': { type: 'colour-setting', clipId: 'clip-1', setting: 'exposure', value: 0.5 },
+  color: { type: 'color', adjustmentId: 'look', color: createColorSettings() },
+  'color-setting': { type: 'color-setting', clipId: 'clip-1', setting: 'exposure', value: 0.5 },
   'hsl-band': {
     type: 'hsl-band',
     adjustmentId: 'look',
     band: 'blue',
     values: { hue: 5, saturation: 0.2, lightness: 0 },
   },
-  'colour-curve': {
-    type: 'colour-curve',
+  'color-curve': {
+    type: 'color-curve',
     clipId: 'clip-1',
     channel: 'master',
     points: [
@@ -292,10 +292,10 @@ describe('editCommandSchema', () => {
     expect(editCommandSchema.safeParse({ ...samples.delete, clip: 'clip-1' }).success).toBe(false);
     expect(editCommandSchema.safeParse({ ...samples['bookmark-add'], frame: 1.5 }).success).toBe(false);
     expect(editCommandSchema.safeParse({ ...samples['layer-key-value'], setting: 'gamma' }).success).toBe(false);
-    // Opacity belongs to the track Transform, and a track has no Colour of its own.
+    // Opacity belongs to the track Transform, and a track has no Color of its own.
     expect(editCommandSchema.safeParse({ ...samples['layer-key-value'], setting: 'opacity' }).success).toBe(false);
     expect(editCommandSchema.safeParse({ type: 'opacity', layerId: 'video-1', opacity: 0.5 }).success).toBe(false);
-    expect(editCommandSchema.safeParse({ ...samples['colour-setting'], layerId: 'video-1' }).success).toBe(false);
+    expect(editCommandSchema.safeParse({ ...samples['color-setting'], layerId: 'video-1' }).success).toBe(false);
     expect(editCommandSchema.safeParse({ ...samples['adjustment-range'], keyframes: 'follow' }).success).toBe(false);
     expect(editCommandSchema.safeParse({ ...samples['adjustment-add'], duration: 0 }).success).toBe(false);
     expect(editCommandSchema.safeParse({ ...samples['select-narrow'], ranges: [] }).success).toBe(false);
@@ -311,7 +311,7 @@ describe('editCommandSchema', () => {
     expect(referencedEditCommandSchema.safeParse({ ...samples['bookmark-add'], frame: 1.5 }).success).toBe(false);
     expect(referencedEditCommandSchema.safeParse({ type: 'export' }).success).toBe(false);
     const published = JSON.stringify(z.toJSONSchema(referencedEditCommandSchema, { io: 'input' }));
-    expect(published).toContain('colour-setting');
+    expect(published).toContain('color-setting');
     expect(published.length).toBeLessThan(1_500);
   });
 

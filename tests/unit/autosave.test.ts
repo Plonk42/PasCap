@@ -279,13 +279,13 @@ describe('explicit autosave recovery', () => {
   );
 
   it.each([
-    new ApiError('Cancelled', 0, 'aborted'),
+    new ApiError('Canceled', 0, 'aborted'),
     new ApiError('Invalid response', 200, 'response'),
     new ApiError('Invalid request', 0, 'request'),
     new Error('Unclassified error'),
     'Original rejected explanation',
     null,
-  ])('does not offer retry for an unclassified, cancelled or invalid response failure', async (error) => {
+  ])('does not offer retry for an unclassified, canceled or invalid response failure', async (error) => {
     const save = vi.fn<Save>().mockRejectedValueOnce(error);
     const { project, autosave, states } = setup(save);
     autosave.update({ ...project, title: 'Edited' });
@@ -313,7 +313,7 @@ describe('explicit autosave recovery', () => {
       );
     vi.stubGlobal('fetch', fetchMock);
     const { autosave, states } = setup(api.save, project);
-    autosave.update({ ...project, title: 'Lost acknowledgement' });
+    autosave.update({ ...project, title: 'Lost acknowledgment' });
     await autosave.flush();
     expect(states.at(-1)?.recovery).toBe('retry');
     autosave.update({ ...project, title: 'Latest unsaved draft', revision: 4 });

@@ -21,7 +21,7 @@ test.beforeEach(async ({ page, request }) => {
     unexpected.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
     await route.abort('blockedbyclient');
   });
-  const document = createProject('advanced-memory', 'Advanced colour · memory only');
+  const document = createProject('advanced-memory', 'Advanced color · memory only');
   document.media.videoIds = [asset.id];
   document.clips = [createClip('one', asset.id, 0, 120)];
   document.adjustments = [adjustmentFrom0(120)];
@@ -32,14 +32,14 @@ test.beforeEach(async ({ page, request }) => {
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeEnabled();
 });
 test.afterEach(() => expect(unexpected).toEqual([]));
-const openSection = (page: Page, title: 'HSL ranges' | 'Colour curves') =>
+const openSection = (page: Page, title: 'HSL ranges' | 'Color curves') =>
   page.getByRole('button', { name: `${title} section`, exact: true }).click();
 
 test('static HSL exact entry, invalid drafts, keyboard, range reset and Undo', async ({ page }) => {
   await expect(page.getByRole('radiogroup', { name: 'HSL range' })).toBeHidden();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeVisible();
   await openSection(page, 'HSL ranges');
-  // Each HSL slider track follows the selected range's own hue (cyan's centre is 180°).
+  // Each HSL slider track follows the selected range's own hue (cyan's center is 180°).
   const track = (name: string) =>
     page
       .getByRole('slider', { name, exact: true })
@@ -62,44 +62,44 @@ test('static HSL exact entry, invalid drafts, keyboard, range reset and Undo', a
   const field = page.getByRole('spinbutton', { name: 'HSL hue', exact: true });
   await field.fill('12.3456789');
   await field.press('Enter');
-  await expect.poll(async () => (await current(page)).adjustments[0]!.colour.hsl.cyan.hue).toBe(12.3456789);
+  await expect.poll(async () => (await current(page)).adjustments[0]!.color.hsl.cyan.hue).toBe(12.3456789);
   await field.fill('31');
   await field.press('Enter');
   await expect(field).toHaveValue('31');
-  expect((await current(page)).adjustments[0]!.colour.hsl.cyan.hue).toBe(12.3456789);
+  expect((await current(page)).adjustments[0]!.color.hsl.cyan.hue).toBe(12.3456789);
   await field.press('Escape');
   await expect(field).toHaveValue('12.3456789');
   await page.getByRole('button', { name: 'Reset cyan HSL range', exact: true }).click();
-  await expect.poll(async () => (await current(page)).adjustments[0]!.colour.hsl.cyan.hue).toBe(0);
+  await expect.poll(async () => (await current(page)).adjustments[0]!.color.hsl.cyan.hue).toBe(0);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(field).toHaveValue('12.3456789');
   await page.getByRole('slider', { name: 'HSL saturation', exact: true }).press('ArrowRight');
-  await expect.poll(async () => (await current(page)).adjustments[0]!.colour.hsl.cyan.saturation).toBe(0.01);
+  await expect.poll(async () => (await current(page)).adjustments[0]!.color.hsl.cyan.saturation).toBe(0.01);
 });
 
 test('curve endpoints, exact collisions, nonmonotonic values, maximum points and reset', async ({ page }) => {
-  await openSection(page, 'Colour curves');
-  const input = page.getByRole('spinbutton', { name: 'Colour curve input', exact: true });
-  const output = page.getByRole('spinbutton', { name: 'Colour curve output', exact: true });
+  await openSection(page, 'Color curves');
+  const input = page.getByRole('spinbutton', { name: 'Color curve input', exact: true });
+  const output = page.getByRole('spinbutton', { name: 'Color curve output', exact: true });
   await expect(input).toBeDisabled();
   await output.fill('0.8');
   await output.press('Enter');
-  await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
+  await page.getByRole('button', { name: 'Add color curve control node', exact: true }).click();
   await expect(input).toHaveValue('0.25');
   await output.fill('0.123456789');
   await output.press('Enter');
   await input.fill('1');
   await input.press('Enter');
   await expect(input).toHaveValue('1');
-  expect((await current(page)).adjustments[0]!.colour.curves.master[1]!.x).toBe(0.25);
+  expect((await current(page)).adjustments[0]!.color.curves.master[1]!.x).toBe(0.25);
   await input.press('Escape');
   for (let i = 4; i < 16; i++)
-    await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Add colour curve control node', exact: true })).toBeDisabled();
-  expect((await current(page)).adjustments[0]!.colour.curves.master).toHaveLength(16);
+    await page.getByRole('button', { name: 'Add color curve control node', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Add color curve control node', exact: true })).toBeDisabled();
+  expect((await current(page)).adjustments[0]!.color.curves.master).toHaveLength(16);
   await page.getByRole('button', { name: 'Reset master curve', exact: true }).click();
   await expect
-    .poll(async () => (await current(page)).adjustments[0]!.colour.curves.master)
+    .poll(async () => (await current(page)).adjustments[0]!.color.curves.master)
     .toEqual([
       { x: 0, y: 0 },
       { x: 0.5, y: 0.5 },
@@ -108,28 +108,28 @@ test('curve endpoints, exact collisions, nonmonotonic values, maximum points and
 });
 
 test('all four curves share one graph and the channel swatches choose the editable curve', async ({ page }) => {
-  await openSection(page, 'Colour curves');
-  const channels = page.getByRole('radiogroup', { name: 'Colour curve channel' });
-  const plot = page.locator('.colour-curve-plot');
+  await openSection(page, 'Color curves');
+  const channels = page.getByRole('radiogroup', { name: 'Color curve channel' });
+  const plot = page.locator('.color-curve-plot');
   const timecode = await page.getByRole('button', { name: 'Go to timecode' }).textContent();
   await expect(channels.getByRole('radio', { name: 'master', exact: true })).toBeChecked();
-  await expect(plot.locator('path.colour-curve-other')).toHaveCount(3);
+  await expect(plot.locator('path.color-curve-other')).toHaveCount(3);
   await channels.getByRole('radio', { name: 'red', exact: true }).click();
-  await expect(plot.locator('path.colour-curve-selected')).toHaveAttribute('data-channel', 'red');
-  await expect(plot.locator('path.colour-curve-other[data-channel="master"]')).toHaveCount(1);
-  const output = page.getByRole('spinbutton', { name: 'Colour curve output', exact: true });
+  await expect(plot.locator('path.color-curve-selected')).toHaveAttribute('data-channel', 'red');
+  await expect(plot.locator('path.color-curve-other[data-channel="master"]')).toHaveCount(1);
+  const output = page.getByRole('spinbutton', { name: 'Color curve output', exact: true });
   await output.fill('0.2');
   await output.press('Enter');
-  await expect.poll(async () => (await current(page)).adjustments[0]!.colour.curves.red[0]!.y).toBe(0.2);
-  expect((await current(page)).adjustments[0]!.colour.curves.master[0]!.y).toBe(0);
-  const red = await plot.locator('path.colour-curve-selected').getAttribute('d');
+  await expect.poll(async () => (await current(page)).adjustments[0]!.color.curves.red[0]!.y).toBe(0.2);
+  expect((await current(page)).adjustments[0]!.color.curves.master[0]!.y).toBe(0);
+  const red = await plot.locator('path.color-curve-selected').getAttribute('d');
   await channels.getByRole('radio', { name: 'red', exact: true }).press('ArrowRight');
   const green = channels.getByRole('radio', { name: 'green', exact: true });
   await expect(green).toBeChecked();
   await expect(green).toBeFocused();
   // The edited red curve stays drawn, without nodes, while green is editable.
-  await expect(plot.locator('path.colour-curve-other[data-channel="red"]')).toHaveAttribute('d', red!);
-  await expect(plot.getByRole('button', { name: /^Colour curve control node/ })).toHaveCount(3);
+  await expect(plot.locator('path.color-curve-other[data-channel="red"]')).toHaveAttribute('d', red!);
+  await expect(plot.getByRole('button', { name: /^Color curve control node/ })).toHaveCount(3);
   await expect(page.getByRole('button', { name: 'Reset green curve', exact: true })).toBeVisible();
   await green.press('End');
   await expect(channels.getByRole('radio', { name: 'blue', exact: true })).toBeChecked();
@@ -139,11 +139,11 @@ test('all four curves share one graph and the channel swatches choose the editab
   await expect(page.getByRole('button', { name: 'Go to timecode' })).toHaveText(timecode!);
 });
 
-test('releasing a curve drag far outside the plot commits a node clamped between its neighbours', async ({ page }) => {
-  await openSection(page, 'Colour curves');
-  await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
+test('releasing a curve drag far outside the plot commits a node clamped between its neighbors', async ({ page }) => {
+  await openSection(page, 'Color curves');
+  await page.getByRole('button', { name: 'Add color curve control node', exact: true }).click();
   await expect.poll(() => memory.saves).toBe(1);
-  const box = (await page.getByRole('button', { name: 'Colour curve control node 2', exact: true }).boundingBox())!;
+  const box = (await page.getByRole('button', { name: 'Color curve control node 2', exact: true }).boundingBox())!;
   const x = box.x + box.width / 2,
     y = box.y + box.height / 2;
   await page.mouse.move(x, y);
@@ -151,20 +151,20 @@ test('releasing a curve drag far outside the plot commits a node clamped between
   await page.mouse.move(x + 600, y + 600, { steps: 4 });
   await page.mouse.up();
   await expect.poll(() => memory.saves).toBe(2);
-  const [, node] = (await current(page)).adjustments[0]!.colour.curves.master;
+  const [, node] = (await current(page)).adjustments[0]!.color.curves.master;
   expect(node!.x).toBeGreaterThan(0.49);
   expect(node!.x).toBeLessThan(0.5);
   expect(node!.y).toBe(0);
 });
 
-test('captured curve drafts cancel, stay inside the plot between neighbours and commit once with Undo', async ({
+test('captured curve drafts cancel, stay inside the plot between neighbors and commit once with Undo', async ({
   page,
 }) => {
-  await openSection(page, 'Colour curves');
-  await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
+  await openSection(page, 'Color curves');
+  await page.getByRole('button', { name: 'Add color curve control node', exact: true }).click();
   await expect.poll(() => memory.saves).toBe(1);
-  const original = (await current(page)).adjustments[0]!.colour.curves.master;
-  const point = page.getByRole('button', { name: 'Colour curve control node 2', exact: true });
+  const original = (await current(page)).adjustments[0]!.color.curves.master;
+  const point = page.getByRole('button', { name: 'Color curve control node 2', exact: true });
   const box = await point.boundingBox();
   if (!box) throw new Error('Curve point not visible.');
   const x = box.x + box.width / 2,
@@ -175,29 +175,29 @@ test('captured curve drafts cancel, stay inside the plot between neighbours and 
   expect(memory.saves).toBe(1);
   await page.keyboard.press('Escape');
   await page.mouse.up();
-  expect((await current(page)).adjustments[0]!.colour.curves.master).toEqual(original);
+  expect((await current(page)).adjustments[0]!.color.curves.master).toEqual(original);
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.move(x + 10, y - 10);
   await page.mouse.move(x + 400, y - 400);
-  const plot = (await page.locator('.colour-curve-plot').boundingBox())!;
+  const plot = (await page.locator('.color-curve-plot').boundingBox())!;
   const dragged = (await point.boundingBox())!;
   expect(dragged.x + dragged.width / 2).toBeLessThanOrEqual(plot.x + plot.width + 0.5);
   expect(dragged.y + dragged.height / 2).toBeGreaterThanOrEqual(plot.y - 0.5);
-  await expect(page.locator('.colour-curve-plot')).not.toHaveClass(/invalid/);
+  await expect(page.locator('.color-curve-plot')).not.toHaveClass(/invalid/);
   await page.keyboard.press('Escape');
   await page.mouse.up();
-  expect((await current(page)).adjustments[0]!.colour.curves.master).toEqual(original);
+  expect((await current(page)).adjustments[0]!.color.curves.master).toEqual(original);
   expect(memory.saves).toBe(1);
   await page.mouse.move(x, y);
   await page.mouse.down();
   await page.mouse.move(x + 15, y - 15);
   await page.mouse.up();
   await expect.poll(() => memory.saves).toBe(2);
-  expect((await current(page)).adjustments[0]!.colour.curves.master).not.toEqual(original);
+  expect((await current(page)).adjustments[0]!.color.curves.master).not.toEqual(original);
   await point.focus();
   await page.keyboard.press('Control+z');
-  await expect.poll(async () => (await current(page)).adjustments[0]!.colour.curves.master).toEqual(original);
+  await expect.poll(async () => (await current(page)).adjustments[0]!.color.curves.master).toEqual(original);
   await expect(point).toBeFocused();
 });
 
@@ -206,26 +206,26 @@ test('scalar keys do not disable static HSL or curves and Reset keys preserves t
 }) => {
   const document = memory.snapshot();
   document.adjustments[0]!.keyframes = [gradePoint(0, { exposure: 0.4 })];
-  document.adjustments[0]!.colour.hsl.red.hue = 7;
-  document.adjustments[0]!.colour.curves.master[0]!.y = 0.05;
+  document.adjustments[0]!.color.hsl.red.hue = 7;
+  document.adjustments[0]!.color.curves.master[0]!.y = 0.05;
   memory.seed(document);
   await page.reload();
   await inspectorTab(page, 'Adjustment');
   await openSection(page, 'HSL ranges');
   await expect(page.getByRole('slider', { name: 'HSL hue', exact: true })).toBeEnabled();
-  await page.getByRole('button', { name: 'Reset colour', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset color', exact: true }).click();
   await expect.poll(async () => (await current(page)).adjustments[0]!.keyframes[0]!.values.exposure).toBe(0);
-  expect((await current(page)).adjustments[0]!.colour.hsl.red.hue).toBe(7);
-  expect((await current(page)).adjustments[0]!.colour.curves.master[0]!.y).toBe(0.05);
+  expect((await current(page)).adjustments[0]!.color.hsl.red.hue).toBe(7);
+  expect((await current(page)).adjustments[0]!.color.curves.master[0]!.y).toBe(0.05);
 });
 
 for (const cancellation of ['pointercancel', 'lostcapture', 'windowblur'] as const) {
   test(`curve ${cancellation} restores captured points without a draft save`, async ({ page }) => {
-    await openSection(page, 'Colour curves');
-    await page.getByRole('button', { name: 'Add colour curve control node', exact: true }).click();
+    await openSection(page, 'Color curves');
+    await page.getByRole('button', { name: 'Add color curve control node', exact: true }).click();
     await expect.poll(() => memory.saves).toBe(1);
-    const original = (await current(page)).adjustments[0]!.colour.curves.master;
-    const point = page.getByRole('button', { name: 'Colour curve control node 2', exact: true });
+    const original = (await current(page)).adjustments[0]!.color.curves.master;
+    const point = page.getByRole('button', { name: 'Color curve control node 2', exact: true });
     const box = await point.boundingBox();
     if (!box) throw new Error('Visible point required.');
     await point.evaluate((element) =>
@@ -247,9 +247,9 @@ for (const cancellation of ['pointercancel', 'lostcapture', 'windowblur'] as con
       );
     else await point.dispatchEvent('pointercancel');
     await page.mouse.up();
-    expect((await current(page)).adjustments[0]!.colour.curves.master).toEqual(original);
+    expect((await current(page)).adjustments[0]!.color.curves.master).toEqual(original);
     expect(memory.saves).toBe(1);
-    await expect(page.getByRole('button', { name: 'Add colour curve control node', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Add color curve control node', exact: true })).toBeEnabled();
   });
 }
 
@@ -271,13 +271,13 @@ test('advanced adjustment settings stay with the adjustment; selecting a clip sh
   await field.fill('31');
   await field.press('Enter');
   await page.locator('[data-clip-id="two"] .timeline-clip-body').click();
-  await expect(page.locator('#inspector-pane .colour-target > span')).toHaveText(/ · this clip only$/);
+  await expect(page.locator('#inspector-pane .color-target > span')).toHaveText(/ · this clip only$/);
   await expect(field).toHaveValue('0');
   await expect(field).toBeEnabled();
   await field.fill('-4.23456789');
   await field.press('Enter');
   const changed = await current(page);
-  expect(changed.adjustments[0]!.colour.hsl.red.hue).toBe(7.123456789);
-  expect(changed.clips[1]!.grade.colour.hsl.red.hue).toBe(-4.23456789);
+  expect(changed.adjustments[0]!.color.hsl.red.hue).toBe(7.123456789);
+  expect(changed.clips[1]!.grade.color.hsl.red.hue).toBe(-4.23456789);
   expect(changed.clips[0]).toEqual(document.clips[0]);
 });

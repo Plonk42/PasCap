@@ -38,10 +38,10 @@ function metadata(): VideoMetadata {
     frameRate: { ...PROJECT_FPS },
     frameCount: 12,
     durationSeconds: framesToSeconds(12),
-    colourPrimaries: 'bt709',
-    colourTransfer: 'bt709',
-    colourSpace: 'bt709',
-    colourRange: 'tv',
+    colorPrimaries: 'bt709',
+    colorTransfer: 'bt709',
+    colorSpace: 'bt709',
+    colorRange: 'tv',
     hasAudio: false,
   };
 }
@@ -50,7 +50,7 @@ async function fakeProcess(
   args: string[],
   options: NonNullable<Parameters<typeof runProcess>[2]> = {},
 ): Promise<Buffer> {
-  if (options.signal?.aborted) throw new ServiceError('Job cancelled.', 499);
+  if (options.signal?.aborted) throw new ServiceError('Job canceled.', 499);
   const output = args.at(-1)!;
   if (output === 'pipe:1') return Buffer.alloc(160 * 90 * 3, 64);
   await writeFile(output, args.includes('-progress') ? 'mock verified proxy' : 'mock thumbnail');
@@ -81,7 +81,7 @@ async function videoFixture() {
   const jobs = new JobQueue();
   queues.push(jobs);
   const library = new MediaLibrary(directories.config, jobs);
-  await library.initialise();
+  await library.initialize();
   const original = path.join(directories.card, 'DJI_0523.MP4');
   const bytes = Buffer.from('disposable original bytes: flight over the ridge');
   await writeFile(original, bytes);
@@ -125,13 +125,13 @@ describe('full-content checksum', () => {
     expect(progress.every((fraction) => fraction > 0 && fraction <= 1)).toBe(true);
   });
 
-  it('stops when cancelled', async () => {
+  it('stops when canceled', async () => {
     const { card } = await setup();
     const filename = path.join(card, 'clip.mp4');
     await writeFile(filename, Buffer.alloc(4 * 1024 * 1024));
     const controller = new AbortController();
     controller.abort();
-    await expect(hashFile(filename, controller.signal)).rejects.toThrow('cancelled');
+    await expect(hashFile(filename, controller.signal)).rejects.toThrow('canceled');
   });
 
   it('is recorded and persisted by the first preparation', async () => {
@@ -206,7 +206,7 @@ describe('video relink', () => {
     const jobs = new JobQueue();
     queues.push(jobs);
     const library = new MediaLibrary(config, jobs);
-    await library.initialise();
+    await library.initialize();
     const original = path.join(card, 'never-prepared.mp4');
     await writeFile(original, 'unprepared bytes');
     const asset = await library.register(original);
@@ -269,7 +269,7 @@ describe('music relink', () => {
     const jobs = new JobQueue();
     queues.push(jobs);
     const audio = new AudioLibrary(config, jobs);
-    await audio.initialise();
+    await audio.initialize();
     const playback = audio.playbackPath(asset);
     const moved = await moveToDrive(original, drive);
     expect(await audio.missing()).toEqual([asset.id]);

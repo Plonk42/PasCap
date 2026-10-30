@@ -380,7 +380,7 @@ test('a Transform marker snaps to the playhead, Alt bypasses it, and arrow keys 
   await page.mouse.move(x + 21 * scale, y, { steps: 4 });
   await expect(page.locator('.timeline-transform-key.moving')).toHaveAttribute('data-transform-keyframe', '63');
   await expect(page.locator('.snap-guide')).toHaveCount(1);
-  // The Transform keyframe icon colour (#c4e9ff).
+  // The Transform keyframe icon color (#c4e9ff).
   await expect(page.locator('.snap-guide')).toHaveCSS('background-color', 'rgb(196, 233, 255)');
   await page.keyboard.down('Alt');
   await page.mouse.move(x + 21 * scale + 1, y);
@@ -438,7 +438,7 @@ test('a default Transform keyframe returns every setting to neutral from its fra
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
-test('Reset works like Colour: the whole base unanimated, only the playhead keyframe once animated', async ({
+test('Reset works like Color: the whole base unanimated, only the playhead keyframe once animated', async ({
   page,
 }) => {
   const before = await seed(page, (document) => {
@@ -557,7 +557,7 @@ test('stored rows start closed, select on a click anywhere and step each setting
   await page.mouse.click(box.x + 6, box.y + box.height / 2);
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
   await expectSelected(page, 40);
-  // Chips carry the same per-setting arrows as Colour's.
+  // Chips carry the same per-setting arrows as Color's.
   const scaleNext = list.locator('[data-keyframe-frame="10"]').getByRole('button', { name: 'Next Scale keyframe' });
   await scaleNext.click();
   await expectSelected(page, 70);
@@ -600,7 +600,7 @@ test('bulk expansion includes Transform in Track while heading help and tab navi
   page,
 }) => {
   const before = await current(page);
-  // HSL ranges and Colour curves start collapsed: a mixed tab offers Collapse all first.
+  // HSL ranges and Color curves start collapsed: a mixed tab offers Collapse all first.
   await page.getByRole('button', { name: 'Collapse all Track sections', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Transform section', exact: true })).toHaveAttribute(
     'aria-expanded',
@@ -620,7 +620,7 @@ test('bulk expansion includes Transform in Track while heading help and tab navi
   await expect(exact(page, 'Scale')).toBeVisible();
   await page.getByRole('tab', { name: 'Track', exact: true }).focus();
   await page.keyboard.press('ArrowLeft');
-  await expect(page.getByRole('tab', { name: 'Colour', exact: true })).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Color', exact: true })).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(exact(page, 'Scale')).toBeVisible();
   expect(await current(page)).toEqual(before);

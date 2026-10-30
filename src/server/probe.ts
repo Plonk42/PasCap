@@ -85,10 +85,10 @@ export async function probeVideo(
     frameRate: { ...PROJECT_FPS },
     frameCount,
     durationSeconds: duration,
-    colourPrimaries: video.color_primaries,
-    colourTransfer: video.color_transfer,
-    colourSpace: video.color_space,
-    colourRange: video.color_range,
+    colorPrimaries: video.color_primaries,
+    colorTransfer: video.color_transfer,
+    colorSpace: video.color_space,
+    colorRange: video.color_range,
     hasAudio: probe.streams.some((stream) => stream.codec_type === 'audio'),
   });
 }

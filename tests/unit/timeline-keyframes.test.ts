@@ -47,7 +47,7 @@ describe('capture-relative marker geometry', () => {
     expect(keyframeFrameAtPointer(20, 200, 200 + 30 * scale, 100, 100 + 10 * scale, scale)).toBe(60);
     expect(keyframeFrameAtPointer(20, 200, 200 - 10 * scale, 100, 100 - 5 * scale, scale)).toBe(5);
   });
-  it('quantises once and bounds timeline coordinates, never source frames', () => {
+  it('quantizes once and bounds timeline coordinates, never source frames', () => {
     expect(keyframeFrameAtPointer(20, 100, 100.6, 0, 0, 1)).toBe(21);
     expect(keyframeFrameAtPointer(20, 100, -200, 0, 0, 1)).toBe(0);
     expect(keyframeFrameAtPointer(2_147_483_640, 0, 100, 0, 0, 1)).toBe(2_147_483_647);

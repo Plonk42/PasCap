@@ -38,7 +38,7 @@ interface ReaderRun {
 }
 
 export function musicAborted(): DOMException {
-  return new DOMException('Music operation cancelled', 'AbortError');
+  return new DOMException('Music operation canceled', 'AbortError');
 }
 
 /** Read one exact bounded response; HTML/error bodies or ignored Range requests are not PCM. */

@@ -1,20 +1,20 @@
 import { z } from 'zod';
-import type { RGB } from './colour.js';
+import type { RGB } from './color.js';
 import { described } from './described.js';
 
 export const HSL_BANDS = ['red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple', 'magenta'] as const;
-export const HSL_CENTRES = [0, 30, 60, 120, 180, 240, 270, 300] as const;
+export const HSL_CENTERS = [0, 30, 60, 120, 180, 240, 270, 300] as const;
 export const CURVE_CHANNELS = ['master', 'red', 'green', 'blue'] as const;
 export type HslBand = (typeof HSL_BANDS)[number];
 export type CurveChannel = (typeof CURVE_CHANNELS)[number];
 export const hslBandSchema = z
   .object({
     hue: described(z.number().min(-30).max(30), 'Shift in degrees.'),
-    saturation: described(z.number().min(-1).max(1), '−1 removes its colour.'),
+    saturation: described(z.number().min(-1).max(1), '−1 removes its color.'),
     lightness: described(z.number().min(-0.5).max(0.5), 'Change.'),
   })
   .strict();
-const band = (name: HslBand, centre: number) => described(hslBandSchema, `The ${name} range, centred on ${centre}°.`);
+const band = (name: HslBand, center: number) => described(hslBandSchema, `The ${name} range, centerd on ${center}°.`);
 export const hslSchema = z
   .object({
     red: band('red', 0),
@@ -33,7 +33,7 @@ export const curvePointSchema = z
     y: described(z.number().min(0).max(1), 'Output value for that input.'),
   })
   .strict();
-export const colourCurveSchema = z
+export const colorCurveSchema = z
   .array(curvePointSchema)
   .min(2)
   .max(16)
@@ -42,20 +42,20 @@ export const colourCurveSchema = z
       points[0]?.x === 0 &&
       points.at(-1)?.x === 1 &&
       points.every((point, index) => index === 0 || point.x > points[index - 1]!.x),
-    { message: 'Colour curve control node inputs must strictly ascend from 0 to 1.' },
+    { message: 'Color curve control node inputs must strictly ascend from 0 to 1.' },
   );
-const curve = (channel: CurveChannel) => described(colourCurveSchema, `The ${channel} curve.`);
+const curve = (channel: CurveChannel) => described(colorCurveSchema, `The ${channel} curve.`);
 export const curvesSchema = z
   .object({ master: curve('master'), red: curve('red'), green: curve('green'), blue: curve('blue') })
   .strict();
 export type HslSettings = z.infer<typeof hslSchema>;
-export type ColourCurvePoint = z.infer<typeof curvePointSchema>;
-export type ColourCurves = z.infer<typeof curvesSchema>;
+export type ColorCurvePoint = z.infer<typeof curvePointSchema>;
+export type ColorCurves = z.infer<typeof curvesSchema>;
 
 export function createHslSettings(): HslSettings {
   return Object.fromEntries(HSL_BANDS.map((band) => [band, { hue: 0, saturation: 0, lightness: 0 }])) as HslSettings;
 }
-export function createColourCurves(): ColourCurves {
+export function createColorCurves(): ColorCurves {
   return Object.fromEntries(
     CURVE_CHANNELS.map((channel) => [
       channel,
@@ -65,19 +65,19 @@ export function createColourCurves(): ColourCurves {
         { x: 1, y: 1 },
       ],
     ]),
-  ) as ColourCurves;
+  ) as ColorCurves;
 }
 export function isNeutralHsl(hsl: HslSettings): boolean {
   return HSL_BANDS.every((band) => hsl[band].hue === 0 && hsl[band].saturation === 0 && hsl[band].lightness === 0);
 }
-export function isIdentityCurve(points: readonly ColourCurvePoint[]): boolean {
+export function isIdentityCurve(points: readonly ColorCurvePoint[]): boolean {
   return points.every((point) => point.x === point.y);
 }
-export function evaluateColourCurve(points: readonly ColourCurvePoint[], input: number): number {
-  return compileColourCurve(points)(input);
+export function evaluateColorCurve(points: readonly ColorCurvePoint[], input: number): number {
+  return compileColorCurve(points)(input);
 }
-/** Monotone cubic (Fritsch–Butland/PCHIP) node slopes: smooth, never overshooting neighbouring outputs. */
-export function colourCurveSlopes(points: readonly ColourCurvePoint[]): Float64Array {
+/** Monotone cubic (Fritsch–Butland/PCHIP) node slopes: smooth, never overshooting neighboring outputs. */
+export function colorCurveSlopes(points: readonly ColorCurvePoint[]): Float64Array {
   const last = points.length - 1;
   const width = (at: number): number => points[at + 1]!.x - points[at]!.x;
   const secant = (at: number): number => (points[at + 1]!.y - points[at]!.y) / width(at);
@@ -106,11 +106,11 @@ function endSlope(near: number, far: number, nearSecant: number, farSecant: numb
   return slope;
 }
 /** Determine identity once for a frame's already validated curve. */
-export function compileColourCurve(points: readonly ColourCurvePoint[]): (input: number) => number {
+export function compileColorCurve(points: readonly ColorCurvePoint[]): (input: number) => number {
   if (isIdentityCurve(points)) return (input) => input;
   const xs = Float64Array.from(points, (point) => point.x);
   const ys = Float64Array.from(points, (point) => point.y);
-  const slopes = colourCurveSlopes(points);
+  const slopes = colorCurveSlopes(points);
   const last = ys.length - 1;
   return (input) => {
     if (input <= 0) return ys[0]!;
@@ -132,10 +132,10 @@ export function compileColourCurve(points: readonly ColourCurvePoint[]): (input:
   };
 }
 /** Master then per-channel curves, in place on an encoded triple; null for identity. */
-export function compileColourCurvesInto(curves: ColourCurves): ((rgb: Float64Array) => void) | null {
+export function compileColorCurvesInto(curves: ColorCurves): ((rgb: Float64Array) => void) | null {
   if (CURVE_CHANNELS.every((channel) => isIdentityCurve(curves[channel]))) return null;
-  const master = compileColourCurve(curves.master);
-  const channels = [compileColourCurve(curves.red), compileColourCurve(curves.green), compileColourCurve(curves.blue)];
+  const master = compileColorCurve(curves.master);
+  const channels = [compileColorCurve(curves.red), compileColorCurve(curves.green), compileColorCurve(curves.blue)];
   return (rgb) => {
     for (let channel = 0; channel < 3; channel++) rgb[channel] = channels[channel]!(master(rgb[channel]!));
   };
@@ -179,13 +179,13 @@ export function compileHslInto(hsl: HslSettings): ((rgb: Float64Array) => void) 
     hue = (hue + 360) % 360;
     let left = 7;
     for (let i = 0; i < 7; i++)
-      if (hue < HSL_CENTRES[i + 1]!) {
+      if (hue < HSL_CENTERS[i + 1]!) {
         left = i;
         break;
       }
     const right = (left + 1) % 8;
-    const end = left === 7 ? 360 : HSL_CENTRES[left + 1]!;
-    const weight = smooth((hue - HSL_CENTRES[left]!) / (end - HSL_CENTRES[left]!));
+    const end = left === 7 ? 360 : HSL_CENTERS[left + 1]!;
+    const weight = smooth((hue - HSL_CENTERS[left]!) / (end - HSL_CENTERS[left]!));
     const influence = smooth(clamp(chroma / 0.1));
     const lightness = (maximum + minimum) / 2;
     const saturation = chroma / (1 - Math.abs(2 * lightness - 1));

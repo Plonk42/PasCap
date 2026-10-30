@@ -456,7 +456,7 @@ export function MediaLibrary({
   const remove = (ids: readonly string[]): void => {
     const first = visible.findIndex((asset) => ids.includes(asset.id));
     const remaining = (asset: MediaAsset): boolean => !ids.includes(asset.id);
-    const neighbour =
+    const neighbor =
       visible.slice(first + 1).find(remaining) ?? visible.slice(0, Math.max(0, first)).reverse().find(remaining);
     setRemoving(null);
     if (!onRemove([...ids])) return;
@@ -464,10 +464,8 @@ export function MediaLibrary({
     setConfirmPrepare(false);
     // The removed card took focus with it; keep keyboard users in the list without opening a review.
     requestAnimationFrame(() => {
-      const target = neighbour
-        ? document.querySelector<HTMLElement>(
-            `.media-item[data-media-id="${CSS.escape(neighbour.id)}"] .media-checkbox`,
-          )
+      const target = neighbor
+        ? document.querySelector<HTMLElement>(`.media-item[data-media-id="${CSS.escape(neighbor.id)}"] .media-checkbox`)
         : document.querySelector<HTMLElement>('[aria-label="Search media"]');
       target?.focus();
     });

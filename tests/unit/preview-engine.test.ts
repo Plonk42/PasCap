@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { CompositeGroup } from '../../src/preview/compositor.js';
 import { PreviewEngine } from '../../src/preview/engine.js';
-import { NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOR, type RGB } from '../../src/shared/color.js';
 import { compositePixel } from '../../src/shared/composition.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import {
@@ -110,7 +110,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock('../../src/preview/video-streams.js', () => {
   const budget = 6;
-  const cancelled = (): DOMException => new DOMException('Cancelled', 'AbortError');
+  const canceled = (): DOMException => new DOMException('Canceled', 'AbortError');
   return {
     VideoStreams: class implements StreamsDouble {
       readonly lanes: LaneDouble[];
@@ -233,7 +233,7 @@ vi.mock('../../src/preview/video-streams.js', () => {
             else reject(error);
           };
           const check = (): void => {
-            if (signal.aborted || lane.generation !== generation) return finish(cancelled());
+            if (signal.aborted || lane.generation !== generation) return finish(canceled());
             try {
               this.#advance(index, sourceFrame, false);
             } catch (error) {
@@ -316,7 +316,7 @@ vi.mock('../../src/preview/music.js', () => ({
       state.music.push(this as unknown as MusicDouble);
     }
     configure = vi.fn(async (tracks: readonly MusicTrack[], signal: AbortSignal): Promise<void> => {
-      if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+      if (signal.aborted) throw new DOMException('Canceled', 'AbortError');
       this.pause();
       this.hasMusic = tracks.length > 0;
     });
@@ -325,7 +325,7 @@ vi.mock('../../src/preview/music.js', () => ({
     });
     start = vi.fn(async (frame: number, signal: AbortSignal): Promise<void> => {
       await state.onStart?.(signal);
-      if (signal.aborted) throw new DOMException('Cancelled', 'AbortError');
+      if (signal.aborted) throw new DOMException('Canceled', 'AbortError');
       this.clockFrame = frame;
       this.clockTime = state.now;
       this.running = true;
@@ -429,8 +429,8 @@ function expectSurface(
               slot: lanes.indexOf(layer.clipId),
               sourceFrame: layer.sourceFrame,
               url: proxyUrl(layer.mediaId),
-              grade: clipOriginal ? NEUTRAL_COLOUR : layer.grade,
-              settings: adjustmentOriginal ? NEUTRAL_COLOUR : layer.colour,
+              grade: clipOriginal ? NEUTRAL_COLOR : layer.grade,
+              settings: adjustmentOriginal ? NEUTRAL_COLOR : layer.color,
               aspect: 16 / 9,
               spatial: layer.spatial,
               detail: clipOriginal ? NEUTRAL_DETAIL : layer.detail,
@@ -519,7 +519,7 @@ function gradedLayersProject(): ProjectDocument {
   const lower = project.layers[0]!;
   const left = project.clips[0]!;
   left.grade = {
-    colour: { ...NEUTRAL_COLOUR, hue: 15, saturation: 0.8 },
+    color: { ...NEUTRAL_COLOR, hue: 15, saturation: 0.8 },
     keyframes: [gradeKey(0, { exposure: -1 }), gradeKey(50, { exposure: 1 }, 'hold')],
   };
   left.speed = { mode: 'constant', rate: 2 };
@@ -536,7 +536,7 @@ function gradedLayersProject(): ProjectDocument {
   upper.transform.keyframes = [opacityKey(0, 0.35, 'smooth'), opacityKey(60, 0.7, 'hold')];
   const top = createClip('upper-clip', 'upper-video', 200, 275, upper.id);
   top.speed = { mode: 'constant', rate: 1.25 };
-  top.grade.colour.temperature = 0.4;
+  top.grade.color.temperature = 0.4;
   project.layers.push(upper);
   project.clips.push(right, top);
   project.media.videoIds.push('other-video', 'upper-video');
@@ -1019,18 +1019,18 @@ describe('playback on one clock', () => {
     const groups = compositor().visible!;
     let pixel = [0, 0, 0];
     for (const group of groups) {
-      const colour = [0, 0, 0];
+      const color = [0, 0, 0];
       let alpha = 0;
       for (const clip of group) {
         const coverage = clip.opacity * clip.blendWeight;
         alpha += coverage;
         gradeChainPixel(rgb(lanes[clip.slot]!), sourceGrades(clip.grade!, clip.settings).stages).forEach(
           (channel, index) => {
-            colour[index]! += channel * coverage * clip.brightness;
+            color[index]! += channel * coverage * clip.brightness;
           },
         );
       }
-      pixel = pixel.map((channel, index) => colour[index]! + channel * (1 - alpha));
+      pixel = pixel.map((channel, index) => color[index]! + channel * (1 - alpha));
     }
     expect(pixel).toEqual(compositePixel(sampleTimeline(project, 51), (layer) => rgb(layer.clipId)));
     await engine.seek(70);
@@ -1071,7 +1071,7 @@ describe('playback on one clock', () => {
     expect(music().start).toHaveBeenCalledOnce();
   });
 
-  it('restarts music and video together when music loses synchronisation', async () => {
+  it('restarts music and video together when music loses synchronization', async () => {
     const project = singleProject(true);
     const { engine, anchor } = await playing(project, 8);
     state.musicSync = false;
@@ -1110,12 +1110,12 @@ describe('playback on one clock', () => {
     expect(music().start).not.toHaveBeenCalled();
   });
 
-  it('restarts from the first frame at the end, but not after a cancelled reset', async () => {
+  it('restarts from the first frame at the end, but not after a canceled reset', async () => {
     const project = singleProject();
     const engine = await paused(project, 59);
-    const cancelled = engine.play();
+    const canceled = engine.play();
     engine.pause();
-    await cancelled;
+    await canceled;
     expect(engine.diagnostics()).toMatchObject({ status: 'paused', playing: false, frame: 59 });
     await engine.play();
     expect(engine.diagnostics()).toMatchObject({ status: 'playing', frame: 0 });
@@ -1170,7 +1170,7 @@ describe('appearance without reloading timing', () => {
     expect(compositor().uploadFrame).toHaveBeenCalledOnce();
   });
 
-  it('updates keys, opacity, colour and stacking while playing without restarting decoders or music', async () => {
+  it('updates keys, opacity, color and stacking while playing without restarting decoders or music', async () => {
     const project = layeredProject(3);
     project.music = [musicTrack(60)];
     const { engine, anchor } = await playing(project, 15);
@@ -1195,8 +1195,8 @@ describe('appearance without reloading timing', () => {
     project.adjustments = [createAdjustment('look', 0, 60)];
     const engine = await paused(project, 10);
     const starts = streams().starts.length;
-    project.adjustments[0]!.colour.saturation = 0.4;
-    project.clips[0]!.grade.colour.exposure = 0.3;
+    project.adjustments[0]!.color.saturation = 0.4;
+    project.clips[0]!.grade.color.exposure = 0.3;
     engine.updateProjectAppearance(project);
     expect(compositor().visible![0]![0]).toMatchObject({ grade: { exposure: 0.3 }, settings: { saturation: 0.4 } });
     expect(compositor().visible![1]![0]).toMatchObject({ grade: { exposure: 0 }, settings: { saturation: 0.4 } });
@@ -1214,15 +1214,15 @@ describe('appearance without reloading timing', () => {
     project.adjustments = [createAdjustment('look', 0, 60)];
     const engine = await paused(project, 8);
     const draft = structuredClone(project);
-    draft.adjustments[0]!.colour.hdr = 0;
+    draft.adjustments[0]!.color.hdr = 0;
     engine.updateProjectAppearance(draft);
     expect(compositor().prepareDetail).not.toHaveBeenCalled();
-    draft.adjustments[0]!.colour.hdr = 0.7;
+    draft.adjustments[0]!.color.hdr = 0.7;
     engine.updateProjectAppearance(draft);
     expect(compositor().prepareDetail).toHaveBeenCalledOnce();
     expect(compositor().visible![0]![0]!.settings.hdr).toBe(0.7);
     expect(compositor().prepareStaged).not.toHaveBeenCalled();
-    draft.clips[0]!.grade.colour.saturation = 0.5;
+    draft.clips[0]!.grade.color.saturation = 0.5;
     engine.updateProjectAppearance(draft);
     expect(compositor().prepareStaged).toHaveBeenCalledWith(true);
     expect(compositor().visible![0]![0]!.grade!.saturation).toBe(0.5);
@@ -1322,7 +1322,7 @@ describe('editor-only ungraded comparison', () => {
       expectSurface(engine, project, frame, true);
       expect(compositor().visible).toEqual(
         graded.map((group) =>
-          group.map((clip) => ({ ...clip, grade: NEUTRAL_COLOUR, settings: NEUTRAL_COLOUR, detail: NEUTRAL_DETAIL })),
+          group.map((clip) => ({ ...clip, grade: NEUTRAL_COLOR, settings: NEUTRAL_COLOR, detail: NEUTRAL_DETAIL })),
         ),
       );
       engine.setUngraded('clip');
@@ -1460,9 +1460,9 @@ describe('lifecycle', () => {
     const project = singleProject();
     const engine = await paused(project, 8);
     const before = structuredClone(compositor().visible);
-    project.clips[0]!.grade.colour.exposure = 2;
+    project.clips[0]!.grade.color.exposure = 2;
     engine.capturePixels();
     expect(compositor().visible).toEqual(before);
-    expect(projectSchema.parse(project).clips[0]!.grade.colour.exposure).toBe(2);
+    expect(projectSchema.parse(project).clips[0]!.grade.color.exposure).toBe(2);
   });
 });

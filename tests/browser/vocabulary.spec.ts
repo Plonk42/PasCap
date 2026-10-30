@@ -73,13 +73,13 @@ for (const viewport of [
       page.getByRole('group', { name: 'Adjustment keyframes adjustment 00:00:00 – 00:03:00', exact: true }),
     ).toBeAttached();
     await expect(page.getByRole('button', { name: 'Delete adjustment keyframe 30', exact: true })).toBeAttached();
-    await page.getByRole('button', { name: 'Colour animation help', exact: true }).focus();
+    await page.getByRole('button', { name: 'Color animation help', exact: true }).focus();
     await page.keyboard.press('Enter');
     await expect(page.locator('.editor-help-content:popover-open')).toContainText('every video track');
     await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'Colour curves section', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Colour curve control node 1', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Delete colour curve control node', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Color curves section', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Color curve control node 1', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Delete color curve control node', exact: true })).toBeDisabled();
     await inspectorTab(page, 'Track');
     await page.getByRole('button', { name: 'Keyframe Scale', exact: true }).click();
     const transformKeys = page.getByRole('group', { name: 'Transform keyframes Track 1', exact: true });

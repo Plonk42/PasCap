@@ -34,7 +34,7 @@ export type IconName =
   | 'end'
   | 'more'
   | 'speed'
-  | 'colour'
+  | 'color'
   | 'layers'
   | 'music'
   | 'curve'
@@ -94,7 +94,7 @@ const paths: Record<IconName, string> = {
   end: 'M19 5v14M6 5l10 7-10 7',
   more: 'M5 12h.1M12 12h.1M19 12h.1',
   speed: 'M4 18a9 9 0 1 1 16 0M12 13l5-6M5 13h1m6-9v1m6 8h1M10 18h4',
-  colour: 'M12 3a9 9 0 1 0 0 18h2a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h3a5 5 0 0 0 0-10h-4ZM7 8h.1M12 6h.1M6 13h.1',
+  color: 'M12 3a9 9 0 1 0 0 18h2a2 2 0 0 0 0-4h-1a2 2 0 0 1 0-4h3a5 5 0 0 0 0-10h-4ZM7 8h.1M12 6h.1M6 13h.1',
   layers: 'm3 8 9-5 9 5-9 5-9-5Zm0 5 9 5 9-5M3 18l9 5 9-5',
   music: 'M9 17V5l11-2v12M9 17a3 3 0 1 1-3-3c2 0 3 1 3 3Zm11-2a3 3 0 1 1-3-3c2 0 3 1 3 3Z',
   curve: 'M3 18c8 0 10-12 18-12M3 15v6m18-18v6',

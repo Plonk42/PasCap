@@ -7,7 +7,7 @@ import {
   scaleCorrection,
   type AutoCorrection,
 } from '../../src/shared/auto-adjust.js';
-import { animatedSettings, autoAdjustCommand, trackSamples, type AutoOwner } from '../../src/shared/auto-colour.js';
+import { animatedSettings, autoAdjustCommand, trackSamples, type AutoOwner } from '../../src/shared/auto-color.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import { createAdjustment, layerKeyAsGradeKey, MAX_GRADE_KEYFRAMES } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
@@ -27,7 +27,7 @@ import {
   type AutoAdjustContext,
   type AutoAdjustSource,
 } from '../../src/web/auto-adjust.js';
-import { adjustmentColourOwner, gradeOwnerOf } from '../../src/web/colour-owner.js';
+import { adjustmentColorOwner, gradeOwnerOf } from '../../src/web/color-owner.js';
 import { analysisAsset as asset } from './analysis-asset.js';
 
 /** Clip A (source 100–400) cut to a reversed clip B (source 0–300 at 2×), on one track; an empty second track. */
@@ -80,7 +80,7 @@ const CORRECTION: AutoCorrection = {
 const OTHER: AutoCorrection = { ...CORRECTION, temperature: -0.4, exposure: -0.3, contrast: 0.9 };
 
 describe('Auto adjust target', () => {
-  it('analyses the whole source range of the graded clip, reversed or retimed, wherever the playhead is', () => {
+  it('analyzes the whole source range of the graded clip, reversed or retimed, wherever the playhead is', () => {
     const document = project();
     const a = target(document, 'a', 10);
     expect(a.parts.map(({ clip, asset }) => [clip.clip.id, asset.id])).toEqual([['a', 'one']]);
@@ -92,7 +92,7 @@ describe('Auto adjust target', () => {
     expect(b.key).not.toBe(a.key);
   });
 
-  it('analyses each clip of the track on its own, whole, from any of them', () => {
+  it('analyzes each clip of the track on its own, whole, from any of them', () => {
     const document = project();
     const track = target(document, 'a', 10, 'track');
     expect(track.label).toBe('2 clips on Track 1, each on its own');
@@ -109,7 +109,7 @@ describe('Auto adjust target', () => {
   it('samples a whole track in proportion to its duration on screen for the estimate operation', () => {
     const layout = calculateLayout(project());
     const [a, b] = layout.clips as [PlacedClip, PlacedClip];
-    // A lasts 300 frames, reversed B at 2× 150: 16 frames at the centres of 450 / 16 frame slices.
+    // A lasts 300 frames, reversed B at 2× 150: 16 frames at the centers of 450 / 16 frame slices.
     const samples = trackSamples(layout.clips);
     expect(samples.map(({ clip }) => clip.clip.id)).toEqual([...Array(11).fill('a'), ...Array(5).fill('b')]);
     const positions = Array.from({ length: 16 }, (_, index) => Math.floor(((index + 0.5) * 450) / 16));
@@ -127,7 +127,7 @@ describe('Auto adjust target', () => {
       'Prepare the recording of this clip first.',
     );
     expect(autoAdjustTarget(context(document, 'a', 350), 'playhead').reason).toBe(
-      'Move the playhead over this clip to analyse 1 s around it.',
+      'Move the playhead over this clip to analyze 1 s around it.',
     );
   });
 });
@@ -140,22 +140,22 @@ describe('Auto adjust edit', () => {
     document.adjustments = [createAdjustment('look', 0, 300)];
     return document;
   }
-  const look = (document: ProjectDocument) => adjustmentColourOwner(document.adjustments[0]!, 'look');
+  const look = (document: ProjectDocument) => adjustmentColorOwner(document.adjustments[0]!, 'look');
 
-  it('replaces the eleven settings with the scaled correction in one Colour edit and one Undo step', () => {
+  it('replaces the eleven settings with the scaled correction in one Color edit and one Undo step', () => {
     const document = adjusted();
     const item = document.adjustments[0]!;
-    item.colour = { ...item.colour, hue: 12, vibrance: 0.4, hdr: 0.3, localContrast: 0.2, exposure: -1 };
-    item.colour.hsl.red.saturation = 0.25;
+    item.color = { ...item.color, hue: 12, vibrance: 0.4, hdr: 0.3, localContrast: 0.2, exposure: -1 };
+    item.color.hsl.red.saturation = 0.25;
     document.layers[0]!.transform.base.opacity = 0.8;
     const before = structuredClone(document);
     const command = autoAdjustCommand(look(document), CORRECTION, 0.5, LOOK)!;
     const next = applyCommand(document, command);
     const scaled = scaleCorrection(CORRECTION, 0.5);
-    expect(next.adjustments[0]!.colour).toEqual({ ...item.colour, ...scaled });
+    expect(next.adjustments[0]!.color).toEqual({ ...item.color, ...scaled });
     // Hue, HDR, Local contrast, HSL, curves, keyframes, the range, the tracks (Opacity, Transform) and clips are untouched.
-    expect({ ...next.adjustments[0]!, colour: before.adjustments[0]!.colour }).toEqual(before.adjustments[0]);
-    expect(next.adjustments[0]!.colour.hsl).toEqual(before.adjustments[0]!.colour.hsl);
+    expect({ ...next.adjustments[0]!, color: before.adjustments[0]!.color }).toEqual(before.adjustments[0]);
+    expect(next.adjustments[0]!.color.hsl).toEqual(before.adjustments[0]!.color.hsl);
     expect(next.layers).toEqual(before.layers);
     expect(next.clips).toEqual(before.clips);
     const history = new EditHistory(document);
@@ -167,7 +167,7 @@ describe('Auto adjust edit', () => {
   it('leaves animated settings and every keyframe unchanged, and reports them', () => {
     const document = adjusted();
     const item = document.adjustments[0]!;
-    item.colour.exposure = 0.25;
+    item.color.exposure = 0.25;
     item.keyframes = [
       layerKeyAsGradeKey(layerKeyframe(20, { ...EMPTY_KEY_VALUES, exposure: 0.5, hue: 10 }, 'smooth')),
       layerKeyAsGradeKey(layerKeyframe(90, { ...EMPTY_KEY_VALUES, saturation: 1.3 }, 'linear')),
@@ -177,11 +177,11 @@ describe('Auto adjust edit', () => {
       document,
       autoAdjustCommand(look(document), CORRECTION, AUTO_ADJUST.balancedIntensity, LOOK)!,
     );
-    const colour = next.adjustments[0]!.colour;
-    expect(colour.exposure).toBe(0.25);
-    expect(colour.saturation).toBe(item.colour.saturation);
-    expect(colour.contrast).toBe(CORRECTION.contrast);
-    expect(colour.blacks).toBe(CORRECTION.blacks);
+    const color = next.adjustments[0]!.color;
+    expect(color.exposure).toBe(0.25);
+    expect(color.saturation).toBe(item.color.saturation);
+    expect(color.contrast).toBe(CORRECTION.contrast);
+    expect(color.blacks).toBe(CORRECTION.blacks);
     expect(next.adjustments[0]!.keyframes).toEqual(item.keyframes);
   });
 
@@ -214,9 +214,9 @@ describe('Auto adjust edit', () => {
 });
 
 describe('Auto adjust on clip grades', () => {
-  it('writes the clip grade only, keeping its keyframes, the track Colour and the other clips', () => {
+  it('writes the clip grade only, keeping its keyframes, the track Color and the other clips', () => {
     const document = project();
-    grade(document, 'a').colour.hue = 12;
+    grade(document, 'a').color.hue = 12;
     grade(document, 'a').keyframes = [
       layerKeyAsGradeKey(layerKeyframe(150, { ...EMPTY_KEY_VALUES, hue: 4 }, 'linear')),
     ];
@@ -231,7 +231,7 @@ describe('Auto adjust on clip grades', () => {
         0.5,
       ),
     );
-    expect(grade(next, 'a').colour).toEqual({ ...before.clips[0]!.grade.colour, ...scaleCorrection(CORRECTION, 0.5) });
+    expect(grade(next, 'a').color).toEqual({ ...before.clips[0]!.grade.color, ...scaleCorrection(CORRECTION, 0.5) });
     expect(grade(next, 'a').keyframes).toEqual(before.clips[0]!.grade.keyframes);
     expect(next.layers).toEqual(before.layers);
     expect(next.clips[1]).toEqual(before.clips[1]);
@@ -256,8 +256,8 @@ describe('Auto adjust on clip grades', () => {
     );
     expect(commands.map((command) => (command as { clipIds?: string[] }).clipIds)).toEqual([['a'], ['b']]);
     const next = applied(document, commands);
-    expect(grade(next, 'a').colour).toMatchObject(scaleCorrection(CORRECTION, 0.8));
-    expect(grade(next, 'b').colour).toMatchObject(scaleCorrection(OTHER, 0.8));
+    expect(grade(next, 'a').color).toMatchObject(scaleCorrection(CORRECTION, 0.8));
+    expect(grade(next, 'b').color).toMatchObject(scaleCorrection(OTHER, 0.8));
     expect(next.layers).toEqual(before.layers);
     const history = new EditHistory(document);
     history.replace(next);
@@ -293,9 +293,9 @@ describe('Auto adjust on clip grades', () => {
         0.8,
       ),
     );
-    expect(grade(next, 'a').colour.exposure).toBe(0);
-    expect(grade(next, 'b').colour.contrast).toBe(1);
-    expect(grade(next, 'a').colour.contrast).toBe(scaleCorrection(CORRECTION, 0.8).contrast);
+    expect(grade(next, 'a').color.exposure).toBe(0);
+    expect(grade(next, 'b').color.contrast).toBe(1);
+    expect(grade(next, 'a').color.contrast).toBe(scaleCorrection(CORRECTION, 0.8).contrast);
     grade(document, 'a').keyframes = [];
     expect(clipsKeepingAnimated(document, target(document, 'a', 10, 'track'))).toBe(1);
   });
@@ -342,7 +342,7 @@ function keyedValues(document: ProjectDocument, clipId: string, frame: number): 
 }
 
 describe('Auto adjust keyframe', () => {
-  it('analyses the frames within 1 s of the playhead, through the clip retiming', () => {
+  it('analyzes the frames within 1 s of the playhead, through the clip retiming', () => {
     const document = project();
     const layout = calculateLayout(document);
     const frames = target(document, 'a', 100, 'playhead').parts[0]!.sourceFrames;
@@ -360,7 +360,7 @@ describe('Auto adjust keyframe', () => {
   it('keys only from the playhead on the clip, with room for a keyframe at its source frame', () => {
     const document = project();
     expect(keyframeReason(context(document, 'a', 11), 'playhead')).toBeNull();
-    expect(keyframeReason(context(document, 'a', 11), 'clip')).toMatch(/analyse the playhead/);
+    expect(keyframeReason(context(document, 'a', 11), 'clip')).toMatch(/analyze the playhead/);
     expect(keyframeReason(context(document, 'a', 11), 'track')).toBe(
       'Keyframes go to this clip only, at the playhead.',
     );
@@ -377,7 +377,7 @@ describe('Auto adjust keyframe', () => {
 
   it('keys the eleven settings at the source frame shown, in one Undo step, joining or overwriting a keyframe there', () => {
     const document = project();
-    grade(document, 'a').colour.exposure = -0.4;
+    grade(document, 'a').color.exposure = -0.4;
     grade(document, 'a').keyframes = [
       layerKeyAsGradeKey(layerKeyframe(160, { ...EMPTY_KEY_VALUES, hue: 20, exposure: 0.2 }, 'smooth')),
     ];
@@ -398,7 +398,7 @@ describe('Auto adjust keyframe', () => {
     expect(key.values.hue).toBe(20);
     // Joining settings adopt the Easing the keyframe's settings agree on.
     expect(AUTO_ADJUST_SETTINGS.every((setting) => key.easing[setting] === 'smooth')).toBe(true);
-    expect(grade(next, 'a').colour).toEqual(before.clips[0]!.grade.colour);
+    expect(grade(next, 'a').color).toEqual(before.clips[0]!.grade.color);
     expect(next.layers).toEqual(before.layers);
     const history = new EditHistory(document);
     history.replace(next);

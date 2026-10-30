@@ -177,7 +177,7 @@ describe('loopback API boundary', () => {
 });
 
 describe('bounded media queue', () => {
-  it('serialises heavy jobs and cancels queued work', async () => {
+  it('serializes heavy jobs and cancels queued work', async () => {
     const queue = new JobQueue();
     const order: string[] = [];
     let release = (): void => {};
@@ -194,7 +194,7 @@ describe('bounded media queue', () => {
     queue.cancel(second.id);
     release();
     expect((await queue.wait(first.id)).state).toBe('completed');
-    expect((await queue.wait(second.id)).state).toBe('cancelled');
+    expect((await queue.wait(second.id)).state).toBe('canceled');
     expect(order).toEqual(['first']);
     await queue.close();
   });
@@ -220,7 +220,7 @@ describe('bounded media queue', () => {
     release();
     await queue.wait(first.id);
     await queue.wait(second.id);
-    expect(state).toBe('cancelled');
+    expect(state).toBe('canceled');
     await queue.close();
   });
 });

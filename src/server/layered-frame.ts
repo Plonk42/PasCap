@@ -1,6 +1,6 @@
 import { endianness } from 'node:os';
 import { setImmediate as yieldToEvents } from 'node:timers/promises';
-import { colourSchema, isNeutralAdvancedColour, type ColourSettings, type PixelGrade } from '../shared/colour.js';
+import { colorSchema, isNeutralAdvancedColor, type ColorSettings, type PixelGrade } from '../shared/color.js';
 import {
   compileDetail,
   detailSchema,
@@ -14,7 +14,7 @@ import { compileGradeChain, isNeutralTone, sourceGrades } from '../shared/grade.
 import { forEachSerial } from '../shared/serial.js';
 import { compileSpatialMapping, type SpatialMapping } from '../shared/spatial.js';
 import type { PreviewLayer } from '../shared/timeline.js';
-import { ColourLutCache, checkLayeredCancellation, sampleColourLut } from './layered-colour.js';
+import { ColorLutCache, checkLayeredCancellation, sampleColorLut } from './layered-color.js';
 import type { CompositorPool } from './layered-pool.js';
 
 export interface ContentBounds {
@@ -36,18 +36,18 @@ export interface FrameSource {
   bounds: ContentBounds;
   lut: Float32Array | null;
   /** Nonneutral HSL/curves in either grade grade exactly per pixel instead of through the LUT. */
-  exactColour: ColourSettings | readonly ColourSettings[] | null;
+  exactColor: ColorSettings | readonly ColorSettings[] | null;
   /** Clip Sharpen/Clarity/Denoise applied to source taps before grading; null when they and local tone are neutral. */
   detail: DetailSettings | null;
-  /** Summed clip and track Shadows/Highlights/HDR/Local contrast (and Exposure), neighbourhood stages of the same kernel. */
+  /** Summed clip and track Shadows/Highlights/HDR/Local contrast (and Exposure), neighborhood stages of the same kernel. */
   tone: LocalTone;
   multiplier: number;
   coverage: number;
   mapping: SpatialMapping;
   fullCanvas: boolean;
 }
-interface PreparedSource extends Omit<FrameSource, 'exactColour' | 'detail'> {
-  exactColour: PixelGrade | null;
+interface PreparedSource extends Omit<FrameSource, 'exactColor' | 'detail'> {
+  exactColor: PixelGrade | null;
   detail: DetailFilter | null;
   sampler: DetailSampler;
 }
@@ -155,7 +155,7 @@ function sampleGradedSource(
       return true;
     }
     if (source.detail) {
-      // Pixel centres of the fitted content: the centre tap equals the byte-indexed sample.
+      // Pixel centers of the fitted content: the center tap equals the byte-indexed sample.
       const { bounds } = source;
       sampleSource(source, (x + 0.5 - bounds.x) / bounds.width, (y + 0.5 - bounds.y) / bounds.height, resampled);
       gradeSampledRgb(source, resampled, graded);
@@ -164,13 +164,13 @@ function sampleGradedSource(
     const red = source.rgb[inputOffset]!;
     const green = source.rgb[inputOffset + 1]!;
     const blue = source.rgb[inputOffset + 2]!;
-    if (source.exactColour) source.exactColour.bytes(red, green, blue, graded);
-    else sampleColourLut(source.lut!, red, green, blue, graded);
+    if (source.exactColor) source.exactColor.bytes(red, green, blue, graded);
+    else sampleColorLut(source.lut!, red, green, blue, graded);
     return true;
   }
   if (!sampleSpatialRgb(source, x, y, resampled)) return false;
   if (source.multiplier === 0) graded.fill(0);
-  // Grade AFTER RGB resampling; never interpolate already graded endpoint colours.
+  // Grade AFTER RGB resampling; never interpolate already graded endpoint colors.
   else gradeSampledRgb(source, resampled, graded);
   return true;
 }
@@ -178,12 +178,12 @@ function sampleGradedSource(
 /** Advanced knees can amplify even scalar LUT error: evaluate the complete grade
  * on the fractional sampled RGB, before fades/coverage, with only tiny triples. */
 function gradeSampledRgb(source: PreparedSource, rgb: Float64Array, out: Float64Array): void {
-  if (source.exactColour) {
+  if (source.exactColor) {
     out[0] = rgb[0]! / 255;
     out[1] = rgb[1]! / 255;
     out[2] = rgb[2]! / 255;
-    source.exactColour.encoded(out);
-  } else sampleColourLut(source.lut!, rgb[0]!, rgb[1]!, rgb[2]!, out);
+    source.exactColor.encoded(out);
+  } else sampleColorLut(source.lut!, rgb[0]!, rgb[1]!, rgb[2]!, out);
 }
 
 function groupCoverage(sources: readonly LayerFrameSource[]): number {
@@ -198,7 +198,7 @@ function groupCoverage(sources: readonly LayerFrameSource[]): number {
 async function prepareSources(
   sources: readonly LayerFrameSource[],
   target: { width: number; height: number },
-  cache: ColourLutCache,
+  cache: ColorLutCache,
   signal: AbortSignal,
   pool: CompositorPool | null,
 ): Promise<FrameSource[]> {
@@ -208,10 +208,10 @@ async function prepareSources(
   for (const source of sources) {
     validateBounds(source.bounds, target);
     // Validate and choose the grading path once per source/frame, never per pixel.
-    const grades = sourceGrades(colourSchema.parse(source.sample.grade), colourSchema.parse(source.sample.colour));
+    const grades = sourceGrades(colorSchema.parse(source.sample.grade), colorSchema.parse(source.sample.color));
     // Local tone runs in the detail stage: keep it out of LUT identity so animation reuses one LUT.
     const stages = grades.stages.map((stage) => ({ ...stage, shadows: 0, highlights: 0, hdr: 0, localContrast: 0 }));
-    const exactColour = stages.every(isNeutralAdvancedColour) ? null : stages;
+    const exactColor = stages.every(isNeutralAdvancedColor) ? null : stages;
     const mapping = compileSpatialMapping(
       source.sample.spatial,
       source.original.width,
@@ -222,8 +222,8 @@ async function prepareSources(
     prepared.push({
       rgb: source.rgb,
       bounds: source.bounds,
-      lut: exactColour ? null : await cache.get(stages, signal, pool), // NOSONAR -- two borrowed slots, never parallel LUT builds.
-      exactColour,
+      lut: exactColor ? null : await cache.get(stages, signal, pool), // NOSONAR -- two borrowed slots, never parallel LUT builds.
+      exactColor,
       detail:
         isNeutralDetail(source.sample.detail) && isNeutralTone(grades.tone)
           ? null
@@ -258,8 +258,8 @@ export function fittedContent(
  * Each pixel reads only its own accumulator entry, so disjoint bands never interact.
  */
 /** One grade or several, applied in sequence. */
-function gradeStages(colour: ColourSettings | readonly ColourSettings[]): readonly ColourSettings[] {
-  return Array.isArray(colour) ? colour : [colour as ColourSettings];
+function gradeStages(color: ColorSettings | readonly ColorSettings[]): readonly ColorSettings[] {
+  return Array.isArray(color) ? color : [color as ColorSettings];
 }
 
 export function composeRows(
@@ -273,7 +273,7 @@ export function composeRows(
     const sampled = new Float64Array(3);
     return {
       ...source,
-      exactColour: source.exactColour ? compileGradeChain(gradeStages(source.exactColour)) : null,
+      exactColor: source.exactColor ? compileGradeChain(gradeStages(source.exactColor)) : null,
       detail: source.detail
         ? compileDetail(
             source.detail,
@@ -344,7 +344,7 @@ export async function composeLayerFrame(
   accumulator: Buffer,
   target: { width: number; height: number },
   sources: readonly LayerFrameSource[],
-  cache: ColourLutCache,
+  cache: ColorLutCache,
   signal: AbortSignal,
   pool: CompositorPool | null = null,
 ): Promise<void> {

@@ -60,8 +60,8 @@ const probeSchema = z.looseObject({
   format: z.looseObject({ duration: z.string().optional() }).optional(),
 });
 
-function assertNotCancelled(signal: AbortSignal): void {
-  if (signal.aborted) throw new ServiceError('Job cancelled.', 499);
+function assertNotCanceled(signal: AbortSignal): void {
+  if (signal.aborted) throw new ServiceError('Job canceled.', 499);
 }
 
 /** Probe only headers, never packet dumps or a source-video soundtrack. */
@@ -253,7 +253,7 @@ export class AudioLibrary {
   readonly #operations = new SerialWriter();
   readonly #preparing = new Map<string, string>();
   readonly #relinking = new Map<string, string>();
-  readonly #analysing = new Map<string, string>();
+  readonly #analyzing = new Map<string, string>();
   readonly #waveforms = new Map<string, Promise<DetailWaveform>>();
   readonly #waveformQueue = new SerialWriter();
   constructor(
@@ -261,7 +261,7 @@ export class AudioLibrary {
     readonly jobs: JobQueue,
   ) {}
 
-  async initialise(): Promise<void> {
+  async initialize(): Promise<void> {
     await this.#operations.run(async () => {
       const filename = path.join(this.config.dataDir, MUSIC_REGISTRY);
       let saved: z.infer<typeof registrySchema>;
@@ -369,7 +369,7 @@ export class AudioLibrary {
     } catch {
       return null;
     }
-    // It is only a cache: an unreadable one is analysed again like a missing one.
+    // It is only a cache: an unreadable one is analyzed again like a missing one.
     const parsed = musicAnalysisSchema.safeParse(value);
     if (!parsed.success) return null;
     const saved = parsed.data.source;
@@ -429,18 +429,18 @@ export class AudioLibrary {
   }
   /** The queued or running analysis of this music, if any. */
   analysisJob(id: string): MediaJob | null {
-    const active = this.#analysing.get(id);
+    const active = this.#analyzing.get(id);
     return active === undefined ? null : this.jobs.get(active);
   }
   /** Queues the tempo, beat and section analysis of prepared music. */
-  analyse(id: string): MediaJob {
-    const active = this.#analysing.get(id);
+  analyze(id: string): MediaJob {
+    const active = this.#analyzing.get(id);
     if (active !== undefined) return this.jobs.get(active);
     const asset = this.get(id);
     if (asset.status !== 'ready' || !asset.content)
-      throw new ServiceError('Prepare the music before analysing it.', 409);
+      throw new ServiceError('Prepare the music before analyzing it.', 409);
     if (this.#preparing.has(id) || this.#relinking.has(id))
-      throw new ServiceError(`${asset.name} is busy. Analyse it once its current job finishes.`, 409);
+      throw new ServiceError(`${asset.name} is busy. Analyze it once its current job finishes.`, 409);
     return this.#submitAnalysis(asset);
   }
   #submitAnalysis(asset: AudioAsset): MediaJob {
@@ -459,7 +459,7 @@ export class AudioLibrary {
         );
         const after = await this.#cacheIdentity(this.get(id));
         if (after?.mtimeMs !== source.mtimeMs || after.bytes !== source.bytes || after.content !== source.content)
-          throw new ServiceError('The music cache changed while it was analysed. Analyse the music again.', 409);
+          throw new ServiceError('The music cache changed while it was analyzed. Analyze the music again.', 409);
         const analysis = musicAnalysisSchema.parse({ version: MUSIC_ANALYSIS_VERSION, source, ...measurement });
         await atomicWrite(this.analysisPath(current), JSON.stringify(analysis));
         return analysis.tempo
@@ -467,19 +467,19 @@ export class AudioLibrary {
           : 'No steady beat found';
       },
       () => {
-        if (this.#analysing.get(id) === job.id) this.#analysing.delete(id);
+        if (this.#analyzing.get(id) === job.id) this.#analyzing.delete(id);
         return Promise.resolve();
       },
     );
-    this.#analysing.set(id, job.id);
+    this.#analyzing.set(id, job.id);
     return job;
   }
   /** Music becomes ready first; its analysis follows as a background job. */
   async #queueAnalysis(id: string): Promise<void> {
     try {
-      if (!this.#analysing.has(id) && !(await this.analysis(id))) this.#submitAnalysis(this.get(id));
+      if (!this.#analyzing.has(id) && !(await this.analysis(id))) this.#submitAnalysis(this.get(id));
     } catch {
-      // The music is ready either way; Audio then offers Analyse music.
+      // The music is ready either way; Audio then offers Analyze music.
     }
   }
   async assertReady(id: string): Promise<AudioAsset> {
@@ -560,10 +560,10 @@ export class AudioLibrary {
     assertCacheOutsideSource(path.dirname(snapshot.sourcePath), this.config.dataDir);
     await assertSourceIdentity(snapshot.sourcePath, snapshot.fingerprint, true);
     // Preparing may replace the cache an analysis would read.
-    const analysing = this.#analysing.get(id);
-    if (analysing !== undefined) {
-      this.jobs.cancel(analysing);
-      this.#analysing.delete(id);
+    const analyzing = this.#analyzing.get(id);
+    if (analyzing !== undefined) {
+      this.jobs.cancel(analyzing);
+      this.#analyzing.delete(id);
     }
     const current = this.#assets.get(id)!;
     current.status = 'queued';
@@ -581,7 +581,7 @@ export class AudioLibrary {
       'audio',
       snapshot.name,
       async (context) => {
-        assertNotCancelled(context.signal);
+        assertNotCanceled(context.signal);
         current.status = 'preparing';
         await this.#save();
         if (current.content === null) {
@@ -591,7 +591,7 @@ export class AudioLibrary {
           current.content = content;
         }
         const waveform = await this.#prepareAsset(snapshot, context);
-        assertNotCancelled(context.signal);
+        assertNotCanceled(context.signal);
         current.waveform = waveform;
       },
       async (finished) =>
@@ -637,7 +637,7 @@ export class AudioLibrary {
           const fingerprint = await verifyMovedOriginal(sourcePath, content, context.signal, (fraction) =>
             context.update(0.01 + fraction * 0.97, `Checking every byte of ${sourcePath}`),
           );
-          assertNotCancelled(context.signal);
+          assertNotCanceled(context.signal);
           await this.commitRelink(id, sourcePath, fingerprint);
           return `Relinked to ${sourcePath}`;
         },
@@ -685,7 +685,7 @@ export class AudioLibrary {
     }
   }
   async #prepareAsset(asset: AudioAsset, context: JobContext): Promise<number[]> {
-    assertNotCancelled(context.signal);
+    assertNotCanceled(context.signal);
     assertCacheOutsideSource(path.dirname(asset.sourcePath), this.config.dataDir);
     await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
     const directory = this.assetDir(asset);
@@ -703,7 +703,7 @@ export class AudioLibrary {
       const waveform = await this.#cachedWaveform(asset, context);
       if (waveform) {
         await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
-        assertNotCancelled(context.signal);
+        assertNotCanceled(context.signal);
         context.update(0.99, 'Cached playback and waveform verified');
         return waveform;
       }
@@ -771,11 +771,11 @@ export class AudioLibrary {
       await verifyPlayback(temporary, asset.metadata);
       const waveform = await sampleWaveform(temporary, asset.metadata.durationSeconds, context.signal);
       await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
-      assertNotCancelled(context.signal);
+      assertNotCanceled(context.signal);
       await chmod(temporary, 0o600);
       await rename(temporary, playback);
       published = true;
-      assertNotCancelled(context.signal);
+      assertNotCanceled(context.signal);
       context.update(0.99, 'Music playback and bounded waveform verified');
       return waveform;
     } catch (error) {

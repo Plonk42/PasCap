@@ -78,7 +78,7 @@ class Frames {
         const check = (): void => {
           if (signal.aborted || generation !== this.generation) {
             this.listeners.delete(check);
-            reject(new DOMException('Cancelled', 'AbortError'));
+            reject(new DOMException('Canceled', 'AbortError'));
             return;
           }
           try {
@@ -186,7 +186,7 @@ describe('owned source proxy transport', () => {
     f.transport.dispose();
   });
 
-  it('keeps the displayed image while a frame decodes, shows it, then the latest seek, never cancelling it', async () => {
+  it('keeps the displayed image while a frame decodes, shows it, then the latest seek, never canceling it', async () => {
     const f = await loaded();
     f.frames.auto = false;
     f.transport.seek(60);
@@ -366,7 +366,7 @@ describe('owned source proxy transport', () => {
     f.transport.dispose();
   });
 
-  it('cancelling startup before its first frame keeps the displayed exact frame', async () => {
+  it('canceling startup before its first frame keeps the displayed exact frame', async () => {
     const f = await loaded(5);
     f.frames.auto = false;
     f.transport.play();

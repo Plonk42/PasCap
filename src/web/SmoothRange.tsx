@@ -88,7 +88,7 @@ function wait(ms: number, signal: AbortSignal): Promise<void> {
       'abort',
       () => {
         clearTimeout(timer);
-        reject(new ApiError('Request cancelled.', 0, 'aborted'));
+        reject(new ApiError('Request canceled.', 0, 'aborted'));
       },
       { once: true },
     );
@@ -96,7 +96,7 @@ function wait(ms: number, signal: AbortSignal): Promise<void> {
 }
 
 function failure(cause: unknown): Phase {
-  return { kind: 'error', message: cause instanceof Error ? cause.message : 'Cannot analyse this recording.' };
+  return { kind: 'error', message: cause instanceof Error ? cause.message : 'Cannot analyze this recording.' };
 }
 
 export interface SmoothRangeState {
@@ -112,7 +112,7 @@ export interface SmoothRangeState {
   /** The kept allowed movement, without a drag in progress. */
   savedTolerance: number;
   setTolerance: (value: number) => void;
-  /** A slider drag's value, or null when it ends or is cancelled. */
+  /** A slider drag's value, or null when it ends or is canceled. */
   previewTolerance: (value: number | null) => void;
   find: () => void;
 }
@@ -153,7 +153,7 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
         return poll(next);
       };
       const done = await poll(job);
-      if (done.state === 'cancelled') return setPhase({ kind: 'idle' });
+      if (done.state === 'canceled') return setPhase({ kind: 'idle' });
       if (done.state === 'failed') throw new Error(done.message);
       const { analysis } = await api.motion(asset.id, { signal });
       if (!analysis) throw new Error('The analysis finished but its result is missing. Try again.');
@@ -188,7 +188,7 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
   const find = useCallback(() => {
     const signal = start();
     api
-      .analyseMotion(asset.id)
+      .analyzeMotion(asset.id)
       .then(({ job }) => (signal.aborted ? undefined : follow(job, signal)))
       .catch((cause: unknown) => {
         if (!signal.aborted) setPhase(failure(cause));
@@ -298,7 +298,7 @@ function LaneChooser({ available, shown, onShown }: Readonly<ChooserProps>) {
                 );
               }}
             />
-            <i style={{ background: spec.colour }} aria-hidden="true" />
+            <i style={{ background: spec.color }} aria-hidden="true" />
             {spec.label}
           </label>
         ))}
@@ -386,10 +386,10 @@ interface SeriesLaneProps {
   value: number | null;
 }
 
-/** One flight data value on its own min–max scale, labelled with that extent or its value under the pointer. */
+/** One flight data value on its own min–max scale, labeled with that extent or its value under the pointer. */
 function SeriesLane({ spec, d, extent, count, ranges, value }: Readonly<SeriesLaneProps>) {
   return (
-    <div className="source-motion-plot" data-lane={spec.key} style={{ '--series': spec.colour } as CSSProperties}>
+    <div className="source-motion-plot" data-lane={spec.key} style={{ '--series': spec.color } as CSSProperties}>
       <svg viewBox={`0 0 ${count} 100`} preserveAspectRatio="none" aria-hidden="true">
         <Bands ranges={ranges} />
         <path className="source-motion-area" d={areaUnder(d)} />
@@ -622,7 +622,7 @@ function AnalysisStatus({ smooth, disabled, onKeyDown }: Readonly<StatusProps>) 
         onKeyDown={onKeyDown}
         onClick={smooth.find}
       >
-        {phase.kind === 'error' ? 'Retry analysing camera motion' : 'Analyse camera motion'}
+        {phase.kind === 'error' ? 'Retry analyzing camera motion' : 'Analyze camera motion'}
       </button>
       {phase.kind === 'error' && (
         <span className="smooth-range-error" role="alert">
@@ -720,7 +720,7 @@ export function CameraMotionPanel({
         <HelpPopover label="Camera motion" guide="find-the-best-steady-range">
           <p>
             The lanes under the range show how the camera moves: the amber area marks jolts, the white line its movement
-            and the green bands steady ranges. Use best sets IN and OUT to the best one, favouring orbits and reveals
+            and the green bands steady ranges. Use best sets IN and OUT to the best one, favoring orbits and reveals
             over approaches and nearly still footage; Use all keeps every steady range.
           </p>
           <p className="editor-help-tip">

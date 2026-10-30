@@ -63,7 +63,7 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
 - snap_cuts_to_beats (first without apply, then with apply) moves each cut onto the beat, or with
   prefer hit or beat-or-hit onto a strong hit; check_alignment reports how the cut follows the music.
   Cuts you placed deliberately go in keep (or keepOnHit for those already on a hit), and maxShift
-  stops a cut from travelling far to reach a beat.
+  stops a cut from traveling far to reach a beat.
 - Transitions: cuts on beats; short cross-dissolves (8–15 frames) between related shots; fade
   through black between sections; opening and closing fades on the track to match the music.
   After snapping, add dissolves with keepCut so the change stays on the beat and later cuts
@@ -71,10 +71,10 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
 - Use a second track only for an overlay; a clip that needs its own grade gets a clip grade.
 
 ## 6. Grade
-- Each clip has its own grade (a clipId on the colour commands), applied first and kept with
+- Each clip has its own grade (a clipId on the color commands), applied first and kept with
   the clip when it moves. An adjustment grades every track over a stretch of the film, after the
   clip grades, for a shared look, such as one per music section: adjustment-add with its
-  settings, then an adjustmentId on the colour commands; adjustment-range moves or trims it,
+  settings, then an adjustmentId on the color commands; adjustment-range moves or trims it,
   adjustment-split cuts it in two. Adjustments never overlap and stay at their project frames
   when clips move. describe_project lists them with what they change; describe_track gives what
   each clip's grade changes and the adjustments over it. Read them before changing a grade:
@@ -88,9 +88,9 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   correction per shot, estimate with applyAs shots (layerId or clipIds) writes each clip's own
   correction into its clip grade in one call; dissolves blend the two grades. Keep adjustments
   for the look shared by every shot of a stretch.
-- Change one setting with colour-setting, hsl-band, colour-curve or transform-setting, which
+- Change one setting with color-setting, hsl-band, color-curve or transform-setting, which
   keep every other value; a keyed setting follows its keyframes, so change those instead
-  (layer-key-value). The colour and transform commands replace everything and suit a full grade.
+  (layer-key-value). The color and transform commands replace everything and suit a full grade.
   detail-clips sets the same Detail on several clips in one command.
 - To animate, layer-key-set keys several settings at one frame in one command, with one Easing
   (hold keeps a grade until the next keyframe) or one per setting; settings left out keep what

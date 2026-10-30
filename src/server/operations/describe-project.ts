@@ -22,7 +22,7 @@ function span(start: number, end: number) {
 }
 
 /** "none", "static" or "N keyframes". */
-function gradeLabel(grade: Pick<ClipGrade, 'colour' | 'keyframes'>): string {
+function gradeLabel(grade: Pick<ClipGrade, 'color' | 'keyframes'>): string {
   if (grade.keyframes.length) return `${grade.keyframes.length} keyframe${grade.keyframes.length === 1 ? '' : 's'}`;
   return isNeutralClipGrade(grade) ? 'none' : 'static';
 }

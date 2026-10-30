@@ -283,7 +283,7 @@ export class GpuCompositor {
     this.#helloReply.resolve({ accept: rejection === null });
     if (rejection) throw new Error(rejection);
     await this.#wait(this.#ready.promise, deadline, 'the page did not prepare its programs');
-    if (signal.aborted) throw new ServiceError('Job cancelled.', 499);
+    if (signal.aborted) throw new ServiceError('Job canceled.', 499);
   }
 
   #reject(hello: GpuHello): string | null {
@@ -304,7 +304,7 @@ export class GpuCompositor {
         promise,
         new Promise<never>((_, reject) => {
           timer = setTimeout(() => reject(new Error(`${timeout} in time`)), Math.max(0, deadline - Date.now()));
-          onAbort = () => reject(new ServiceError('Job cancelled.', 499));
+          onAbort = () => reject(new ServiceError('Job canceled.', 499));
           if (signal.aborted) onAbort();
           else signal.addEventListener('abort', onAbort, { once: true });
         }),
@@ -613,7 +613,7 @@ export async function startGpuCompositor(options: GpuCompositorOptions): Promise
     try {
       compositor = await GpuCompositor.launch(binary, backend, options, script);
     } catch (error) {
-      if (options.signal.aborted) throw new ServiceError('Job cancelled.', 499);
+      if (options.signal.aborted) throw new ServiceError('Job canceled.', 499);
       reasons.push(`${backend}: ${message(error)}`);
     }
   });

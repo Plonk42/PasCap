@@ -70,7 +70,7 @@
   stroke: rgb(243 217 164 / 95%);
 }
 
-/* Strong hits in the colours of the tone strip's bands. */
+/* Strong hits in the colors of the tone strip's bands. */
 .timeline-ruler-beats .hit.low {
   stroke: #ff9b73;
 }

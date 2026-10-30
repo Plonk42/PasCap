@@ -13,7 +13,7 @@ import {
 } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
-import type { ColourSettings } from '../shared/colour.js';
+import type { ColorSettings } from '../shared/color.js';
 import { adjustmentAt, GRADE_SETTINGS, isNeutralClipGrade } from '../shared/grade.js';
 import { KEYFRAME_SETTINGS } from '../shared/keyframes.js';
 import { resolveMediaSelection, type MediaSelections } from '../shared/media-selection.js';
@@ -807,7 +807,7 @@ export function Timeline(props: Readonly<Props>) {
   const beats = beatSnap.beats;
   const [clipMenu, setClipMenu] = useState<ClipMenuAnchor | null>(null);
   // Editor-only, for this session: a grade without keyframes, pasted onto other clips.
-  const [copiedGrade, setCopiedGrade] = useState<ColourSettings | null>(null);
+  const [copiedGrade, setCopiedGrade] = useState<ColorSettings | null>(null);
   const closeClipMenu = useCallback((restoreFocus: boolean): void => {
     setClipMenu(null);
     if (restoreFocus) document.querySelector<HTMLElement>('.timeline-clip.selected .timeline-clip-body')?.focus();
@@ -879,7 +879,7 @@ export function Timeline(props: Readonly<Props>) {
     onError,
   });
   const gradeKeys = useKeyframeSlide({
-    kind: clipKeyframeKind('grade', { ...clipKindOptions, onOpen: () => props.onOpenSection('colour') }),
+    kind: clipKeyframeKind('grade', { ...clipKindOptions, onOpen: () => props.onOpenSection('color') }),
     project,
     frame,
     scale,
@@ -897,7 +897,7 @@ export function Timeline(props: Readonly<Props>) {
     kind: adjustmentKeyframeKind({
       onSelect: props.onSelectAdjustment,
       onSeek,
-      onOpen: () => props.onOpenSection('colour'),
+      onOpen: () => props.onOpenSection('color'),
     }),
     project,
     frame,
@@ -1861,7 +1861,7 @@ export function Timeline(props: Readonly<Props>) {
                       <strong>{shortName(name)}</strong>
                       {!isNeutralClipGrade(clip.grade) && (
                         <span className="clip-grade-mark" title="This clip has its own grade">
-                          <Icon name="colour" size={14} />
+                          <Icon name="color" size={14} />
                         </span>
                       )}
                       <small>

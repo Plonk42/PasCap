@@ -44,7 +44,7 @@ need no issue or Project card.
 ## Scope and triage
 
 - Preserve the user's intent. Inspect relevant code/docs only as needed to establish
-  current behaviour; do not invent reproductions, approvals, technical solutions or
+  current behavior; do not invent reproductions, approvals, technical solutions or
   completed verification. A short but clear request is enough to log a proposal.
   Ask only if a missing decision prevents safe scoping, destination or milestone choice.
 - Issues track concrete deliverables, not sprint containers. If the request is only
@@ -52,7 +52,7 @@ need no issue or Project card.
   Iteration mechanism and ask for missing cadence/dates or selection approval before
   scheduling. Without agreed timeboxes, use a selected-work view. Existing #15 is
   a legacy checkpoint, not a template for another tracker or recurring checklist.
-- Give the issue **exactly one** category: `bug` for evidenced incorrect behaviour,
+- Give the issue **exactly one** category: `bug` for evidenced incorrect behavior,
   `enhancement` for a product proposal/improvement, or `task` for engineering,
   documentation, verification or operations. Preserve unrelated modifiers on reuse.
 - Give it **exactly one** priority and explain why: `priority:p0` active critical
@@ -87,8 +87,8 @@ need no issue or Project card.
 
 Use a concise, actionable title and these sections, adapting to the matching form:
 
-- **Goal / user problem:** the requested outcome and verified current behaviour.
-- **Scope and non-goals:** bounded behaviour; preserve originals, strict persisted
+- **Goal / user problem:** the requested outcome and verified current behavior.
+- **Scope and non-goals:** bounded behavior; preserve originals, strict persisted
   data, reversible edits and authoritative integer-frame timing. No unrelated feature
   or owner-media qualification is implied; a schema change includes its project upgrade step.
 - **Acceptance criteria:** observable checklist. Distinguish proposed acceptance from

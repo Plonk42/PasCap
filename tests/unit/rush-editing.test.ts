@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOR } from '../../src/shared/color.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import { createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, type Interpolation, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
@@ -91,8 +91,8 @@ function primaryProject(
   document.adjustments = [
     {
       ...createAdjustment('look', 0, 1_000_000),
-      colour: {
-        ...NEUTRAL_COLOUR,
+      color: {
+        ...NEUTRAL_COLOR,
         temperature: 0.2,
         tint: -0.3,
         exposure: 0.6,
@@ -361,7 +361,7 @@ describe('time-ruler range on one selected clip', () => {
 });
 
 describe('atomic source removal on the primary ripple row', () => {
-  it('keeps two independent excerpts of the same original and ripples ordered neighbours', () => {
+  it('keeps two independent excerpts of the same original and ripples ordered neighbors', () => {
     const document = primaryProject();
     const original = placed(document, 'rush').clip;
     const next = singleCommit(
@@ -412,7 +412,7 @@ describe('atomic source removal on the primary ripple row', () => {
     if (left.speed.mode === 'constant') left.speed.rate = 1.5;
     expect(right).not.toHaveProperty('correction');
     expect(right.speed).toEqual({ mode: 'constant', rate: 1 });
-    expect(original).not.toHaveProperty('colour');
+    expect(original).not.toHaveProperty('color');
     expect(original.speed).toEqual({ mode: 'constant', rate: 1 });
   });
 
@@ -531,7 +531,7 @@ describe('atomic source removal on the primary ripple row', () => {
       expect(next.clips.some((clip) => clip.id === 'right')).toBe(false);
     },
   );
-  it('repairs the new neighbour boundary when the whole dissolved excerpt is deleted', () => {
+  it('repairs the new neighbor boundary when the whole dissolved excerpt is deleted', () => {
     const next = singleCommit(withDissolves(), removal('rush', 100, 220));
     expect(next.layers[0]!.transitions).toEqual([
       { leftId: 'before', rightId: 'after', type: 'cut', duration: 0 },
@@ -643,7 +643,7 @@ describe('atomic source removal on the primary ripple row', () => {
   );
 });
 
-describe('positioned overlay removal without neighbour ripple', () => {
+describe('positioned overlay removal without neighbor ripple', () => {
   it.each([
     {
       name: 'middle',
@@ -657,7 +657,7 @@ describe('positioned overlay removal without neighbour ripple', () => {
     { name: 'prefix', sourceIn: 100, sourceOut: 130, positions: [['top', 80, 170]] },
     { name: 'suffix', sourceIn: 160, sourceOut: 220, positions: [['top', 50, 110]] },
     { name: 'whole excerpt', sourceIn: 100, sourceOut: 220, positions: [] },
-  ])('keeps absolute neighbours and the cut gap for a $name removal', ({ sourceIn, sourceOut, positions }) => {
+  ])('keeps absolute neighbors and the cut gap for a $name removal', ({ sourceIn, sourceOut, positions }) => {
     const document = overlayProject();
     const next = singleCommit(document, removal('top', sourceIn, sourceOut));
     expect(
@@ -710,7 +710,7 @@ describe('positioned overlay removal without neighbour ripple', () => {
     expectUnchangedOthers(document, trim, 'top');
   });
 
-  it('rejects a quantised internal overlap atomically rather than relocating the right excerpt', () => {
+  it('rejects a quantized internal overlap atomically rather than relocating the right excerpt', () => {
     const document = overlayProject({ mode: 'constant', rate: 3 });
     document.clips.find((clip) => clip.id === 'top')!.sourceOut = 103;
     const parsed = projectSchema.parse(document);
@@ -774,7 +774,7 @@ describe('quick trims retain the displayed original frame', () => {
   });
 
   it.each(['in', 'out'] as const)(
-    'keeps overlay neighbours fixed for quick %s trim and preserves OUT on IN trim',
+    'keeps overlay neighbors fixed for quick %s trim and preserves OUT on IN trim',
     (edge) => {
       const keys = [point(0, { translateX: 0.5 }), point(100, { opacity: 0.4 }), point(1_000, { rotation: 60 })];
       const document = overlayProject({ mode: 'constant', rate: 2 }, keys);

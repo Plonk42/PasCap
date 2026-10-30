@@ -4,20 +4,20 @@ import { api, ApiError, type ServiceHealth } from './api.js';
 const RETRY_DELAYS_MS = [500, 1_000, 2_000, 4_000] as const;
 const ATTEMPT_TIMEOUT_MS = 5_000;
 
-function cancelled(): ApiError {
-  return new ApiError('Connecting to the local PasCap service was cancelled.', 0, 'aborted');
+function canceled(): ApiError {
+  return new ApiError('Connecting to the local PasCap service was canceled.', 0, 'aborted');
 }
 
 function delay(milliseconds: number, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     if (signal.aborted) {
-      reject(cancelled());
+      reject(canceled());
       return;
     }
     const onAbort = (): void => {
       clearTimeout(timer);
       signal.removeEventListener('abort', onAbort);
-      reject(cancelled());
+      reject(canceled());
     };
     const timer = setTimeout(() => {
       signal.removeEventListener('abort', onAbort);
@@ -39,7 +39,7 @@ export async function waitForService(
     () => attempt < maxAttempts && health === null,
     async () => {
       attempt++;
-      if (signal.aborted) throw cancelled();
+      if (signal.aborted) throw canceled();
       onAttempt?.(attempt, maxAttempts);
       try {
         health = await api.health({ signal, timeoutMs: ATTEMPT_TIMEOUT_MS });

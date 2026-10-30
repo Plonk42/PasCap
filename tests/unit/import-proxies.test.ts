@@ -43,10 +43,10 @@ function metadata(): VideoMetadata {
     frameRate: { ...PROJECT_FPS },
     frameCount: 12,
     durationSeconds: framesToSeconds(12),
-    colourPrimaries: 'bt709',
-    colourTransfer: 'bt709',
-    colourSpace: 'bt709',
-    colourRange: 'tv',
+    colorPrimaries: 'bt709',
+    colorTransfer: 'bt709',
+    colorSpace: 'bt709',
+    colorRange: 'tv',
     hasAudio: false,
   };
 }
@@ -74,7 +74,7 @@ function deferred() {
 function untilReleased(promise: Promise<void>, signal: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const abort = (): void => {
-      reject(new ServiceError('Job cancelled.', 499));
+      reject(new ServiceError('Job canceled.', 499));
     };
     if (signal.aborted) {
       abort();
@@ -116,7 +116,7 @@ async function fixture() {
   const jobs = new JobQueue();
   queues.push(jobs);
   const library = new MediaLibrary(directories.config, jobs);
-  await library.initialise();
+  await library.initialize();
   return { ...directories, library, jobs };
 }
 async function serviceFixture() {
@@ -138,7 +138,7 @@ async function fakeProcess(
   args: string[],
   options: NonNullable<Parameters<typeof runProcess>[2]> = {},
 ): Promise<Buffer> {
-  if (options.signal?.aborted) throw new ServiceError('Job cancelled.', 499);
+  if (options.signal?.aborted) throw new ServiceError('Job canceled.', 499);
   const output = args.at(-1);
   if (!output) throw new Error('Expected an output argument.');
   if (output === 'pipe:1') return Buffer.alloc(160 * 90 * 3, 64);
@@ -185,7 +185,7 @@ describe('raw registration and startup stay non-queuing', () => {
         });
       }),
     );
-    const contents = JSON.stringify(registrySchema.parse({ version: 2, assets }));
+    const contents = JSON.stringify(registrySchema.parse({ version: 3, assets }));
     await writeFile(path.join(config.dataDir, 'videos.json'), contents);
     vi.mocked(probeVideo).mockClear();
     const service = await createApp(config);
@@ -563,7 +563,7 @@ describe('registration and preparation admission races', () => {
     expect(jobs.list().map((job) => job.kind)).toEqual(['motion', 'prepare']);
     gate.resolve();
     expect((await jobs.wait(accepted.job!.id)).state).toBe('failed');
-    expect((await jobs.wait(motion!.id)).state).toBe('cancelled');
+    expect((await jobs.wait(motion!.id)).state).toBe('canceled');
     expect(library.get(accepted.asset.id)).toMatchObject({ status: 'error', prepared: null });
     const retry = await library.prepare(accepted.asset.id);
     expect(retry.id).not.toBe(accepted.job!.id);
@@ -621,8 +621,8 @@ describe('one worker, cancellation and explicit retry', () => {
     jobs.cancel(first.id);
     jobs.cancel(second.id);
     expect((await Promise.all([jobs.wait(first.id), jobs.wait(second.id)])).map((job) => job.state)).toEqual([
-      'cancelled',
-      'cancelled',
+      'canceled',
+      'canceled',
     ]);
     expect(library.list().every((asset) => asset.status === 'error' && asset.prepared === null)).toBe(true);
     expect(await readdir(library.assetDir(imported.assets[0]!))).toEqual([]);
@@ -711,7 +711,7 @@ describe('NVDEC proxy decoding', () => {
     const jobs = new JobQueue();
     queues.push(jobs);
     const library = new MediaLibrary({ ...directories.config, hardwareDecode: true }, jobs);
-    await library.initialise();
+    await library.initialize();
     return { ...directories, library, jobs };
   }
 

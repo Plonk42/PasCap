@@ -1,18 +1,18 @@
 import { z } from 'zod';
-import type { ColourSettings, LocalToneSetting, ScalarColourSetting } from './colour.js';
-import { COLOUR_CONTROLS, colourSchema, LOCAL_TONE_SETTINGS, NEUTRAL_COLOUR } from './colour.js';
+import type { ColorSettings, LocalToneSetting, ScalarColorSetting } from './color.js';
+import { COLOR_CONTROLS, colorSchema, LOCAL_TONE_SETTINGS, NEUTRAL_COLOR } from './color.js';
 import { described } from './described.js';
 
 export const interpolationSchema = z.enum(['hold', 'linear', 'ease-in', 'ease-out', 'smooth']);
 export type Interpolation = z.infer<typeof interpolationSchema>;
-export type KeyframeSetting = 'opacity' | ScalarColourSetting;
+export type KeyframeSetting = 'opacity' | ScalarColorSetting;
 
-/** One ordered control catalogue for the fifteen independently participating track channels. */
+/** One ordered control catalog for the fifteen independently participating track channels. */
 export const KEYFRAME_SETTINGS = Object.freeze(
   (
     [
       { key: 'opacity', label: 'Opacity', min: 0, max: 1, step: 0.01 },
-      ...COLOUR_CONTROLS.map(({ key, label, min, max, step }) => ({ key, label, min, max, step })),
+      ...COLOR_CONTROLS.map(({ key, label, min, max, step }) => ({ key, label, min, max, step })),
     ] as const
   ).map((setting) => Object.freeze(setting)),
 ) satisfies readonly { key: KeyframeSetting; label: string; min: number; max: number; step: number }[];
@@ -23,20 +23,20 @@ export const keyframeSettingSchema = z.enum(
 export const layerKeyValuesSchema = z
   .object({
     opacity: described(z.number().min(0).max(1), 'Opacity, 0 (transparent) to 1 (opaque).').nullable(),
-    temperature: colourSchema.shape.temperature.nullable(),
-    tint: colourSchema.shape.tint.nullable(),
-    exposure: colourSchema.shape.exposure.nullable(),
-    brightness: colourSchema.shape.brightness.nullable(),
-    contrast: colourSchema.shape.contrast.nullable(),
-    hue: colourSchema.shape.hue.nullable(),
-    saturation: colourSchema.shape.saturation.nullable(),
-    vibrance: colourSchema.shape.vibrance.nullable(),
-    highlights: colourSchema.shape.highlights.nullable(),
-    shadows: colourSchema.shape.shadows.nullable(),
-    whites: colourSchema.shape.whites.nullable(),
-    blacks: colourSchema.shape.blacks.nullable(),
-    hdr: colourSchema.shape.hdr.nullable(),
-    localContrast: colourSchema.shape.localContrast.nullable(),
+    temperature: colorSchema.shape.temperature.nullable(),
+    tint: colorSchema.shape.tint.nullable(),
+    exposure: colorSchema.shape.exposure.nullable(),
+    brightness: colorSchema.shape.brightness.nullable(),
+    contrast: colorSchema.shape.contrast.nullable(),
+    hue: colorSchema.shape.hue.nullable(),
+    saturation: colorSchema.shape.saturation.nullable(),
+    vibrance: colorSchema.shape.vibrance.nullable(),
+    highlights: colorSchema.shape.highlights.nullable(),
+    shadows: colorSchema.shape.shadows.nullable(),
+    whites: colorSchema.shape.whites.nullable(),
+    blacks: colorSchema.shape.blacks.nullable(),
+    hdr: colorSchema.shape.hdr.nullable(),
+    localContrast: colorSchema.shape.localContrast.nullable(),
   })
   .strict();
 export type LayerKeyValues = z.infer<typeof layerKeyValuesSchema>;
@@ -135,7 +135,7 @@ export function defaultKeyframe(frame: number): LayerKeyframe {
   const values = {
     ...EMPTY_KEY_VALUES,
     opacity: 1,
-    ...Object.fromEntries(COLOUR_CONTROLS.map(({ key }) => [key, NEUTRAL_COLOUR[key]])),
+    ...Object.fromEntries(COLOR_CONTROLS.map(({ key }) => [key, NEUTRAL_COLOR[key]])),
   };
   return { ...uniformKeyframe(frame, values, 'hold'), reset: true };
 }
@@ -191,7 +191,7 @@ export function isKeyframeFrame(frame: number): boolean {
   return Number.isSafeInteger(frame) && frame >= 0 && frame <= 2_147_483_647;
 }
 
-/** Strict neighbours in an already ordered row; zero is a participating value. */
+/** Strict neighbors in an already ordered row; zero is a participating value. */
 export function keyframeNeighbors(
   keys: readonly LayerKeyframe[],
   frame: number,
@@ -248,11 +248,11 @@ export function hasLayerKeys(layer: { keyframes: readonly LayerKeyframe[] }, set
 }
 /** Whether any frame of the track can evaluate a nonzero Shadows, Highlights or HDR. */
 export function usesLocalTone(layer: {
-  colour: Pick<ColourSettings, LocalToneSetting>;
+  color: Pick<ColorSettings, LocalToneSetting>;
   keyframes: readonly LayerKeyframe[];
 }): boolean {
   return LOCAL_TONE_SETTINGS.some(
-    (setting) => layer.colour[setting] !== 0 || layer.keyframes.some((key) => (key.values[setting] ?? 0) !== 0),
+    (setting) => layer.color[setting] !== 0 || layer.keyframes.some((key) => (key.values[setting] ?? 0) !== 0),
   );
 }
 export function keySettings(key: LayerKeyframe): KeyframeSetting[] {

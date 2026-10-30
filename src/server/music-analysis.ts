@@ -19,7 +19,7 @@ export const MUSIC_ANALYSIS = {
   bands: 40,
   lowHz: 30,
   highHz: 16_000,
-  /** Bands centred below this carry the kick drum, used to find downbeats. */
+  /** Bands centerd below this carry the kick drum, used to find downbeats. */
   kickHz: 150,
   chromaHz: [55, 2_000] as const,
   /** Spectral flux peaks this many samples before the onset that causes it (measured on clicks). */
@@ -47,7 +47,7 @@ export const MUSIC_ANALYSIS = {
   refineFrames: 2,
   /** Leading and trailing beats weaker than this share of the beats' RMS are dropped. */
   trimShare: 0.5,
-  /** Beats move onto the straightest line through this many neighbours on one side, or around them (0: off). */
+  /** Beats move onto the straightest line through this many neighbors on one side, or around them (0: off). */
   beatGridBeats: 8,
   downbeat: {
     /** Beat salience: standard scores of the kick bands and the chord change (onsets mark every beat alike). */
@@ -185,27 +185,27 @@ function hzFromMel(value: number): number {
 }
 const binHz = (bin: number): number => (bin * MUSIC_SAMPLE_RATE) / WINDOW;
 
-/** Triangular mel bands; a band narrower than one bin takes the bin nearest its centre. */
-function bandWeights(): { weights: BandWeight[]; centres: number[] } {
+/** Triangular mel bands; a band narrower than one bin takes the bin nearest its center. */
+function bandWeights(): { weights: BandWeight[]; centers: number[] } {
   const low = mel(MUSIC_ANALYSIS.lowHz);
   const edges = Array.from({ length: BANDS + 2 }, (_, index) =>
     hzFromMel(low + ((mel(MUSIC_ANALYSIS.highHz) - low) * index) / (BANDS + 1)),
   );
   const weights: BandWeight[] = [];
   for (let band = 0; band < BANDS; band++) {
-    const [from, centre, to] = [edges[band]!, edges[band + 1]!, edges[band + 2]!];
+    const [from, center, to] = [edges[band]!, edges[band + 1]!, edges[band + 2]!];
     let found = false;
     for (let bin = 1; bin <= HALF; bin++) {
       const hz = binHz(bin);
-      const weight = hz <= centre ? (hz - from) / (centre - from) : (to - hz) / (to - centre);
+      const weight = hz <= center ? (hz - from) / (center - from) : (to - hz) / (to - center);
       if (weight > 0) {
         weights.push({ bin, band, weight });
         found = true;
       }
     }
-    if (!found) weights.push({ bin: Math.max(1, Math.round((centre * WINDOW) / MUSIC_SAMPLE_RATE)), band, weight: 1 });
+    if (!found) weights.push({ bin: Math.max(1, Math.round((center * WINDOW) / MUSIC_SAMPLE_RATE)), band, weight: 1 });
   }
-  return { weights, centres: edges.slice(1, -1) };
+  return { weights, centers: edges.slice(1, -1) };
 }
 
 /** Per-frame and per-second features of a mono 48 kHz stream, never holding the whole stream. */
@@ -273,10 +273,10 @@ export class MusicFeatureExtractor {
   #squares = 0;
   #loudnessSamples = 0;
   constructor() {
-    const { weights, centres } = bandWeights();
+    const { weights, centers } = bandWeights();
     this.#weights = weights;
-    this.#kick = centres.flatMap((hz, band) => (hz < MUSIC_ANALYSIS.kickHz ? [band] : []));
-    this.#toneOfBand = Int8Array.from(centres, (hz) => {
+    this.#kick = centers.flatMap((hz, band) => (hz < MUSIC_ANALYSIS.kickHz ? [band] : []));
+    this.#toneOfBand = Int8Array.from(centers, (hz) => {
       if (hz < MUSIC_ANALYSIS.toneHz[0]) return 0;
       return hz < MUSIC_ANALYSIS.toneHz[1] ? 1 : 2;
     });
@@ -303,11 +303,11 @@ export class MusicFeatureExtractor {
       this.#peak = Math.max(this.#peak, Math.abs(value));
       if (this.#received % HOP === 0) this.#flushPeak();
       if (++this.#loudnessSamples === LOUDNESS_SAMPLES) this.#flushLoudness();
-      if (this.#frame * HOP + HALF <= this.#received) this.#analyseFrame();
+      if (this.#frame * HOP + HALF <= this.#received) this.#analyzeFrame();
     }
   }
   finish(): MusicFeatures {
-    while (this.#frame * HOP < this.#received) this.#analyseFrame();
+    while (this.#frame * HOP < this.#received) this.#analyzeFrame();
     if (this.#received % HOP !== 0) this.#flushPeak();
     if (this.#loudnessSamples > 0) this.#flushLoudness();
     if (this.#blockFrames > 0) this.#flushBlock();
@@ -351,7 +351,7 @@ export class MusicFeatureExtractor {
     this.#blockChroma.fill(0);
     this.#blockFrames = 0;
   }
-  #analyseFrame(): void {
+  #analyzeFrame(): void {
     const first = this.#frame * HOP - HALF;
     for (let index = 0; index < WINDOW; index++) {
       const position = first + index;
@@ -485,16 +485,16 @@ function meanSquare(envelope: Float32Array, from: number, to: number): number {
   return sum / (to - from);
 }
 
-/** The window periods at every frame, interpolated between window centres. */
+/** The window periods at every frame, interpolated between window centers. */
 function framePeriods(n: number, windows: { from: number; to: number }[], periods: number[]): Float32Array {
-  const centres = windows.map((window) => (window.from + window.to) / 2);
+  const centers = windows.map((window) => (window.from + window.to) / 2);
   const frames = new Float32Array(n);
   let window = 0;
   for (let index = 0; index < n; index++) {
-    while (window + 1 < centres.length && centres[window + 1]! <= index) window++;
-    if (index <= centres[0]! || window + 1 >= centres.length) frames[index] = periods[window]!;
+    while (window + 1 < centers.length && centers[window + 1]! <= index) window++;
+    if (index <= centers[0]! || window + 1 >= centers.length) frames[index] = periods[window]!;
     else {
-      const progress = (index - centres[window]!) / (centres[window + 1]! - centres[window]!);
+      const progress = (index - centers[window]!) / (centers[window + 1]! - centers[window]!);
       frames[index] = periods[window]! + progress * (periods[window + 1]! - periods[window]!);
     }
   }
@@ -945,8 +945,8 @@ function meanDb(values: number[]): number {
   return Math.max(SILENT_DB, 10 * Math.log10(power));
 }
 
-/** Each per-second feature standardised over the song, then each block scaled to unit length. */
-function standardise(blocks: Float32Array[]): Float64Array[] {
+/** Each per-second feature standardized over the song, then each block scaled to unit length. */
+function standardize(blocks: Float32Array[]): Float64Array[] {
   const count = blocks.length;
   const size = blocks[0]!.length;
   const mean = new Float64Array(size);
@@ -985,19 +985,19 @@ function novelty(vectors: Float64Array[], reach: number): Float64Array {
   };
   const count = vectors.length;
   const curve = new Float64Array(count);
-  for (let centre = 1; centre < count; centre++) {
-    const from = Math.max(-reach, -centre);
-    const to = Math.min(reach, count - centre);
+  for (let center = 1; center < count; center++) {
+    const from = Math.max(-reach, -center);
+    const to = Math.min(reach, count - center);
     let sum = 0;
     let weight = 0;
     for (let a = from; a < to; a++) {
       for (let b = from; b < to; b++) {
         const value = kernel(a, b);
-        sum += value && value * dot(vectors[centre + a]!, vectors[centre + b]!);
+        sum += value && value * dot(vectors[center + a]!, vectors[center + b]!);
         weight += Math.abs(value);
       }
     }
-    curve[centre] = weight > 0 ? sum / weight : 0;
+    curve[center] = weight > 0 ? sum / weight : 0;
   }
   return curve;
 }
@@ -1005,12 +1005,12 @@ function novelty(vectors: Float64Array[], reach: number): Float64Array {
 function sectionBoundaries(blocks: Float32Array[]): number[] {
   const reach = MUSIC_ANALYSIS.sectionBlocks;
   if (blocks.length < 2 * reach) return [];
-  const curve = novelty(standardise(blocks), reach);
+  const curve = novelty(standardize(blocks), reach);
   const peaks: number[] = [];
-  for (let centre = reach; centre <= blocks.length - reach; centre++) {
-    const value = curve[centre]!;
-    if (value >= MUSIC_ANALYSIS.sectionNovelty && value >= curve[centre - 1]! && value >= (curve[centre + 1] ?? 0))
-      peaks.push(centre);
+  for (let center = reach; center <= blocks.length - reach; center++) {
+    const value = curve[center]!;
+    if (value >= MUSIC_ANALYSIS.sectionNovelty && value >= curve[center - 1]! && value >= (curve[center + 1] ?? 0))
+      peaks.push(center);
   }
   peaks.sort((a, b) => curve[b]! - curve[a]! || a - b);
   const chosen: number[] = [];
@@ -1044,11 +1044,11 @@ function sections(features: MusicFeatures, anchors: number[]): MusicMeasurement[
       Math.ceil(toSample / LOUDNESS_SAMPLES),
     );
     // Least-squares slope of loudness over the section, as its change from start to end.
-    const centre = (values.length - 1) / 2;
+    const center = (values.length - 1) / 2;
     const level = values.reduce((sum, value) => sum + value, 0) / values.length;
-    const variance = values.reduce((sum, _, index) => sum + (index - centre) ** 2, 0);
+    const variance = values.reduce((sum, _, index) => sum + (index - center) ** 2, 0);
     const slope =
-      variance > 0 ? values.reduce((sum, value, index) => sum + (index - centre) * (value - level), 0) / variance : 0;
+      variance > 0 ? values.reduce((sum, value, index) => sum + (index - center) * (value - level), 0) / variance : 0;
     return { fromSample, toSample, loudnessDb: meanDb(values), change: slope * (values.length - 1) };
   });
   const levels = parts.map((part) => part.loudnessDb);
@@ -1207,7 +1207,7 @@ function swells(loudness: number[]): MusicMeasurement['swells'] {
 }
 
 /** Tempo, beats, downbeats, hits and sections from the features. Deterministic. */
-export function analyseFeatures(features: MusicFeatures): MusicMeasurement {
+export function analyzeFeatures(features: MusicFeatures): MusicMeasurement {
   const envelope = onsetEnvelope(features.flux);
   const base = {
     sampleRate: MUSIC_SAMPLE_RATE,
@@ -1266,7 +1266,7 @@ export function analyseFeatures(features: MusicFeatures): MusicMeasurement {
 const READ_BYTES = 1_048_576;
 
 /** Streams the stereo PCM16 cache in 1 MiB blocks as a float mono mix; never reads it whole. */
-export async function analyseMusicFile(
+export async function analyzeMusicFile(
   filename: string,
   onProgress: (fraction: number) => void = () => {},
 ): Promise<MusicMeasurement> {
@@ -1296,7 +1296,7 @@ export async function analyseMusicFile(
         onProgress((0.9 * position) / size);
       },
     );
-    const measurement = analyseFeatures(extractor.finish());
+    const measurement = analyzeFeatures(extractor.finish());
     onProgress(1);
     return measurement;
   } finally {
@@ -1317,7 +1317,7 @@ export function measureMusic(
   const entry = new URL(`./music-analysis-worker.${source ? 'ts' : 'js'}`, import.meta.url);
   const worker = new Worker(entry, source ? { execArgv: ['--import', 'tsx'] } : {});
   return new Promise<MusicMeasurement>((resolve, reject) => {
-    const abort = (): void => reject(new ServiceError('Job cancelled.', 499));
+    const abort = (): void => reject(new ServiceError('Job canceled.', 499));
     if (signal.aborted) return abort();
     signal.addEventListener('abort', abort, { once: true });
     worker.on('message', (reply: MusicWorkerReply) => {

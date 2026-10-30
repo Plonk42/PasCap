@@ -54,7 +54,7 @@ export const runDescribeRecording: OperationRunner<typeof describeRecording> = a
     },
     keptRanges: kept ?? null,
     allowedMovement: tolerance,
-    motionAnalysed: analysis !== null,
+    motionAnalyzed: analysis !== null,
     steadyRanges: shots.map((shot) => ({
       ...shot,
       inTimecode: formatTimecode(shot.sourceIn),

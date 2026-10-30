@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
-import { createColourSettings } from '../../src/shared/colour.js';
+import { createColorSettings } from '../../src/shared/color.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
 import {
@@ -283,7 +283,7 @@ async function expectCutOverlay(page: Page, inFrame: number, outFrame: number): 
     left: Number.parseFloat((element as HTMLElement).style.left),
     width: Number.parseFloat((element as HTMLElement).style.width),
   }));
-  // CSSOM serialises subpixel lengths to fewer significant digits; frame marks above remain exact.
+  // CSSOM serializes subpixel lengths to fewer significant digits; frame marks above remain exact.
   expect(style.left).toBeCloseTo(geometry.leading + inFrame * geometry.scale, 2);
   expect(style.width).toBeCloseTo((outFrame - inFrame) * geometry.scale, 2);
 }
@@ -492,7 +492,7 @@ test('three ranges from one rush keep the source pinned, independent, reloadable
   expect(edited.clips[2]).toEqual({
     ...added.clips[2]!,
     sourceIn: 50,
-    grade: { ...added.clips[2]!.grade, colour: { ...added.clips[2]!.grade.colour, saturation: 1.2 } },
+    grade: { ...added.clips[2]!.grade, color: { ...added.clips[2]!.grade.color, saturation: 1.2 } },
   });
   expect(edited.layers).toEqual(added.layers);
   await flush(page);
@@ -643,7 +643,7 @@ test('visible split then S selects each right piece, preserves boundaries and de
   document.adjustments = [
     {
       ...adjustmentFrom0(200, [gradePoint(20, { exposure: 0.2 })]),
-      colour: { ...createColourSettings(), contrast: 1.25, saturation: 0.7, hue: 20 },
+      color: { ...createColorSettings(), contrast: 1.25, saturation: 0.7, hue: 20 },
     },
   ];
   document.layers[0]!.transform.base.opacity = 0.65;
@@ -850,7 +850,7 @@ test('I/O middle removal is transient then one edit, preserving absolute adjustm
         ),
         gradePoint(1_000, { exposure: 0.6 }, 'smooth'),
       ]),
-      colour: { ...createColourSettings(), exposure: -0.2, saturation: 0.6 },
+      color: { ...createColorSettings(), exposure: -0.2, saturation: 0.6 },
     },
   ];
   document.layers[0]!.transform.base.opacity = 0.65;
@@ -947,7 +947,7 @@ test('I/O middle removal is transient then one edit, preserving absolute adjustm
   expect(await current(page)).toEqual(next);
 });
 
-test('overlay middle cuts keep their gap and neighbours fixed; visible quick trims keep absolute placement semantics', async ({
+test('overlay middle cuts keep their gap and neighbors fixed; visible quick trims keep absolute placement semantics', async ({
   page,
 }) => {
   const document = sequence();
@@ -1800,7 +1800,7 @@ for (const action of ['scrub', 'mark', 'apply', 'reset', 'trim'] as const) {
   });
 }
 
-test('a one-frame source range remains exact; an Escape-cancelled numeric draft is not played or inserted', async ({
+test('a one-frame source range remains exact; an Escape-canceled numeric draft is not played or inserted', async ({
   page,
 }) => {
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
@@ -2096,7 +2096,7 @@ test('the motion timeline shows jolts, allowed movement and the best steady rang
   const row = page.locator('.smooth-panel');
   await expect(row).toHaveAttribute('data-smooth-in', String(steady.sourceIn));
   await expect(row).toHaveAttribute('data-smooth-out', String(steady.sourceOut));
-  await expect(page.getByRole('button', { name: 'Analyse camera motion', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Analyze camera motion', exact: true })).toHaveCount(0);
   const timeline = page.locator('.source-motion');
   const imageLane = timeline.locator('[data-lane="image"]');
   const band = imageLane.locator('.source-motion-band:not(.alternative)');
@@ -2246,7 +2246,7 @@ test('Use all keeps every steady range as a kept range in one Undo step, adding 
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
-test('a proxy prepared before the analysis offers Analyse camera motion, which runs one background job', async ({
+test('a proxy prepared before the analysis offers Analyze camera motion, which runs one background job', async ({
   page,
 }) => {
   const asset = assets[0]!;
@@ -2286,7 +2286,7 @@ test('a proxy prepared before the analysis offers Analyse camera motion, which r
   });
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   await expect(page.locator('.source-motion')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Analyse camera motion', exact: true }).click();
+  await page.getByRole('button', { name: 'Analyze camera motion', exact: true }).click();
   await expect(page.locator('.smooth-panel')).toContainText('Measuring camera motion… 50 %');
   await expect(page.locator('.smooth-panel')).toHaveAttribute('data-smooth-in', /^\d+$/);
   await expect(page.locator('.source-motion')).toHaveCount(1);
@@ -2323,7 +2323,7 @@ test('a ready recording follows the camera motion analysis queued after preparat
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   const panel = page.locator('.smooth-panel');
   await expect(panel).toContainText('Camera motion queued');
-  await expect(page.getByRole('button', { name: 'Analyse camera motion', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Analyze camera motion', exact: true })).toHaveCount(0);
   state = { state: 'running', progress: 0.25 };
   await expect(panel).toContainText('Measuring camera motion… 25 %');
   state = { state: 'completed', progress: 1, finishedAt: job.createdAt };
@@ -2439,7 +2439,7 @@ test('removing recordings from the project bin confirms used footage and Undo re
   await expect(heading).toHaveText('Media 2');
   expect(await edited()).toEqual(before);
 
-  // A used recording asks first; cancelling changes nothing and returns focus.
+  // A used recording asks first; canceling changes nothing and returns focus.
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   await expect(page.locator('canvas[data-source-decoder]')).toHaveCount(1);
   const trash = page.getByRole('button', { name: 'Remove pattern-a.mp4 from project', exact: true });
@@ -2659,7 +2659,7 @@ test('applied ranges are the recording’s kept ranges: saved with the project, 
   await expect(strip).toHaveAttribute('data-source-in', '10');
   await page.keyboard.press('Escape');
 
-  // Handles stop one frame from the neighbouring kept range instead of failing.
+  // Handles stop one frame from the neighboring kept range instead of failing.
   const end = page.getByRole('slider', { name: 'Trim source end', exact: true });
   await expect(end).toHaveAttribute('aria-valuemax', '59');
   await end.press('End');

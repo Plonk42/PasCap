@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { COLOUR_CONTROLS, NEUTRAL_COLOUR } from '../shared/colour.js';
+import { COLOR_CONTROLS, NEUTRAL_COLOR } from '../shared/color.js';
 import { KEYFRAME_SETTINGS, type KeyframeSetting } from '../shared/keyframes.js';
 import { Icon } from './icons.js';
 import type { NumberFieldProps } from './NumberField.js';
@@ -123,9 +123,9 @@ export function RangeSettingControl({
   exact,
 }: Readonly<RangeSettingProps>) {
   const definition = KEYFRAME_SETTINGS.find((item) => item.key === setting)!;
-  const colour = COLOUR_CONTROLS.find((item) => item.key === setting);
+  const color = COLOR_CONTROLS.find((item) => item.key === setting);
   const name = label ?? definition.label;
-  const neutral = colour ? NEUTRAL_COLOUR[colour.key] : 1;
+  const neutral = color ? NEUTRAL_COLOR[color.key] : 1;
   const scale = setting === 'opacity' ? 100 : 1;
   const exactHint = setting === 'opacity' ? `${hint} Opacity uses 0–100%.` : hint;
   const fieldContext = exact?.resetKey ?? resetKey ?? `${id}:${hint}`;
@@ -144,7 +144,7 @@ export function RangeSettingControl({
           {scope}
         </ResetLabel>
         {locked}
-        {actions && <span className="colour-control-actions">{actions}</span>}
+        {actions && <span className="color-control-actions">{actions}</span>}
       </span>
       <ValueControl
         id={id}
@@ -157,7 +157,7 @@ export function RangeSettingControl({
         disabled={disabled}
         resetKey={fieldContext}
         {...(fieldValidation === undefined ? {} : { validate: (next: number) => fieldValidation(next / scale) })}
-        unit={setting === 'opacity' ? '%' : (colour?.unit ?? '')}
+        unit={setting === 'opacity' ? '%' : (color?.unit ?? '')}
         {...(isToned(setting) ? { tone: setting } : {})}
         onCommit={(next) => onCommit(next / scale)}
         {...(onDraft === undefined ? {} : { onDraft: (next) => onDraft(next === null ? null : next / scale) })}

@@ -136,8 +136,8 @@ export async function createApp(config = createConfig()) {
   const projects = new ProjectStore(config.dataDir);
   await ensurePrivateDirectory(config.dataDir);
   const mcp = await mcpToken(config.dataDir);
-  await library.initialise();
-  await audio.initialise();
+  await library.initialize();
+  await audio.initialize();
   const archiveWarnings = await restoreExports(config, jobs);
   const operationContext = {
     projects,
@@ -231,7 +231,7 @@ export async function createApp(config = createConfig()) {
   });
   app.post('/api/media/:id/motion', async (request, reply) => {
     z.object({}).strict().parse(request.body);
-    return reply.code(202).send({ job: library.analyseMotion(idParams.parse(request.params).id) });
+    return reply.code(202).send({ job: library.analyzeMotion(idParams.parse(request.params).id) });
   });
   app.route({
     method: ['GET', 'HEAD'],
@@ -308,7 +308,7 @@ export async function createApp(config = createConfig()) {
   });
   app.post('/api/audio/:id/analysis', async (request, reply) => {
     z.object({}).strict().parse(request.body);
-    return reply.code(202).send({ job: audio.analyse(idParams.parse(request.params).id) });
+    return reply.code(202).send({ job: audio.analyze(idParams.parse(request.params).id) });
   });
   app.get('/api/projects', async () => ({ projects: await projects.list() }));
   app.post('/api/projects', async (request, reply) =>

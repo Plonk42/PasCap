@@ -54,7 +54,7 @@ describe('shared retiming and recoverable speed edits', () => {
       expect(clipDuration(trimmed)).toBeLessThan(map.duration);
     });
   }
-  it('retimes transitions in output frames and supports independent per-clip colour/speed undo', () => {
+  it('retimes transitions in output frames and supports independent per-clip color/speed undo', () => {
     let project = applyCommand(createProject('p', 'P'), {
       type: 'insert',
       clip: createClip('a', 'source', 0, 120),

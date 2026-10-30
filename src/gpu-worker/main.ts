@@ -111,7 +111,7 @@ function drawFrame(
     return {
       slot,
       grade: source.grade,
-      settings: source.colour,
+      settings: source.color,
       aspect: source.width / source.height,
       spatial: source.spatial,
       detail: source.detail,

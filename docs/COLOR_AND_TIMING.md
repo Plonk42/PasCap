@@ -1,26 +1,26 @@
-# PasCap colour and timing contract
+# PasCap color and timing contract
 
 This specification is shared by the CPU reference, WebGL2 shader and native
-scalar LUT or exact advanced-colour export. It is elementary SDR grading, not
+scalar LUT or exact advanced-color export. It is elementary SDR grading, not
 highlight recovery. Originals remain untouched.
 
-## Colour
+## Color
 
 Each source is graded by its clip's grade (`clip.grade`, keyframed at source frames), then by
 the adjustment covering that project frame (`project.adjustments`, keyframed from its start):
 each applies the complete grade below to the previous one's encoded output. Video tracks have
-no Colour, and a dissolve's two sources share the adjustment at that frame. An exactly neutral
+no Color, and a dissolve's two sources share the adjustment at that frame. An exactly neutral
 grade short-circuits; a neutral clip grade without an adjustment returns its input unchanged.
 Grading precedes black fades and coverage/group composition. Static export bakes each clip's
 unkeyed scalar grade into its own LUT; composited paths compose each source's two scalar grades
 into one of at most two reused LUT arrays, and advanced grades are exact.
 See [clip grades and adjustments](design/ROW_APPEARANCE.md) for ownership, UI and strict storage.
 
-- Input/output: full-range normalised nonlinear R′G′B′, BT.709 primaries and transfer.
+- Input/output: full-range normalized nonlinear R′G′B′, BT.709 primaries and transfer.
   Limited-range BT.709 Y′CbCr footage is converted with the BT.709 matrix first.
   Native rendering explicitly selects its input/output matrix and range.
 - HTML video supplies browser-converted RGB textures. The preview treats these
-  samples as BT.709 code values, with the browser's default video colour conversion.
+  samples as BT.709 code values, with the browser's default video color conversion.
   Browser/driver transfer or range differences must be measured, not assumed away.
   WebGL draws to an ordinary SDR sRGB canvas; numeric code-value comparison is the
   acceptance test. Wide-gamut/HDR input is rejected.
@@ -31,9 +31,9 @@ See [clip grades and adjustments](design/ROW_APPEARANCE.md) for ownership, UI an
   $q=(2^{T/2+I/4},2^{-I/4},2^{-T/2+I/4})$; normalize with
   $N=0.2126q_R+0.7152q_G+0.0722q_B$ and apply $L'=L\odot(q/N)$ before Exposure,
   without clipping intermediate gains/RGB. Positive Temperature warms; positive
-  Tint adds magenta. Nonzero settings intentionally colour greys. Normalization
+  Tint adds magenta. Nonzero settings intentionally color grays. Normalization
   preserves neutral-white linear BT.709 luminance before clipping only, not
-  arbitrary coloured pixels or final output. CPU/reference/native/GPU use this
+  arbitrary colored pixels or final output. CPU/reference/native/GPU use this
   same math, not Kelvin or HDR. **Auto white balance** only chooses a clip grade's Temperature/Tint
   keyframe values, and **Auto** ([Auto adjust](design/AUTO_ADJUST.md)) only chooses eleven of its
   scalar values or keyframe values by evaluating this grade; neither adds a stage. See
@@ -43,7 +43,7 @@ See [clip grades and adjustments](design/ROW_APPEARANCE.md) for ownership, UI an
   encoded luminance `V = OETF(Y)`, then apply in order:
   - Contrast `c`: `V ← V + (c − 1) × V × (1 − V) × (2V − 1)`, an S-curve (c > 1) or
     flattening (c < 1) pivoting at encoded 0.5; its midtone slope is `(1 + c) / 2`.
-  - Brightness `b`: `V ← V + 2b × V × (1 − V)`, moving mid grey by `b / 2`.
+  - Brightness `b`: `V ← V + 2b × V × (1 − V)`, moving mid gray by `b / 2`.
   - Shadows and Highlights are not part of this per-pixel grade: they are local
     exposure changes applied to source pixels before grading, from each area's
     edge-aware base brightness, with the clip grade's and adjustment's values summed
@@ -53,26 +53,26 @@ See [clip grades and adjustments](design/ROW_APPEARANCE.md) for ownership, UI an
     +1 pushes near-white tones to white; it barely touches tones below the upper range.
   - Blacks `k`: `V + 0.25k × (1 − V)^4`, moving the black point; it fades out towards white.
     Lowered (k < 0), `V ← max(0, V + 0.25k × (1 − V)^4)` joins the gain below, crushing
-    near-black tones to black (at −1, everything below about encoded 0.14; mid grey moves
+    near-black tones to black (at −1, everything below about encoded 0.14; mid gray moves
     by about 0.016) while keeping hue and saturation. Raised (k > 0), black cannot be
     scaled, so `V` is left for the gain and the luminance lift
     `EOTF(V + 0.25k × (1 − V)^4) − EOTF(V)` is added equally to every linear channel
-    afterwards: a matte, faded look in which near-black tones turn greyer (black becomes
+    afterwards: a matte, faded look in which near-black tones turn grayer (black becomes
     encoded 0.25 at +1).
 
   Multiply every channel by `EOTF(V) / Y` (`(2 − c)(1 + 2b)` at `Y = 0`, or 0 when
   Blacks is lowered), then add any raised-Blacks lift. Each curve is monotonic over its
   whole range and keeps black (except raised Blacks) and white (except lowered Whites);
-  as a gain the result keeps chroma ratios, so colours turn greyer only
+  as a gain the result keeps chroma ratios, so colors turn grayer only
   through the raised-Blacks lift and clip to black only through lowered Blacks.
 
 - Recompute unclipped linear luminance. Define
   `Cb = (B − Y) / 1.8556`, `Cr = (R − Y) / 1.5748`.
   Rotate `(Cb, Cr)` by hue in radians, then multiply by
   `saturation × (1 + v × (1 − c))`. Vibrance `v` is −1…2, neutral 0; `c = (max − min) / max`
-  of the linear RGB after the tone stages (0 for grey, 1 for a fully saturated colour).
-  Vibrance changes muted colours most and leaves fully saturated colours unchanged, so
-  raising it does not push strong colours out of gamut; greys stay grey. There is no
+  of the linear RGB after the tone stages (0 for gray, 1 for a fully saturated color).
+  Vibrance changes muted colors most and leaves fully saturated colors unchanged, so
+  raising it does not push strong colors out of gamut; grays stay gray. There is no
   skin-tone protection. CPU reference, native LUT/exact grading and GPU shaders share
   this math; static Vibrance keeps the scalar LUT export path.
   Reconstruct `R = Y + 1.5748 Cr`, `B = Y + 1.8556 Cb`,
@@ -96,7 +96,7 @@ See [clip grades and adjustments](design/ROW_APPEARANCE.md) for ownership, UI an
   the old opaque black padding after grading. Nonneutral geometry inverse-maps
   and resample source RGB before grading, with transparent coverage outside the
   transformed/cropped original; crop does not refit the image.
-  Quantisation, interpolation and 4:2:0 encoding are
+  Quantization, interpolation and 4:2:0 encoding are
   documented differences, not claimed equivalence. Tests measure LUT error and
   GPU/CPU/native pixel error. Extreme slider settings may have larger LUT error.
 
@@ -105,12 +105,12 @@ See [clip grades and adjustments](design/ROW_APPEARANCE.md) for ownership, UI an
 Clip grade keyframes and clip-instance custom speed keyframes use integer **original-source
 frames**; adjustment keyframes count integer frames from the adjustment's start; track
 Transform keyframes use integer **project frames** and override each keyed setting across every
-clip on that track. Unkeyed grade settings use the grade's `colour` and unkeyed Transform
+clip on that track. Unkeyed grade settings use the grade's `color` and unkeyed Transform
 settings `layer.transform.base`. Clip speed remains per clip and is never a grade setting.
 **Opacity** is the ninth Transform setting: `transform.base.opacity` is a required number in
 0–1, initially 1 on a new track, and nullable `opacity` in Transform keyframes overrides it
 with its own Easing, including on both dissolve sources. There is no saved `clip.opacity` and
-no Opacity in Colour. The fourteen required nullable grade keyframe fields are `temperature`,
+no Opacity in Color. The fourteen required nullable grade keyframe fields are `temperature`,
 `tint`, `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `vibrance`, `highlights`,
 `shadows`, `whites`, `blacks`, `hdr` and `localContrast`.
 Hold/linear/ease-in/ease-out/smooth interpolation is that setting's own Easing at the left keyframe
@@ -127,7 +127,7 @@ The **Opacity** slider is in **Track → Transform**, after Rotation, and starts
 It edits the Transform base without keyframes and works on an empty track. With keyframes, only
 a setting keyed at the real playhead is editable; its hollow triangle explicitly captures it.
 Sliders never create keyframes. Opacity is not an RGB grading parameter: it
-controls coverage during composition after the SDR colour math above.
+controls coverage during composition after the SDR color math above.
 
 For each enabled video track, source-over uses premultiplied encoded RGB/coverage.
 Let $w_i$ be dissolve weight, $o_i$ evaluated Opacity, $b_i$ black-fade brightness
@@ -146,11 +146,11 @@ light blend or extra tone map. See [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAME
 
 ### Editor-only original preview
 
-Holding the preview's **Original** button replaces **all evaluated colour settings** with the
-shared `NEUTRAL_COLOUR` value for every enabled video track and both sources in each
+Holding the preview's **Original** button replaces **all evaluated color settings** with the
+shared `NEUTRAL_COLOR` value for every enabled video track and both sources in each
 dissolve, bypassing clip grades, adjustments and their keyframes alike, and bypasses clip
 Detail. Holding **Shift** as it is pressed bypasses only clip grades and Detail, **Alt** only
-adjustments. Future colour controls added to `NEUTRAL_COLOUR` are automatically bypassed,
+adjustments. Future color controls added to `NEUTRAL_COLOR` are automatically bypassed,
 without a separate per-control list. Stored grades and keyframes are unchanged.
 
 Only grading is neutralized: exact observed source frames and `PlacedClip.retiming`,
@@ -194,7 +194,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
   A closing fade ends at its last video clip OUT, not a later music/project OUT.
 - An `N ≥ 2` fade uses endpoint-inclusive weights `j/(N−1)` or `1−j/(N−1)`.
   A one-frame fade is a black frame. This yields two adjoining black frames at
-  a black transition's centre. It is intentional, deterministic and testable.
+  a black transition's center. It is intentional, deterministic and testable.
 - Incoming/outgoing transition and opening/closing regions must not overlap
   within a clip. Invalid durations/edits are rejected, never silently clamped.
 - Splits deep-copy static settings, grades and clip-speed anchors, preserve exterior boundaries
@@ -218,7 +218,7 @@ resets to normal graded preview. Export continues to use the saved grading contr
   music track's start + duration, bounded to 2,147,483,647 frames without clamping.
   Music can extend the project. Empty/entirely hidden video regions and music-only
   tails are opaque black, never a frozen last image; music fades at its own end.
-- UI timecode is 30 fps non-drop-frame, labelled NDF. Duration in seconds uses the
+- UI timecode is 30 fps non-drop-frame, labeled NDF. Duration in seconds uses the
   rational rate, so timecode is not a wall-clock duration at 29.97 fps.
 
 ## Music sampling and mixing
@@ -231,7 +231,7 @@ rate. Each music track's selected source repeats only with explicit Loop, contri
 silence outside placement, and receives its own `10^(gainDb/20)` linear fade
 envelope before mixing. Sum all music tracks linearly and **hard-clamp [−1, 1] once
 after all sources**, never per-source or during native pairwise accumulation.
-No normalisation, ducking, effects or hidden gain compensation. Music is not
+No normalization, ducking, effects or hidden gain compensation. Music is not
 retimed/rippled with video tracks; clip speed, grades, adjustments and Opacity are unchanged.
 
 One AudioContext/worklet and output-timestamp epoch retain the exact one-frame
@@ -276,20 +276,20 @@ measurement reports must identify their project snapshot's schema without overwr
 historical reports; the report identifier is separate from the project schema.
 Project identifiers such as `preview-lab`/`preview-lab-v6` are not schema versions
 and are not renamed by this contract.
-Projects and receipt snapshots saved before the current schema, with track Colour, are
+Projects and receipt snapshots saved before the current schema, with track Color or British spelling, are
 rejected with the reason and left unchanged, with no compatibility defaults, old-format/null
 fallback readers or automatic deletion. The strict current schema requires
-a complete `grade` on every clip (Colour, including Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local
+a complete `grade` on every clip (Color, including Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local
 contrast bases and static HSL/curves, and keyframes with all fourteen nullable fields), the
 `adjustments` array, constant or custom-curve clip speed, boolean clip `reverse` and track
-`transform` base/per-setting keyframes, Opacity included; video tracks carry no `colour`,
-`opacity` or `keyframes`, and saved `clip.colour`, `clip.correction`, `clip.opacity` and
+`transform` base/per-setting keyframes, Opacity included; video tracks carry no `color`,
+`opacity` or `keyframes`, and saved `clip.color`, `clip.correction`, `clip.opacity` and
 `clip.spatial` are rejected, not defaulted.
 Production export receipts also remain version 1, with strict current-schema snapshots and
 required `musicSources` captured-original/`settings.audio` identified-plan arrays;
 older snapshots or invalid arrays are rejected without rewriting receipts/MP4s.
 Proxy/current PCM formats and source guards are unchanged; the registries are
-version 2 (full-content checksums).
+version 3 (videos) and 2 (music), with full-content checksums.
 Source ranges and every retained clip speed keyframe position are validated against registered
 original frame counts, including hidden track references.
 
@@ -298,8 +298,8 @@ The order is decoded linear Temperature/Tint gains before Exposure and the
 remaining scalar SDR stages, encoded BT.709 HSL, master curve, individual RGB
 curves, then the adjustment's grade in the same order, black-fade brightness and group
 coverage/source-over. HSL/curves add no channels to the fourteen nullable keyframe fields.
-HSL protects greys in its incoming
-RGB, not greys already coloured by Temperature/Tint. The Original preview bypasses
-the entire colour transform, not geometry or coverage. Precise advanced bounds,
+HSL protects grays in its incoming
+RGB, not grays already colored by Temperature/Tint. The Original preview bypasses
+the entire color transform, not geometry or coverage. Precise advanced bounds,
 circular weighting, smooth monotone cubic curves and resource budgets are in
 [HSL_AND_CURVES.md](design/HSL_AND_CURVES.md).
