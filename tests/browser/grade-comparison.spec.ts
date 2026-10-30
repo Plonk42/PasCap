@@ -599,8 +599,8 @@ test('bypasses clip grades and adjustments across dissolves, retaining coverage,
   page,
   comparison,
 }) => {
-  // Sixteen full software-rendered readbacks; hosted runner speed is not a correctness bound.
-  test.setTimeout(60_000);
+  // Sixteen full software-rendered readbacks of two grades per source (about 60 s CI-like); hosted runner speed is not a correctness bound.
+  test.setTimeout(180_000);
   const { layered, neutral } = comparison;
   expect(nonColourContract(neutral)).toEqual(nonColourContract(layered));
   expect(neutral.clips.map(({ grade: _grade, ...clip }) => clip)).toEqual(
