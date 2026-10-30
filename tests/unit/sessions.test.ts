@@ -170,6 +170,31 @@ describe('assistant sessions', () => {
     expect(status.session).not.toHaveProperty('pictures');
   });
 
+  it('reads the allowed movement of a brief saved before it was named maxJolts', async () => {
+    const { call, dataDir } = await setup();
+    await call('assistant', 'session_start', { projectId: 'flight', expectedRevision: 1 });
+    const file = path.join(dataDir, 'assistant', 'flight', 'session.json');
+    const saved = JSON.parse(await readFile(file, 'utf8')) as { brief: Record<string, unknown> };
+    const { maxJolts: _, minMovement, maxMovement, minFlightSpeed, maxFlightSpeed, ...earlier } = saved.brief;
+    expect([minMovement, maxMovement, minFlightSpeed, maxFlightSpeed]).toEqual([null, null, null, null]);
+    await writeFile(file, JSON.stringify({ ...saved, brief: { ...earlier, allowedMovement: 3 } }));
+    const status = await call('editor', 'session_status', { projectId: 'flight' });
+    const { brief } = status.session as { brief: Record<string, unknown> };
+    expect(brief).toMatchObject({ maxJolts: 3, minMovement: null, maxFlightSpeed: null });
+    expect(brief).not.toHaveProperty('allowedMovement');
+  });
+
+  it('refuses a brief whose minimum movement or flight speed is not below its maximum', async () => {
+    const { call } = await setup();
+    await expect(
+      call('assistant', 'session_start', {
+        projectId: 'flight',
+        expectedRevision: 1,
+        brief: { minFlightSpeed: 10, maxFlightSpeed: 4 },
+      }),
+    ).rejects.toThrow('The minimum flight speed, 10, must be less than the maximum, 4.');
+  });
+
   it('refuses to start on a stale revision or beside an active session, saying whether it can be used', async () => {
     const stale = await setup();
     await expect(

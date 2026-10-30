@@ -81,7 +81,7 @@ describe('recording shots', () => {
     expect(shots[0]!.sourceIn).toBe(0);
     expect(shots[1]!.sourceOut).toBe(FRAMES);
     expect(shots[0]!.speed).toBeCloseTo((3 * 100 * FPS) / 320, 0);
-    expect(shots[0]!.roughness).toBeLessThan(2);
+    expect(shots[0]!.jolts).toBeLessThan(2);
     expect(shots[0]!.flight).toMatchObject({ horizontalSpeed: 4, verticalSpeed: 0 });
     expect(shots[1]!.flight!.height).toBeGreaterThan(60);
     expect(stillShare).toBe(0);

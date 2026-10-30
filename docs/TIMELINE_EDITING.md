@@ -926,8 +926,8 @@ in the same column, the **motion timeline** stacks lanes, each labeled at its to
 one playhead line runs through the strip and every lane, and the footage omitted by IN/OUT
 (including a trim draft) is hatched across them. The 44 px image lane plots the **jolts**
 (amber area: how fast the camera movement changes, % of image width per s², up to 8),
-the **movement** in the picture (white line, up to 10 % of width per s) and the **allowed
-movement** (dashed accent lines at its maximum and, once raised above 0, its minimum); a 30 px lane follows for each chosen flight data value,
+the **movement** in the picture (white line, up to 10 % of width per s), the **maximum jolts**
+(dashed accent line) and, where the **Movement** range does not reach the lane's ends, its limits (dashed white lines); a 30 px lane follows for each chosen flight data value,
 scaled from its lowest to its highest value in the recording, which its label shows (a
 nearly flat value is widened to a minimum span, such as 5 m of height or 2 m/s of speed,
 so sensor noise does not fill the lane), each in its own color, matching its swatch in the menu; the flight speed lane
@@ -938,19 +938,21 @@ once-per-second samples) and the image lane the timecode. Clicking or dragging a
 scrubs like the strip. Below the IN/OUT fields, separated by a hairline, the **Camera
 motion** section has a header row: its title (a chevron button, **Collapse camera
 motion**), its help, **Best steady range** with what it shows, its length and IN–OUT timecode, **Use best** and **Use all N**.
-Two rows of limits follow, each a name with Reset and a range slider: two thumbs on one track
-(**<name> minimum** / **<name> maximum**) with an exact field for each end. **Allowed movement**
-(jolts, 0–6, initially 0–2) and **Flight speed** (m/s, 0–20, initially 0–20; at 20 the maximum
-has no limit), with **Flight data** (**Flight data lanes**) at the end of the first row, a menu
+Up to three rows of limits follow, each a name with Reset and a slider with its exact field. **Maximum
+jolts** (0.5–6, initially 2) is a single slider. **Movement** (% of image width per s, 0–10,
+initially 0–10) and **Flight speed** (m/s, 0–20, initially 0–20) are range sliders: two thumbs on
+one track (**<name> minimum** / **<name> maximum**) with an exact field for each end; at its top
+(10 %/s, 20 m/s) the maximum has no limit. **Flight data** (**Flight data lanes**) ends the first row, a menu
 choosing which flight data values this recording has get a lane, **Flight speed** initially.
-The minimum stays below the maximum: an exact entry that crosses it is an inline error, unapplied
+A minimum stays below its maximum: an exact entry that crosses it is an inline error, unapplied
 until corrected or restored with Escape. Flight speed is shown only for a recording with
 flight speed data. Collapsing hides the lanes and controls, keeping the
-title and the suggestion; the collapse, both limits and flight data choices are
-browser preferences (a single allowed movement kept earlier becomes the maximum). Steady ranges are the stretches of at least 2 s whose
-jolts are at least the allowed movement's minimum and below its maximum and whose recorded flight speed
-is within its range (frames without a recorded speed are not judged by it), bridging stretches outside them shorter than 0.5 s and keeping 0.2 s clear of
-their edges inside the recording. A stretch where the camera stands still is not a steady range:
+title and the suggestion; the collapse, the three limits and flight data choices are
+browser preferences (a maximum jolts kept earlier, then called allowed movement, is kept). Steady ranges are the stretches of at least 2 s whose
+frames all have jolts below the maximum, picture movement within **Movement** and recorded flight speed
+within **Flight speed** (frames without a recorded speed are not judged by it), bridging stretches outside them shorter than 0.5 s and keeping 0.2 s clear of
+their edges inside the recording. Raising the Movement minimum leaves out static footage and trims
+static starts and ends off the ranges. Even with it at 0, a stretch where the camera stands still is not a steady range:
 when at least 99.5 % of its frames move less than 0.5 % of the image width per second
 (about three minutes to pan one width), the drone is hovering with nothing happening in
 the picture, so it gets no band or suggestion.
@@ -972,8 +974,8 @@ So a 6 s orbit outranks a 30 s straight approach or a long, nearly still stretch
 ranges showing the same kind the longer one wins. Without flight data a sideways movement is
 read as a pan. Content moving down is never a reveal: a forward flight with the camera looking
 down moves it as a tilt up does. `describe_recording` gives the assistant each range's kind
-and rank. Move the **Allowed movement** or **Flight speed** thumbs, or drag a dashed line of the image lane
-itself (it highlights within 6 px, and the image lane shows the range; a line stops a step before
+and rank. Move the sliders, or drag a dashed line of the image lane
+itself (it highlights within 6 px, and the image lane shows its limit; a movement line stops a step before
 the other one, and dragging it never scrubs). **Use best** applies the suggestion as the active kept range (and
 shows its IN frame), like any other range choice, in one Undo step; it reads **In use** once applied.
 **Use all N** (**Use all N steady ranges as kept ranges**) replaces the recording's kept ranges with the steady
@@ -986,13 +988,15 @@ camera motion** in the header instead, which queues one **Camera motion analysis
 acceleration seen straight ahead barely changes the picture, so speed changes without
 turning are not detected by the jolts; the flight speed line shows them, and only the **Flight speed**
 range uses them. Flight logs are not used. The assistant's `describe_recording` and
-`compare_recordings` take one allowed movement, the maximum, with no minimum or flight speed limit.
+`compare_recordings` take the same limits (`maxJolts`, `minMovement`, `maxMovement`, `minFlightSpeed`,
+`maxFlightSpeed`), from the request, else the session brief, which **Hand off** fills from these
+sliders.
 
 ### Keeping the best steady range of several recordings
 
 With one or more recordings selected in Media, **Use best** (star icon, **Use best steady
 ranges**) in the selection bar keeps, for each of them, the best steady range Source preview's
-**Use best** would choose within the current **Allowed movement** and **Flight speed**, as its **only** kept range,
+**Use best** would choose within the current **Maximum jolts**, **Movement** and **Flight speed**, as its **only** kept range,
 replacing any others, in one Undo step, and makes it active. It reads each
 recording's camera motion analysis when the selection changes (once per session) and shows how
 many recordings it will change beside its label. Recordings that cannot get a suggestion (not

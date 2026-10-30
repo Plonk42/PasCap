@@ -1,6 +1,5 @@
 import type { EditCommand } from '../../shared/commands.js';
 import type { ProjectDocument } from '../../shared/model.js';
-import { steadyLimits } from '../../shared/motion-analysis.js';
 import type { compareRecordings, recordingSheet, still, timelineSheet } from '../../shared/operations/pictures.js';
 import { projectVideoIds } from '../../shared/projects.js';
 import { recordingShots } from '../../shared/recording-shots.js';
@@ -10,7 +9,7 @@ import { formatTimecode, framesToSeconds, PROJECT_FPS } from '../../shared/timin
 import { ServiceError } from '../errors.js';
 import { assertSourceRanges } from '../project-sources.js';
 import type { OperationRunner, ServiceContext } from './context.js';
-import { allowedMovementFor } from './describe-recording.js';
+import { steadyLimitsFor } from './describe-recording.js';
 import { applyBatch } from './edit.js';
 
 const FPS = PROJECT_FPS.numerator / PROJECT_FPS.denominator;
@@ -110,8 +109,7 @@ async function defaultRange(
   const kept = project.selects[mediaId];
   const analysis = await library.motion(mediaId);
   if (analysis) {
-    const tolerance = await allowedMovementFor(sessions, project.id);
-    const { shots } = recordingShots(analysis, asset.damage, kept, steadyLimits(tolerance), FPS);
+    const { shots } = recordingShots(analysis, asset.damage, kept, await steadyLimitsFor(sessions, project.id), FPS);
     const best = shots.find((shot) => shot.rank === 1);
     if (best) return { sourceIn: best.sourceIn, sourceOut: best.sourceOut };
   }

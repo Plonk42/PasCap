@@ -38,7 +38,7 @@ function skipReason(asset: MediaAsset, lookup: Lookup | undefined): string | nul
 
 /**
  * What keeping the best steady range of each recording would change: the range Use best keeps
- * at the current Allowed movement and Flight speed, replacing every kept range of the recording.
+ * within the current Maximum jolts, Movement and Flight speed, replacing every kept range of the recording.
  */
 export function useBestRanges(
   assets: readonly MediaAsset[],

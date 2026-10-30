@@ -53,8 +53,28 @@
 
 .hand-off-options {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.hand-off-check {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 2px 8px;
+  font-size: 13px;
+}
+
+.hand-off-check > input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.hand-off-check > small {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .hand-off-readiness h3 {

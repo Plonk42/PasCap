@@ -724,8 +724,10 @@ See [MULTIPLE_MUSIC.md](design/MULTIPLE_MUSIC.md) for strict fields, bounds and 
 
 **Hand off** (header, beside Export, **Hand off to an assistant**) opens a dialog for the
 brief an assistant connected through MCP receives: **What should it make?** (up to 2,000
-characters), **Music track** (Any or a placed music track), **Target length (s)**, **Allowed
-movement** (0.5–6) and **Most clips**, all optional; an invalid number keeps an inline error
+characters), **Music track** (Any or a placed music track), **Target length (s)** and **Most
+clips**, all optional, and **Steady ranges as in Source preview** (checked initially), which sends
+the Maximum jolts, Movement and Flight speed set there, as summarized beside it (unchecked, the
+summary shows the defaults the assistant uses instead); an invalid number keeps an inline error
 and disables **Hand off**. **What the assistant can use** lists the bin's video recordings
 prepared, their camera motion analyzed, the music prepared and analyzed and a running export
 (stills wait for it), each with a check or warning and, where jobs are missing, **Prepare N**

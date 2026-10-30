@@ -1,11 +1,64 @@
 import { z } from 'zod';
 import { described } from './described.js';
 import { frameSchema, idSchema, type ProjectDocument, type SelectRange } from './model.js';
+import {
+  FLIGHT_SPEED_RANGE,
+  MAX_JOLTS,
+  MOVEMENT_RANGE,
+  steadyLimitFields,
+  steadyLimits,
+  steadyLimitsError,
+  steadyLimitsFrom,
+  type SteadyLimitFields,
+} from './motion-analysis.js';
 
 export const MAX_BRIEF_NOTES = 2000;
 export const MAX_SESSION_NOTES = 4000;
 /** Older entries of a long session's edit log are dropped. */
 export const MAX_SESSION_EDITS = 500;
+
+const movement = '% of the image width per second';
+const LIMITS: Readonly<Record<keyof SteadyLimitFields, { min: number; max: number; text: string }>> = {
+  maxJolts: {
+    ...MAX_JOLTS,
+    text: `Jolts (how fast the camera movement changes, % of the image width per s²) every frame of a steady range stays below, ${MAX_JOLTS.min}–${MAX_JOLTS.max}: lower is steadier`,
+  },
+  minMovement: {
+    ...MOVEMENT_RANGE,
+    text: `Least picture movement of every frame of a steady range, ${movement}, ${MOVEMENT_RANGE.min}–${MOVEMENT_RANGE.max}: raise it to leave out static footage`,
+  },
+  maxMovement: {
+    ...MOVEMENT_RANGE,
+    text: `Most picture movement of every frame of a steady range, ${movement}; ${MOVEMENT_RANGE.max} has no limit`,
+  },
+  minFlightSpeed: {
+    ...FLIGHT_SPEED_RANGE,
+    text: `Least horizontal flight speed of every frame of a steady range, m/s, ${FLIGHT_SPEED_RANGE.min}–${FLIGHT_SPEED_RANGE.max}; frames without recorded speed are not judged by it`,
+  },
+  maxFlightSpeed: {
+    ...FLIGHT_SPEED_RANGE,
+    text: `Most horizontal flight speed of every frame of a steady range, m/s; ${FLIGHT_SPEED_RANGE.max} has no limit`,
+  },
+};
+
+/**
+ * The steady-range limits Source preview sets, as fields for the assistant, each wrapped (optional,
+ * nullable…) and described with `unset(initial value)` appended.
+ */
+export function steadyLimitShape<T extends z.ZodType>(
+  wrap: (field: z.ZodNumber) => T,
+  unset: (initial: number) => string = () => '',
+): Record<keyof SteadyLimitFields, T> {
+  const initial = steadyLimitFields(steadyLimits());
+  const keys = Object.keys(LIMITS) as (keyof SteadyLimitFields)[];
+  return Object.fromEntries(
+    keys.map((key) => {
+      const { min, max, text } = LIMITS[key];
+      const suffix = unset(initial[key]);
+      return [key, described(wrap(z.number().min(min).max(max)), suffix ? `${text}; ${suffix}.` : `${text}.`)];
+    }),
+  ) as Record<keyof SteadyLimitFields, T>;
+}
 
 export const briefSchema = z
   .object({
@@ -18,13 +71,17 @@ export const briefSchema = z
       z.number().positive().max(86_400).nullable().default(null),
       'Target length of the cut in seconds; null follows the music.',
     ),
-    allowedMovement: described(
-      z.number().min(0.5).max(6).nullable().default(null),
-      'Allowed camera movement for steady ranges, 0.5–6 as in Source preview; null keeps its default.',
+    ...steadyLimitShape(
+      (field) => field.nullable().default(null),
+      (initial) => `null keeps ${initial}`,
     ),
     maxClips: described(z.number().int().positive().max(1000).nullable().default(null), 'Most clips in the cut.'),
   })
-  .strict();
+  .strict()
+  .superRefine((brief, context) => {
+    const error = steadyLimitsError(steadyLimitsFrom(brief));
+    if (error) context.addIssue({ code: 'custom', message: error });
+  });
 export type Brief = z.output<typeof briefSchema>;
 
 export const sessionEditSchema = z

@@ -2,7 +2,13 @@ import type { describeRecording } from '../../shared/operations/describe-recordi
 import { durationOf } from '../../shared/operations/timecode.js';
 import { projectVideoIds } from '../../shared/projects.js';
 import { recordingShots, type SteadyShot } from '../../shared/recording-shots.js';
-import { SMOOTH_TOLERANCE, steadyLimits } from '../../shared/motion-analysis.js';
+import {
+  steadyLimitFields,
+  steadyLimitsError,
+  steadyLimitsFrom,
+  type SteadyLimitSource,
+  type SteadyLimits,
+} from '../../shared/motion-analysis.js';
 import { formatTimecode, framesToSeconds, PROJECT_FPS } from '../../shared/timing.js';
 import { ServiceError } from '../errors.js';
 import type { OperationRunner, ServiceContext } from './context.js';
@@ -14,19 +20,22 @@ function pictured(shots: readonly SteadyShot[], cells: number): SteadyShot[] {
   return shots.filter((shot) => shot.rank <= cells);
 }
 
-/** The allowed movement asked for, else the active session's, else the editor's initial one. */
-export async function allowedMovementFor(
+/** Each steady-range limit asked for, else the active session brief's, else the editor's initial one. */
+export async function steadyLimitsFor(
   sessions: ServiceContext['sessions'],
   projectId: string,
-  asked?: number,
-): Promise<number> {
+  asked: SteadyLimitSource = {},
+): Promise<SteadyLimits> {
   const session = await sessions.current(projectId);
-  return asked ?? (session?.endedAt === null ? session.brief.allowedMovement : null) ?? SMOOTH_TOLERANCE.initial;
+  const limits = steadyLimitsFrom(asked, session?.endedAt === null ? session.brief : {});
+  const error = steadyLimitsError(limits);
+  if (error) throw new ServiceError(error, 422);
+  return limits;
 }
 
 export const runDescribeRecording: OperationRunner<typeof describeRecording> = async (
   { projects, library, sessions, stills, images },
-  { projectId, mediaId, allowedMovement, sheet },
+  { projectId, mediaId, sheet, ...asked },
 ) => {
   const project = await projects.load(projectId);
   if (!projectVideoIds(project).has(mediaId))
@@ -34,11 +43,11 @@ export const runDescribeRecording: OperationRunner<typeof describeRecording> = a
   const asset = library.get(mediaId);
   if (asset.status !== 'ready')
     throw new ServiceError(`${asset.name} is not prepared yet, so it cannot be described or shown.`, 409);
-  const tolerance = await allowedMovementFor(sessions, projectId, allowedMovement);
+  const limits = await steadyLimitsFor(sessions, projectId, asked);
   const analysis = await library.motion(mediaId);
   const kept = project.selects[mediaId];
   const { shots, stillShare } = analysis
-    ? recordingShots(analysis, asset.damage, kept, steadyLimits(tolerance), FPS)
+    ? recordingShots(analysis, asset.damage, kept, limits, FPS)
     : { shots: [], stillShare: null };
   const shown = sheet ? pictured(shots, images.sheetCells) : [];
   const middles = shown.map((shot) => Math.floor((shot.sourceIn + shot.sourceOut) / 2));
@@ -53,7 +62,7 @@ export const runDescribeRecording: OperationRunner<typeof describeRecording> = a
       flightData: (analysis?.telemetry.length ?? 0) > 0,
     },
     keptRanges: kept ?? null,
-    allowedMovement: tolerance,
+    limits: steadyLimitFields(limits),
     motionAnalyzed: analysis !== null,
     steadyRanges: shots.map((shot) => ({
       ...shot,

@@ -10,7 +10,8 @@ what the footage shows from its pictures.
   recordings of the bin with the ranges the user kept, and bookmarks. Later, include only the
   parts a step needs (videoTracks after an edit, with layerId for one track).
 - session_status: an active session started by the user's Hand off carries their brief (notes,
-  music track, target length, allowed movement, most clips). Follow it.
+  music track, target length, steady-range limits on jolts, movement and flight speed, most clips).
+  Follow it.
 - music_analysis: tempo, key, sections (quiet, build, peak, release) with their loudness and tone,
   swells, silences, beats and downbeats, and hits (kicks, snares, crashes that stand out, with their
   band and whether they are strong) at project frames. The target length is the music clip's

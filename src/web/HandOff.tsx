@@ -2,12 +2,19 @@ import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 
 import { MAX_BRIEF_NOTES, type Brief } from '../shared/assistant-session.js';
 import type { MediaJob } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
+import {
+  steadyLimitFields,
+  steadyLimits,
+  type SteadyLimitFields,
+  type SteadyLimits,
+} from '../shared/motion-analysis.js';
 import type { OperationOutput } from '../shared/operations/index.js';
 import { forEachSerial } from '../shared/serial.js';
 import { api } from './api.js';
 import { Icon } from './icons.js';
 import { Modal } from './Modal.js';
 import { callOperation } from './operations.js';
+import { steadyLimitsText, useSteadyLimits } from './SmoothRange.js';
 import './hand-off.css';
 
 type Readiness = OperationOutput<'hand_off_readiness'>;
@@ -41,6 +48,16 @@ function optionalNumber(
   if (!Number.isFinite(value) || value < minimum || value > maximum || (integer && !Number.isInteger(value)))
     return { value: null, error: `Enter ${integer ? 'a whole number' : 'a number'} from ${minimum} to ${maximum}.` };
   return { value, error: '' };
+}
+
+/** The limits as brief fields: those left at their default stay null, so the assistant's defaults apply. */
+function briefLimits(limits: SteadyLimits | null): Record<keyof SteadyLimitFields, number | null> {
+  const fields = steadyLimitFields(limits ?? steadyLimits());
+  const initial = steadyLimitFields(steadyLimits());
+  const keys = Object.keys(fields) as (keyof SteadyLimitFields)[];
+  return Object.fromEntries(
+    keys.map((key) => [key, limits === null || fields[key] === initial[key] ? null : fields[key]]),
+  ) as Record<keyof SteadyLimitFields, number | null>;
 }
 
 function useReadiness(projectId: string): { readiness: Readiness | null; error: string; refresh: () => void } {
@@ -252,16 +269,16 @@ export function HandOffDialog({
   const [notes, setNotes] = useState('');
   const [musicTrackId, setMusicTrackId] = useState<string>(project.music.length === 1 ? project.music[0]!.id : '');
   const [target, setTarget] = useState('');
-  const [movement, setMovement] = useState('');
+  const [useLimits, setUseLimits] = useState(true);
+  const [limits] = useSteadyLimits();
   const [maxClips, setMaxClips] = useState('');
   const [pending, setPending] = useState(false);
   const [queueError, setQueueError] = useState('');
   const submission = useRef(false);
   const { readiness, error: readinessError, refresh } = useReadiness(project.id);
   const targetSeconds = optionalNumber(target, 1, 86_400);
-  const allowedMovement = optionalNumber(movement, 0.5, 6);
   const clips = optionalNumber(maxClips, 1, 1000, true);
-  const invalid = targetSeconds.error !== '' || allowedMovement.error !== '' || clips.error !== '';
+  const invalid = targetSeconds.error !== '' || clips.error !== '';
   const submitting = busy || pending;
 
   const queueJobs = async (run: () => Promise<{ job: MediaJob }[]>): Promise<void> => {
@@ -285,7 +302,7 @@ export function HandOffDialog({
         notes: notes.trim(),
         musicTrackId: musicTrackId || null,
         targetSeconds: targetSeconds.value,
-        allowedMovement: allowedMovement.value,
+        ...briefLimits(useLimits ? limits : null),
         maxClips: clips.value,
       });
       if (ok) onClose();
@@ -390,8 +407,19 @@ export function HandOffDialog({
           </select>
         </div>
         {field('target', 'Target length (s)', target, setTarget, targetSeconds.error, 'Music', 'any')}
-        {field('movement', 'Allowed movement', movement, setMovement, allowedMovement.error, '2', '0.1')}
         {field('clips', 'Most clips', maxClips, setMaxClips, clips.error, 'Any', '1')}
+        <div className="hand-off-check">
+          <input
+            id={`${id}-limits`}
+            type="checkbox"
+            checked={useLimits}
+            disabled={submitting}
+            aria-describedby={`${id}-limits-text`}
+            onChange={(event) => setUseLimits(event.target.checked)}
+          />
+          <label htmlFor={`${id}-limits`}>Steady ranges as in Source preview</label>
+          <small id={`${id}-limits-text`}>{steadyLimitsText(useLimits ? limits : steadyLimits())}</small>
+        </div>
       </div>
       <section className="hand-off-readiness" aria-labelledby={`${id}-ready`}>
         <h3 id={`${id}-ready`}>What the assistant can use</h3>

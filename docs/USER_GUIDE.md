@@ -183,8 +183,8 @@ clips. Plus/double-click target the selected video track; a drop targets the tra
 After a drone recording is prepared, a background job measures its camera motion
 (Activity shows it after the other jobs, so every proxy of an import comes first). Lanes directly under the
 source range strip share its playhead and hatching: the first shows jolts (amber area:
-sudden angle or speed changes), camera movement (white line) and the dashed allowed
-movement limits (drag them); the green bands mark steady ranges, the suggested one strongest.
+sudden angle or speed changes), camera movement (white line) and their dashed limits
+(drag them); the green bands mark steady ranges, the suggested one strongest.
 Stretches where the camera does not move at all, such as a hover, are left out.
 Hover to read the values at that moment; click or drag to scrub. Below the IN/OUT
 fields, **Camera motion** gives the **Best steady range**, what it shows, its length and IN–OUT, and **Use best**
@@ -196,10 +196,11 @@ Undo step; neither adds clips: use the **Kept ranges** list for that.
 To sort a batch, select the recordings in Media and choose **Use best** in the selection bar:
 each keeps only its best steady range, in one Undo step. It first asks before replacing kept
 ranges you already set, and names the recordings it skipped, such as those not analyzed yet.
-Move the **Allowed movement** maximum left for only very steady footage, right to accept more
-movement; raise its minimum to keep only lively footage. **Flight speed** keeps only footage
-flown between its two speeds (at 20 m/s the maximum has no limit), for example only fast passes;
-dragging a dashed line in the jolts lane moves the allowed movement too. **Flight data** adds or removes lanes: flight and
+Move **Maximum jolts** left for only very steady footage, right to accept more abrupt
+changes. Raise the **Movement** minimum to leave out static footage (a slow pan moves about 1–3 %
+of the picture's width per second), or lower its maximum to leave out whip pans. **Flight speed**
+keeps only footage flown between its two speeds (at 20 m/s the maximum has no limit), for example
+only fast passes. **Hand off** gives the assistant these limits too. **Flight data** adds or removes lanes: flight and
 vertical speed, height, distance from home, ISO, shutter speed, exposure bias and digital
 zoom, for example to spot a climb or an exposure jump. The chevron hides the lanes and
 controls, keeping the suggestion. Recordings prepared earlier offer **Analyze camera

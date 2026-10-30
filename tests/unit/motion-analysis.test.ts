@@ -9,8 +9,11 @@ import {
   MOTION_WIDTH,
   motionAnalysisSchema,
   motionProfile,
+  MOVEMENT_RANGE,
   smoothRanges,
   steadyLimits,
+  steadyLimitsError,
+  steadyLimitsFrom,
   STILL_SPEED,
   telemetryAt,
   type MotionAnalysis,
@@ -262,18 +265,29 @@ describe('smooth ranges', () => {
     expect(smoothRanges(profile, steadyLimits(4), FPS)[0]).toEqual({ sourceIn: 0, sourceOut: 600 });
   });
 
-  it('keeps only frames whose jolts reach the minimum of the allowed movement', () => {
-    const roughness = Array.from({ length: 600 }, (_, frame) => (frame < 300 ? 0.5 : 1.5));
+  it('keeps only frames whose picture movement is within the movement range, open above its top', () => {
+    // A slow drift for 10 s (not a still hover), then a pan, then a whip pan.
+    const speed = Array.from({ length: 900 }, (_, frame) => {
+      if (frame < 300) return 0.6;
+      return frame < 600 ? 3 : 12;
+    });
     const profile = measured(
-      roughness,
-      roughness.map(() => 3),
+      speed.map(() => 0),
+      speed,
     );
-    expect(smoothRanges(profile, { ...steadyLimits(2), movement: [1, 2] }, FPS)).toEqual([
-      { sourceIn: 306, sourceOut: 600 },
-    ]);
-    expect(smoothRanges(profile, { ...steadyLimits(2), movement: [0, 1] }, FPS)).toEqual([
-      { sourceIn: 0, sourceOut: 294 },
-    ]);
+    const movement = (low: number, high: number) => ({ ...steadyLimits(2), movement: [low, high] as const });
+    expect(smoothRanges(profile, movement(1, MOVEMENT_RANGE.max), FPS)).toEqual([{ sourceIn: 306, sourceOut: 900 }]);
+    expect(smoothRanges(profile, movement(1, 5), FPS)).toEqual([{ sourceIn: 306, sourceOut: 594 }]);
+    expect(smoothRanges(profile, movement(0, 1), FPS)).toEqual([{ sourceIn: 0, sourceOut: 294 }]);
+  });
+
+  it('takes each limit from the first source that sets it, and refuses a minimum above its maximum', () => {
+    const limits = steadyLimitsFrom({ minMovement: 1, maxJolts: null }, { maxJolts: 3, minMovement: 2 });
+    expect(limits).toEqual({ maxJolts: 3, movement: [1, MOVEMENT_RANGE.max], flightSpeed: [0, 20] });
+    expect(steadyLimitsError(limits)).toBeNull();
+    expect(steadyLimitsError(steadyLimitsFrom({ minFlightSpeed: 8, maxFlightSpeed: 5 }))).toBe(
+      'The minimum flight speed, 8, must be less than the maximum, 5.',
+    );
   });
 
   it('keeps only frames flown within the flight speed range, judging none where the drone recorded no speed', () => {

@@ -6,11 +6,11 @@ export const MOTION_WIDTH = 320;
 export const MOTION_HEIGHT = 180;
 export const MOTION_ANALYSIS_VERSION = 3;
 
-/** Image tolerance (% of image width per s²): lower suggests only steadier footage. */
-export const SMOOTH_TOLERANCE = { min: 0.5, max: 6, step: 0.1, initial: 2 } as const;
-/** Source preview's Allowed movement: the jolts a steady frame may have, from its low end up to its high end. */
-export const MOVEMENT_RANGE = { min: 0, max: SMOOTH_TOLERANCE.max, step: 0.1 } as const;
-/** Source preview's Flight speed in m/s, both ends included; the high end at `max` is open. */
+/** Jolts (% of image width per s²) every steady frame stays below: lower suggests only steadier footage. */
+export const MAX_JOLTS = { min: 0.5, max: 6, step: 0.1, initial: 2 } as const;
+/** Picture movement in % of image width per s, both ends included; the high end at `max` is open. */
+export const MOVEMENT_RANGE = { min: 0, max: 10, step: 0.1 } as const;
+/** Horizontal flight speed in m/s, both ends included; the high end at `max` is open. */
 export const FLIGHT_SPEED_RANGE = { min: 0, max: 20, step: 0.5 } as const;
 const SMOOTH_GAP_SECONDS = 0.5;
 export const SMOOTH_MIN_SECONDS = 2;
@@ -77,18 +77,66 @@ export interface SmoothRange {
 
 export type Bounds = readonly [low: number, high: number];
 
-/** What a steady frame may show: jolts within `movement` and, where the drone recorded it, flight speed within `flightSpeed`. */
+/**
+ * What every frame of a steady range shows: jolts below `maxJolts`, picture movement within
+ * `movement` and, where the drone recorded it, flight speed within `flightSpeed`.
+ */
 export interface SteadyLimits {
+  maxJolts: number;
   movement: Bounds;
   flightSpeed: Bounds;
 }
 
-/** Jolts below `allowedMovement`, at any flight speed. */
-export function steadyLimits(allowedMovement: number = SMOOTH_TOLERANCE.initial): SteadyLimits {
+/** Jolts below `maxJolts`, at any movement and flight speed. */
+export function steadyLimits(maxJolts: number = MAX_JOLTS.initial): SteadyLimits {
   return {
-    movement: [MOVEMENT_RANGE.min, allowedMovement],
+    maxJolts,
+    movement: [MOVEMENT_RANGE.min, MOVEMENT_RANGE.max],
     flightSpeed: [FLIGHT_SPEED_RANGE.min, FLIGHT_SPEED_RANGE.max],
   };
+}
+
+/** The limits as flat fields, as the assistant reads and sets them. */
+export interface SteadyLimitFields {
+  maxJolts: number;
+  minMovement: number;
+  maxMovement: number;
+  minFlightSpeed: number;
+  maxFlightSpeed: number;
+}
+
+export function steadyLimitFields({ maxJolts, movement, flightSpeed }: SteadyLimits): SteadyLimitFields {
+  return {
+    maxJolts,
+    minMovement: movement[0],
+    maxMovement: movement[1],
+    minFlightSpeed: flightSpeed[0],
+    maxFlightSpeed: flightSpeed[1],
+  };
+}
+
+/** Some limit fields; null or absent leaves a field to the next source. */
+export type SteadyLimitSource = { [K in keyof SteadyLimitFields]?: number | null | undefined };
+
+/** Each field from the first source that sets it, else its default. */
+export function steadyLimitsFrom(...sources: readonly SteadyLimitSource[]): SteadyLimits {
+  const fields = steadyLimitFields(steadyLimits());
+  const pick = <K extends keyof SteadyLimitFields>(key: K): number =>
+    sources.map((source) => source[key]).find((value) => value !== undefined && value !== null) ?? fields[key];
+  return {
+    maxJolts: pick('maxJolts'),
+    movement: [pick('minMovement'), pick('maxMovement')],
+    flightSpeed: [pick('minFlightSpeed'), pick('maxFlightSpeed')],
+  };
+}
+
+/** Why a minimum does not stay below its maximum, or null. */
+export function steadyLimitsError({ movement, flightSpeed }: SteadyLimits): string | null {
+  if (movement[0] >= movement[1])
+    return `The minimum movement, ${movement[0]}, must be less than the maximum, ${movement[1]}.`;
+  if (flightSpeed[0] >= flightSpeed[1])
+    return `The minimum flight speed, ${flightSpeed[0]}, must be less than the maximum, ${flightSpeed[1]}.`;
+  return null;
 }
 
 function telemetryBetween(
@@ -200,18 +248,21 @@ export function motionProfile(analysis: MotionAnalysis, fps: number): MotionProf
   };
 }
 
-function withinFlightSpeed(speed: number | null, [low, high]: Bounds): boolean {
-  // Frames without a recorded speed are not judged by it.
-  if (speed === null) return true;
-  return speed >= low && (high >= FLIGHT_SPEED_RANGE.max || speed <= high);
+/** Within both ends, or above the low one when the high one is the slider's open top. */
+function within(value: number, [low, high]: Bounds, open: number): boolean {
+  return value >= low && (high >= open || value <= high);
 }
 
 function steadyMask(profile: MotionProfile, limits: SteadyLimits, gap: number): boolean[] {
-  const [low, high] = limits.movement;
-  const steady = profile.roughness.map(
-    (value, frame) =>
-      value >= low && value < high && withinFlightSpeed(profile.flightSpeed[frame] ?? null, limits.flightSpeed),
-  );
+  const steady = profile.roughness.map((jolts, frame) => {
+    // Frames without a recorded flight speed are not judged by it.
+    const flightSpeed = profile.flightSpeed[frame] ?? null;
+    return (
+      jolts < limits.maxJolts &&
+      within(profile.speed[frame]!, limits.movement, MOVEMENT_RANGE.max) &&
+      (flightSpeed === null || within(flightSpeed, limits.flightSpeed, FLIGHT_SPEED_RANGE.max))
+    );
+  });
   // Short jolts between steady stretches do not split a flight.
   let start = 0;
   while (start < steady.length) {

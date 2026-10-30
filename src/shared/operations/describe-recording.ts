@@ -1,6 +1,6 @@
 import { z } from 'zod';
+import { steadyLimitShape } from '../assistant-session.js';
 import { described } from '../described.js';
-import { SMOOTH_TOLERANCE } from '../motion-analysis.js';
 import { frameSchema, idSchema } from '../model.js';
 import { SHOT_KINDS, SHOT_SCORE_SECONDS, SHOT_WEIGHTS } from '../recording-shots.js';
 import { imageSchema } from './pictures.js';
@@ -13,14 +13,14 @@ const meters = (text: string) => described(z.number().nullable(), `${text}; null
 
 export const describeRecording = defineOperation({
   name: 'describe_recording',
-  description: `Map where a video recording is usable and how its camera moves, measured from its camera motion analysis and the drone's flight data, inside the ranges the user kept: its steady ranges in source order with their length, picture movement (${speed}), roughness, a camera move name (static, pan, tilt, push in, pull out, rotate; a sideways flight looks like a pan), what they show (orbit, reveal, move, approach, static), their rank (1 = the best, as Source preview suggests it) and mean flight data, plus damaged frames and how much of it hovers still. It never says what the footage shows: with sheet true, it also returns a contact sheet with the middle frame of each steady range (the best-ranked ones when they do not all fit), for you to judge. To compare several recordings, compare_recordings shows them in one picture; recording_sheet shows any other frames.`,
+  description: `Map where a video recording is usable and how its camera moves, measured from its camera motion analysis and the drone's flight data, inside the ranges the user kept: its steady ranges in source order with their length, picture movement (${speed}), jolts, a camera move name (static, pan, tilt, push in, pull out, rotate; a sideways flight looks like a pan), what they show (orbit, reveal, move, approach, static), their rank (1 = the best, as Source preview suggests it) and mean flight data, plus damaged frames and how much of it hovers still. It never says what the footage shows: with sheet true, it also returns a contact sheet with the middle frame of each steady range (the best-ranked ones when they do not all fit), for you to judge. To compare several recordings, compare_recordings shows them in one picture; recording_sheet shows any other frames.`,
   input: z
     .object({
       projectId: described(idSchema, 'ID of the saved project, whose kept ranges and session brief apply.'),
       mediaId: described(idSchema, 'ID of a video recording in the project, from describe_project.'),
-      allowedMovement: described(
-        z.number().min(SMOOTH_TOLERANCE.min).max(SMOOTH_TOLERANCE.max).optional(),
-        `How much the movement may change in a steady range (${SMOOTH_TOLERANCE.min}–${SMOOTH_TOLERANCE.max}, lower is steadier), the maximum of Source preview's Allowed movement, with no minimum or flight speed limit; defaults to the session brief's, else ${SMOOTH_TOLERANCE.initial}.`,
+      ...steadyLimitShape(
+        (field) => field.optional(),
+        (initial) => `defaults to the session brief's, else ${initial}`,
       ),
       sheet: described(
         z.boolean().default(false),
@@ -48,7 +48,10 @@ export const describeRecording = defineOperation({
         z.array(sourceRange).nullable(),
         'The source ranges the user kept; null when the whole recording is available.',
       ),
-      allowedMovement: z.number(),
+      limits: described(
+        z.object(steadyLimitShape((field) => field)).strict(),
+        'The steady-range limits applied: the request, else the session brief, else the defaults.',
+      ),
       motionAnalyzed: described(
         z.boolean(),
         'False when the camera motion has not been analyzed yet: there are then no steady ranges to report; ask the user to analyze it.',
@@ -63,9 +66,9 @@ export const describeRecording = defineOperation({
             seconds: z.number(),
             speed: described(z.number(), `Mean picture movement, ${speed}.`),
             peakSpeed: described(z.number(), `Highest picture movement, ${speed}.`),
-            roughness: described(
+            jolts: described(
               z.number(),
-              'Mean change of that movement, % of the image width per s²; the allowed movement bounds it.',
+              'Mean jolts: how fast that movement changes, % of the image width per s²; maxJolts bounds every frame.',
             ),
             motion: described(
               z.string(),

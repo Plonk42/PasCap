@@ -62,7 +62,17 @@ function session(edits: number): MemorySession {
       startedAt: '2026-10-21T10:00:00.000Z',
       startedBy: 'assistant',
       lastActivityAt: '2026-10-21T10:01:00.000Z',
-      brief: { notes: 'A calm cut', musicTrackId: null, targetSeconds: null, allowedMovement: null, maxClips: null },
+      brief: {
+        notes: 'A calm cut',
+        musicTrackId: null,
+        targetSeconds: null,
+        maxJolts: null,
+        minMovement: null,
+        maxMovement: null,
+        minFlightSpeed: null,
+        maxFlightSpeed: null,
+        maxClips: null,
+      },
       checkpointId: '2026-10-21T10-00-00-000Z-abcdef',
       edits: Array.from({ length: edits }, (_, index) => ({
         revision: index + 2,
@@ -229,6 +239,12 @@ test('hands off with a brief after showing what the assistant can use, then open
       },
     });
   });
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'pascap-steady-range-limits',
+      JSON.stringify({ maxJolts: 3, movement: [1, 10], flightSpeed: [0, 20] }),
+    ),
+  );
   await page.goto(`/?project=${PROJECT_ID}`);
   await ready(page);
   await page.getByRole('button', { name: 'Hand off to an assistant' }).click();
@@ -251,11 +267,20 @@ test('hands off with a brief after showing what the assistant can use, then open
 
   await dialog.getByLabel('What should it make?').fill('A calm cut of the lake');
   await dialog.getByLabel('Target length (s)').fill('30');
-  await dialog.getByLabel('Allowed movement').fill('9');
-  await expect(dialog.getByText('Enter a number from 0.5 to 6.')).toBeVisible();
+  await dialog.getByLabel('Most clips').fill('0.5');
+  await expect(dialog.getByText('Enter a whole number from 1 to 1000.')).toBeVisible();
   const confirm = dialog.getByRole('button', { name: 'Hand off', exact: true });
   await expect(confirm).toBeDisabled();
-  await dialog.getByLabel('Allowed movement').fill('3');
+  await dialog.getByLabel('Most clips').fill('');
+  // Source preview's steady-range limits go with the brief, those left at their default as null.
+  const limits = dialog.getByRole('checkbox', { name: 'Steady ranges as in Source preview' });
+  await expect(limits).toBeChecked();
+  await expect(dialog.getByText('Jolts below 3 · movement from 1 %/s · any flight speed')).toBeVisible();
+  // Unchecked, the summary shows the defaults the assistant would use instead.
+  await limits.uncheck();
+  await expect(dialog.getByText('Jolts below 2 · any movement · any flight speed')).toBeVisible();
+  await limits.check();
+  await expect(dialog.getByText('Jolts below 3 · movement from 1 %/s · any flight speed')).toBeVisible();
   await confirm.click();
   await expect(dialog).toHaveCount(0);
   await expect(page.locator('.assistant-banner.editing')).toBeVisible();
@@ -264,7 +289,11 @@ test('hands off with a brief after showing what the assistant can use, then open
     notes: 'A calm cut of the lake',
     musicTrackId: null,
     targetSeconds: 30,
-    allowedMovement: 3,
+    maxJolts: 3,
+    minMovement: 1,
+    maxMovement: null,
+    minFlightSpeed: null,
+    maxFlightSpeed: null,
     maxClips: null,
   });
 

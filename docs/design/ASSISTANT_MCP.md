@@ -158,10 +158,12 @@ checks run inside the project store's write queue, so no save interleaves with a
 restore.
 
 The **brief** is what the user tells the assistant, in the chat or later in the Hand off
-dialog: notes (≤ 2,000 characters), music track, target length in seconds, allowed camera
-movement (0.5–6) and the maximum number of clips, all optional. It carries no permissions:
-the assistant may use every operation. It is stored and returned, never interpreted by the
-service.
+dialog: notes (≤ 2,000 characters), music track, target length in seconds, the steady-range
+limits of Source preview (`maxJolts`, `minMovement`, `maxMovement`, `minFlightSpeed`,
+`maxFlightSpeed`) and the maximum number of clips, all optional. It carries no permissions:
+the assistant may use every operation. The service applies its limits to `describe_recording` and
+`compare_recordings` and otherwise only stores and returns it. A session saved before the
+limits were named keeps its `allowedMovement` as `maxJolts`.
 
 ### Music analysis cache
 
@@ -309,14 +311,18 @@ Read; for editor and assistant. Read every appearance value of one video track: 
 
 #### `describe_recording`
 
-Read; for editor and assistant. Map where a video recording is usable and how its camera moves, measured from its camera motion analysis and the drone's flight data, inside the ranges the user kept: its steady ranges in source order with their length, picture movement (% of the image width per second), roughness, a camera move name (static, pan, tilt, push in, pull out, rotate; a sideways flight looks like a pan), what they show (orbit, reveal, move, approach, static), their rank (1 = the best, as Source preview suggests it) and mean flight data, plus damaged frames and how much of it hovers still. It never says what the footage shows: with sheet true, it also returns a contact sheet with the middle frame of each steady range (the best-ranked ones when they do not all fit), for you to judge. To compare several recordings, compare_recordings shows them in one picture; recording_sheet shows any other frames.
+Read; for editor and assistant. Map where a video recording is usable and how its camera moves, measured from its camera motion analysis and the drone's flight data, inside the ranges the user kept: its steady ranges in source order with their length, picture movement (% of the image width per second), jolts, a camera move name (static, pan, tilt, push in, pull out, rotate; a sideways flight looks like a pan), what they show (orbit, reveal, move, approach, static), their rank (1 = the best, as Source preview suggests it) and mean flight data, plus damaged frames and how much of it hovers still. It never says what the footage shows: with sheet true, it also returns a contact sheet with the middle frame of each steady range (the best-ranked ones when they do not all fit), for you to judge. To compare several recordings, compare_recordings shows them in one picture; recording_sheet shows any other frames.
 
-| Input             | Type    | Description                                                                                                                                                                                                      |
-| ----------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `projectId`       | string  | ID of the saved project, whose kept ranges and session brief apply.                                                                                                                                              |
-| `mediaId`         | string  | ID of a video recording in the project, from describe_project.                                                                                                                                                   |
-| `allowedMovement` | number  | How much the movement may change in a steady range (0.5–6, lower is steadier), the maximum of Source preview's Allowed movement, with no minimum or flight speed limit; defaults to the session brief's, else 2. |
-| `sheet`           | boolean | True adds a contact sheet of the middle frames of the steady ranges.                                                                                                                                             |
+| Input            | Type    | Description                                                                                                                                                                             |
+| ---------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId`      | string  | ID of the saved project, whose kept ranges and session brief apply.                                                                                                                     |
+| `mediaId`        | string  | ID of a video recording in the project, from describe_project.                                                                                                                          |
+| `maxJolts`       | number  | Jolts (how fast the camera movement changes, % of the image width per s²) every frame of a steady range stays below, 0.5–6: lower is steadier; defaults to the session brief's, else 2. |
+| `minMovement`    | number  | Least picture movement of every frame of a steady range, % of the image width per second, 0–10: raise it to leave out static footage; defaults to the session brief's, else 0.          |
+| `maxMovement`    | number  | Most picture movement of every frame of a steady range, % of the image width per second; 10 has no limit; defaults to the session brief's, else 10.                                     |
+| `minFlightSpeed` | number  | Least horizontal flight speed of every frame of a steady range, m/s, 0–20; frames without recorded speed are not judged by it; defaults to the session brief's, else 0.                 |
+| `maxFlightSpeed` | number  | Most horizontal flight speed of every frame of a steady range, m/s; 20 has no limit; defaults to the session brief's, else 20.                                                          |
+| `sheet`          | boolean | True adds a contact sheet of the middle frames of the steady ranges.                                                                                                                    |
 
 #### `music_analysis`
 
@@ -483,7 +489,7 @@ Read; for editor and assistant. Render source frames of one video recording's ed
 
 #### `compare_recordings`
 
-Read; for assistant. Show candidate shots from several video recordings in one contact sheet, without any grade or Transform, to pick the best of similar takes before placing it. Each candidate takes `frames` cells in a row, spread across its range (frames 1 lays the candidates out row by row). A candidate without a range shows its recording's best steady range (rank 1) inside the kept ranges at the session's allowed movement, as describe_recording lists them, else its first kept range or the whole recording. The number of cells is limited by the service's image budget.
+Read; for assistant. Show candidate shots from several video recordings in one contact sheet, without any grade or Transform, to pick the best of similar takes before placing it. Each candidate takes `frames` cells in a row, spread across its range (frames 1 lays the candidates out row by row). A candidate without a range shows its recording's best steady range (rank 1) inside the kept ranges within the session's steady-range limits, as describe_recording lists them, else its first kept range or the whole recording. The number of cells is limited by the service's image budget.
 
 | Input        | Type            | Description                                                                                                                                  |
 | ------------ | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -578,7 +584,7 @@ registry; the assistant never sees them.
 | `preview_edits`      | both      | Dry run of a batch against the saved revision: resulting timeline summary and errors, no save                                                                                                                                                                                                                                                                                           |                                                                                        |
 | `describe_project`   | both      | Compact timeline: tracks with their Transform Opacity and keyframe count, clips with timecodes and grade summaries, transitions, adjustments with what they change, music, recordings with their kept ranges, bookmarks                                                                                                                                                                 |                                                                                        |
 | `describe_track`     | both      | One video track's Transform (Opacity included) and keyframes, what each clip's grade changes with the adjustments over it, its keyed settings, the clip grade and adjustment keyframes on request and the values that apply at requested frames, with the adjustment there ([#252](https://github.com/Plonk42/PasCap/issues/252), [#288](https://github.com/Plonk42/PasCap/issues/288)) | ≤ 32 frames                                                                            |
-| `describe_recording` | both      | Shot descriptors (below) inside the selects, flight data, damage, `allowedMovement`, an opt-in sheet (`sheet: true`) of each steady range's middle frame ([#239](https://github.com/Plonk42/PasCap/issues/239))                                                                                                                                                                         | Computed on request, no cache                                                          |
+| `describe_recording` | both      | Shot descriptors (below) inside the selects, flight data, damage, the steady-range limits applied, an opt-in sheet (`sheet: true`) of each steady range's middle frame ([#239](https://github.com/Plonk42/PasCap/issues/239))                                                                                                                                                           | Computed on request, no cache                                                          |
 | `still`              | both      | One composed project frame from the proxies (`frame`, `width`, `crop?`, `commands?` for a candidate), JPEG ([#238](https://github.com/Plonk42/PasCap/issues/238))                                                                                                                                                                                                                       | Serial, two waiting; refused (409) while an export or reference job runs; image budget |
 | `timeline_sheet`     | both      | Contact sheet of project frames (`frames[]`, `commands?`), JPEG plus legend                                                                                                                                                                                                                                                                                                             | Same as still                                                                          |
 | `recording_sheet`    | both      | Contact sheet of a recording's proxy frames (`mediaId`, `frames[]`), ungraded, JPEG plus legend                                                                                                                                                                                                                                                                                         | Same as still                                                                          |
@@ -656,10 +662,12 @@ Implemented ([#239](https://github.com/Plonk42/PasCap/issues/239),
 moves; the model judges what it shows from pictures. From the cached motion analysis and
 flight data, without decoding:
 
-- the steady ranges at the allowed movement (the request's, else the active session brief's,
-  else 2), as Source preview finds them (`smoothRanges`, damaged frames excluded), cut to the
+- the steady ranges within the limits Source preview sets (`maxJolts`, `minMovement`, `maxMovement`,
+  `minFlightSpeed`, `maxFlightSpeed`, each from the request, else the active session brief, else
+  its default: 2, 0, 10, 0 and 20, the maxima at their top having no limit; a minimum not below its
+  maximum is refused), as Source preview finds them (`smoothRanges`, damaged frames excluded), cut to the
   project's kept ranges (pieces under 2 s dropped), in source order; each with its length,
-  mean and peak picture movement (% of image width per second), mean roughness, a camera move
+  mean and peak picture movement (% of image width per second), mean jolts, a camera move
   name and mean flight data (height, horizontal and vertical speed, distance from home);
 - the camera move is arithmetic on the mean `tx`/`ty`/`zoom`/`rotation` of the range, read as
   the move that would cause it: content moving right is a pan left, down a tilt up, growing a
@@ -685,7 +693,7 @@ model sees the pictures. A recording without motion analysis returns no ranges a
 Flights often hold several near-identical takes of one subject, of which the user keeps only
 the best. `compare_recordings` shows candidates from several recordings in one ungraded
 sheet: each candidate is a recording and a source range (by default its best steady range
-inside the kept ranges at the session's allowed movement, else its first kept range or the
+inside the kept ranges within the session's steady-range limits, else its first kept range or the
 whole recording), shown in 1–4 cells at the centers of equal parts of the range, one row per
 candidate when there are several cells. Its legend gives each candidate's cells, range, length
 and frames. Like the other sheets it is limited by the image budget's cells per sheet
@@ -943,8 +951,9 @@ Follow mode, Take over, restore and the Hand off dialog are implemented
   log** disclosure lists the session's batches, each with a timecode button seeking to the frame
   it changed. The summary is dismissed with ×.
 - **Hand off** (header, beside Export; [HandOff.tsx](../../src/web/HandOff.tsx)) opens a
-  dialog with the brief's fields (notes, a placed music track or Any, target length, allowed
-  movement, most clips) and **What the assistant can use**, from `hand_off_readiness`
+  dialog with the brief's fields (notes, a placed music track or Any, target length, most clips,
+  and **Steady ranges as in Source preview**, which sends the limits set there that differ from
+  their defaults) and **What the assistant can use**, from `hand_off_readiness`
   (editor only): bin recordings prepared, their camera motion analyzed, music prepared and
   analyzed, a running export. Missing jobs are queued from the dialog (**Prepare N**,
   **Analyze N**) and the list refreshes every 2 s while they run; none of it blocks the

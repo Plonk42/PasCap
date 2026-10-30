@@ -29,10 +29,22 @@ function describeBrief(brief: Brief): string {
     brief.notes && `notes “${brief.notes}”`,
     brief.musicTrackId && `music track ${brief.musicTrackId}`,
     brief.targetSeconds !== null && `target length ${brief.targetSeconds} s`,
-    brief.allowedMovement !== null && `allowed movement ${brief.allowedMovement}`,
+    brief.maxJolts !== null && `jolts below ${brief.maxJolts}`,
+    brief.minMovement !== null && `movement at least ${brief.minMovement} %/s`,
+    brief.maxMovement !== null && `movement at most ${brief.maxMovement} %/s`,
+    brief.minFlightSpeed !== null && `flight speed at least ${brief.minFlightSpeed} m/s`,
+    brief.maxFlightSpeed !== null && `flight speed at most ${brief.maxFlightSpeed} m/s`,
     brief.maxClips !== null && `at most ${brief.maxClips} clips`,
   ].filter((part): part is string => typeof part === 'string' && part !== '');
   return parts.length ? `Brief: ${parts.join('; ')}.` : 'The brief is empty.';
+}
+
+/** A brief saved before maxJolts was named so called it allowedMovement. */
+function upgradeBrief(saved: Record<string, unknown>): Record<string, unknown> {
+  const brief = saved.brief;
+  if (typeof brief !== 'object' || brief === null || !('allowedMovement' in brief)) return saved;
+  const { allowedMovement, ...rest } = brief as Record<string, unknown>;
+  return { ...saved, brief: { ...rest, maxJolts: allowedMovement } };
 }
 
 /** Why a session cannot start beside the active one, and what an assistant can do instead. */
@@ -81,7 +93,7 @@ export class AssistantSessions {
         throw new ServiceError('A session must be a regular file.', 500);
       // A picture count briefly kept on the mcp branch (#243) means nothing now.
       const { pictures: _pictures, ...saved } = JSON.parse(await readFile(filename, 'utf8')) as Record<string, unknown>;
-      return sessionSchema.parse(saved);
+      return sessionSchema.parse(upgradeBrief(saved));
     } catch (error) {
       if (isNotFound(error)) return null;
       throw error;

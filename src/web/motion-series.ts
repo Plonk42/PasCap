@@ -1,4 +1,5 @@
 import {
+  MOVEMENT_RANGE,
   telemetryAt,
   type MotionProfile,
   type TelemetryField,
@@ -82,7 +83,7 @@ export const SERIES: readonly SeriesSpec[] = [
 
 export const DEFAULT_SERIES: readonly SeriesKey[] = ['horizontalSpeed'];
 /** % of image width per second at the top of the image lane, so recordings compare at a glance. */
-export const CAMERA_MOTION_MAX = 10;
+export const CAMERA_MOTION_MAX = MOVEMENT_RANGE.max;
 /** At most this many points per line, whatever the recording's length. */
 const CHART_POINTS = 600;
 

@@ -151,7 +151,7 @@ const candidateSchema = z
 export const compareRecordings = defineOperation({
   name: 'compare_recordings',
   description:
-    "Show candidate shots from several video recordings in one contact sheet, without any grade or Transform, to pick the best of similar takes before placing it. Each candidate takes `frames` cells in a row, spread across its range (frames 1 lays the candidates out row by row). A candidate without a range shows its recording's best steady range (rank 1) inside the kept ranges at the session's allowed movement, as describe_recording lists them, else its first kept range or the whole recording. The number of cells is limited by the service's image budget.",
+    "Show candidate shots from several video recordings in one contact sheet, without any grade or Transform, to pick the best of similar takes before placing it. Each candidate takes `frames` cells in a row, spread across its range (frames 1 lays the candidates out row by row). A candidate without a range shows its recording's best steady range (rank 1) inside the kept ranges within the session's steady-range limits, as describe_recording lists them, else its first kept range or the whole recording. The number of cells is limited by the service's image budget.",
   input: z
     .object({
       projectId,

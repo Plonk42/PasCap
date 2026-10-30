@@ -5,10 +5,10 @@ import { applyCommand } from '../../src/shared/commands.js';
 import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
 import {
   FLIGHT_SPEED_RANGE,
+  MAX_JOLTS,
   MOTION_ANALYSIS_VERSION,
   motionProfile,
   MOVEMENT_RANGE,
-  SMOOTH_TOLERANCE,
   smoothRanges,
   steadyLimits,
   type MotionAnalysis,
@@ -2076,17 +2076,17 @@ function jerkyThenSteady(asset: MediaAsset): MotionAnalysis {
   };
 }
 
-test('the motion timeline shows jolts, allowed movement and the best steady range; Use applies it as IN/OUT', async ({
+test('the motion timeline shows jolts, their maximum and the best steady range; Use applies it as IN/OUT', async ({
   page,
 }) => {
   const asset = assets[0]!;
   const fps = 30000 / 1001;
   const analysis = jerkyThenSteady(asset);
   const profile = motionProfile(analysis, fps);
-  const best = (tolerance: number) =>
-    rankedSmoothRanges(analysis, smoothRanges(profile, steadyLimits(tolerance), fps), fps)[0]!;
-  const steady = best(SMOOTH_TOLERANCE.initial);
-  const tolerant = best(SMOOTH_TOLERANCE.max);
+  const best = (maxJolts: number) =>
+    rankedSmoothRanges(analysis, smoothRanges(profile, steadyLimits(maxJolts), fps), fps)[0]!;
+  const steady = best(MAX_JOLTS.initial);
+  const tolerant = best(MAX_JOLTS.max);
   const seconds = (part: { sourceIn: number; sourceOut: number }): string =>
     `${((part.sourceOut - part.sourceIn) / fps).toFixed(2)} s`;
   expect(steady.sourceIn).toBeGreaterThan(20);
@@ -2107,8 +2107,9 @@ test('the motion timeline shows jolts, allowed movement and the best steady rang
   const band = imageLane.locator('.source-motion-band:not(.alternative)');
   await expect(band).toHaveAttribute('x', String(steady.sourceIn));
   await expect(band).toHaveAttribute('width', String(steady.sourceOut - steady.sourceIn));
-  const tolerance = timeline.locator('.source-motion-tolerance');
-  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.initial)));
+  const tolerance = timeline.locator('.source-motion-tolerance[data-line="jolts"]');
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(MAX_JOLTS.initial)));
+  await expect(timeline.locator('.source-motion-tolerance')).toHaveCount(1);
   // The lanes sit directly under the range strip, in its column, and its playhead runs through them.
   const [stripBox, timelineBox, headBox] = await Promise.all([
     page.locator('.source-range-strip').boundingBox(),
@@ -2131,18 +2132,17 @@ test('the motion timeline shows jolts, allowed movement and the best steady rang
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', String(steady.sourceIn));
   await expect(use).toBeDisabled();
   await expect(use).toHaveText('In use');
-  // Dragging the maximum's thumb previews the suggestion before release; Escape restores it.
-  const allowed = page.getByRole('slider', { name: 'Allowed movement maximum', exact: true });
+  // Dragging the slider previews the suggestion before release; Escape restores it.
+  const allowed = page.getByRole('slider', { name: 'Maximum jolts', exact: true });
   const allowedBox = (await allowed.boundingBox())!;
-  const thumbAt = 5 + (allowedBox.width - 10) * (SMOOTH_TOLERANCE.initial / MOVEMENT_RANGE.max);
-  await page.mouse.move(allowedBox.x + thumbAt, allowedBox.y + allowedBox.height / 2);
+  await page.mouse.move(allowedBox.x + allowedBox.width * 0.25, allowedBox.y + allowedBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(allowedBox.x + allowedBox.width + 20, allowedBox.y + allowedBox.height / 2, { steps: 4 });
-  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.max)));
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(MAX_JOLTS.max)));
   await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
   await page.keyboard.press('Escape');
   await page.mouse.up();
-  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.initial)));
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(MAX_JOLTS.initial)));
   await expect(row).toHaveAttribute('data-smooth-in', String(steady.sourceIn));
   // The lanes hatch the footage outside IN/OUT like the strip.
   const omitted = await timeline
@@ -2151,9 +2151,9 @@ test('the motion timeline shows jolts, allowed movement and the best steady rang
   expect(omitted[0]).toBeCloseTo((timelineBox!.width * steady.sourceIn) / 120, 0);
   expect(omitted[1]).toBeCloseTo((timelineBox!.width * (120 - steady.sourceOut)) / 120, 0);
 
-  await page.getByRole('slider', { name: 'Allowed movement maximum', exact: true }).fill(String(SMOOTH_TOLERANCE.max));
+  await page.getByRole('slider', { name: 'Maximum jolts', exact: true }).fill(String(MAX_JOLTS.max));
   await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
-  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.max)));
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(MAX_JOLTS.max)));
   await expect(use).toBeEnabled();
   await expect(strip).toHaveAttribute('data-source-in', String(steady.sourceIn));
 
@@ -2192,7 +2192,7 @@ test('the motion timeline shows jolts, allowed movement and the best steady rang
   await expect(row).toHaveAttribute('data-collapsed', 'true');
   await expect(timeline).toHaveCount(0);
   await expect(use).toHaveCount(0);
-  await expect(page.getByRole('slider', { name: 'Allowed movement maximum', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('slider', { name: 'Maximum jolts', exact: true })).toHaveCount(0);
   await expect(page.locator('summary[aria-label="Flight data lanes"]')).toHaveCount(0);
   await expect(row.locator('.smooth-panel-summary')).toContainText(seconds(tolerant));
   await page.getByRole('button', { name: 'Close source review', exact: true }).click();
@@ -2207,29 +2207,26 @@ test('the motion timeline shows jolts, allowed movement and the best steady rang
   await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
   expect(requests).toEqual(['GET']);
 
-  // A dashed line itself is a handle: dragging the maximum to the bottom asks for the steadiest footage only.
+  // The dashed line itself is a handle: dragging it to the bottom asks for the steadiest footage only.
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', /^\d+$/);
   const frameBefore = await page.locator('.source-preview').getAttribute('data-source-frame');
   const box = (await imageLane.boundingBox())!;
-  const lineAt = box.y + (lineY(SMOOTH_TOLERANCE.max) / 100) * box.height;
+  const lineAt = box.y + (lineY(MAX_JOLTS.max) / 100) * box.height;
   await page.mouse.move(box.x + box.width * 0.4, lineAt);
   await expect(timeline).toHaveAttribute('data-near-tolerance', 'true');
-  await expect(readout).toContainText('Allowed movement 0.0 – 6.0');
+  await expect(readout).toContainText('Maximum jolts 6.0');
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.4, box.y + box.height + 20, { steps: 4 });
   await page.mouse.up();
-  // It stops a step above the minimum.
-  const slider = page.getByRole('slider', { name: 'Allowed movement maximum', exact: true });
-  await expect(slider).toHaveValue(String(MOVEMENT_RANGE.step));
-  await expect(tolerance).toHaveAttribute('y1', String(lineY(MOVEMENT_RANGE.step)));
+  const slider = page.getByRole('slider', { name: 'Maximum jolts', exact: true });
+  await expect(slider).toHaveValue(String(MAX_JOLTS.min));
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(MAX_JOLTS.min)));
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', frameBefore!);
   expect(timelineOf(await current(page))).toEqual(timelineOf(before));
   await expectOnlyRangesSaved(page);
 });
 
-test('the Allowed movement minimum and the Flight speed range narrow the steady ranges, kept as preferences', async ({
-  page,
-}) => {
+test('the Movement and Flight speed ranges narrow the steady ranges, kept as preferences', async ({ page }) => {
   const asset = assets[0]!;
   const fps = 30000 / 1001;
   const analysis = jerkyThenSteady(asset);
@@ -2239,7 +2236,9 @@ test('the Allowed movement minimum and the Flight speed range narrow the steady 
   const fastLimits: SteadyLimits = { ...steadyLimits(), flightSpeed: [5.5, FLIGHT_SPEED_RANGE.max] };
   const fast = best(fastLimits)!;
   expect(fast.sourceIn).toBeGreaterThan(initial.sourceIn);
-  expect(best({ ...fastLimits, movement: [1.5, 2] })).toBeUndefined();
+  // The steady pan moves the picture about 14 % of its width per second.
+  expect(best({ ...fastLimits, movement: [1, MOVEMENT_RANGE.max] })).toEqual(fast);
+  expect(best({ ...fastLimits, movement: [1, 9] })).toBeUndefined();
   await page.route(`**/api/media/${asset.id}/motion`, (route) => route.fulfill({ json: { analysis, job: null } }));
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
   const row = page.locator('.smooth-panel');
@@ -2253,34 +2252,36 @@ test('the Allowed movement minimum and the Flight speed range narrow the steady 
   await expect(page.getByRole('spinbutton', { name: 'Flight speed minimum', exact: true })).toHaveValue('5.5');
   await expect(flightLane.locator('.source-motion-limit')).toHaveCount(1);
 
-  // An exact minimum above the maximum stays an unapplied error until Escape restores it.
-  const low = page.getByRole('spinbutton', { name: 'Allowed movement minimum', exact: true });
-  await low.fill('3');
-  await low.press('Enter');
-  await expect(row.getByRole('alert')).toContainText('Enter less than the maximum, 2.');
+  // A movement minimum draws a white dashed line in the image lane; this pan moves enough to stay.
+  const movementLine = page.locator('.source-motion-tolerance.movement');
+  await expect(movementLine).toHaveCount(0);
+  await page.getByRole('slider', { name: 'Movement minimum', exact: true }).fill('1');
+  await expect(movementLine).toHaveAttribute('data-line', 'movementLow');
   await expect(row).toHaveAttribute('data-smooth-in', String(fast.sourceIn));
-  await low.press('Escape');
-  await expect(low).toHaveValue('0');
-  await expect(row.getByRole('alert')).toHaveCount(0);
 
-  // Raising the minimum draws its own dashed line and can leave no steady range at all.
-  const tolerance = page.locator('.source-motion-tolerance');
-  await expect(tolerance).toHaveCount(1);
-  await page.getByRole('slider', { name: 'Allowed movement minimum', exact: true }).fill('1.5');
-  await expect(tolerance).toHaveCount(2);
+  // An exact minimum above the maximum stays an unapplied error until Escape restores it.
+  await page.getByRole('slider', { name: 'Movement maximum', exact: true }).fill('9');
+  await expect(movementLine).toHaveCount(2);
   await expect(row.locator('.smooth-panel-summary')).toHaveText('No steady range of 2 s or more');
   await expect(page.getByRole('button', { name: /^Use all \d+ steady ranges as kept ranges$/ })).toBeDisabled();
-  expect(await page.evaluate(() => localStorage.getItem('pascap-steady-limits'))).toBe(
-    JSON.stringify({ movement: [1.5, 2], flightSpeed: [5.5, FLIGHT_SPEED_RANGE.max] }),
+  const low = page.getByRole('spinbutton', { name: 'Movement minimum', exact: true });
+  await low.fill('9.5');
+  await low.press('Enter');
+  await expect(row.getByRole('alert')).toContainText('Enter less than the maximum, 9.');
+  await low.press('Escape');
+  await expect(low).toHaveValue('1');
+  await expect(row.getByRole('alert')).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('pascap-steady-range-limits'))).toBe(
+    JSON.stringify({ maxJolts: MAX_JOLTS.initial, movement: [1, 9], flightSpeed: [5.5, FLIGHT_SPEED_RANGE.max] }),
   );
 
   // The limits are kept when the recording is reviewed again; each Reset restores its own range.
   await page.getByRole('button', { name: 'Close source review', exact: true }).click();
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
-  await expect(page.getByRole('slider', { name: 'Allowed movement minimum', exact: true })).toHaveValue('1.5');
-  await page.getByRole('button', { name: 'Reset Allowed movement', exact: true }).click();
+  await expect(page.getByRole('slider', { name: 'Movement maximum', exact: true })).toHaveValue('9');
+  await page.getByRole('button', { name: 'Reset Movement', exact: true }).click();
   await expect(row).toHaveAttribute('data-smooth-in', String(fast.sourceIn));
-  await expect(tolerance).toHaveCount(1);
+  await expect(movementLine).toHaveCount(0);
   await page.getByRole('button', { name: 'Reset Flight speed', exact: true }).click();
   await expect(row).toHaveAttribute('data-smooth-in', String(initial.sourceIn));
   await expect(page.getByRole('button', { name: 'Reset Flight speed', exact: true })).toHaveAttribute(

@@ -60,8 +60,8 @@ export interface SteadyShot {
   /** Mean and highest movement of the picture, % of image width per second. */
   speed: number;
   peakSpeed: number;
-  /** Mean change of that movement, % of image width per s², as the allowed movement measures it. */
-  roughness: number;
+  /** Mean jolts: how fast that movement changes, % of image width per s². */
+  jolts: number;
   /** How the picture moves, named as a camera move would make it. */
   motion: string;
   kind: ShotKind;
@@ -218,7 +218,7 @@ function describeShot(
     ...range,
     speed: rounded(mean(speed)),
     peakSpeed: rounded(Math.max(...speed)),
-    roughness: rounded(mean(profile.roughness.slice(range.sourceIn, range.sourceOut))),
+    jolts: rounded(mean(profile.roughness.slice(range.sourceIn, range.sourceOut))),
     motion: cameraMotion(analysis, range.sourceIn, range.sourceOut, fps),
     kind: shotKind(analysis, range.sourceIn, range.sourceOut, fps, flight),
     flight,

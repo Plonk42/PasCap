@@ -487,7 +487,7 @@ describe('operation routes', () => {
         }),
       },
       sessions: {
-        current: async () => ({ endedAt: null, brief: { allowedMovement: 3 } }),
+        current: async () => ({ endedAt: null, brief: { maxJolts: 3, minMovement: 0.5 } }),
       },
       stills: {
         recordingSheet: async (_: string, frames: number[]) => {
@@ -499,7 +499,13 @@ describe('operation routes', () => {
     } as unknown as Parameters<typeof runners.describe_recording>[0];
     const described = await runners.describe_recording(context, { projectId: 'shots', mediaId: 'rec-1', sheet: true });
     expect(described.revision).toBe(project.revision);
-    expect(described.allowedMovement).toBe(3);
+    expect(described.limits).toEqual({
+      maxJolts: 3,
+      minMovement: 0.5,
+      maxMovement: 10,
+      minFlightSpeed: 0,
+      maxFlightSpeed: 20,
+    });
     expect(described.recording).toMatchObject({ damaged: [{ sourceIn: 100, sourceOut: 130 }], flightData: false });
     expect(described.keptRanges).toEqual([{ sourceIn: 30, sourceOut: 570 }]);
     const ranges = described.steadyRanges;
@@ -518,11 +524,18 @@ describe('operation routes', () => {
     const bare = await runners.describe_recording(context, {
       projectId: 'shots',
       mediaId: 'rec-1',
-      allowedMovement: 1,
+      maxJolts: 1,
       sheet: false,
     });
     expect(bare.image).toBeUndefined();
-    expect(bare.allowedMovement).toBe(1);
+    // The request's limits come first, the brief's fill the others.
+    expect(bare.limits).toMatchObject({ maxJolts: 1, minMovement: 0.5 });
+    await expect(
+      runners.describe_recording(context, { projectId: 'shots', mediaId: 'rec-1', maxMovement: 0.2, sheet: false }),
+    ).rejects.toMatchObject({
+      statusCode: 422,
+      message: 'The minimum movement, 0.5, must be less than the maximum, 0.2.',
+    });
     await expect(
       runners.describe_recording(context, { projectId: 'shots', mediaId: 'rec-9', sheet: false }),
     ).rejects.toMatchObject({ statusCode: 404 });

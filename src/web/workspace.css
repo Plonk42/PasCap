@@ -698,7 +698,7 @@ body {
 
 .source-dock .source-preview {
   max-height: none;
-  min-height: 64px;
+  min-height: 48px;
   aspect-ratio: auto;
 }
 
