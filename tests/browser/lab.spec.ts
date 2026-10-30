@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { ExportReceipt } from '../../src/server/export.js';
-import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOR } from '../../src/shared/color.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { planExportMusic } from '../../src/shared/export.js';
 import { createClip, createLayer, createProject, projectSchema } from '../../src/shared/model.js';
@@ -103,7 +103,7 @@ test('compact library handles 12 recordings and the editor fits the desktop view
 
 test('removes fixed A/B slots, promotional text and default technical clutter', async ({ page }) => {
   await expect(page.getByRole('button', { name: /Clip [AB]/ })).toHaveCount(0);
-  await expect(page.getByText('One colour contract.')).toHaveCount(0);
+  await expect(page.getByText('One color contract.')).toHaveCount(0);
   await expect(page.getByText('Local-first. Landscape-minded.')).toHaveCount(0);
   await expect(page.getByText('Find the feeling.')).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Diagnostics', exact: true })).toHaveCount(0);
@@ -164,7 +164,7 @@ test('seeks by clicking the ruler, scrubs with the playhead handle and selects a
 
 test('GPU matches CPU for neutral, each control and a combined grade', async ({ page }) => {
   const settings = [
-    NEUTRAL_COLOUR,
+    NEUTRAL_COLOR,
     ...[
       { exposure: 1 },
       { brightness: 0.1 },
@@ -173,9 +173,9 @@ test('GPU matches CPU for neutral, each control and a combined grade', async ({ 
       { saturation: 0.4 },
       { whites: -0.5 },
       { blacks: 0.3 },
-    ].map((change) => ({ ...NEUTRAL_COLOUR, ...change })),
+    ].map((change) => ({ ...NEUTRAL_COLOR, ...change })),
     {
-      ...NEUTRAL_COLOUR,
+      ...NEUTRAL_COLOR,
       exposure: 0.6,
       brightness: 0.02,
       contrast: 1.1,
@@ -186,7 +186,7 @@ test('GPU matches CPU for neutral, each control and a combined grade', async ({ 
     },
   ];
   const results = await page.evaluate(
-    (grades) => grades.map((grade) => window.pascapLab!.verifyColour(grade)),
+    (grades) => grades.map((grade) => window.pascapLab!.verifyColor(grade)),
     settings,
   );
   for (const result of results) {
@@ -202,7 +202,7 @@ test('paused grading changes pixels immediately and saves/reloads the selected c
   );
   await inspectorTab(page, 'Clip grade');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
-  await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().colourLatencyMs !== null);
+  await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().colorLatencyMs !== null);
   const after = await page.evaluate(() => Array.from(window.pascapLab!.engine.capturePixels().slice(100_000, 100_004)));
   expect(after).not.toEqual(before);
   await page.evaluate(() => window.pascapLab!.flush());
@@ -211,7 +211,7 @@ test('paused grading changes pixels immediately and saves/reloads the selected c
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await inspectorTab(page, 'Clip grade');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('0.7');
-  await page.getByRole('button', { name: 'Reset colour' }).click();
+  await page.getByRole('button', { name: 'Reset color' }).click();
   await page.evaluate(() => window.pascapLab!.flush());
 });
 
@@ -238,7 +238,7 @@ test('seeks before, inside and after every transition and cancels obsolete scrub
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(120);
 });
 
-test('playback and colour updates run outside React, shortcuts ignore text inputs', async ({ page }) => {
+test('playback and color updates run outside React, shortcuts ignore text inputs', async ({ page }) => {
   // Quarter speed keeps playback running (~20 s) through the slow UI steps of a software-rendered runner.
   let project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   for (const clip of project.clips)
@@ -253,9 +253,9 @@ test('playback and colour updates run outside React, shortcuts ignore text input
   await page.waitForFunction(() => (window.pascapLab?.engine.diagnostics().frame ?? 0) > 20);
   await inspectorTab(page, 'Clip grade');
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('0.2');
-  await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().colourLatencyMs !== null);
+  await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().colorLatencyMs !== null);
   await page.getByRole('button', { name: 'Pause preview' }).click();
-  await page.getByRole('button', { name: 'Reset colour' }).click();
+  await page.getByRole('button', { name: 'Reset color' }).click();
   await page.evaluate(() => window.pascapLab!.flush());
 });
 
@@ -292,10 +292,10 @@ test('Space plays after a pointer press on a control, but keeps keyboard activat
   await expect(snap).toHaveAttribute('aria-pressed', initial!);
   expect(await playing()).toBe(false);
 
-  await page.getByRole('tab', { name: 'Colour', exact: true }).click();
+  await page.getByRole('tab', { name: 'Color', exact: true }).click();
   await toggle(true);
   await toggle(false);
-  // Pressing the slider's centre keeps neutral Saturation 1, so this is a focus change, not an edit.
+  // Pressing the slider's center keeps neutral Saturation 1, so this is a focus change, not an edit.
   const saturation = page.getByRole('slider', { name: 'Saturation', exact: true });
   await saturation.click();
   await expect(saturation).toBeFocused();
@@ -488,7 +488,7 @@ test('each Ramp up preset easing saves and restores along with the clip grade', 
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toHaveValue('0.6');
   await inspectorTab(page, 'Clip');
   await expect(page.getByRole('combobox', { name: 'Clip speed keyframe easing' })).toHaveValue('smooth');
-  expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.grade.colour.exposure)).toBe(0.6);
+  expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.grade.color.exposure)).toBe(0.6);
 });
 
 test('music waveform, placement, looping, gain, fades and audio-clock preview work', async ({ page }) => {
@@ -638,7 +638,7 @@ test('speed changes while playing pause and reload the mapped frame without losi
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   const project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(project.clips[0]?.speed).toEqual({ mode: 'constant', rate: 1.5 });
-  expect(project.clips[0]?.grade.colour.exposure).toBe(0.4);
+  expect(project.clips[0]?.grade.color.exposure).toBe(0.4);
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().playing)).toBe(false);
 });
 
@@ -705,7 +705,7 @@ test('export cancellation stops native work and publishes no incomplete output l
   await cancel.click();
   await expect(page.locator('.activity-job').filter({ hasText: accepted.label }).first()).toHaveAttribute(
     'data-state',
-    'cancelled',
+    'canceled',
     { timeout: 15_000 },
   );
   const queue = (await (await request.get('/api/jobs')).json()) as {
@@ -713,7 +713,7 @@ test('export cancellation stops native work and publishes no incomplete output l
   };
   expect(queue.jobs.find((job) => job.id === accepted.id)).toMatchObject({
     kind: 'export',
-    state: 'cancelled',
+    state: 'canceled',
     outputUrl: null,
     receiptUrl: null,
   });
@@ -910,9 +910,9 @@ test('changing a later boundary preserves independent excerpts while an adjustme
   await page.getByRole('button', { name: 'Transition after pattern-b.mp4, clip 2 on Track 1', exact: true }).click();
   await page.getByRole('combobox', { name: 'Transition type' }).selectOption('cross-dissolve');
   const project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(project.adjustments[0]?.colour.exposure).toBe(0.8);
+  expect(project.adjustments[0]?.color.exposure).toBe(0.8);
   expect(project.clips.map((clip) => clip.grade)).toEqual(added.clips.map((clip) => clip.grade));
-  expect(project.clips.every((clip) => !('colour' in clip) && !('correction' in clip))).toBe(true);
+  expect(project.clips.every((clip) => !('color' in clip) && !('correction' in clip))).toBe(true);
   expect(project.layers[0]!.transitions[0]).toMatchObject({ duration: 18 });
   expect(project.layers[0]!.transitions[1]).toMatchObject({ type: 'cross-dissolve', duration: 30 });
   const region = calculateLayout(project).transitions[1]!;

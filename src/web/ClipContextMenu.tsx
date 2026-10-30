@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import './editor-panels.css';
 import type { EditCommand } from '../shared/commands.js';
-import type { ColourSettings } from '../shared/colour.js';
+import type { ColorSettings } from '../shared/color.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { Icon } from './icons.js';
 import {
-  copiedColour,
+  copiedColor,
   copyGradeBlocked,
   pasteGradeCommands,
   pasteTargets,
@@ -27,8 +27,8 @@ interface Props {
   project: ProjectDocument;
   /** Every selected clip and adjustment. */
   selected: readonly GradeTarget[];
-  copiedGrade: ColourSettings | null;
-  onCopyGrade: (colour: ColourSettings) => void;
+  copiedGrade: ColorSettings | null;
+  onCopyGrade: (color: ColorSettings) => void;
   onEdit: (commands: readonly EditCommand[]) => void;
   onClose: (restoreFocus: boolean) => void;
 }
@@ -131,13 +131,13 @@ export function ClipContextMenu({
         title={copyBlocked ?? `Copy this ${noun}’s grade, to paste it on clips and adjustments`}
         aria-disabled={copyBlocked !== null}
         onClick={() => {
-          const colour = copiedColour(project, target);
-          if (!colour) return;
-          onCopyGrade(colour);
+          const color = copiedColor(project, target);
+          if (!color) return;
+          onCopyGrade(color);
           onClose(true);
         }}
       >
-        <Icon name="colour" size={15} />
+        <Icon name="color" size={15} />
         Copy grade
       </button>
       <button
@@ -151,7 +151,7 @@ export function ClipContextMenu({
           onEdit(pasteGradeCommands(project, targets, copiedGrade));
         }}
       >
-        <Icon name="colour" size={15} />
+        <Icon name="color" size={15} />
         {targets.length > 1 ? `Paste grade on ${targets.length}` : 'Paste grade'}
       </button>
     </fieldset>

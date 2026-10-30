@@ -29,10 +29,10 @@ export const metadataSchema = z
     frameRate: rateSchema,
     frameCount: frameSchema.positive(),
     durationSeconds: z.number().positive(),
-    colourPrimaries: z.literal('bt709'),
-    colourTransfer: z.literal('bt709'),
-    colourSpace: z.literal('bt709'),
-    colourRange: z.enum(['tv', 'pc']),
+    colorPrimaries: z.literal('bt709'),
+    colorTransfer: z.literal('bt709'),
+    colorSpace: z.literal('bt709'),
+    colorRange: z.enum(['tv', 'pc']),
     hasAudio: z.boolean(),
   })
   .strict();
@@ -77,7 +77,29 @@ export const mediaAssetSchema = z
     damage: z.array(damagedRangeSchema).default([]),
   })
   .strict();
-export const registrySchema = z.object({ version: z.literal(2), assets: z.array(mediaAssetSchema) }).strict();
+export const VIDEO_REGISTRY_VERSION = 3;
+export const registrySchema = z
+  .object({ version: z.literal(VIDEO_REGISTRY_VERSION), assets: z.array(mediaAssetSchema) })
+  .strict();
+
+/** Version 2 spelled the metadata fields `colourPrimaries`… (#292); anything else is left to `registrySchema`. */
+export function upgradeVideoRegistry(value: unknown): unknown {
+  if (!isRecord(value) || value.version !== 2 || !Array.isArray(value.assets)) return value;
+  const assets = value.assets.map((asset: unknown) =>
+    isRecord(asset) && isRecord(asset.metadata)
+      ? {
+          ...asset,
+          metadata: Object.fromEntries(
+            Object.entries(asset.metadata).map(([key, field]) => [key.replace(/^colour/, 'color'), field]),
+          ),
+        }
+      : asset,
+  );
+  return { ...value, version: VIDEO_REGISTRY_VERSION, assets };
+}
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 export type MediaAsset = z.infer<typeof mediaAssetSchema>;
 export type SourceFingerprint = z.infer<typeof fingerprintSchema>;
 export type SourceContent = z.infer<typeof contentSchema>;
@@ -98,7 +120,7 @@ export const jobSchema = z
     id: idSchema,
     kind: z.enum(['prepare', 'reference', 'audio', 'export', 'relink', 'motion', 'music-analysis']),
     label: z.string(),
-    state: z.enum(['queued', 'running', 'completed', 'failed', 'cancelled']),
+    state: z.enum(['queued', 'running', 'completed', 'failed', 'canceled']),
     progress: z.number().min(0).max(1),
     message: z.string(),
     createdAt: z.string(),

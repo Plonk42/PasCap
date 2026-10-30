@@ -10,7 +10,7 @@ import { calculateLayout } from './timeline.js';
 export type BeatSnap = (project: ProjectDocument, excludedMusicIds?: ReadonlySet<string>) => readonly number[];
 export const NO_BEATS: BeatSnap = () => [];
 
-/** Snaps to the analysed beats, downbeats or strong hits of every music clip, where they play now. */
+/** Snaps to the analyzed beats, downbeats or strong hits of every music clip, where they play now. */
 export function musicBeatSnap(
   analysisOf: (mediaId: string) => Pick<MusicAnalysis, 'beats' | 'hits'> | null,
   target: MusicTarget,

@@ -1,24 +1,24 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import {
-  colourCurveSchema,
-  colourCurveSlopes,
-  createColourCurves,
+  colorCurveSchema,
+  colorCurveSlopes,
+  createColorCurves,
   createHslSettings,
   CURVE_CHANNELS,
-  evaluateColourCurve,
+  evaluateColorCurve,
   HSL_BANDS,
-  HSL_CENTRES,
+  HSL_CENTERS,
   isIdentityCurve,
   isNeutralHsl,
-  type ColourCurvePoint,
+  type ColorCurvePoint,
   type CurveChannel,
   type HslBand,
-} from '../shared/advanced-colour.js';
-import { colourSchema, type ColourSettings } from '../shared/colour.js';
+} from '../shared/advanced-color.js';
+import { colorSchema, type ColorSettings } from '../shared/color.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { ProjectDocument } from '../shared/model.js';
-import './advanced-colour.css';
-import { colourTarget, ownerNoun, type ColourOwner } from './colour-owner.js';
+import './advanced-color.css';
+import { colorTarget, ownerNoun, type ColorOwner } from './color-owner.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { InspectorSection } from './InspectorSection.js';
@@ -30,7 +30,7 @@ import { ValueControl } from './ValueControl.js';
 
 interface Props {
   project: ProjectDocument;
-  layer: ColourOwner;
+  layer: ColorOwner;
   frame: number;
   disabled: boolean;
   onEdit: (command: EditCommand) => void;
@@ -43,23 +43,23 @@ const HSL_CONTROLS = [
   { key: 'lightness', label: 'Lightness', min: -0.5, max: 0.5, step: 0.005 },
 ] as const;
 
-/** Each HSL slider's track shows its axis in the selected range's own colour. */
+/** Each HSL slider's track shows its axis in the selected range's own color. */
 function hslTrack(band: HslBand, key: (typeof HSL_CONTROLS)[number]['key']): string {
-  const centre = HSL_CENTRES[HSL_BANDS.indexOf(band)]!;
+  const center = HSL_CENTERS[HSL_BANDS.indexOf(band)]!;
   if (key === 'hue')
-    return `linear-gradient(90deg, hsl(${centre - 30} 75% 52%), hsl(${centre} 75% 52%), hsl(${centre + 30} 75% 52%))`;
-  if (key === 'saturation') return `linear-gradient(90deg, #6e6e6e, hsl(${centre} 45% 50%), hsl(${centre} 90% 50%))`;
-  return `linear-gradient(90deg, hsl(${centre} 70% 12%), hsl(${centre} 70% 50%), hsl(${centre} 70% 88%))`;
+    return `linear-gradient(90deg, hsl(${center - 30} 75% 52%), hsl(${center} 75% 52%), hsl(${center + 30} 75% 52%))`;
+  if (key === 'saturation') return `linear-gradient(90deg, #6e6e6e, hsl(${center} 45% 50%), hsl(${center} 90% 50%))`;
+  return `linear-gradient(90deg, hsl(${center} 70% 12%), hsl(${center} 70% 50%), hsl(${center} 70% 88%))`;
 }
 
-const bandColour = (band: HslBand): string => `hsl(${HSL_CENTRES[HSL_BANDS.indexOf(band)]!} 75% 52%)`;
-const CURVE_COLOURS: Readonly<Record<CurveChannel, string>> = {
+const bandColor = (band: HslBand): string => `hsl(${HSL_CENTERS[HSL_BANDS.indexOf(band)]!} 75% 52%)`;
+const CURVE_COLORS: Readonly<Record<CurveChannel, string>> = {
   master: '#dfe5e1',
   red: '#ef5d5d',
   green: '#55c46d',
   blue: '#5b8ff2',
 };
-const capitalise = (name: string): string => name.charAt(0).toUpperCase() + name.slice(1);
+const capitalize = (name: string): string => name.charAt(0).toUpperCase() + name.slice(1);
 const SWATCH_STEPS: Readonly<Record<string, (at: number, last: number) => number>> = {
   ArrowLeft: (at) => at - 1,
   ArrowUp: (at) => at - 1,
@@ -69,7 +69,7 @@ const SWATCH_STEPS: Readonly<Record<string, (at: number, last: number) => number
   End: (_, last) => last,
 };
 
-/** A single-choice row of coloured square buttons with radio-group keyboard behaviour. */
+/** A single-choice row of colored square buttons with radio-group keyboard behavior. */
 function SwatchGroup<T extends string>({
   label,
   noun,
@@ -80,7 +80,7 @@ function SwatchGroup<T extends string>({
 }: Readonly<{
   label: string;
   noun: string;
-  options: readonly { value: T; colour: string }[];
+  options: readonly { value: T; color: string }[];
   value: T;
   disabled: boolean;
   onChange: (value: T) => void;
@@ -96,19 +96,19 @@ function SwatchGroup<T extends string>({
     if (target instanceof HTMLElement) target.focus();
   };
   return (
-    <div role="radiogroup" aria-label={label} className="colour-swatches">
+    <div role="radiogroup" aria-label={label} className="color-swatches">
       {options.map((option, at) => (
         <button
           key={option.value}
           type="button"
           role="radio"
-          className="colour-swatch"
+          className="color-swatch"
           aria-label={option.value}
           aria-checked={option.value === value}
-          title={`${capitalise(option.value)} ${noun}`}
+          title={`${capitalize(option.value)} ${noun}`}
           tabIndex={option.value === value ? 0 : -1}
           disabled={disabled}
-          style={{ '--swatch': option.colour } as CSSProperties}
+          style={{ '--swatch': option.color } as CSSProperties}
           onClick={() => onChange(option.value)}
           onKeyDown={(event) => keyboard(event, at)}
         />
@@ -119,7 +119,7 @@ function SwatchGroup<T extends string>({
 
 const clamp = (value: number, low: number, high: number): number => Math.min(high, Math.max(low, value));
 
-/** Open interval between neighbours, kept a small margin away so a drag never merges nodes. */
+/** Open interval between neighbors, kept a small margin away so a drag never merges nodes. */
 function dragSpan(left: number, right: number): [number, number] {
   const margin = Math.min(0.001, (right - left) / 4);
   return [left + margin, right - margin];
@@ -130,15 +130,15 @@ function isHistoryShortcut(event: KeyboardEvent<HTMLButtonElement>): boolean {
 }
 
 /** Each Hermite segment is exactly one cubic Bézier; an invalid draft falls back to straight lines. */
-function curvePath(points: readonly ColourCurvePoint[]): string {
+function curvePath(points: readonly ColorCurvePoint[]): string {
   const at = (x: number, y: number): string => `${x * 100} ${(1 - y) * 100}`;
   const start = `M${at(points[0]!.x, points[0]!.y)}`;
-  if (!colourCurveSchema.safeParse(points).success)
+  if (!colorCurveSchema.safeParse(points).success)
     return `${start}${points
       .slice(1)
       .map((point) => `L${at(point.x, point.y)}`)
       .join('')}`;
-  const slopes = colourCurveSlopes(points);
+  const slopes = colorCurveSlopes(points);
   return `${start}${points
     .slice(1)
     .map((right, index) => {
@@ -150,7 +150,7 @@ function curvePath(points: readonly ColourCurvePoint[]): string {
 }
 
 /** Preserve local point identity through a single input move and Undo; never save IDs. */
-function useCurveSelection(points: readonly ColourCurvePoint[]) {
+function useCurveSelection(points: readonly ColorCurvePoint[]) {
   const [stored, setStored] = useState(() => ({
     inputs: points.map((point) => point.x),
     ids: points.map((point) => `point-${point.x}`),
@@ -198,15 +198,15 @@ interface Capture {
   pointer: number;
   element: HTMLButtonElement;
   project: ProjectDocument;
-  colour: ColourSettings;
+  color: ColorSettings;
   frame: number;
   index: number;
-  origin: ColourCurvePoint;
+  origin: ColorCurvePoint;
   x: number;
   y: number;
   width: number;
   height: number;
-  points: ColourCurvePoint[];
+  points: ColorCurvePoint[];
   error: string | null;
   moved: boolean;
 }
@@ -221,13 +221,13 @@ function CurveEditor({
   onPreview,
   channel,
 }: Readonly<Props & { channel: CurveChannel }>) {
-  const points = layer.colour.curves[channel];
+  const points = layer.color.curves[channel];
   const selection = useCurveSelection(points);
   const index = points.findIndex((point) => point.x === selection.selected);
   const selected = points[index]!;
   const endpoint = index === 0 || index === points.length - 1;
   const capture = useRef<Capture | null>(null);
-  const [draft, setDraft] = useState<ColourCurvePoint[] | null>(null);
+  const [draft, setDraft] = useState<ColorCurvePoint[] | null>(null);
   const [error, setError] = useState('');
   const latest = useRef({ onPreview, onEdit, layer });
   latest.current = { onPreview, onEdit, layer };
@@ -262,15 +262,15 @@ function CurveEditor({
   }, [channel, layer.id, project.id]);
   const unavailable = disabled || draft !== null;
   const context = `${project.id}:${layer.id}:${channel}:${selection.identity}`;
-  const validate = (next: ColourCurvePoint[]): string | null => {
-    const result = colourCurveSchema.safeParse(next);
+  const validate = (next: ColorCurvePoint[]): string | null => {
+    const result = colorCurveSchema.safeParse(next);
     return result.success
       ? null
       : 'Curve inputs must be unique and ascending from 0 to 1, with 2–16 control nodes and outputs in 0–1.';
   };
-  const replace = (at: number, changes: Partial<ColourCurvePoint>): ColourCurvePoint[] =>
+  const replace = (at: number, changes: Partial<ColorCurvePoint>): ColorCurvePoint[] =>
     points.map((point, position) => (position === at ? { ...point, ...changes } : point));
-  const change = (next: ColourCurvePoint[]): void => {
+  const change = (next: ColorCurvePoint[]): void => {
     if (unavailable) return;
     const message = validate(next);
     if (message) {
@@ -278,15 +278,15 @@ function CurveEditor({
       return;
     }
     onEdit({
-      type: 'colour',
-      ...colourTarget(layer),
-      colour: { ...layer.colour, curves: { ...layer.colour.curves, [channel]: next } },
+      type: 'color',
+      ...colorTarget(layer),
+      color: { ...layer.color, curves: { ...layer.color.curves, [channel]: next } },
     });
     setError('');
   };
   const begin = (event: PointerEvent<HTMLButtonElement>, at: number): void => {
     if (unavailable || capture.current || event.button !== 0 || !event.isPrimary) return;
-    const box = event.currentTarget.closest('.colour-curve-plot')?.getBoundingClientRect();
+    const box = event.currentTarget.closest('.color-curve-plot')?.getBoundingClientRect();
     if (!box?.width || !box.height) return;
     event.preventDefault();
     event.stopPropagation();
@@ -296,7 +296,7 @@ function CurveEditor({
       pointer: event.pointerId,
       element: event.currentTarget,
       project,
-      colour: layer.colour,
+      color: layer.color,
       frame,
       index: at,
       origin: points[at]!,
@@ -322,10 +322,10 @@ function CurveEditor({
       dy = event.clientY - active.y;
     if (!active.moved && Math.hypot(dx, dy) < 3) return;
     active.moved = true;
-    const original = active.colour.curves[channel];
+    const original = active.color.curves[channel];
     const left = original[active.index - 1];
     const right = original[active.index + 1];
-    // Interior nodes stay strictly between their neighbours; endpoint inputs are fixed.
+    // Interior nodes stay strictly between their neighbors; endpoint inputs are fixed.
     const x =
       left && right ? clamp(active.origin.x + dx / active.width, ...dragSpan(left.x, right.x)) : active.origin.x;
     const y = clamp(active.origin.y - dy / active.height, 0, 1);
@@ -334,9 +334,9 @@ function CurveEditor({
     setDraft(active.points);
     setError(active.error ?? '');
     const command: EditCommand = {
-      type: 'colour',
-      ...colourTarget(layer),
-      colour: { ...active.colour, curves: { ...active.colour.curves, [channel]: active.points } },
+      type: 'color',
+      ...colorTarget(layer),
+      color: { ...active.color, curves: { ...active.color.curves, [channel]: active.points } },
     };
     onPreview({ document: active.error ? active.project : applyCommand(active.project, command), frame: active.frame });
   };
@@ -352,9 +352,9 @@ function CurveEditor({
     }
     if (active.moved)
       latest.current.onEdit({
-        type: 'colour',
-        ...colourTarget(latest.current.layer),
-        colour: { ...active.colour, curves: { ...active.colour.curves, [channel]: active.points } },
+        type: 'color',
+        ...colorTarget(latest.current.layer),
+        color: { ...active.color, curves: { ...active.color.curves, [channel]: active.points } },
       });
   };
   const keyboard = (event: KeyboardEvent<HTMLButtonElement>, at: number): void => {
@@ -365,7 +365,7 @@ function CurveEditor({
     const point = points[at]!;
     const delta = event.shiftKey ? 0.1 : 0.01;
     const interior = at > 0 && at < points.length - 1;
-    let next: ColourCurvePoint[] | null = null;
+    let next: ColorCurvePoint[] | null = null;
     if (event.key === 'ArrowLeft' && interior) next = replace(at, { x: point.x - delta });
     if (event.key === 'ArrowRight' && interior) next = replace(at, { x: point.x + delta });
     if (event.key === 'ArrowUp') next = replace(at, { y: point.y + delta });
@@ -386,39 +386,39 @@ function CurveEditor({
     for (let at = 1; at < points.length - 1; at++)
       if (points[at + 1]!.x - points[at]!.x > points[largest + 1]!.x - points[largest]!.x) largest = at;
     const x = (points[largest]!.x + points[largest + 1]!.x) / 2;
-    change([...points.slice(0, largest + 1), { x, y: evaluateColourCurve(points, x) }, ...points.slice(largest + 1)]);
+    change([...points.slice(0, largest + 1), { x, y: evaluateColorCurve(points, x) }, ...points.slice(largest + 1)]);
   };
   return (
-    <section className="colour-curve-editor" aria-label={`${channel} colour curve editor`} data-dirty={draft !== null}>
+    <section className="color-curve-editor" aria-label={`${channel} color curve editor`} data-dirty={draft !== null}>
       <div
-        className={`colour-curve-plot${draft && error ? ' invalid' : ''}`}
-        style={{ '--curve': CURVE_COLOURS[channel] } as CSSProperties}
+        className={`color-curve-plot${draft && error ? ' invalid' : ''}`}
+        style={{ '--curve': CURVE_COLORS[channel] } as CSSProperties}
       >
         <svg
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
           role="img"
-          aria-label={`Encoded colour curves, ${channel} editable`}
+          aria-label={`Encoded color curves, ${channel} editable`}
         >
-          <path d="M0 100L100 0M25 0V100M50 0V100M75 0V100M0 25H100M0 50H100M0 75H100" className="colour-curve-grid" />
+          <path d="M0 100L100 0M25 0V100M50 0V100M75 0V100M0 25H100M0 50H100M0 75H100" className="color-curve-grid" />
           {CURVE_CHANNELS.filter((other) => other !== channel).map((other) => (
             <path
               key={other}
-              d={curvePath(layer.colour.curves[other])}
-              className="colour-curve-other"
-              stroke={CURVE_COLOURS[other]}
+              d={curvePath(layer.color.curves[other])}
+              className="color-curve-other"
+              stroke={CURVE_COLORS[other]}
               data-channel={other}
             />
           ))}
-          <path d={curvePath(shown)} className="colour-curve-selected" data-channel={channel} />
+          <path d={curvePath(shown)} className="color-curve-selected" data-channel={channel} />
         </svg>
         {shown.map((point, at) => (
           <button
             key={selection.ids[at]}
             type="button"
-            className="colour-curve-point"
+            className="color-curve-point"
             style={{ left: `${point.x * 100}%`, top: `${(1 - point.y) * 100}%` }}
-            aria-label={`Colour curve control node ${at + 1}`}
+            aria-label={`Color curve control node ${at + 1}`}
             aria-pressed={index === at}
             aria-disabled={disabled && !capture.current}
             title={`Input ${point.x}, output ${point.y}. Arrows edit; Shift moves 0.1; Enter selects.`}
@@ -437,11 +437,11 @@ function CurveEditor({
           />
         ))}
       </div>
-      <div className="colour-curve-fields">
+      <div className="color-curve-fields">
         <label>
           Input 0–1
           <NumberField
-            aria-label="Colour curve input"
+            aria-label="Color curve input"
             value={selected.x}
             min={0}
             max={1}
@@ -454,7 +454,7 @@ function CurveEditor({
         <label>
           Output 0–1
           <NumberField
-            aria-label="Colour curve output"
+            aria-label="Color curve output"
             value={selected.y}
             min={0}
             max={1}
@@ -466,7 +466,7 @@ function CurveEditor({
         <button
           type="button"
           className="icon-button"
-          aria-label="Add colour curve control node"
+          aria-label="Add color curve control node"
           disabled={unavailable || points.length >= 16}
           onClick={add}
         >
@@ -475,7 +475,7 @@ function CurveEditor({
         <button
           type="button"
           className="icon-button"
-          aria-label="Delete colour curve control node"
+          aria-label="Delete color curve control node"
           disabled={unavailable || endpoint}
           onClick={() => change(points.filter((_, at) => at !== index))}
         >
@@ -491,53 +491,53 @@ function CurveEditor({
   );
 }
 
-function colourCommit({ layer, disabled, onEdit }: Readonly<Props>) {
-  return (colour: ColourSettings): void => {
-    if (!disabled) onEdit({ type: 'colour', ...colourTarget(layer), colour: colourSchema.parse(colour) });
+function colorCommit({ layer, disabled, onEdit }: Readonly<Props>) {
+  return (color: ColorSettings): void => {
+    if (!disabled) onEdit({ type: 'color', ...colorTarget(layer), color: colorSchema.parse(color) });
   };
 }
 
 export function HslRangesSection(props: Readonly<Props>) {
   const { layer, project, disabled } = props;
   const [band, setBand] = useState<HslBand>('red');
-  const commit = colourCommit(props);
+  const commit = colorCommit(props);
   const context = `${project.id}:${layer.id}:${band}`;
   return (
     <InspectorSection
       id="hsl"
       title="HSL ranges"
       icon="sliders"
-      modified={!isNeutralHsl(layer.colour.hsl)}
+      modified={!isNeutralHsl(layer.color.hsl)}
       help={
-        <HelpPopover label="HSL ranges" guide="colour-speed-and-keyframes">
+        <HelpPopover label="HSL ranges" guide="color-speed-and-keyframes">
           <p>
-            Shift the hue, saturation or lightness of one colour range, such as the blues, on this {ownerNoun(layer)}.
-            Neighbouring ranges blend smoothly and greys stay untouched.
+            Shift the hue, saturation or lightness of one color range, such as the blues, on this {ownerNoun(layer)}.
+            Neighboring ranges blend smoothly and grays stay untouched.
           </p>
           <p className="editor-help-tip">Tip: Reset all returns every range to neutral.</p>
         </HelpPopover>
       }
     >
-      <div className="advanced-colour">
+      <div className="advanced-color">
         <SwatchGroup
           label="HSL range"
           noun="range"
-          options={HSL_BANDS.map((name) => ({ value: name, colour: bandColour(name) }))}
+          options={HSL_BANDS.map((name) => ({ value: name, color: bandColor(name) }))}
           value={band}
           disabled={disabled}
           onChange={setBand}
         />
         {HSL_CONTROLS.map((control) => {
-          const withValue = (value: number): ColourSettings => ({
-            ...layer.colour,
-            hsl: { ...layer.colour.hsl, [band]: { ...layer.colour.hsl[band], [control.key]: value } },
+          const withValue = (value: number): ColorSettings => ({
+            ...layer.color,
+            hsl: { ...layer.color.hsl, [band]: { ...layer.color.hsl[band], [control.key]: value } },
           });
           return (
             <div className="advanced-hsl-control" key={control.key}>
               <ResetLabel
                 htmlFor={`${context}-${control.key}`}
                 name={`HSL ${control.key}`}
-                blocked={resetBlocked(layer.colour.hsl[band][control.key] === 0, disabled)}
+                blocked={resetBlocked(layer.color.hsl[band][control.key] === 0, disabled)}
                 onReset={() => commit(withValue(0))}
               >
                 {control.label}
@@ -545,7 +545,7 @@ export function HslRangesSection(props: Readonly<Props>) {
               <ValueControl
                 id={`${context}-${control.key}`}
                 aria-label={`HSL ${control.key}`}
-                value={layer.colour.hsl[band][control.key]}
+                value={layer.color.hsl[band][control.key]}
                 min={control.min}
                 max={control.max}
                 step={control.step}
@@ -554,22 +554,20 @@ export function HslRangesSection(props: Readonly<Props>) {
                 disabled={disabled}
                 onCommit={(value) => commit(withValue(value))}
                 onDraft={(value) =>
-                  livePreview(
-                    value === null ? null : { type: 'colour', ...colourTarget(layer), colour: withValue(value) },
-                  )
+                  livePreview(value === null ? null : { type: 'color', ...colorTarget(layer), color: withValue(value) })
                 }
               />
             </div>
           );
         })}
-        <div className="advanced-colour-tools">
+        <div className="advanced-color-tools">
           <button
             type="button"
             className="text-button"
             disabled={disabled}
             aria-label={`Reset ${band} HSL range`}
             onClick={() =>
-              commit({ ...layer.colour, hsl: { ...layer.colour.hsl, [band]: { hue: 0, saturation: 0, lightness: 0 } } })
+              commit({ ...layer.color, hsl: { ...layer.color.hsl, [band]: { hue: 0, saturation: 0, lightness: 0 } } })
             }
           >
             <Icon name="reset" size={13} />
@@ -580,7 +578,7 @@ export function HslRangesSection(props: Readonly<Props>) {
             className="text-button"
             disabled={disabled}
             aria-label="Reset all HSL ranges"
-            onClick={() => commit({ ...layer.colour, hsl: createHslSettings() })}
+            onClick={() => commit({ ...layer.color, hsl: createHslSettings() })}
           >
             Reset all
           </button>
@@ -590,20 +588,20 @@ export function HslRangesSection(props: Readonly<Props>) {
   );
 }
 
-export function ColourCurvesSection(props: Readonly<Props>) {
+export function ColorCurvesSection(props: Readonly<Props>) {
   const { layer, project, disabled } = props;
   const [channel, setChannel] = useState<CurveChannel>('master');
-  const commit = colourCommit(props);
+  const commit = colorCommit(props);
   return (
     <InspectorSection
       id="curves"
-      title="Colour curves"
+      title="Color curves"
       icon="tone-curve"
-      modified={!Object.values(layer.colour.curves).every(isIdentityCurve)}
+      modified={!Object.values(layer.color.curves).every(isIdentityCurve)}
       help={
-        <HelpPopover label="Colour curves" guide="colour-speed-and-keyframes">
+        <HelpPopover label="Color curves" guide="color-speed-and-keyframes">
           <p>
-            Drag control nodes to reshape brightness or colour: Master changes everything, Red, Green and Blue one
+            Drag control nodes to reshape brightness or color: Master changes everything, Red, Green and Blue one
             channel each. Add a node to bend another part of the curve.
           </p>
           <p className="editor-help-tip">
@@ -612,24 +610,24 @@ export function ColourCurvesSection(props: Readonly<Props>) {
         </HelpPopover>
       }
     >
-      <div className="advanced-colour">
+      <div className="advanced-color">
         <SwatchGroup
-          label="Colour curve channel"
+          label="Color curve channel"
           noun="curve"
-          options={CURVE_CHANNELS.map((name) => ({ value: name, colour: CURVE_COLOURS[name] }))}
+          options={CURVE_CHANNELS.map((name) => ({ value: name, color: CURVE_COLORS[name] }))}
           value={channel}
           disabled={disabled}
           onChange={setChannel}
         />
         <CurveEditor key={`${project.id}:${layer.id}:${channel}`} {...props} channel={channel} />
-        <div className="advanced-colour-tools">
+        <div className="advanced-color-tools">
           <button
             type="button"
             className="text-button"
             disabled={disabled}
             aria-label={`Reset ${channel} curve`}
             onClick={() =>
-              commit({ ...layer.colour, curves: { ...layer.colour.curves, [channel]: createColourCurves()[channel] } })
+              commit({ ...layer.color, curves: { ...layer.color.curves, [channel]: createColorCurves()[channel] } })
             }
           >
             <Icon name="reset" size={13} />
@@ -639,8 +637,8 @@ export function ColourCurvesSection(props: Readonly<Props>) {
             type="button"
             className="text-button"
             disabled={disabled}
-            aria-label="Reset all colour curves"
-            onClick={() => commit({ ...layer.colour, curves: createColourCurves() })}
+            aria-label="Reset all color curves"
+            onClick={() => commit({ ...layer.color, curves: createColorCurves() })}
           >
             Reset all
           </button>

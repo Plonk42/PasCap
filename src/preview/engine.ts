@@ -1,4 +1,4 @@
-import { NEUTRAL_COLOUR } from '../shared/colour.js';
+import { NEUTRAL_COLOR } from '../shared/color.js';
 import { isNeutralDetail, NEUTRAL_DETAIL } from '../shared/detail.js';
 import { gradeUsesLocalTone, isNeutralClipGrade } from '../shared/grade.js';
 import { PROXY_GOP_FRAMES } from '../shared/media.js';
@@ -46,7 +46,7 @@ export interface PreviewDiagnostics {
   lastSeekMs: number | null;
   medianSeekMs: number | null;
   seekSamples: number;
-  colourLatencyMs: number | null;
+  colorLatencyMs: number | null;
   stalls: number;
   boundaryStalls: number;
   stallMilliseconds: number;
@@ -100,7 +100,7 @@ function timingKey(project: ProjectDocument): string {
   return JSON.stringify({
     id: project.id,
     frameRate: project.frameRate,
-    colourProfile: project.colourProfile,
+    colorProfile: project.colorProfile,
     clips: project.clips
       .map(({ id, mediaId, layerId, start, sourceIn, sourceOut, speed }) => ({
         id,
@@ -183,8 +183,8 @@ export class PreviewEngine {
   readonly #seekTimes: number[] = [];
   readonly #renderTimes: number[] = [];
   #renderedFrames = 0;
-  #colourRequested = 0;
-  #colourLatency: number | null = null;
+  #colorRequested = 0;
+  #colorLatency: number | null = null;
   #stalls = 0;
   #boundaryStalls = 0;
   #stallStart = 0;
@@ -236,7 +236,7 @@ export class PreviewEngine {
       lastSeekMs: this.#seekTimes.at(-1) ?? null,
       medianSeekMs: median(this.#seekTimes),
       seekSamples: this.#seekTimes.length,
-      colourLatencyMs: this.#colourLatency,
+      colorLatencyMs: this.#colorLatency,
       stalls: this.#stalls,
       boundaryStalls: this.#boundaryStalls,
       stallMilliseconds: this.#stallTotal + (this.#stallStart ? now - this.#stallStart : 0),
@@ -543,7 +543,7 @@ export class PreviewEngine {
     }
   }
   /**
-   * Interactive seek. While requests keep arriving, the frame being decoded is never cancelled: the
+   * Interactive seek. While requests keep arriving, the frame being decoded is never canceled: the
    * latest request waits for it, and the next image may be a cheaper exact frame on the way to it.
    * Once requests stop, such an intermediate frame gives way, so the latest request is drawn exactly
    * as soon as possible.
@@ -658,7 +658,7 @@ export class PreviewEngine {
     if (!this.#playing && !this.#busy && this.#status === 'paused' && !this.#drawFrame(this.#frame))
       void this.seek(this.#frame);
   }
-  /** Editor-only bypass of Colour and clip detail filters: keep source clocks, coverage and saved settings. */
+  /** Editor-only bypass of Color and clip detail filters: keep source clocks, coverage and saved settings. */
   setUngraded(enabled: boolean | OriginalMode): void {
     const mode = enabled === true ? 'all' : enabled || null;
     if (this.#disposed || !this.#document || this.#original === mode) return;
@@ -667,7 +667,7 @@ export class PreviewEngine {
     this.#redrawPaused();
     this.#emit(true);
   }
-  /** No music configuration or retiming reload for opacity/colour/spatial/stacking edits. */
+  /** No music configuration or retiming reload for opacity/color/spatial/stacking edits. */
   updateProjectAppearance(document: ProjectDocument): void {
     if (this.#disposed || !this.#document) throw new Error('Load a project before updating its appearance.');
     const snapshot = projectSchema.parse(document);
@@ -680,7 +680,7 @@ export class PreviewEngine {
     this.#layout = calculateLayout(snapshot);
     this.#resizeLanes();
     this.#dirty = true;
-    this.#colourRequested = performance.now();
+    this.#colorRequested = performance.now();
     if (!this.#layout.duration || !this.#compositor.available) {
       this.#clearSurface();
       return;
@@ -788,8 +788,8 @@ export class PreviewEngine {
             throw new Error('Original media dimensions must be positive integers.');
           return {
             slot,
-            grade: this.#original === 'all' || this.#original === 'clip' ? NEUTRAL_COLOUR : layer.grade,
-            settings: this.#original === 'all' || this.#original === 'adjustment' ? NEUTRAL_COLOUR : layer.colour,
+            grade: this.#original === 'all' || this.#original === 'clip' ? NEUTRAL_COLOR : layer.grade,
+            settings: this.#original === 'all' || this.#original === 'adjustment' ? NEUTRAL_COLOR : layer.color,
             aspect: aspect ?? dimensions.width / dimensions.height,
             spatial: layer.spatial,
             detail: this.#original === 'all' || this.#original === 'clip' ? NEUTRAL_DETAIL : layer.detail,
@@ -805,12 +805,12 @@ export class PreviewEngine {
     this.#renderSurface(frame, layers, groups);
     this.#dirty = false;
     this.#frame = frame;
-    if (this.#colourRequested) {
-      const requested = this.#colourRequested;
-      this.#colourRequested = 0;
+    if (this.#colorRequested) {
+      const requested = this.#colorRequested;
+      this.#colorRequested = 0;
       requestAnimationFrame(() => {
         if (!this.#disposed) {
-          this.#colourLatency = performance.now() - requested;
+          this.#colorLatency = performance.now() - requested;
           this.#emit(true);
         }
       });

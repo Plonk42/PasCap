@@ -54,15 +54,15 @@ function quadrature(
   difference: number,
   interpolation: Interpolation,
 ): number {
-  const centre = (begin + end) / 2;
+  const center = (begin + end) / 2;
   const half = (end - begin) / 2;
   let sum = 0;
   for (const [node, weight] of QUADRATURE) {
     const offset = node * half;
     sum +=
       weight *
-      (1 / (leftRate + difference * interpolatedProgress(centre - offset, interpolation)) +
-        1 / (leftRate + difference * interpolatedProgress(centre + offset, interpolation)));
+      (1 / (leftRate + difference * interpolatedProgress(center - offset, interpolation)) +
+        1 / (leftRate + difference * interpolatedProgress(center + offset, interpolation)));
   }
   return half * sum;
 }
@@ -148,7 +148,7 @@ function finite(value: number): number {
  * Integrate dt=ds/rate(s), splitting at EVERY stored key, even one-frame holds.
  * Linear/hold intervals have closed forms; eased intervals use bounded numerical
  * quadrature. Only final duration is rounded, with the existing clip-base clock
- * normalisation. Storage is O(keys), never O(recording duration).
+ * normalization. Storage is O(keys), never O(recording duration).
  */
 export function compileClipSpeedCurve(sourceIn: number, sourceOut: number, speed: Readonly<SpeedCurve>): Retiming {
   const keys = speed.keyframes;

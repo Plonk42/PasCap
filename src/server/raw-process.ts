@@ -90,7 +90,7 @@ export class RawFrameReader {
   }
 }
 
-/** The callback honours backpressure even when write() returns true. */
+/** The callback honors backpressure even when write() returns true. */
 export function writeRawFrame(stream: Writable, frame: Buffer): Promise<void> {
   return new Promise((resolve, reject) => {
     stream.write(frame, (error) => {
@@ -123,13 +123,13 @@ export class RawVideoPass {
   #failure: Error | null = null;
   #stopping = false;
   #timer: ReturnType<typeof setTimeout> | undefined;
-  readonly #cancel = (): void => this.fail(new ServiceError('Job cancelled.', 499));
+  readonly #cancel = (): void => this.fail(new ServiceError('Job canceled.', 499));
   constructor(private readonly options: RawProcessOptions) {
     options.signal.addEventListener('abort', this.#cancel, { once: true });
     if (options.signal.aborted) this.#cancel();
   }
   check = (): void => {
-    if (this.options.signal.aborted) throw new ServiceError('Job cancelled.', 499);
+    if (this.options.signal.aborted) throw new ServiceError('Job canceled.', 499);
     if (this.#failure) throw this.#failure;
   };
   private child(

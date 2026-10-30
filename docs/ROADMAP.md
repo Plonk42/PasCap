@@ -19,7 +19,7 @@ animation are specified by [#131's current contract](design/SPATIAL_TRANSFORMS.m
 claiming qualification or changing milestone status. Static clip Sharpen, Clarity
 and Denoise and the keyable HDR look and Local contrast follow [#123's contract](design/DETAIL_FILTERS.md), likewise without a
 qualification claim.
-Milestone v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)) moves Colour to
+Milestone v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)) moves Color to
 [clip grades and adjustments](design/ROW_APPEARANCE.md): every clip has its own grade, keyed at
 source frames so it follows its footage, and up to 1,024 adjustments grade every video track over
 a range of the film, after each clip's grade. Its
@@ -32,19 +32,19 @@ multiplier. Its slider lives in **Track → Transform** and works on empty track
 **Placement** contains placement only. With keyframes, a setting not enabled at the real
 playhead is read-only until explicitly captured; sliders never create keyframes. Grade
 keyframes have fourteen nullable channels:
-twelve scalar colour settings (including `temperature`, `tint`,
+twelve scalar color settings (including `temperature`, `tint`,
 `vibrance`, `whites` and `blacks`), `hdr` and `localContrast`. Saved `clip.opacity` is
 rejected. [Temperature and Tint](design/TEMPERATURE_AND_TINT.md) use
 normalized −2…2 and −1…1, neutral 0, with independent animation. Positive Temperature
 warms; positive Tint adds magenta. The shared normalized linear-gain formula runs
-before Exposure and intentionally colours greys; neutral-white luminance is
+before Exposure and intentionally colors grays; neutral-white luminance is
 preserved before clipping only. Static
 [HSL ranges and master/RGB curves](design/HSL_AND_CURVES.md)
 follow scalar grading in each grade without adding animation channels. Projects and receipt
-snapshots saved before the current schema, with track Colour, are rejected with the reason and
+snapshots saved before the current schema, with track Color or British spelling, are rejected with the reason and
 left unchanged, without defaults or automatic deletion;
-proxy/current PCM formats remain unchanged; the registries are version 2 (full-content
-checksums). Projects require a 0–8
+proxy/current PCM formats remain unchanged; the registries are version 3 (videos) and 2 (music),
+with full-content checksums. Projects require a 0–8
 music track array of clips joined by transitions (`[]` without music); version-1 export receipts
 require strict current-schema snapshots and captured audio-source/instance-plan arrays.
 Music can extend duration to maximum video/music OUT: closing video fades finish
@@ -57,11 +57,11 @@ Enabling Ripple packs from the current first start; while on, clips continuously
 sequence there, and turning it off retains actual placements. Video tracks display stored
 bottom-to-top composition order without primary/overlay roles. The UI provides a
 pinned ruler, synchronized native track access, accessible action bounds and contextual
-heading help. Properties tabs are **Clip / Colour / Track / Audio**, split by ownership:
-**Colour** edits the grade of the selected clip or adjustment; its
+heading help. Properties tabs are **Clip / Color / Track / Audio**, split by ownership:
+**Color** edits the grade of the selected clip or adjustment; its
 [keyframe list](https://github.com/Plonk42/PasCap/issues/26) sits at the
-end of the Colour section, under a small **Keyframes** heading with animation/timing help
-beside it, followed by HSL ranges and Colour curves. Nested keyframe details retain drafts and input
+end of the Color section, under a small **Keyframes** heading with animation/timing help
+beside it, followed by HSL ranges and Color curves. Nested keyframe details retain drafts and input
 identity; there is no outer list disclosure or list expansion preference.
 Track holds Transform with Opacity (ending with its own keyframe list),
 Transitions and Fades. Clip keeps
@@ -140,11 +140,11 @@ or private-media/hardware qualification work.
 
 [Milestone](https://github.com/Plonk42/PasCap/milestone/2)
 
-| Issue                                                                               | Scope                                                                                                          |
-| ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| [#6 — Intended-GPU preview](https://github.com/Plonk42/PasCap/issues/6)             | Record the actual renderer and test nominal playback, scrubbing, ramps/dissolves and track animation           |
-| [#7 — Complete 5–10 minute flight edit](https://github.com/Plonk42/PasCap/issues/7) | Consented, licensed inputs; save/reopen, full preview, verified draft/final exports and interruption behaviour |
-| [#8 — A/V and resource soak](https://github.com/Plonk42/PasCap/issues/8)            | Measure browser/GPU/native children/scratch and audible loop/buffering behaviour over realistic duration       |
+| Issue                                                                               | Scope                                                                                                         |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| [#6 — Intended-GPU preview](https://github.com/Plonk42/PasCap/issues/6)             | Record the actual renderer and test nominal playback, scrubbing, ramps/dissolves and track animation          |
+| [#7 — Complete 5–10 minute flight edit](https://github.com/Plonk42/PasCap/issues/7) | Consented, licensed inputs; save/reopen, full preview, verified draft/final exports and interruption behavior |
+| [#8 — A/V and resource soak](https://github.com/Plonk42/PasCap/issues/8)            | Measure browser/GPU/native children/scratch and audible loop/buffering behavior over realistic duration       |
 
 The long-flight run uses intended-GPU findings and export-space safety from v0.1.
 Synthetic/SwiftShader CI cannot close the hardware gate. Failures must produce
@@ -162,7 +162,7 @@ the native FFmpeg toolchain at startup and scripts its local install.
 
 - Original recordings are never uploaded, copied or automatically deleted.
 - Strict local data remains explicit; projects saved before the current schema, with track
-  Colour, are rejected and left unchanged, without fallback fields.
+  Color or British spelling, are rejected and left unchanged, without fallback fields.
 - The application is local/single-user, not GitHub Pages, LAN hosting or remote SaaS.
 - No new rendering effect is scheduled from an inspection checklist alone.
 - [The implementation plan](../EDITOR_IMPLEMENTATION_PLAN.md) is retained as design

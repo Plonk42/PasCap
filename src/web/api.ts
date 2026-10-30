@@ -93,8 +93,8 @@ export async function request<T>(
   const uncertainty = readOnly
     ? ''
     : ' The operation may still have completed; check the latest project or job state before repeating it.';
-  const cancelled = (): ApiError => new ApiError(`Request cancelled.${uncertainty}`, 0, 'aborted');
-  if (options.signal?.aborted) throw cancelled();
+  const canceled = (): ApiError => new ApiError(`Request canceled.${uncertainty}`, 0, 'aborted');
+  if (options.signal?.aborted) throw canceled();
   let payload: string | undefined;
   try {
     if (body !== undefined) payload = JSON.stringify(body);
@@ -120,7 +120,7 @@ export async function request<T>(
     rejectInterrupted(error);
     controller.abort();
   };
-  const onAbort = (): void => interrupt(cancelled());
+  const onAbort = (): void => interrupt(canceled());
   options.signal?.addEventListener('abort', onAbort, { once: true });
   const timer = setTimeout(() => {
     // A received HTTP conflict remains authoritative even if its explanation never arrives.
@@ -220,11 +220,7 @@ export const api = {
     try {
       response = await fetch(`/api/footage/preview?${new URLSearchParams({ path })}`, { signal });
     } catch {
-      throw new ApiError(
-        signal.aborted ? 'Request cancelled.' : 'Cannot reach the local PasCap service.',
-        0,
-        'network',
-      );
+      throw new ApiError(signal.aborted ? 'Request canceled.' : 'Cannot reach the local PasCap service.', 0, 'network');
     }
     if (!response.ok) {
       const error = errorSchema.safeParse(await response.json().catch(() => null));
@@ -264,7 +260,7 @@ export const api = {
       options,
     ),
   /** Queues the camera-motion analysis that steady-range suggestions need. */
-  analyseMotion: (id: string) => request(`/api/media/${id}/motion`, z.object({ job: jobSchema }), 'POST', {}),
+  analyzeMotion: (id: string) => request(`/api/media/${id}/motion`, z.object({ job: jobSchema }), 'POST', {}),
   /** The tempo, beat and section analysis of the current music cache, or null, and its queued or running job. */
   musicAnalysis: (id: string, options?: RequestOptions) =>
     request(
@@ -274,7 +270,7 @@ export const api = {
       undefined,
       options,
     ),
-  analyseMusic: (id: string) => request(`/api/audio/${id}/analysis`, z.object({ job: jobSchema }), 'POST', {}),
+  analyzeMusic: (id: string) => request(`/api/audio/${id}/analysis`, z.object({ job: jobSchema }), 'POST', {}),
   /** Queues a full-content check of the moved copy; the job's outcome is the answer. */
   relinkMedia: (id: string, path: string) =>
     request(`/api/media/${id}/relink`, z.object({ job: jobSchema }), 'POST', { path }),

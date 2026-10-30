@@ -27,7 +27,7 @@ interface PlaybackRun {
   contextStart: number | null;
   prefilled: ((chunks: MusicChunk[]) => void) | null;
   started: ((contextStart: number) => void) | null;
-  cancelled: ((error?: Error) => void) | null;
+  canceled: ((error?: Error) => void) | null;
 }
 
 function abortable<T>(operation: Promise<T>, signal: AbortSignal, deadlineMessage?: string): Promise<T> {
@@ -180,7 +180,7 @@ export class MusicPlayback {
   }
   #fail(run: PlaybackRun, error: Error): void {
     run.error = error;
-    run.cancelled?.(error);
+    run.canceled?.(error);
     run.controller.abort();
     this.#node?.port.postMessage({ kind: 'stop', generation: run.generation });
   }
@@ -245,7 +245,7 @@ export class MusicPlayback {
     const controller = new AbortController();
     const cancel = (): void => {
       controller.abort();
-      run.cancelled?.();
+      run.canceled?.();
     };
     const run: PlaybackRun = {
       generation,
@@ -257,7 +257,7 @@ export class MusicPlayback {
       contextStart: null,
       prefilled: null,
       started: null,
-      cancelled: null,
+      canceled: null,
     };
     this.#lastErrorFrames = 0;
     signal.addEventListener('abort', cancel, { once: true });
@@ -273,13 +273,13 @@ export class MusicPlayback {
       const chunks = await new Promise<MusicChunk[]>((resolve, reject) => {
         const finish = (): void => {
           run.prefilled = null;
-          run.cancelled = null;
+          run.canceled = null;
         };
         run.prefilled = (value) => {
           finish();
           resolve(value);
         };
-        run.cancelled = (error?: Error) => {
+        run.canceled = (error?: Error) => {
           finish();
           reject(error ?? aborted());
         };
@@ -294,13 +294,13 @@ export class MusicPlayback {
         const finish = (): void => {
           clearTimeout(timeout);
           run.started = null;
-          run.cancelled = null;
+          run.canceled = null;
         };
         run.started = (value) => {
           finish();
           resolve(value);
         };
-        run.cancelled = (error?: Error) => {
+        run.canceled = (error?: Error) => {
           finish();
           reject(error ?? aborted());
         };
@@ -356,7 +356,7 @@ export class MusicPlayback {
     if (run) {
       run.detach();
       run.controller.abort();
-      run.cancelled?.();
+      run.canceled?.();
       this.#node?.port.postMessage({ kind: 'stop', generation: run.generation });
     }
     this.#generation++;

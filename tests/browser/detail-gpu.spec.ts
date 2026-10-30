@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import type { CompositeClip } from '../../src/preview/compositor.js';
-import { gradePixel, NEUTRAL_COLOUR, type ColourSettings, type RGB } from '../../src/shared/colour.js';
+import { gradePixel, NEUTRAL_COLOR, type ColorSettings, type RGB } from '../../src/shared/color.js';
 import { compileDetail, localTone, type DetailSettings } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../../src/shared/spatial.js';
 
@@ -72,11 +72,11 @@ function bilinear(texture: Texture, u: number, t: number, out: Float64Array): vo
 function clip(
   detail: DetailSettings,
   pose: Partial<SpatialPose> = {},
-  tone: Partial<Pick<ColourSettings, 'shadows' | 'highlights' | 'hdr' | 'localContrast' | 'exposure'>> = {},
+  tone: Partial<Pick<ColorSettings, 'shadows' | 'highlights' | 'hdr' | 'localContrast' | 'exposure'>> = {},
 ): CompositeClip {
   return {
     slot: 0,
-    settings: { ...NEUTRAL_COLOUR, ...tone },
+    settings: { ...NEUTRAL_COLOR, ...tone },
     aspect: 16 / 9,
     spatial: { ...NEUTRAL_SPATIAL_POSE, ...pose },
     detail,

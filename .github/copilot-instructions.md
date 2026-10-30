@@ -10,7 +10,7 @@ edits real projects with it, so saved data must keep working. Details are in
 
 - Start from current `main` (`git pull --ff-only`). Never stash, reset, discard or
   commit unrelated edits that are already in the checkout; leave them unstaged.
-- **Routine changes go directly to `main`:** UI/editor behaviour, docs, tests, small
+- **Routine changes go directly to `main`:** UI/editor behavior, docs, tests, small
   fixes and refactors. Run the fast gate below, commit and `git push origin main`.
   CI on `main` is the backstop; if it fails, fixing it is the next task.
 - **Risky changes use a short-lived branch and PR** with squash auto-merge
@@ -19,7 +19,7 @@ edits real projects with it, so saved data must keep working. Details are in
   scripts, dependency upgrades. Don't wait for CI in the session; report the PR.
 - **Long-lived dev branches** (owner-requested, no auto-merge, merged whole after
   evaluation): split each issue into steps that keep tests passing (add the new
-  behaviour beside the old, then remove the old). Delete specs of removed behaviour
+  behavior beside the old, then remove the old). Delete specs of removed behavior
   rather than porting them; add focused specs for the new. Per step run
   `npm run check` plus the specs you edited; run the full suites on CI at the end of
   each issue (`gh workflow run ci.yml --ref <branch>`), not locally. Do live UI
@@ -73,10 +73,12 @@ edits real projects with it, so saved data must keep working. Details are in
   benchmarks and long renders need explicit owner consent.
 - Keep the editor simple to learn without removing features: common actions where
   expected, accessible native controls, visual feedback over explanatory text.
-  Preserve keyboard/focus behaviour and one Undo step per completed gesture;
+  Preserve keyboard/focus behavior and one Undo step per completed gesture;
   invalid edits never silently clamp, merge or overwrite.
+- American English everywhere (#292): UI, help, code, file names, docs and saved fields use
+  American spelling: **Color**, analyze, canceled, center, gray, neighbor, behavior.
 - User-facing animation text uses **Keyframe**, **enabled setting** and **Easing**,
-  following [the editor control catalogue](../docs/design/EDITOR_CONTROLS.md).
+  following [the editor control catalog](../docs/design/EDITOR_CONTROLS.md).
   Keep contextual accessible names and technical/internal math terms such as
   anchor, participant and `interpolation` where needed; do not rename saved fields
   or internal identifiers merely to match visible labels.
@@ -91,6 +93,8 @@ edits real projects with it, so saved data must keep working. Details are in
   values; reject data a build cannot open clearly and leave it unchanged.
   Regenerable caches (proxies, PCM, thumbnails, motion analysis) may instead
   require explicit re-preparation. Never write the schema number in docs.
+  Owner waiver #292 (2026-10-30): the American spelling rename has no project migration (older
+  projects are rejected and left unchanged); `videos.json` version 3 upgrades version 2 on read.
 - Never commit or post private paths, media, credentials, caches or generated reports.
 
 ## Architecture
@@ -121,9 +125,9 @@ edits real projects with it, so saved data must keep working. Details are in
   enabled-setting chip arrows. All per-channel arrows visit strictly earlier/later keyframes where that
   channel is nonnull (zero is enabled). Each expanded
   section has one keyframe line (count, one Previous/Next pair over the same set, Reset), hidden
-  while collapsed. Colour and Transform each end with their own stored keyframe list (same
-  row pattern via one shared `StoredKeyframeList`); there is no separate Keyframes section. The pair: Colour visits the twelve scalar
-  colour/HDR/Local contrast keyframes of the clip grade or adjustment it edits; Speed visits **all retained custom speed source keyframes of the
+  while collapsed. Color and Transform each end with their own stored keyframe list (same
+  row pattern via one shared `StoredKeyframeList`); there is no separate Keyframes section. The pair: Color visits the twelve scalar
+  color/HDR/Local contrast keyframes of the clip grade or adjustment it edits; Speed visits **all retained custom speed source keyframes of the
   selected clip**, including off-trim keyframes and original exclusive OUT; Speed's
   single setting has no extra per-setting arrows beside its diamond. Clip source navigation
   previews the nearest image mapped by authoritative retiming, using an independent
@@ -143,66 +147,66 @@ edits real projects with it, so saved data must keep working. Details are in
   frames, `[]` on new projects. They are extra `snapPoints()` for every snapping gesture,
   slide through `useKeyframeSlide` (a dragged bookmark never snaps to itself) and never
   retime, render or export. See [timeline](../docs/TIMELINE_EDITING.md).
-- Colour lives in **clip grades and adjustments** (#273/#286, owner-approved, below): each has a
-  complete `colour` with twelve graded scalar fields (including `vibrance`, −1…2, a chroma scale
-  after Saturation weighted towards muted colours; #184 `whites`, −1…1, a white-point tone stage
+- Color lives in **clip grades and adjustments** (#273/#286, owner-approved, below): each has a
+  complete `color` with twelve graded scalar fields (including `vibrance`, −1…2, a chroma scale
+  after Saturation weighted towards muted colors; #184 `whites`, −1…1, a white-point tone stage
   after Highlights, and `blacks`, −1…1, a black-point tone stage after Whites; raised it adds a
-  matte lift), `hdr`, `localContrast`, `colour.hsl` (eight complete named bands) and
-  `colour.curves` (master/red/green/blue 2–16-point arrays). HSL/curves remain static, not
-  animation channels. Video tracks have no Colour; saved `clip.colour`/`clip.correction` are
+  matte lift), `hdr`, `localContrast`, `color.hsl` (eight complete named bands) and
+  `color.curves` (master/red/green/blue 2–16-point arrays). HSL/curves remain static, not
+  animation channels. Video tracks have no Color; saved `clip.color`/`clip.correction` are
   invalid. Neutral creators deep-clone nested structures; never repair missing saved fields.
   Advanced resets never overwrite scalar bases/keys; Reset on an animated section never erases
   advanced settings. Keep existing LUT/buffer/decoder/native budgets and strict gates. See
-  [the advanced colour contract](../docs/design/HSL_AND_CURVES.md).
-- Approved #68: required `temperature` and `tint` colour fields use normalized
+  [the advanced color contract](../docs/design/HSL_AND_CURVES.md).
+- Approved #68: required `temperature` and `tint` color fields use normalized
   −2…2 and −1…1, neutral 0; positive Temperature warms, positive Tint adds magenta.
   For Temperature $T$, Tint $I$, raw gains are
   $q=(2^{T/2+I/4},2^{-I/4},2^{-T/2+I/4})$, normalized as
   $g=q/(0.2126q_R+0.7152q_G+0.0722q_B)$. Apply to decoded linear RGB before
   Exposure, then the remaining scalar SDR stages → encoded HSL → master → RGB
   curves → fades/coverage. CPU/reference/native/GPU use the same math and order.
-  Nonzero settings intentionally colour greys; normalization preserves neutral-white
+  Nonzero settings intentionally color grays; normalization preserves neutral-white
   linear luminance before clipping only, not arbitrary pixels or final output.
-  No Kelvin/HDR output. #285: both automatic tools write **clip grades only** (Colour tab, Clip
+  No Kelvin/HDR output. #285: both automatic tools write **clip grades only** (Color tab, Clip
   target; adjustments have neither). #218 **Auto white balance** (under Tint) estimates Temperature/Tint
   from 16 proxy frames within ±30 of the playhead (on the graded clip, mapped through retiming) on its
   own temporary reader, and keyframes both at the source frame shown there like their diamonds, one Undo
-  step; no schema/render/export change. #167 Phase 1 **Auto** (Colour keyframe line)
-  fits eleven scalar settings from 16 proxy frames through the real grade (#225: colour is raised with
-  Saturation and Vibrance, Saturation giving way first on strong colours such as skies), previews them in a
+  step; no schema/render/export change. #167 Phase 1 **Auto** (Color keyframe line)
+  fits eleven scalar settings from 16 proxy frames through the real grade (#225: color is raised with
+  Saturation and Vibrance, Saturation giving way first on strong colors such as skies), previews them in a
   popover with Intensity (initially 80%, the fitted correction; 100% exaggerates it by a
   quarter) and applies one Undo step. **Source** (named by scope): Playhead (±30 frames), This clip (whole graded clip) or Every clip on <track>
-  (each analysed on its own, one `colour` edit per clip, **Apply to N clips**; keyframes go to this clip only). **Apply as**: Grade values edits
+  (each analyzed on its own, one `color` edit per clip, **Apply to N clips**; keyframes go to this clip only). **Apply as**: Grade values edits
   the grades' values, leaving animated settings and keyframes unchanged; Keyframe (Playhead source only)
   captures all eleven at the source frame like their diamonds (initial, with Playhead, once any is
   animated). Constants in `src/shared/auto-adjust.ts`, no schema/render change
   ([Auto adjust](../docs/design/AUTO_ADJUST.md)).
   Main/stored slider/exact-field/reset/diamond/navigation retain
   explicit capture and one-step gestures.
-  Compare bypasses all Colour, including Temperature/Tint, and clip Detail, never coverage or geometry.
+  Compare bypasses all Color, including Temperature/Tint, and clip Detail, never coverage or geometry.
   See [Temperature and Tint](../docs/design/TEMPERATURE_AND_TINT.md).
 - v1.3, owner-approved #273/#286: every clip requires
-  `grade: { colour, keyframes }` (0–64 keys at original-source frames, fourteen nullable
+  `grade: { color, keyframes }` (0–64 keys at original-source frames, fourteen nullable
   channels), evaluated at the continuous source position (one frame lower when reversed) and kept
   with the footage through every clip edit. Projects require `adjustments`: 0–1,024 items
-  `{ id, start, duration, colour, keyframes }`, ascending, never overlapping, each grading
+  `{ id, start, duration, color, keyframes }`, ascending, never overlapping, each grading
   **every video track** within `[start, start + duration)` with hard edges; 0–64 keys counted from
   the item start, always within its range (a move or trim that would leave one outside is
   refused), moving with it (`adjustment-range` `move`) or keeping their project frames (`stay`, a trim). Items never follow
   clips and never extend duration. Each source is graded by its clip grade, then the item at that
   project frame, in sequence (each stage clips and encodes; local tone summed once in the detail
   kernel). Static export requires no adjustments and unkeyed scalar clip grades without local
-  tone, one LUT per clip. The **Colour** tab (Clip / Colour / Track / Audio) edits the grade of the
+  tone, one LUT per clip. The **Color** tab (Clip / Color / Track / Audio) edits the grade of the
   clip or adjustment selected on the timeline (adjustments are drawn on the pinned adjustment track
   or added over the ruler range or the selected clip, deleted from its header); clip keys are amber
   markers inside clips; Copy/Paste grade in the clip and adjustment menus; Original with Shift/Alt
   bypasses only clip grades /
-  adjustments. Colour and `layer-key-*` commands take `clipId` (`colour`: `clipIds`) or
+  adjustments. Color and `layer-key-*` commands take `clipId` (`color`: `clipIds`) or
   `adjustmentId`. No migration (owner, 2026-10-28): projects and receipt snapshots saved with track
-  Colour are rejected with the reason and left unchanged. Items are on a pinned timeline lane (#287)
+  Color are rejected with the reason and left unchanged. Items are on a pinned timeline lane (#287)
   and edited through MCP with the `adjustment-*` commands (#288); see [clip grades and adjustments](../docs/design/CLIP_GRADES_AND_ADJUSTMENTS.md) and
   [row appearance](../docs/design/ROW_APPEARANCE.md).
-- Owner-approved #131: Transform is **track-owned, exactly like Colour**.
+- Owner-approved #131: Transform is **track-owned, exactly like Color**.
   Every video track requires strict `transform: { base, keyframes }`; clips have no
   `spatial` field. Nine complete pose values (#286: the eight geometry settings and
   **Opacity**, 0–1, neutral 1) and 0–256 ascending absolute project-frame
@@ -210,14 +214,14 @@ edits real projects with it, so saved data must keep working. Details are in
   (others null, at least one number) with its own Easing, and each setting interpolates
   between its own keys with endpoint holds. A setting without keys holds its base;
   deleting its last key reveals that base. A Transform default keyframe (`reset: true`,
-  neutral pose, Hold) never reaches back, like a Colour default keyframe. Reset transform
-  behaves like Colour Reset: unanimated it restores the neutral base, animated it
+  neutral pose, Hold) never reaches back, like a Color default keyframe. Reset transform
+  behaves like Color Reset: unanimated it restores the neutral base, animated it
   neutralizes the enabled settings of the key at the playhead. The pose applies to
   every source on the track (both dissolve sources, per source, no extra resampling
   pass); clip edits never copy or shift it and moves adopt the destination pose.
   Scale is 0.1–8, translation −2–2 output-width/height fractions, rotation
   −180°–180° clockwise with numeric, not shortest-arc interpolation. Crop fractions
-  are each in 0–1 (a crop of 1, or opposite crops summing to 1 or more, cover nothing), without refit or moving the original-centre pivot;
+  are each in 0–1 (a crop of 1, or opposite crops summing to 1 or more, cover nothing), without refit or moving the original-center pivot;
   use unrounded original-aspect contain fit and top-left half-open crop bounds.
   Exact neutral rendering (geometry only: Opacity never leaves it) preserves opaque black
   letterboxing after grading; nonneutral uncovered pixels are transparent. Track → Transform is collapsed by default, with a capture triangle and Previous/Next per setting,
@@ -229,18 +233,18 @@ edits real projects with it, so saved data must keep working. Details are in
 - Owner-approved #123: every clip requires strict static `detail: { sharpen 0–2,
 clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channel; split/
   cut/duplicate copy it. Filters run on bilinear source taps around the inverse-mapped
-  point, before the Colour grade: Denoise (spatial bilateral) → Clarity → Sharpen,
+  point, before the Color grade: Denoise (spatial bilateral) → Clarity → Sharpen,
   radii in 1/720 of the image height. Exact neutral bypasses the kernel (bit-identical).
   Shader tap tables and the native compositor share `src/shared/detail.ts`; any
   nonneutral detail requires composited export without new Node buffers or native processes.
   #147: export composites detail/HDR groups in one service-owned headless Chrome GPU
   worker page (same shaders, loopback HTTP, software renderers rejected) with automatic
   CPU fallback; the CPU kernel stays the parity reference.
-  Compare bypasses Colour and Detail. Clip → Detail is the third section, collapsed
+  Compare bypasses Color and Detail. Clip → Detail is the third section, collapsed
   by default, with live slider preview and one Undo per release. See
   [detail filters](../docs/design/DETAIL_FILTERS.md).
-- Grade **Shadows**, **Highlights** (−1…1), **HDR** (`colour.hdr` 0–1, keyframe channel `hdr`,
-  an SDR local tone-mapping look) and **Local contrast** (`colour.localContrast` −1…1, channel
+- Grade **Shadows**, **Highlights** (−1…1), **HDR** (`color.hdr` 0–1, keyframe channel `hdr`,
+  an SDR local tone-mapping look) and **Local contrast** (`color.localContrast` −1…1, channel
   `localContrast`, the local-detail boost split out of HDR, which keeps only its tone
   compression) are local tone settings: evaluated per grade (summed for the clip grade and the
   adjustment) but applied in the shared detail
@@ -269,7 +273,7 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   settings agree on, else Linear. Grade keyframes require boolean `reset`: a **default
   keyframe** (`reset: true`, created with all fourteen settings neutral and Hold Easing)
   never reaches back, so a setting whose first keyframe it is keeps its unkeyed value before
-  it. Toggle **Add default keyframe** in the Colour keyframe line; amber filled marker.
+  it. Toggle **Add default keyframe** in the Color keyframe line; amber filled marker.
   Transform keyframes carry the same `reset` flag (own toggle in the Transform line). See
   [layers/keyframes](../docs/LAYERS_AND_KEYFRAMES.md).
 - Music is a required 0–8 array of independently identified music tracks, never null
@@ -282,7 +286,7 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   and clamp once after the complete sum, with one bounded queue/output clock.
 - Heavy native work stays serial with bounded children/buffers, exact frame counts
   and source identity guards.
-- Read and update the relevant contract guide when behaviour changes:
+- Read and update the relevant contract guide when behavior changes:
   [timeline](../docs/TIMELINE_EDITING.md),
   [layers/keyframes/resources](../docs/LAYERS_AND_KEYFRAMES.md),
   [speed/audio](../docs/SPEED_AND_AUDIO.md),
@@ -291,5 +295,5 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   [detail filters](../docs/design/DETAIL_FILTERS.md),
   [WebCodecs preview](../docs/design/WEBCODECS_PREVIEW.md),
   [workspace/recovery](../docs/WORKSPACE_AND_RECOVERY.md) and
-  [development](../docs/DEVELOPMENT.md). Guides describe current behaviour only;
+  [development](../docs/DEVELOPMENT.md). Guides describe current behavior only;
   history belongs in Git and issues.

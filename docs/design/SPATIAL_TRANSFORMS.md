@@ -26,8 +26,8 @@ The owner chose, on 2026-10-14:
 | ----------------- | ------------------------------------------------------------------------------------------------------ |
 | Ownership         | **Replace** clip Transform: clips have no `spatial` field; every video track owns one Transform        |
 | Keyframes         | **Separate** track Transform keyframes, in project frames, with their own markers and default keyframe |
-| Behaviour         | Exactly like Colour: capture buttons, read-only gaps, default keyframe, Reset, live slider preview     |
-| Application       | **Per source**, like Colour: each clip's recording is cropped, fitted and posed with the track's pose  |
+| Behavior          | Exactly like Color: capture buttons, read-only gaps, default keyframe, Reset, live slider preview      |
+| Application       | **Per source**, like Color: each clip's recording is cropped, fitted and posed with the track's pose   |
 | Different framing | Put the clip on its own track                                                                          |
 
 Rationale for per-source application: it keeps the existing per-source pipeline
@@ -40,7 +40,7 @@ moving a clip to another track adopts that track's Transform.
 
 With [#286](https://github.com/Plonk42/PasCap/issues/286) (owner, 2026-10-28), **Opacity** is
 a Transform setting: Opacity and Transform both describe how the track's layer sits over the
-ones below, and neither grades the image. Colour belongs to
+ones below, and neither grades the image. Color belongs to
 [clip grades and adjustments](ROW_APPEARANCE.md); a track has one keyframe list, its Transform's.
 
 ## Required data and ownership
@@ -70,8 +70,8 @@ covers nothing and the track displays nothing there. It is never rejected or rep
 
 Neutral creation values are not defaults for missing saved data. Transform keyframes
 are the track's only keyframes: they have
-their own list in **Track → Transform** and their own timeline markers. Colour keyframes
-belong to clip grades and adjustments. Colour, clip-only speed and clip-only Detail are unchanged.
+their own list in **Track → Transform** and their own timeline markers. Color keyframes
+belong to clip grades and adjustments. Color, clip-only speed and clip-only Detail are unchanged.
 
 With no keys for a setting, its `base` value holds everywhere. Once any key enables a
 setting, that setting's curve overrides its base, including endpoint holds before its
@@ -85,7 +85,7 @@ setting's last key reveals its unchanged saved base.
 ### Default keyframe
 
 A default keyframe (`reset: true`) is created with all nine settings at their neutral
-values (Opacity 1) and **Hold** Easing, exactly like Colour's. It never reaches back: before a
+values (Opacity 1) and **Hold** Easing, exactly like Color's. It never reaches back: before a
 default keyframe that is a setting's first key, that setting keeps its base. A setting
 keyed earlier eases into the default with its Easing at the previous key, then holds it.
 Its values, Easing, time and enabled settings remain editable; it stays a default keyframe.
@@ -97,7 +97,7 @@ of the track and on both dissolve sources. Geometry can therefore move while slo
 holds one recorded image; no optical-flow or intermediate image is invented. Clip speed,
 trims, splits, cuts, duplicates and moves never touch track Transform keyframes, and
 Transform edits never change source ranges, placement, speed, duration, transitions,
-fades, music or Colour keyframes. Originals and proxies are not cropped or rewritten.
+fades, music or Color keyframes. Originals and proxies are not cropped or rewritten.
 
 ## Geometry and coverage
 
@@ -106,11 +106,11 @@ For original dimensions $W_s,H_s$ and output dimensions $W_o,H_o$, uniform
 contain fit is $f=\min(W_o/W_s,H_o/H_s)$. Fitted dimensions $fW_s,fH_s$ are
 **unrounded** geometry derived from each source's registered original aspect, not
 from an even-rounded proxy/decode rectangle. Apply uniform scale and clockwise rotation
-about the **original image centre**, then translate by
+about the **original image center**, then translate by
 $(\mathrm{translateX}W_o,\mathrm{translateY}H_o)$.
 
 Crop removes original edges without refitting, stretching, recentering or moving
-the pivot. Inverse-map each output pixel centre $(x+0.5,y+0.5)$ into original
+the pivot. Inverse-map each output pixel center $(x+0.5,y+0.5)$ into original
 normalized $(u,v)$, then test the half-open source rectangle:
 
 $$
@@ -146,7 +146,7 @@ $$
 Both dissolve sources use the same evaluated track pose and Opacity; their masks differ
 only through their own recordings' aspect. No second track/group opacity multiplier
 exists. Black fades change RGB, not coverage. Spatial RGB resampling precedes grading.
-The Original preview bypasses Colour and clip Detail only, preserving geometry/coverage.
+The Original preview bypasses Color and clip Detail only, preserving geometry/coverage.
 
 ## Preview, native export and resource boundaries
 
@@ -156,7 +156,7 @@ the same original-aspect mapping, bilinearly sampling the existing fitted RGB8
 content and clamping sample taps to that content, not its black decode padding.
 Neutral native samples retain old byte indexing and opaque padding.
 Native LUT interpolation, fitted decode resolution and final H.264/YUV
-quantisation are approximations, not bitwise GPU/native equivalence.
+quantization are approximations, not bitwise GPU/native equivalence.
 
 Any nonneutral track Transform base, Opacity below 1 or **any** Transform keyframe, even all-neutral or
 after the duration, requires composited export. Nonneutral geometry sends a group to the
@@ -196,7 +196,7 @@ running from a checkerboard to solid; its field's accessible name is **Transform
 - Dragging a main or stored slider previews the draft in the image without a document,
   history, save or music change; release commits one Undo step. Escape, cancellation,
   lost capture, blur or an invalid value restores control and preview.
-- **Reset transform** works like Colour's Reset: with no keyframes it restores the
+- **Reset transform** works like Color's Reset: with no keyframes it restores the
   neutral base, Opacity 100% included; once animated it returns only the settings enabled at the keyframe at the
   playhead to neutral, keeping other keyframes, Easing and the base. Double-clicking a
   setting's name resets only that setting.
@@ -204,7 +204,7 @@ running from a checkerboard to solid; its field's accessible name is **Transform
   the one there, in one Undo step; it is unavailable where an ordinary keyframe exists.
 - Below the nine settings, when the track has Transform keyframes, a small **Keyframes**
   heading introduces the list (fieldset **Transform keyframes** plus the track name, list
-  **Edit Transform keyframes**), built from the same shared stored keyframe list as Colour's.
+  **Edit Transform keyframes**), built from the same shared stored keyframe list as Color's.
   Each row has a timecode button **Go to Transform keyframe N** stretched over the whole row
   (a click anywhere outside the row's controls selects the key), a light-blue **Default**
   badge for a default keyframe, an **Outside duration** badge, a trash **Delete Transform
@@ -244,6 +244,6 @@ salmon **●** speed and amber **◆** clip grade markers is separate.
 ## Preservation
 
 Projects and version-1 export receipt snapshots must satisfy the strict **current schema**.
-Projects and receipt snapshots saved before it, with track Colour and Opacity, are rejected with
+Projects and receipt snapshots saved before it, with track Color and Opacity or British spelling, are rejected with
 the reason and, like completed videos, remain untouched. Do not default-fill or delete old data automatically. Proxy/PCM and receipt/report format versions do not change; the
-registries are version 2 (full-content checksums).
+registries are version 3 (videos) and 2 (music), with full-content checksums.

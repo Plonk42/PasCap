@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyseFeatures, MusicFeatureExtractor } from '../../src/server/music-analysis.js';
+import { analyzeFeatures, MusicFeatureExtractor } from '../../src/server/music-analysis.js';
 import {
   keyName,
   musicBeatFrames,
@@ -58,10 +58,10 @@ function beatTimes(bpm: number, offset: number, seconds: number): number[] {
   return times;
 }
 
-function analyse(signal: Float32Array, chunk = 65_536): MusicMeasurement {
+function analyze(signal: Float32Array, chunk = 65_536): MusicMeasurement {
   const extractor = new MusicFeatureExtractor();
   for (let from = 0; from < signal.length; from += chunk) extractor.push(signal.subarray(from, from + chunk));
-  return analyseFeatures(extractor.finish());
+  return analyzeFeatures(extractor.finish());
 }
 
 function fMeasure(found: number[], truth: number[]): number {
@@ -89,7 +89,7 @@ const downbeatSamples = (result: MusicMeasurement): number[] =>
 describe('music analysis · synthetic signals', () => {
   it.each([60, 75, 90, 110, 128, 150, 174, 200])('finds click-track beats and tempo at %i BPM', (bpm) => {
     const truth = beatTimes(bpm, 0.137 + bpm / 1000, 30);
-    const result = analyse(
+    const result = analyze(
       render(
         30,
         truth.map((time) => ({ time, gain: 0.5 })),
@@ -111,7 +111,7 @@ describe('music analysis · synthetic signals', () => {
     const signal = render(30, [], (time) =>
       time < offset ? 0.1 : 0.1 + 0.6 * Math.exp(-((time - offset) % period) / 0.06),
     );
-    const result = analyse(signal);
+    const result = analyze(signal);
     expect(fMeasure(beatSamples(result), truth)).toBeGreaterThanOrEqual(0.95);
     expect(Math.abs(result.tempo!.bpm / bpm - 1)).toBeLessThanOrEqual(0.02);
   });
@@ -121,7 +121,7 @@ describe('music analysis · synthetic signals', () => {
     const grid = beatTimes(120, 0.3, 30);
     // A player within ±25 ms of the pulse; the beats keep the pulse, not each hit.
     const played = grid.map((time) => time + 0.025 * random());
-    const result = analyse(
+    const result = analyze(
       render(
         30,
         played.map((time) => ({ time, gain: 0.5 })),
@@ -144,7 +144,7 @@ describe('music analysis · synthetic signals', () => {
       { time, gain: 0.6 },
       { time: time + (2 / 3) * 0.6, gain: 0.3 },
     ]);
-    const result = analyse(render(30, hits, () => 0.05));
+    const result = analyze(render(30, hits, () => 0.05));
     expect(fMeasure(beatSamples(result), truth)).toBeGreaterThanOrEqual(0.95);
     expect(Math.abs(result.tempo!.bpm / 100 - 1)).toBeLessThanOrEqual(0.02);
   });
@@ -153,7 +153,7 @@ describe('music analysis · synthetic signals', () => {
     const slow = beatTimes(100, 0.25, 20);
     const fast = beatTimes(130, slow.at(-1)! + 0.6, 40);
     const truth = [...slow, ...fast];
-    const result = analyse(
+    const result = analyze(
       render(
         40,
         truth.map((time) => ({ time, gain: 0.5 })),
@@ -172,7 +172,7 @@ describe('music analysis · synthetic signals', () => {
     // A soft passage whose quiet beat sits under a slightly louder arpeggio, 8% faster.
     const arpeggio = beatTimes(60 / 0.432, 12.1, 30).map((time) => ({ time, gain: 0.12 }));
     const hits = [...truth.map((time) => ({ time, gain: soft(time) ? 0.1 : 0.5 })), ...arpeggio];
-    const result = analyse(render(45, hits, () => 0.02));
+    const result = analyze(render(45, hits, () => 0.02));
     const inside = (samples: number[]): number[] => samples.filter((sample) => soft(sample / RATE));
     expect(
       fMeasure(
@@ -205,7 +205,7 @@ describe('music analysis · synthetic signals', () => {
       const chord = chords[((Math.floor((time - first) / bar) % 4) + 4) % 4]!;
       for (const hz of chord) signal[index] = signal[index]! + 0.05 * Math.sin(2 * Math.PI * hz * time);
     }
-    const result = analyse(signal);
+    const result = analyze(signal);
     expect(result.meter?.beatsPerBar).toBe(4);
     expect(
       fMeasure(
@@ -224,7 +224,7 @@ describe('music analysis · synthetic signals', () => {
       ...Array.from({ length: 8 }, (_, bar) => 34 + 4 * bar),
     ]);
     const hits = times.map((time, index) => ({ time, gain: starts.has(index) ? 0.8 : 0.4, low: starts.has(index) }));
-    const result = analyse(render(34, hits, () => 0.02));
+    const result = analyze(render(34, hits, () => 0.02));
     expect(
       fMeasure(
         downbeatSamples(result),
@@ -236,7 +236,7 @@ describe('music analysis · synthetic signals', () => {
   it('reports no tempo for hits without a steady pulse', () => {
     const random = noise(5);
     const hits = Array.from({ length: 60 }, () => ({ time: 15 * (random() + 1), gain: 0.3 + 0.2 * random() }));
-    expect(analyse(render(30, hits, () => 0.02))).toMatchObject({ tempo: null, meter: null, beats: [] });
+    expect(analyze(render(30, hits, () => 0.02))).toMatchObject({ tempo: null, meter: null, beats: [] });
   });
 
   it.each([
@@ -247,7 +247,7 @@ describe('music analysis · synthetic signals', () => {
     // The track starts on its second beat, so the first beat is not a downbeat.
     const downbeat = (index: number): boolean => (index + 1) % beatsPerBar === 0;
     const hits = truth.map((time, index) => ({ time, gain: downbeat(index) ? 0.8 : 0.4, low: downbeat(index) }));
-    const result = analyse(render(40, hits, () => 0.02));
+    const result = analyze(render(40, hits, () => 0.02));
     expect(fMeasure(beatSamples(result), truth)).toBeGreaterThanOrEqual(0.95);
     expect(result.meter?.beatsPerBar).toBe(beatsPerBar);
     expect(
@@ -262,7 +262,7 @@ describe('music analysis · synthetic signals', () => {
     const truth = beatTimes(120, 0.2, 60);
     const loud = (time: number): boolean => time >= 20 && time < 40;
     const hits = truth.map((time) => ({ time, gain: loud(time) ? 0.8 : 0.1 }));
-    const result = analyse(render(60, hits, (time) => (loud(time) ? 0.2 : 0.02)));
+    const result = analyze(render(60, hits, (time) => (loud(time) ? 0.2 : 0.02)));
     expect(result.sections.map((section) => section.kind)).toEqual(['quiet', 'peak', 'quiet']);
     const [, middle] = result.sections;
     expect(Math.abs(middle!.fromSample - 20 * RATE)).toBeLessThanOrEqual(RATE);
@@ -278,7 +278,7 @@ describe('music analysis · synthetic signals', () => {
   it('names a steady crescendo a build', () => {
     const truth = beatTimes(120, 0.2, 40);
     const level = (time: number): number => (time < 20 ? 0.02 : 0.02 * 10 ** ((time - 20) / 10));
-    const result = analyse(
+    const result = analyze(
       render(
         40,
         truth.map((time) => ({ time, gain: 0.3 })),
@@ -296,7 +296,7 @@ describe('music analysis · synthetic signals', () => {
       { length: 12 },
       (_, index) => 0.4 + 0.5 * (3 + Math.floor(4.6 * index)) + 0.1 * Math.abs(random()),
     );
-    const result = analyse(
+    const result = analyze(
       render(28, [...beats.map((time) => ({ time, gain: 0.15 })), ...extra.map((time) => ({ time, gain: 0.9 }))]),
     );
     const strong = result.hits.filter((hit) => hit.strong).map((hit) => hit.sample);
@@ -316,7 +316,7 @@ describe('music analysis · synthetic signals', () => {
 
   it('keeps closely spaced hits apart', () => {
     const times = [1, 1.08, 3, 3.06, 5, 5.12];
-    const result = analyse(
+    const result = analyze(
       render(
         7,
         times.map((time) => ({ time, gain: 0.6 })),
@@ -349,7 +349,7 @@ describe('music analysis · synthetic signals', () => {
       const time = index / RATE;
       return 0.6 * kick(time) + 0.4 * snare(time) + hiss(time);
     });
-    const { hits } = analyse(signal);
+    const { hits } = analyze(signal);
     const at = (time: number) => hits.find((hit) => Math.abs(hit.sample - time * RATE) <= HIT_TOLERANCE)?.band;
     expect([at(1), at(3), at(5)]).toEqual(['low', 'mid', 'high']);
   });
@@ -357,7 +357,7 @@ describe('music analysis · synthetic signals', () => {
   it('tells strong hits from light ones', () => {
     const loud = [2, 6, 10];
     const soft = [4, 8];
-    const result = analyse(
+    const result = analyze(
       render(
         12,
         [...loud.map((time) => ({ time, gain: 0.8 })), ...soft.map((time) => ({ time, gain: 0.08 }))],
@@ -378,7 +378,7 @@ describe('music analysis · synthetic signals', () => {
     const random = noise(21);
     const signal = Float32Array.from({ length: 10 * RATE }, (_, index) => sample(index / RATE, random));
     // The onset of a held tone at the very start is not a hit after it.
-    expect(analyse(signal).hits.filter((hit) => hit.sample > 0.2 * RATE)).toEqual([]);
+    expect(analyze(signal).hits.filter((hit) => hit.sample > 0.2 * RATE)).toEqual([]);
   });
 
   it('is deterministic and independent of the streamed block size', () => {
@@ -388,9 +388,9 @@ describe('music analysis · synthetic signals', () => {
       truth.map((time) => ({ time, gain: 0.5 })),
       () => 0.03,
     );
-    const first = analyse(signal);
-    expect(analyse(signal)).toEqual(first);
-    expect(analyse(signal, 4_801)).toEqual(first);
+    const first = analyze(signal);
+    expect(analyze(signal)).toEqual(first);
+    expect(analyze(signal, 4_801)).toEqual(first);
   });
 
   it('measures low, mid and high levels per second', () => {
@@ -402,7 +402,7 @@ describe('music analysis · synthetic signals', () => {
       if (time < 6) return 0.5 * Math.sin(2 * Math.PI * 1_000 * time);
       return 0.5 * random();
     });
-    const { tone } = analyse(signal);
+    const { tone } = analyze(signal);
     expect(tone).toHaveLength(9);
     const sine = 20 * Math.log10(0.5 / Math.SQRT2);
     expect(tone[1]![0]).toBeCloseTo(sine, 0);
@@ -439,14 +439,14 @@ describe('music analysis · synthetic signals', () => {
       const time = index / RATE;
       return chords[Math.floor(time / 2) % 4]!.reduce((sum, hz) => sum + 0.1 * Math.sin(2 * Math.PI * hz * time), 0);
     });
-    expect(analyse(signal).key).toMatchObject(key);
+    expect(analyze(signal).key).toMatchObject(key);
   });
 
   it('finds silences of at least 0.3 s, not shorter gaps', () => {
     const gap = (time: number): boolean => (time >= 4 && time < 5) || (time >= 7 && time < 7.15);
     const random = noise(9);
     const signal = Float32Array.from({ length: 10 * RATE }, (_, index) => (gap(index / RATE) ? 0 : 0.3 * random()));
-    expect(analyse(signal).silences).toEqual([{ fromSample: 4 * RATE, toSample: 5 * RATE }]);
+    expect(analyze(signal).silences).toEqual([{ fromSample: 4 * RATE, toSample: 5 * RATE }]);
   });
 
   it('finds a gradual crescendo and a sudden drop', () => {
@@ -460,7 +460,7 @@ describe('music analysis · synthetic signals', () => {
       { length: 26 * RATE },
       (_, index) => Math.sqrt(3) * 10 ** (level(index / RATE) / 20) * random(),
     );
-    const { swells } = analyse(signal);
+    const { swells } = analyze(signal);
     expect(swells).toHaveLength(2);
     const [rise, drop] = swells;
     expect(rise).toMatchObject({ kind: 'crescendo', sudden: false });
@@ -473,7 +473,7 @@ describe('music analysis · synthetic signals', () => {
   });
 
   it('reports silence without tempo, beats or hits', () => {
-    const result = analyse(new Float32Array(10 * RATE));
+    const result = analyze(new Float32Array(10 * RATE));
     expect(result).toMatchObject({ tempo: null, meter: null, beats: [], hits: [], samples: 10 * RATE });
     expect(result.sections).toEqual([{ fromSample: 0, toSample: 10 * RATE, kind: 'quiet', loudnessDb: -120 }]);
     expect(result.loudness.every((value) => value === -120)).toBe(true);
@@ -485,7 +485,7 @@ describe('music analysis · synthetic signals', () => {
       { length: 6 * RATE },
       (_, index) => 0.5 * Math.sin((2 * Math.PI * 440 * index) / RATE),
     );
-    expect(analyse(signal)).toMatchObject({ tempo: null, meter: null, beats: [] });
+    expect(analyze(signal)).toMatchObject({ tempo: null, meter: null, beats: [] });
   });
 });
 
@@ -548,7 +548,7 @@ describe('music beats at project frames', () => {
     const document = createProject('beat-snap', 'Beat snap');
     document.music = [
       singleClipLane(track({ id: 'looped', sourceIn: 5, sourceOut: 30, duration: 70, loop: true })),
-      singleClipLane(track({ id: 'other', mediaId: 'unanalysed', start: 400 })),
+      singleClipLane(track({ id: 'other', mediaId: 'unanalyzed', start: 400 })),
     ];
     const beatsOf = (mediaId: string) => (mediaId === 'audio-1' ? { beats, hits } : null);
     expect(musicBeatSnap(beatsOf, 'beats')(document)).toEqual([105, 115, 130, 140, 155, 165]);

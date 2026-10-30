@@ -199,7 +199,7 @@ test('the first clip of a Ripple track snaps its free start to a bookmark', asyn
   await expect.poll(async () => (await current(page)).clips.find((clip) => clip.id === 'moving')?.start).toBe(77);
 });
 
-test('invalid overlap is visibly rejected and cancelled movement never changes the source or placement', async ({
+test('invalid overlap is visibly rejected and canceled movement never changes the source or placement', async ({
   page,
 }) => {
   await installOverlay(page);
@@ -265,9 +265,9 @@ test('duplicate preserves static settings without copying row points, and overla
   await installOverlay(page);
   let document = await current(page);
   document = applyCommand(document, {
-    type: 'colour',
+    type: 'color',
     clipIds: ['moving'],
-    colour: { ...document.clips[1]!.grade.colour, contrast: 1.3, saturation: 0.7 },
+    color: { ...document.clips[1]!.grade.color, contrast: 1.3, saturation: 0.7 },
   });
   document = applyCommand(document, { type: 'transform-setting', layerId: 'upper', setting: 'opacity', value: 0.6 });
   document = applyCommand(document, {
@@ -285,7 +285,7 @@ test('duplicate preserves static settings without copying row points, and overla
   const copy = duplicated.clips[2]!;
   expect(copy.id).not.toBe('moving');
   expect(copy).toEqual({ ...duplicated.clips[1]!, id: copy.id, start: 50 });
-  expect(copy.grade.colour).toMatchObject({ contrast: 1.3, saturation: 0.7 });
+  expect(copy.grade.color).toMatchObject({ contrast: 1.3, saturation: 0.7 });
   expect(copy).not.toHaveProperty('animation');
   expect(duplicated.layers[1]?.transform).toEqual(document.layers[1]?.transform);
   await page.getByRole('region', { name: 'Video timeline' }).focus();

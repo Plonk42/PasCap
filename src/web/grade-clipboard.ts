@@ -1,5 +1,5 @@
 import type { EditCommand } from '../shared/commands.js';
-import type { ColourSettings } from '../shared/colour.js';
+import type { ColorSettings } from '../shared/color.js';
 import type { ProjectDocument } from '../shared/model.js';
 
 /** A clip's grade or an adjustment, as right-clicked or selected on the timeline. */
@@ -23,10 +23,10 @@ export function copyGradeBlocked(project: ProjectDocument, target: GradeTarget):
     : null;
 }
 
-/** The Colour a copy takes, or null when it cannot be copied. */
-export function copiedColour(project: ProjectDocument, target: GradeTarget): ColourSettings | null {
+/** The Color a copy takes, or null when it cannot be copied. */
+export function copiedColor(project: ProjectDocument, target: GradeTarget): ColorSettings | null {
   const grade = gradeOf(project, target);
-  return grade && !copyGradeBlocked(project, target) ? structuredClone(grade.colour) : null;
+  return grade && !copyGradeBlocked(project, target) ? structuredClone(grade.color) : null;
 }
 
 const same = (left: GradeTarget, right: GradeTarget): boolean => left.kind === right.kind && left.id === right.id;
@@ -55,7 +55,7 @@ export function pasteTargetsLabel(targets: readonly GradeTarget[]): string {
 export function pasteGradeCommands(
   project: ProjectDocument,
   targets: readonly GradeTarget[],
-  colour: ColourSettings,
+  color: ColorSettings,
 ): EditCommand[] {
   const clipIds = targets.filter((target) => target.kind === 'clip').map((target) => target.id);
   const adjustmentIds = new Set(targets.filter((target) => target.kind === 'adjustment').map((target) => target.id));
@@ -64,11 +64,11 @@ export function pasteGradeCommands(
     .flatMap((clip) =>
       clip.grade.keyframes.map((key): EditCommand => ({ type: 'layer-key-remove', clipId: clip.id, frame: key.frame })),
     );
-  if (clipIds.length) commands.push({ type: 'colour', clipIds, colour: structuredClone(colour) });
+  if (clipIds.length) commands.push({ type: 'color', clipIds, color: structuredClone(color) });
   for (const item of project.adjustments.filter((entry) => adjustmentIds.has(entry.id))) {
     for (const key of item.keyframes)
       commands.push({ type: 'layer-key-remove', adjustmentId: item.id, frame: key.frame });
-    commands.push({ type: 'colour', adjustmentId: item.id, colour: structuredClone(colour) });
+    commands.push({ type: 'color', adjustmentId: item.id, color: structuredClone(color) });
   }
   return commands;
 }

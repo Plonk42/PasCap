@@ -15,7 +15,7 @@ interface ProcessOptions {
 export function runProcess(binary: string, args: string[], options: ProcessOptions = {}): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     if (options.signal?.aborted) {
-      reject(new ServiceError('Job cancelled.', 499));
+      reject(new ServiceError('Job canceled.', 499));
       return;
     }
     const child = spawn(binary, args, {
@@ -72,7 +72,7 @@ export function runProcess(binary: string, args: string[], options: ProcessOptio
     });
     child.once('close', (code) => {
       cleanUp();
-      if (options.signal?.aborted) reject(new ServiceError('Job cancelled.', 499));
+      if (options.signal?.aborted) reject(new ServiceError('Job canceled.', 499));
       else if (overflow) reject(new ServiceError(`${binary} exceeded its output limit.`, 500));
       else if (code !== 0) reject(new ServiceError(`${binary} exited ${code}: ${stderr.trim()}`, 422));
       else resolve(Buffer.concat(chunks));

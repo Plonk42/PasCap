@@ -15,8 +15,8 @@ interface Lane {
   readonly listeners: Set<() => void>;
 }
 
-function cancelled(): DOMException {
-  return new DOMException('Obsolete video request cancelled.', 'AbortError');
+function canceled(): DOMException {
+  return new DOMException('Obsolete video request canceled.', 'AbortError');
 }
 
 /**
@@ -148,7 +148,7 @@ export class VideoStreams {
         if (error === undefined) resolve();
         else reject(error);
       };
-      const abort = (): void => finish(cancelled());
+      const abort = (): void => finish(canceled());
       const check = (): void => {
         if (signal.aborted || lane.generation !== generation || this.#disposed) {
           abort();

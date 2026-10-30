@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import path from 'node:path';
-import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
+import { COLOR_CONTROLS } from '../../src/shared/color.js';
 import { KEYFRAME_SETTINGS, uniformKeyframe } from '../../src/shared/keyframes.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import {
@@ -27,10 +27,10 @@ import {
 } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
-type Section = 'Colour' | 'Speed' | 'Transform';
+type Section = 'Color' | 'Speed' | 'Transform';
 const TRACK = 'Track 1';
 const CLIP = 'animated-clip';
-const colourSettings = COLOUR_CONTROLS;
+const colorSettings = COLOR_CONTROLS;
 
 function inspector(page: Page): Locator {
   return page.getByRole('complementary', { name: 'Properties', exact: true });
@@ -61,7 +61,7 @@ function transformDiamond(page: Page): Locator {
   return inspector(page).getByRole('button', { name: 'Keyframe Scale', exact: true });
 }
 
-/** Every main Transform setting has its own diamond, like Colour; stored fields have none. */
+/** Every main Transform setting has its own diamond, like Color; stored fields have none. */
 function transformDiamonds(page: Page): Locator {
   return inspector(page).locator('.spatial-pose-fields .keyframe-toggle');
 }
@@ -117,7 +117,7 @@ async function seek(page: Page, document: ProjectDocument, frame: number): Promi
   await previewAt(page, document, frame);
 }
 
-/** Independent oracle: compare neighbouring outputs of the authoritative placed map. */
+/** Independent oracle: compare neighboring outputs of the authoritative placed map. */
 function nearestOutput(placed: PlacedClip, source: number): number {
   if (source <= placed.clip.sourceIn) return placed.start;
   if (source >= placed.clip.sourceOut) return placed.end - 1;
@@ -237,7 +237,7 @@ for (const viewport of [
       document.clips = [clip];
       memory = await memoryProjects(page, document);
       await page.addInitScript(() => {
-        for (const section of ['source', 'layer-opacity', 'speed', 'transform', 'colour']) {
+        for (const section of ['source', 'layer-opacity', 'speed', 'transform', 'color']) {
           const key = `pascap-section-${section}`;
           if (localStorage.getItem(key) === null) localStorage.setItem(key, 'open');
         }
@@ -291,11 +291,11 @@ for (const viewport of [
       expect(document.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
       await inspectorTab(page, 'Adjustment');
       await expect(inspector(page).getByRole('button', { name: /^Animate / })).toHaveCount(0);
-      await expect(line(page, 'Colour')).toContainText('0 keyframes');
-      await expect(line(page, 'Colour').getByRole('button', { name: 'Reset colour', exact: true })).toBeVisible();
+      await expect(line(page, 'Color')).toContainText('0 keyframes');
+      await expect(line(page, 'Color').getByRole('button', { name: 'Reset color', exact: true })).toBeVisible();
       for (const direction of ['Previous', 'Next'] as const)
-        await expect(navigation(page, 'Colour', direction)).toBeDisabled();
-      for (const { label } of colourSettings) {
+        await expect(navigation(page, 'Color', direction)).toBeDisabled();
+      for (const { label } of colorSettings) {
         await expect(page.getByRole('slider', { name: label, exact: true })).toBeEnabled();
         await expect(page.getByRole('spinbutton', { name: label, exact: true })).toBeEnabled();
         const main = diamond(page, label).locator('..');
@@ -313,7 +313,7 @@ for (const viewport of [
           await expect(arrow).toHaveAttribute('tabindex', '-1');
         }
       }
-      await testInfo.attach('unanimated-colour', { body: await page.screenshot(), contentType: 'image/png' });
+      await testInfo.attach('unanimated-color', { body: await page.screenshot(), contentType: 'image/png' });
       await inspectorTab(page, 'Track');
       await expect(line(page, 'Transform')).toContainText('0 keyframes');
       for (const direction of ['Previous', 'Next'] as const)
@@ -343,7 +343,7 @@ for (const viewport of [
       expect(graded.rgbSum).toBeGreaterThan(0);
       expect(await pixels(page, true)).not.toEqual(graded);
       await inspectorTab(page, 'Adjustment');
-      await expect(line(page, 'Colour')).toContainText('2 keyframes');
+      await expect(line(page, 'Color')).toContainText('2 keyframes');
       await expect(diamond(page, 'Exposure')).toHaveAttribute('aria-pressed', 'false');
       await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toHaveValue('0.6');
       await expect(page.getByRole('spinbutton', { name: 'Temperature', exact: true })).toHaveValue('0.2');
@@ -381,12 +381,12 @@ for (const viewport of [
       await seek(page, document, 0);
       await expect(page.getByRole('spinbutton', { name: 'Temperature', exact: true })).toBeEnabled();
       // Collapsing a section hides its keyframe line; the title row stays.
-      const colour = page.getByRole('button', { name: 'Colour section', exact: true });
-      await colour.click();
-      await expect(line(page, 'Colour')).toBeHidden();
-      await expect(colour).toBeVisible();
-      await colour.click();
-      await expect(line(page, 'Colour')).toBeVisible();
+      const color = page.getByRole('button', { name: 'Color section', exact: true });
+      await color.click();
+      await expect(line(page, 'Color')).toBeHidden();
+      await expect(color).toBeVisible();
+      await color.click();
+      await expect(line(page, 'Color')).toBeVisible();
       for (const section of ['Transform', 'Speed'] as const) {
         await inspectorTab(page, section === 'Speed' ? 'Clip' : 'Track');
         const toggle = page.getByRole('button', { name: `${section} section`, exact: true });
@@ -399,27 +399,25 @@ for (const viewport of [
       await unchanged(page, document);
     });
 
-    test('Colour header visits all twelve scalar settings, HDR and Local contrast and retains main arrows', async ({
+    test('Color header visits all twelve scalar settings, HDR and Local contrast and retains main arrows', async ({
       page,
     }) => {
       const document = await fixture(page, (document) => {
-        document.adjustments[0]!.keyframes = colourSettings.map(({ key }, index) =>
-          gradePoint(index * 5, { [key]: 0 }),
-        );
+        document.adjustments[0]!.keyframes = colorSettings.map(({ key }, index) => gradePoint(index * 5, { [key]: 0 }));
       });
       await inspectorTab(page, 'Adjustment');
       await expect(
         inspector(page)
-          .locator('.colour-controls')
+          .locator('.color-controls')
           .getByRole('button', { name: /^(Previous|Next) / }),
-      ).toHaveCount(colourSettings.length * 2);
-      for (const { label } of colourSettings) {
+      ).toHaveCount(colorSettings.length * 2);
+      for (const { label } of colorSettings) {
         await expect(diamond(page, label)).toBeVisible();
         await expect(diamond(page, label).locator('..')).toHaveClass(/\bkeyframe-setting-navigation\b/);
         await expect(diamond(page, label).locator('..').getByRole('button')).toHaveCount(3);
       }
-      const next = navigation(page, 'Colour', 'Next');
-      const previous = navigation(page, 'Colour', 'Previous');
+      const next = navigation(page, 'Color', 'Next');
+      const previous = navigation(page, 'Color', 'Previous');
       await expect(previous).toBeDisabled();
       for (const frame of [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65]) {
         await next.click();
@@ -721,17 +719,17 @@ for (const viewport of [
         elements.map((element) => ({
           type: element.hasAttribute('data-transform-keyframe') ? 'transform' : 'speed',
           top: element.getBoundingClientRect().top,
-          colour: getComputedStyle(element).color,
+          color: getComputedStyle(element).color,
           border: getComputedStyle(element).borderTopStyle,
-          borderColour: getComputedStyle(element).borderTopColor,
+          borderColor: getComputedStyle(element).borderTopColor,
           width: element.getBoundingClientRect().width,
         })),
       );
       const transform = appearance.find(({ type }) => type === 'transform')!;
       const speed = appearance.find(({ type }) => type === 'speed')!;
       expect(transform.top).toBeLessThan(speed.top);
-      expect(transform.colour).not.toBe(speed.colour);
-      expect(transform.borderColour).not.toBe(speed.borderColour);
+      expect(transform.color).not.toBe(speed.color);
+      expect(transform.borderColor).not.toBe(speed.borderColor);
       // Both are boxed buttons of the same family as the clip grade markers.
       expect([transform.border, speed.border]).toEqual(['solid', 'solid']);
       expect(speed.width).toBe(transform.width);
@@ -828,9 +826,9 @@ for (const viewport of [
       await settingTab(page, 'Transform');
       await expect(navigation(page, 'Transform', 'Next')).toBeDisabled();
       await expect(transformDiamond(page)).toBeDisabled();
-      // The Colour tab shows the selected clip's grade.
-      await page.getByRole('tab', { name: 'Colour', exact: true }).dispatchEvent('click');
-      await expect(navigation(page, 'Colour', 'Next')).toBeDisabled();
+      // The Color tab shows the selected clip's grade.
+      await page.getByRole('tab', { name: 'Color', exact: true }).dispatchEvent('click');
+      await expect(navigation(page, 'Color', 'Next')).toBeDisabled();
       await expect(diamond(page, 'Exposure')).toBeDisabled();
       for (const direction of ['Previous', 'Next'] as const)
         await expect(channelNavigation(page, 'Exposure', direction)).toHaveAttribute('aria-disabled', 'true');
@@ -846,7 +844,7 @@ for (const viewport of [
       await expect(
         page.getByRole('region', { name: 'Clip speed curve editor', exact: true, includeHidden: true }),
       ).toHaveAttribute('data-drafting', 'false');
-      await expect(navigation(page, 'Colour', 'Previous')).toBeEnabled();
+      await expect(navigation(page, 'Color', 'Previous')).toBeEnabled();
       await previewAt(page, document, 15);
       expect(await animatePreferences(page)).toEqual([]);
       await unchanged(page, document);

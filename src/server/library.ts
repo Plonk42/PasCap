@@ -6,6 +6,8 @@ import {
   mediaAssetSchema,
   PROXY_GOP_FRAMES,
   registrySchema,
+  upgradeVideoRegistry,
+  VIDEO_REGISTRY_VERSION,
   type DamagedRange,
   type MediaAsset,
   type MediaJob,
@@ -28,7 +30,7 @@ import {
   verifyMovedOriginal,
 } from './files.js';
 import { JobQueue, type JobContext } from './jobs.js';
-import { analyseProxy, readTelemetry } from './motion.js';
+import { analyzeProxy, readTelemetry } from './motion.js';
 import type { RelinkCandidate } from './relink.js';
 import { NATIVE_THREADS } from './native-threads.js';
 import { probeVideo } from './probe.js';
@@ -37,7 +39,7 @@ import { atomicWrite, ensurePrivateDirectory, SerialWriter } from './storage.js'
 
 export const PROXY_PROFILE = 'h264-720p-bt709-gop15-v1' as const;
 export const FRAME_SAMPLE_MAE_LIMIT = 6;
-/** A frame matching a neighbour better than itself by more than this (8-bit MAE) is shifted. */
+/** A frame matching a neighbor better than itself by more than this (8-bit MAE) is shifted. */
 const SHIFT_MARGIN = 0.25;
 /** Registry v2; the earlier library.json is no longer read. */
 export const VIDEO_REGISTRY = 'videos.json';
@@ -114,17 +116,17 @@ export class MediaLibrary {
   readonly #prepareRequests = new Map<string, Promise<MediaJob>>();
   readonly #preparing = new Map<string, string>();
   readonly #relinking = new Map<string, string>();
-  readonly #analysing = new Map<string, { job: string; verifiedAt: string }>();
+  readonly #analyzing = new Map<string, { job: string; verifiedAt: string }>();
   #nvdec: Promise<boolean> | null = null;
   constructor(
     readonly config: ServiceConfig,
     readonly jobs: JobQueue,
   ) {}
-  async initialise(): Promise<void> {
+  async initialize(): Promise<void> {
     await mkdir(this.config.dataDir, { recursive: true, mode: 0o700 });
     try {
       const saved = registrySchema.parse(
-        JSON.parse(await readFile(path.join(this.config.dataDir, VIDEO_REGISTRY), 'utf8')),
+        upgradeVideoRegistry(JSON.parse(await readFile(path.join(this.config.dataDir, VIDEO_REGISTRY), 'utf8'))),
       );
       for (const asset of saved.assets) {
         // A terminated process cannot leave an active preparation job behind.
@@ -171,7 +173,7 @@ export class MediaLibrary {
   motionPath(asset: MediaAsset): string {
     return path.join(this.assetDir(asset), `motion-v${MOTION_ANALYSIS_VERSION}.json`);
   }
-  /** The cached analysis of the current verified proxy, or null when it has not been analysed. */
+  /** The cached analysis of the current verified proxy, or null when it has not been analyzed. */
   async motion(id: string): Promise<MotionAnalysis | null> {
     const asset = this.get(id);
     if (asset.status !== 'ready' || !asset.prepared) return null;
@@ -191,16 +193,16 @@ export class MediaLibrary {
   }
   /** The queued or running camera motion analysis of this recording, if any. */
   motionJob(id: string): MediaJob | null {
-    const active = this.#analysing.get(id);
+    const active = this.#analyzing.get(id);
     return active === undefined ? null : this.jobs.get(active.job);
   }
   /** Measures camera motion in the verified proxy for smooth-range suggestions. */
-  analyseMotion(id: string): MediaJob {
-    const active = this.#analysing.get(id);
+  analyzeMotion(id: string): MediaJob {
+    const active = this.#analyzing.get(id);
     if (active !== undefined) return this.jobs.get(active.job);
     const asset = this.get(id);
     if (asset.status !== 'ready' || !asset.prepared)
-      throw new ServiceError('Prepare the recording before analysing its camera motion.', 409);
+      throw new ServiceError('Prepare the recording before analyzing its camera motion.', 409);
     if (this.#preparing.has(id) || this.#prepareRequests.has(id) || this.#relinking.has(id))
       throw new ServiceError(`${asset.name} is busy. Try again once its current job finishes.`, 409);
     return this.#submitMotion(asset);
@@ -208,7 +210,7 @@ export class MediaLibrary {
   #submitMotion(asset: MediaAsset): MediaJob {
     const { id } = asset;
     const { verifiedAt } = asset.prepared!.verification;
-    const active = this.#analysing.get(id);
+    const active = this.#analyzing.get(id);
     if (active?.verifiedAt === verifiedAt) return this.jobs.get(active.job);
     // An analysis still queued for an earlier proxy would only fail.
     if (active) this.jobs.cancel(active.job);
@@ -218,24 +220,24 @@ export class MediaLibrary {
       async (context) => {
         const current = this.get(id);
         if (current.prepared?.verification.verifiedAt !== verifiedAt)
-          throw new ServiceError('The proxy changed while waiting. Analyse the camera motion again.', 409);
+          throw new ServiceError('The proxy changed while waiting. Analyze the camera motion again.', 409);
         await assertSourceIdentity(current.sourcePath, current.fingerprint);
         await this.#measureMotion(current, context, 0.01, 0.98);
         return 'Camera motion measured';
       },
       () => {
-        if (this.#analysing.get(id)?.job === job.id) this.#analysing.delete(id);
+        if (this.#analyzing.get(id)?.job === job.id) this.#analyzing.delete(id);
         return Promise.resolve();
       },
     );
-    this.#analysing.set(id, { job: job.id, verifiedAt });
+    this.#analyzing.set(id, { job: job.id, verifiedAt });
     return job;
   }
   async #save(): Promise<void> {
     await this.#writer.run(() => this.#writeRegistry());
   }
   async #writeRegistry(): Promise<void> {
-    const contents = `${JSON.stringify({ version: 2, assets: this.list() }, null, 2)}\n`;
+    const contents = `${JSON.stringify({ version: VIDEO_REGISTRY_VERSION, assets: this.list() }, null, 2)}\n`;
     await atomicWrite(path.join(this.config.dataDir, VIDEO_REGISTRY), contents);
   }
   /** Raw read-only registration for fixtures and explicit preparation scripts. */
@@ -374,7 +376,7 @@ export class MediaLibrary {
     };
   }
   async #queueForEditing(id: string): Promise<MediaJob | null> {
-    // Reuse pending/active admissions. Ready, failed and cancelled preparations
+    // Reuse pending/active admissions. Ready, failed and canceled preparations
     // are never automatically retried by another import.
     if (!this.#prepareRequests.has(id) && !this.#preparing.has(id) && this.get(id).status !== 'registered') return null;
     try {
@@ -419,7 +421,7 @@ export class MediaLibrary {
         'prepare',
         asset.name,
         async (context) => {
-          if (context.signal.aborted) throw new ServiceError('Job cancelled.', 499);
+          if (context.signal.aborted) throw new ServiceError('Job canceled.', 499);
           current.status = 'preparing';
           await this.#save();
           // A queued source may have disappeared or changed before its turn.
@@ -431,7 +433,7 @@ export class MediaLibrary {
             current.content = content;
           }
           const note = await this.#prepareAsset(current, context, blackOutDamage ? current.damage : []);
-          if (context.signal.aborted) throw new ServiceError('Job cancelled.', 499);
+          if (context.signal.aborted) throw new ServiceError('Job canceled.', 499);
           return note;
         },
         async (finished) => {
@@ -488,7 +490,7 @@ export class MediaLibrary {
         const fingerprint = await verifyMovedOriginal(sourcePath, content, context.signal, (fraction) =>
           context.update(0.01 + fraction * 0.97, `Checking every byte of ${sourcePath}`),
         );
-        if (context.signal.aborted) throw new ServiceError('Job cancelled.', 499);
+        if (context.signal.aborted) throw new ServiceError('Job canceled.', 499);
         await this.commitRelink(id, sourcePath, fingerprint);
         return `Relinked to ${sourcePath}`;
       },
@@ -595,7 +597,7 @@ export class MediaLibrary {
         samples.push({ frame, meanAbsoluteError8Bit: mae });
       });
       await assertSourceIdentity(asset.sourcePath, asset.fingerprint, true);
-      if (context.signal.aborted) throw new ServiceError('Job cancelled.', 499);
+      if (context.signal.aborted) throw new ServiceError('Job canceled.', 499);
       await rename(temporary, this.proxyPath(asset));
       await forEachSerial(thumbnailFrames, async (frame) => {
         await runProcess(
@@ -691,7 +693,7 @@ export class MediaLibrary {
     const decoded: Buffer[] = [];
     await forEachSerial(frames, async (frame) => {
       decoded.push(
-        await extractComparisonFrame(this.config, asset.sourcePath, frame, asset.metadata.colourRange, signal),
+        await extractComparisonFrame(this.config, asset.sourcePath, frame, asset.metadata.colorRange, signal),
       );
     });
     return decoded;
@@ -703,7 +705,7 @@ export class MediaLibrary {
     context: JobContext,
     gpu: boolean,
   ): Promise<void> {
-    const inputRange = asset.metadata.colourRange === 'tv' ? 'tv' : 'pc';
+    const inputRange = asset.metadata.colorRange === 'tv' ? 'tv' : 'pc';
     await runProcess(
       this.config.ffmpeg,
       [
@@ -819,19 +821,19 @@ export class MediaLibrary {
   ): Promise<void> {
     const count = asset.metadata.frameCount;
     const original = (frame: number) =>
-      extractComparisonFrame(this.config, asset.sourcePath, frame, asset.metadata.colourRange, context.signal);
+      extractComparisonFrame(this.config, asset.sourcePath, frame, asset.metadata.colorRange, context.signal);
     const checked = repair
       .flatMap((range) => [range.end, range.end + 1])
       .filter((frame) => frame < count && !damagedAt(repair, frame));
     await forEachSerial(checked, async (frame) => {
       const shown = await extractComparisonFrame(this.config, proxy, frame, 'tv', context.signal);
       const same = meanAbsoluteError(await original(frame), shown);
-      let neighbour = Infinity;
-      const neighbours = [frame - 1, frame + 1].filter((item) => item < count && !damagedAt(repair, item));
-      await forEachSerial(neighbours, async (item) => {
-        neighbour = Math.min(neighbour, meanAbsoluteError(await original(item), shown));
+      let neighbor = Infinity;
+      const neighbors = [frame - 1, frame + 1].filter((item) => item < count && !damagedAt(repair, item));
+      await forEachSerial(neighbors, async (item) => {
+        neighbor = Math.min(neighbor, meanAbsoluteError(await original(item), shown));
       });
-      if (same > FRAME_SAMPLE_MAE_LIMIT || same > neighbour + SHIFT_MARGIN)
+      if (same > FRAME_SAMPLE_MAE_LIMIT || same > neighbor + SHIFT_MARGIN)
         throw new ServiceError(
           `Frame ${frame}, just after the damaged frames, does not match the original (${same.toFixed(2)} / 255); the rest of the recording could be shifted.`,
           422,
@@ -855,7 +857,7 @@ export class MediaLibrary {
   async #measureMotion(asset: MediaAsset, context: JobContext, from: number, to: number): Promise<void> {
     const { verifiedAt, frameCount } = asset.prepared!.verification;
     context.update(from, 'Measuring camera motion for steady-range suggestions');
-    const motion = await analyseProxy(
+    const motion = await analyzeProxy(
       this.config.ffmpeg,
       this.proxyPath(asset),
       frameCount,
@@ -872,7 +874,7 @@ export class MediaLibrary {
     try {
       return (await this.#hasMotion(asset)) ? null : this.#submitMotion(asset);
     } catch {
-      // The proxy is ready either way; Source preview then offers Analyse camera motion.
+      // The proxy is ready either way; Source preview then offers Analyze camera motion.
       return null;
     }
   }

@@ -122,13 +122,13 @@ test('Custom creates clip-only keys, visual presets remain editable, and a prese
   const flat = await current(page);
   expect(flat.layers).toEqual(before.layers);
   expect(flat.clips[0]!.speed).toEqual(clipSpeedPreset(flat.clips[0]!, 'flat'));
-  await page.getByRole('button', { name: 'Clip speed preset Slow centre', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Clip speed preset Slow centre', exact: true })).toHaveAttribute(
+  await page.getByRole('button', { name: 'Clip speed preset Slow center', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Clip speed preset Slow center', exact: true })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
   const changed = await current(page);
-  expect(changed.clips[0]!.speed).toEqual(clipSpeedPreset(changed.clips[0]!, 'slow-centre'));
+  expect(changed.clips[0]!.speed).toEqual(clipSpeedPreset(changed.clips[0]!, 'slow-center'));
   expect(changed.layers).toEqual(before.layers);
   await ready(page, changed);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
@@ -416,7 +416,7 @@ test('duplicate/trim/split preserve independent clip curves and keep outside-tri
 
 test('custom mapped preview uses exact decoded source frames with only two video decoders', async ({ page }) => {
   const document = await seedCurve(page, (project) => {
-    project.clips[0]!.speed = clipSpeedPreset(project.clips[0]!, 'slow-centre');
+    project.clips[0]!.speed = clipSpeedPreset(project.clips[0]!, 'slow-center');
   });
   const placed = calculateLayout(document).clips[0]!;
   for (const frame of [

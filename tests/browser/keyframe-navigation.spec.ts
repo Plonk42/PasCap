@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
+import { COLOR_CONTROLS } from '../../src/shared/color.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import type { GradeKeyframe } from '../../src/shared/grade.js';
 import { KEYFRAME_SETTINGS, uniformKeyframe } from '../../src/shared/keyframes.js';
@@ -31,7 +31,7 @@ let memory: MemoryProjects;
 let unexpectedApi: string[];
 
 // Opacity is a track Transform setting (Track tab), with Transform's own stored keyframe cursor; every other setting
-// is a Colour setting of the adjustment at the playhead (Colour tab), whose stored chips step from their own rows.
+// is a Color setting of the adjustment at the playhead (Color tab), whose stored chips step from their own rows.
 function transformOwned(label: string): boolean {
   return label === 'Opacity';
 }
@@ -156,7 +156,7 @@ async function guardedUnavailable(button: Locator): Promise<void> {
   await expect(button).toHaveJSProperty('disabled', false);
 }
 
-function sectionStep(page: Page, label: 'Colour' | 'Speed' | 'Transform', direction: 'Previous' | 'Next'): Locator {
+function sectionStep(page: Page, label: 'Color' | 'Speed' | 'Transform', direction: 'Previous' | 'Next'): Locator {
   return inspector(page)
     .locator('.section-keyframe-line')
     .getByRole('button', { name: `${direction} ${label} keyframe`, exact: true });
@@ -164,7 +164,7 @@ function sectionStep(page: Page, label: 'Colour' | 'Speed' | 'Transform', direct
 
 async function step(page: Page, label: string, direction: 'Previous' | 'Next', rowFrame?: number): Promise<Locator> {
   // Chip arrows are stored-row controls: without an inspected Transform keyframe they step from their row, not the
-  // playhead. Prefer the inspected/active row; for a nonparticipant use a neighbouring participant.
+  // playhead. Prefer the inspected/active row; for a nonparticipant use a neighboring participant.
   await settingTab(page, label);
   const document = await current(page);
   let participants: readonly { frame: number }[];
@@ -175,7 +175,7 @@ async function step(page: Page, label: string, direction: 'Previous' | 'Next', r
     participants = layer.transform.keyframes.filter((point) => point.values.opacity !== null);
     keys = transformKeyframes(page, layer.name);
   } else {
-    const setting = COLOUR_CONTROLS.find((item) => item.label === label)!.key;
+    const setting = COLOR_CONTROLS.find((item) => item.label === label)!.key;
     participants = document.adjustments[0]!.keyframes.filter((point) => point.values[setting] !== null);
     keys = adjustmentKeyframes(page);
   }
@@ -240,14 +240,14 @@ async function readOnly(page: Page, document: ProjectDocument): Promise<void> {
 
 /** Each setting keyed alone at three interleaved frames: Opacity on Track 1's Transform, the others on the adjustment. */
 function interleaved(): ProjectDocument {
-  const colour: GradeKeyframe[] = [];
+  const color: GradeKeyframe[] = [];
   const transform: SpatialKeyframe[] = [];
   for (const start of [3, 43, 83])
     for (const [index, { key }] of KEYFRAME_SETTINGS.entries()) {
       if (key === 'opacity') transform.push(transformPoint(start + index * 2, { opacity: 0 }));
-      else colour.push(gradePoint(start + index * 2, { [key]: 0 }));
+      else color.push(gradePoint(start + index * 2, { [key]: 0 }));
     }
-  return sequence(colour, transform);
+  return sequence(color, transform);
 }
 
 function storedValue(
@@ -265,7 +265,7 @@ test('unkeyed settings keep diamonds with visible guarded per-setting arrows and
 }) => {
   const document = await current(page);
   expect(KEYFRAME_SETTINGS).toHaveLength(15);
-  // Fourteen adjustment Colour diamonds in Colour; Opacity's joins the eight Transform capture buttons in Track.
+  // Fourteen adjustment Color diamonds in Color; Opacity's joins the eight Transform capture buttons in Track.
   await openTab(page, 'Adjustment');
   await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(14);
   await openTab(page, 'Track');
@@ -288,7 +288,7 @@ test('unkeyed settings keep diamonds with visible guarded per-setting arrows and
     }
   }
   await expect(inspector(page).locator('.layer-keyframe-chip')).toHaveCount(0);
-  for (const label of ['Colour', 'Speed', 'Transform'] as const) {
+  for (const label of ['Color', 'Speed', 'Transform'] as const) {
     await settingTab(page, label);
     for (const direction of ['Previous', 'Next'] as const) {
       const button = sectionStep(page, label, direction);
@@ -311,7 +311,7 @@ test('unkeyed settings keep diamonds with visible guarded per-setting arrows and
   await readOnly(page, document);
 });
 
-test('Colour section arrows visit every adjustment keyframe, while stored chips step from their own rows', async ({
+test('Color section arrows visit every adjustment keyframe, while stored chips step from their own rows', async ({
   page,
 }) => {
   const document = sequence([
@@ -323,12 +323,12 @@ test('Colour section arrows visit every adjustment keyframe, while stored chips 
     gradePoint(110, { brightness: 0, exposure: 1 }),
   ]);
   await fixture(page, document);
-  const next = sectionStep(page, 'Colour', 'Next');
-  const previous = sectionStep(page, 'Colour', 'Previous');
+  const next = sectionStep(page, 'Color', 'Next');
+  const previous = sectionStep(page, 'Color', 'Previous');
   await expect(previous).toBeDisabled();
   await expect(
     inspector(page)
-      .locator('.colour-controls')
+      .locator('.color-controls')
       .locator('.keyframe-setting-navigation')
       .getByRole('button', { name: /^(Previous|Next) .* keyframe$/ }),
   ).toHaveCount(28);
@@ -346,7 +346,7 @@ test('Colour section arrows visit every adjustment keyframe, while stored chips 
     await expect(currentKeyframeRow(adjustmentKeyframes(page))).toHaveAttribute('data-keyframe-frame', String(frame));
   }
   await expect(previous).toBeDisabled();
-  // A stored chip steps from its own row; Colour then advances from the real playhead.
+  // A stored chip steps from its own row; Color then advances from the real playhead.
   await goToPoint(page, 50);
   await next.scrollIntoViewIfNeeded();
   await next.click();
@@ -725,13 +725,13 @@ test('all fifteen setting buttons remain present and disabled throughout a nativ
   const box = (await handle.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  // The trim selects its clip, so the Colour tab shows that clip's grade; a synthetic tab click keeps the gesture.
+  // The trim selects its clip, so the Color tab shows that clip's grade; a synthetic tab click keeps the gesture.
   const show = async (label: string): Promise<void> => {
     if (transformOwned(label)) await settingTab(page, label);
-    else await page.getByRole('tab', { name: 'Colour', exact: true }).dispatchEvent('click');
+    else await page.getByRole('tab', { name: 'Color', exact: true }).dispatchEvent('click');
   };
   await show('Exposure');
-  await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .colour-target > span')).toHaveText(
+  await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .color-target > span')).toHaveText(
     / · this clip only$/,
   );
   for (const { label } of KEYFRAME_SETTINGS) {
@@ -750,8 +750,8 @@ test('all fifteen setting buttons remain present and disabled throughout a nativ
       await expect(button).toBeDisabled();
     }
   }
-  for (const label of ['Colour', 'Speed', 'Transform'] as const) {
-    if (label === 'Colour') await show('Exposure');
+  for (const label of ['Color', 'Speed', 'Transform'] as const) {
+    if (label === 'Color') await show('Exposure');
     else await settingTab(page, label);
     for (const direction of ['Previous', 'Next'] as const)
       await expect(sectionStep(page, label, direction)).toBeDisabled();
@@ -764,7 +764,7 @@ test('all fifteen setting buttons remain present and disabled throughout a nativ
   await readOnly(page, document);
 });
 
-test('no opened project keeps Transform buttons and section navigation disabled, without Colour diamonds, phantom chips or writes', async ({
+test('no opened project keeps Transform buttons and section navigation disabled, without Color diamonds, phantom chips or writes', async ({
   page,
 }) => {
   await page.route(/\/api\/projects(?:\?.*)?$/, async (route) => {
@@ -779,10 +779,10 @@ test('no opened project keeps Transform buttons and section navigation disabled,
   const dialog = page.getByRole('dialog', { name: 'Projects', exact: true });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-  // Without a project nothing can be selected, so Colour only asks to select a clip or an adjustment.
-  await openTab(page, 'Colour');
+  // Without a project nothing can be selected, so Color only asks to select a clip or an adjustment.
+  await openTab(page, 'Color');
   await expect(inspector(page).getByRole('button', { name: /^Keyframe / })).toHaveCount(0);
-  await expect(sectionStep(page, 'Colour', 'Next')).toHaveCount(0);
+  await expect(sectionStep(page, 'Color', 'Next')).toHaveCount(0);
   await expect(inspector(page)).toContainText('Select a clip or an adjustment in the timeline to edit its grade.');
   await expect(inspector(page).locator('[role="tabpanel"]:not([hidden])').getByRole('button')).toHaveCount(0);
   // Speed is clip-owned, so without a project only the track's nine Transform settings exist.
@@ -1200,7 +1200,7 @@ test('all navigation groups fit the 270px inspector at the default and minimum v
         ).toBe(true);
       }
     }
-    for (const label of ['Colour', 'Speed', 'Transform'] as const) {
+    for (const label of ['Color', 'Speed', 'Transform'] as const) {
       await settingTab(page, label);
       for (const direction of ['Previous', 'Next'] as const) {
         const button = sectionStep(page, label, direction);

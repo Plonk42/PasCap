@@ -32,7 +32,7 @@ at most **32 unique absolute paths**. The default is only the service user's
 is rejected, but missing/unreadable roots remain visible as unavailable rather
 than failing startup. JSON paths must be absolute; a literal `~` is not expanded.
 
-| Request                                                                    | Behaviour                                                                                                                                                                              |
+| Request                                                                    | Behavior                                                                                                                                                                               |
 | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/footage/roots`                                                   | Root IDs, paths and availability/error information                                                                                                                                     |
 | `GET /api/footage?rootId=root-0&directory=%2Fmedia%2Ffootage%2FFlight`     | Metadata for one folder inside the selected root; `directory` is an encoded absolute path, or omitted for the root itself                                                              |
@@ -50,7 +50,7 @@ Use the root IDs returned by the service. Listings use directory/file metadata
 only: no media-byte reads, probing, recursive discovery, registration, cache writes
 or preparation. Previews are the one bounded exception: FFmpeg reads a video's
 container index and the keyframe nearest its middle (never the whole file), two
-at a time with sixteen waiting and a 20-second limit each, cancelled when the
+at a time with sixteen waiting and a 20-second limit each, canceled when the
 browser disconnects; the JPEG goes to the data directory's `browse-previews/`, at
 most 4,000 files. No original is sent to the browser. Listings put folders first and naturally sort names, retain at
 most **2,000 entries**, and explicitly return `truncated`; choose a narrower folder
@@ -80,24 +80,24 @@ navigation and show Import guidance without a POST. Internal ready-Media-to-Time
 dragging remains supported. Imports reference originals; generated proxies/
 thumbnails, project/registry metadata, exports/receipts and scratch are the only
 new local data, not duplicate original footage. Projects use the strict current schema with
-a complete required grade on every clip (Colour, including Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local
+a complete required grade on every clip (Color, including Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local
 contrast and static HSL/curves, and keyframes with fourteen nullable channels: twelve scalar
-colour settings, including `temperature`, `tint`, `vibrance`, `whites` and `blacks`, `hdr` and
+color settings, including `temperature`, `tint`, `vibrance`, `whites` and `blacks`, `hdr` and
 `localContrast`), the project's `adjustments`,
-no clip colour/correction/opacity/spatial fields, a required boolean clip `reverse`, required video track `transform` base/per-setting project-frame keyframes,
+no clip color/correction/opacity/spatial fields, a required boolean clip `reverse`, required video track `transform` base/per-setting project-frame keyframes,
 Opacity (0–1, 1 on new tracks) included, and
 required `music` array (0–8 independent music tracks, unique required IDs; `[]` without
 music), and
-required per-track Ripple, transitions and opening/closing fades; video tracks have no Colour,
+required per-track Ripple, transitions and opening/closing fades; video tracks have no Color,
 Opacity or keyframes of their own. HSL/curves remain static. The Transform Opacity supplies
 Opacity to each source in a dissolve group, without an additional track multiplier. Projects
-and receipt snapshots saved before the current schema, with track Colour, are rejected with the
+and receipt snapshots saved before the current schema, with track Color or British spelling, are rejected with the
 reason and left unchanged, without compatibility defaults,
 null/old-format readers or automatic deletion.
 Export receipts remain version 1 with strict current-schema snapshots and required captured
 audio-source/instance-plan arrays; invalid arrays/older snapshots remain preserved
 and rejected. Proxy/current PCM formats and source identity checks are unchanged; the
-registries are version 2 (`videos.json`, `music.json`, with full-content checksums).
+registries are `videos.json` version 3 and `music.json` version 2, with full-content checksums.
 
 Music import populates the project bin/preparation queue, never implicit placement.
 Up to eight independent music tracks can reference the same or different originals

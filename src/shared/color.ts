@@ -1,17 +1,17 @@
 import { z } from 'zod';
 import {
-  compileColourCurvesInto,
+  compileColorCurvesInto,
   compileHslInto,
-  createColourCurves,
+  createColorCurves,
   createHslSettings,
   curvesSchema,
   hslSchema,
   isIdentityCurve,
   isNeutralHsl,
-} from './advanced-colour.js';
+} from './advanced-color.js';
 import { described } from './described.js';
 
-export const colourSchema = z
+export const colorSchema = z
   .object({
     temperature: described(z.number().min(-2).max(2), 'White balance, neutral 0: positive warms, negative cools.'),
     tint: described(z.number().min(-1).max(1), 'Neutral 0: positive adds magenta, negative adds green.'),
@@ -19,8 +19,8 @@ export const colourSchema = z
     brightness: described(z.number().min(-0.5).max(0.5), 'Neutral 0: raises or lowers the midtones.'),
     contrast: described(z.number().min(0).max(2), 'Neutral 1: above 1 deepens shadows and brightens highlights.'),
     hue: described(z.number().min(-180).max(180), 'Hue rotation in degrees, neutral 0.'),
-    saturation: described(z.number().min(0).max(2), 'Colour intensity, neutral 1; 0 is greyscale.'),
-    vibrance: described(z.number().min(-1).max(2), 'Neutral 0: raises muted colours more than strong ones.'),
+    saturation: described(z.number().min(0).max(2), 'Color intensity, neutral 1; 0 is grayscale.'),
+    vibrance: described(z.number().min(-1).max(2), 'Neutral 0: raises muted colors more than strong ones.'),
     highlights: described(z.number().min(-1).max(1), 'Neutral 0: brightens or (negative) darkens bright areas.'),
     shadows: described(z.number().min(-1).max(1), 'Neutral 0: opens or (negative) deepens dark areas.'),
     whites: described(z.number().min(-1).max(1), 'White point, neutral 0: lower dims the brightest tones.'),
@@ -38,7 +38,7 @@ export const colourSchema = z
     ),
     hsl: described(
       hslSchema,
-      'Static adjustments of eight colour ranges: hue shift, saturation and lightness change; all 0 is neutral.',
+      'Static adjustments of eight color ranges: hue shift, saturation and lightness change; all 0 is neutral.',
     ),
     curves: described(
       curvesSchema,
@@ -47,9 +47,9 @@ export const colourSchema = z
   })
   .strict();
 
-export type ColourSettings = z.infer<typeof colourSchema>;
+export type ColorSettings = z.infer<typeof colorSchema>;
 export type RGB = readonly [number, number, number];
-export function createColourSettings(): ColourSettings {
+export function createColorSettings(): ColorSettings {
   return {
     temperature: 0,
     tint: 0,
@@ -66,10 +66,10 @@ export function createColourSettings(): ColourSettings {
     hdr: 0,
     localContrast: 0,
     hsl: createHslSettings(),
-    curves: createColourCurves(),
+    curves: createColorCurves(),
   };
 }
-const neutral = createColourSettings();
+const neutral = createColorSettings();
 for (const band of Object.values(neutral.hsl)) Object.freeze(band);
 for (const curve of Object.values(neutral.curves)) {
   curve.forEach(Object.freeze);
@@ -77,9 +77,9 @@ for (const curve of Object.values(neutral.curves)) {
 }
 Object.freeze(neutral.hsl);
 Object.freeze(neutral.curves);
-export const NEUTRAL_COLOUR: Readonly<ColourSettings> = Object.freeze(neutral);
+export const NEUTRAL_COLOR: Readonly<ColorSettings> = Object.freeze(neutral);
 
-export const COLOUR_CONTROLS = [
+export const COLOR_CONTROLS = [
   { key: 'temperature', label: 'Temperature', min: -2, max: 2, step: 0.01, unit: '' },
   { key: 'tint', label: 'Tint', min: -1, max: 1, step: 0.01, unit: '' },
   { key: 'exposure', label: 'Exposure', min: -3, max: 3, step: 0.01, unit: 'EV' },
@@ -95,11 +95,11 @@ export const COLOUR_CONTROLS = [
   { key: 'hdr', label: 'HDR', min: 0, max: 1, step: 0.01, unit: '' },
   { key: 'localContrast', label: 'Local contrast', min: -1, max: 1, step: 0.01, unit: '' },
 ] as const;
-export type ScalarColourSetting = (typeof COLOUR_CONTROLS)[number]['key'];
+export type ScalarColorSetting = (typeof COLOR_CONTROLS)[number]['key'];
 /** Only the scalar numeric channels, never static structured settings. */
-export function scalarColourValues(settings: ColourSettings): Record<ScalarColourSetting, number> {
-  return Object.fromEntries(COLOUR_CONTROLS.map(({ key }) => [key, settings[key]])) as Record<
-    ScalarColourSetting,
+export function scalarColorValues(settings: ColorSettings): Record<ScalarColorSetting, number> {
+  return Object.fromEntries(COLOR_CONTROLS.map(({ key }) => [key, settings[key]])) as Record<
+    ScalarColorSetting,
     number
   >;
 }
@@ -119,7 +119,7 @@ export function encode709(value: number): number {
 }
 
 /** Normalized SDR axes, preserving neutral-white linear luminance before clipping. */
-export function temperatureTintGains(settings: Pick<ColourSettings, 'temperature' | 'tint'>): RGB {
+export function temperatureTintGains(settings: Pick<ColorSettings, 'temperature' | 'tint'>): RGB {
   const { temperature, tint } = settings;
   const red = 2 ** (temperature / 2 + tint / 4);
   const green = 2 ** (-tint / 4);
@@ -128,13 +128,13 @@ export function temperatureTintGains(settings: Pick<ColourSettings, 'temperature
   return [red / luminance, green / luminance, blue / luminance];
 }
 
-/** Authoritative SDR transform. See docs/COLOUR_AND_TIMING.md; no FFmpeg eq approximation. */
-export function gradePixel(rgb: RGB, settings: ColourSettings): RGB {
+/** Authoritative SDR transform. See docs/COLOR_AND_TIMING.md; no FFmpeg eq approximation. */
+export function gradePixel(rgb: RGB, settings: ColorSettings): RGB {
   return compilePixelGrade(settings)(rgb);
 }
 /** Exact frame-owned grade; cache only bounded settings/functions, never pixels. */
-export function compilePixelGrade(settings: ColourSettings): (rgb: RGB) => RGB {
-  if (isNeutralScalarColour(settings) && isNeutralAdvancedColour(settings)) return (rgb) => rgb;
+export function compilePixelGrade(settings: ColorSettings): (rgb: RGB) => RGB {
+  if (isNeutralScalarColor(settings) && isNeutralAdvancedColor(settings)) return (rgb) => rgb;
   const grade = compileGradeInto(settings);
   const triple = new Float64Array(3);
   return (rgb) => {
@@ -151,10 +151,10 @@ export interface PixelGrade {
 }
 const DECODED_BYTES = Float64Array.from({ length: 256 }, (_, code) => decode709(clamp01(code / 255)));
 /** The same grade on a reusable triple, for per-pixel native work. */
-export function compileGradeInto(settings: ColourSettings): PixelGrade {
-  const scalar = isNeutralScalarColour(settings) ? null : compileScalarGrade(settings);
+export function compileGradeInto(settings: ColorSettings): PixelGrade {
+  const scalar = isNeutralScalarColor(settings) ? null : compileScalarGrade(settings);
   const hsl = compileHslInto(settings.hsl);
-  const curves = compileColourCurvesInto(settings.curves);
+  const curves = compileColorCurvesInto(settings.curves);
   return {
     encoded(rgb) {
       if (scalar) scalar(decode709(clamp01(rgb[0]!)), decode709(clamp01(rgb[1]!)), decode709(clamp01(rgb[2]!)), rgb);
@@ -173,19 +173,19 @@ export function compileGradeInto(settings: ColourSettings): PixelGrade {
     },
   };
 }
-/** Local tone settings run in the neighbourhood stage before grading (src/shared/detail.ts), not in the per-pixel grade. */
+/** Local tone settings run in the neighborhood stage before grading (src/shared/detail.ts), not in the per-pixel grade. */
 export const LOCAL_TONE_SETTINGS = ['shadows', 'highlights', 'hdr', 'localContrast'] as const;
 export type LocalToneSetting = (typeof LOCAL_TONE_SETTINGS)[number];
-export function isNeutralLocalTone(settings: Pick<ColourSettings, LocalToneSetting>): boolean {
+export function isNeutralLocalTone(settings: Pick<ColorSettings, LocalToneSetting>): boolean {
   return LOCAL_TONE_SETTINGS.every((key) => settings[key] === 0);
 }
 const localToneSettings: ReadonlySet<string> = new Set(LOCAL_TONE_SETTINGS);
-export function isNeutralScalarColour(settings: ColourSettings): boolean {
-  return COLOUR_CONTROLS.every(({ key }) => localToneSettings.has(key) || settings[key] === NEUTRAL_COLOUR[key]);
+export function isNeutralScalarColor(settings: ColorSettings): boolean {
+  return COLOR_CONTROLS.every(({ key }) => localToneSettings.has(key) || settings[key] === NEUTRAL_COLOR[key]);
 }
 /** Scalar SDR stages from decoded linear input to an encoded triple. */
 function compileScalarGrade(
-  settings: ColourSettings,
+  settings: ColorSettings,
 ): (linearRed: number, linearGreen: number, linearBlue: number, out: Float64Array) => void {
   const [redGain, greenGain, blueGain] = temperatureTintGains(settings);
   const exposure = 2 ** settings.exposure;
@@ -229,13 +229,13 @@ function compileScalarGrade(
 /** Vibrance scales chroma most on muted pixels: 1 + v(1 − c) with c the pixel's linear (max − min) / max. */
 function vibranceGain(red: number, green: number, blue: number, vibrance: number): number {
   const maximum = Math.max(red, green, blue);
-  const colourfulness = maximum > 0 ? (maximum - Math.min(red, green, blue)) / maximum : 0;
-  return 1 + vibrance * (1 - Math.min(1, colourfulness));
+  const colorfulness = maximum > 0 ? (maximum - Math.min(red, green, blue)) / maximum : 0;
+  return 1 + vibrance * (1 - Math.min(1, colorfulness));
 }
 /** Whites moves pure white by this much (encoded) at ±1; monotonic up to 0.25. */
 export const WHITES_RANGE = 0.25;
 /** Contrast, Brightness then Whites on encoded luminance, applied as a linear RGB gain. */
-function toneCurve(v: number, settings: ColourSettings): number {
+function toneCurve(v: number, settings: ColorSettings): number {
   const { contrast, brightness, whites } = settings;
   v += (contrast - 1) * v * (1 - v) * (2 * v - 1);
   v += 2 * brightness * v * (1 - v);
@@ -247,17 +247,17 @@ function blacksCurve(v: number, blacks: number): number {
   return v + blacks * BLACKS_RANGE * (1 - v) ** 4;
 }
 
-export function isNeutralColour(settings: ColourSettings): boolean {
-  return isNeutralLocalTone(settings) && isNeutralScalarColour(settings) && isNeutralAdvancedColour(settings);
+export function isNeutralColor(settings: ColorSettings): boolean {
+  return isNeutralLocalTone(settings) && isNeutralScalarColor(settings) && isNeutralAdvancedColor(settings);
 }
 
-export function isNeutralAdvancedColour(settings: ColourSettings): boolean {
+export function isNeutralAdvancedColor(settings: ColorSettings): boolean {
   return isNeutralHsl(settings.hsl) && Object.values(settings.curves).every(isIdentityCurve);
 }
 
 /** One grade, or grades applied one after another on each other's encoded output. */
-export function generateCube(settings: ColourSettings | readonly ColourSettings[], size = 65): string {
-  const stages = (Array.isArray(settings) ? settings : [settings]).map((stage) => colourSchema.parse(stage));
+export function generateCube(settings: ColorSettings | readonly ColorSettings[], size = 65): string {
+  const stages = (Array.isArray(settings) ? settings : [settings]).map((stage) => colorSchema.parse(stage));
   if (!Number.isInteger(size) || size < 2 || size > 129)
     throw new Error('LUT size must be an integer between 2 and 129.');
   const lines = ['TITLE "PasCap BT709 linear SDR v1"', `LUT_3D_SIZE ${size}`, 'DOMAIN_MIN 0 0 0', 'DOMAIN_MAX 1 1 1'];

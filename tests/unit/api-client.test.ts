@@ -753,7 +753,7 @@ describe('bounded request deadlines and cancellation', () => {
     gate.resolve({ error: 'Late error explanation' });
   });
 
-  it('does not fetch when the caller has already cancelled', async () => {
+  it('does not fetch when the caller has already canceled', async () => {
     const controller = new AbortController();
     controller.abort();
     await expect(request('/api/test', schema, 'GET', undefined, { signal: controller.signal })).rejects.toMatchObject({

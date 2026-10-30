@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createConfig } from '../../src/server/config.js';
 import { validateExport } from '../../src/server/export.js';
 import { JobQueue } from '../../src/server/jobs.js';
-import { ColourLutCache, sampleColourLut } from '../../src/server/layered-colour.js';
+import { ColorLutCache, sampleColorLut } from '../../src/server/layered-color.js';
 import { composeLayerFrame, fittedContent, type LayerFrameSource } from '../../src/server/layered-frame.js';
 import { MediaLibrary } from '../../src/server/library.js';
 import { runRawVideoPass, writeRawFrame } from '../../src/server/raw-process.js';
@@ -13,15 +13,15 @@ import { renderReference, validateReference } from '../../src/server/reference.j
 import { retimeRawVideo } from '../../src/server/retime-process.js';
 import { ProjectStore } from '../../src/server/storage.js';
 import {
-  COLOUR_CONTROLS,
-  createColourSettings,
+  COLOR_CONTROLS,
+  createColorSettings,
   gradePixel,
-  NEUTRAL_COLOUR,
-  scalarColourValues,
-  type ColourSettings,
+  NEUTRAL_COLOR,
+  scalarColorValues,
+  type ColorSettings,
   type RGB,
-} from '../../src/shared/colour.js';
-import { adjustmentColour, compositePixel } from '../../src/shared/composition.js';
+} from '../../src/shared/color.js';
+import { adjustmentColor, compositePixel } from '../../src/shared/composition.js';
 import {
   exportRequestSchema,
   LAYERED_EXPORT_RESOURCES,
@@ -122,10 +122,10 @@ function fakeLibrary(): MediaLibrary {
         frameRate: PROJECT_FPS,
         frameCount: 100,
         durationSeconds: framesToSeconds(100),
-        colourRange: 'tv',
-        colourSpace: 'bt709',
-        colourPrimaries: 'bt709',
-        colourTransfer: 'bt709',
+        colorRange: 'tv',
+        colorSpace: 'bt709',
+        colorPrimaries: 'bt709',
+        colorTransfer: 'bt709',
         hasAudio: false,
       },
       status: 'registered',
@@ -197,13 +197,13 @@ describe('current-schema production dispatch and read-only validation', () => {
         project.adjustments = [createAdjustment('look', 0, 5)];
       },
       (project) => {
-        project.adjustments = [look([point(7, scalarColourValues(NEUTRAL_COLOUR))])];
+        project.adjustments = [look([point(7, scalarColorValues(NEUTRAL_COLOR))])];
       },
       (project) => {
-        project.clips[0]!.grade.keyframes = [layerKeyAsGradeKey(point(7, scalarColourValues(NEUTRAL_COLOUR)))];
+        project.clips[0]!.grade.keyframes = [layerKeyAsGradeKey(point(7, scalarColorValues(NEUTRAL_COLOR)))];
       },
-      ...COLOUR_CONTROLS.map(({ key }) => (project: ProjectDocument) => {
-        project.clips[0]!.grade.keyframes = [layerKeyAsGradeKey(point(7, { [key]: NEUTRAL_COLOUR[key] }))];
+      ...COLOR_CONTROLS.map(({ key }) => (project: ProjectDocument) => {
+        project.clips[0]!.grade.keyframes = [layerKeyAsGradeKey(point(7, { [key]: NEUTRAL_COLOR[key] }))];
       }),
     ];
     for (const change of variants) {
@@ -268,7 +268,7 @@ describe('current-schema production dispatch and read-only validation', () => {
     expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], grade: undefined }] }).success).toBe(
       false,
     );
-    expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], colour: undefined }] }).success).toBe(
+    expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], color: undefined }] }).success).toBe(
       false,
     );
     expect(projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], opacity: 1 }] }).success).toBe(false);
@@ -279,8 +279,8 @@ describe('current-schema production dispatch and read-only validation', () => {
         layers: [{ ...project.layers[0], transform: { ...project.layers[0]!.transform, base: transparentPose } }],
       }).success,
     ).toBe(false);
-    // A track has no Colour, Opacity or keyframes of its own.
-    for (const removed of [{ opacity: 1 }, { colour: createColourSettings() }, { keyframes: [] }])
+    // A track has no Color, Opacity or keyframes of its own.
+    for (const removed of [{ opacity: 1 }, { color: createColorSettings() }, { keyframes: [] }])
       expect(projectSchema.safeParse({ ...project, layers: [{ ...project.layers[0], ...removed }] }).success).toBe(
         false,
       );
@@ -288,7 +288,7 @@ describe('current-schema production dispatch and read-only validation', () => {
       false,
     );
     expect(
-      projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], animation: { opacity: [], colour: [] } }] })
+      projectSchema.safeParse({ ...project, clips: [{ ...project.clips[0], animation: { opacity: [], color: [] } }] })
         .success,
     ).toBe(false);
     project.clips.push(
@@ -340,8 +340,8 @@ describe('current-schema production dispatch and read-only validation', () => {
     expect(Object.isFrozen(snapshot.adjustments[0]!.keyframes)).toBe(true);
     expect(Object.isFrozen(snapshot.adjustments[0]!.keyframes[0])).toBe(true);
     expect(Object.isFrozen(snapshot.adjustments[0]!.keyframes[0]!.values)).toBe(true);
-    expect(Object.isFrozen(snapshot.adjustments[0]!.colour)).toBe(true);
-    expect(Object.isFrozen(snapshot.clips[0]!.grade.colour)).toBe(true);
+    expect(Object.isFrozen(snapshot.adjustments[0]!.color)).toBe(true);
+    expect(Object.isFrozen(snapshot.clips[0]!.grade.color)).toBe(true);
   });
   it('strictly loads the current schema but lists/rejects unsupported versions unchanged, including overwrite attempts', async () => {
     const directory = await temp();
@@ -425,10 +425,10 @@ describe('current-schema production dispatch and read-only validation', () => {
         project.adjustments.push(createAdjustment('look', 0, 5));
       },
       (project: ProjectDocument) => {
-        project.clips[0]!.grade.keyframes.push(layerKeyAsGradeKey(point(7, scalarColourValues(NEUTRAL_COLOUR))));
+        project.clips[0]!.grade.keyframes.push(layerKeyAsGradeKey(point(7, scalarColorValues(NEUTRAL_COLOR))));
       },
       (project: ProjectDocument) => {
-        project.clips[1]!.grade.colour.hdr = 0.3;
+        project.clips[1]!.grade.color.hdr = 0.3;
       },
       (project: ProjectDocument) => {
         project.layers[0]!.transform.keyframes.push(transformKey(7, { opacity: 0.5 }, 'smooth'));
@@ -696,8 +696,8 @@ describe('bounded retiming maps and native pipe ownership without FFmpeg', () =>
   });
 });
 
-const strong: ColourSettings = {
-  ...NEUTRAL_COLOUR,
+const strong: ColorSettings = {
+  ...NEUTRAL_COLOR,
   exposure: 1.2,
   brightness: -0.09,
   contrast: 1.4,
@@ -706,8 +706,8 @@ const strong: ColourSettings = {
   shadows: 0.7,
   highlights: -0.8,
 };
-const warm: ColourSettings = {
-  ...NEUTRAL_COLOUR,
+const warm: ColorSettings = {
+  ...NEUTRAL_COLOR,
   exposure: -0.6,
   brightness: 0.11,
   contrast: 0.72,
@@ -718,12 +718,12 @@ const warm: ColourSettings = {
 };
 describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
   it('approximates the CPU grade numerically, caches settings in only two reusable arrays and writes no LUT files', async () => {
-    const cache = new ColourLutCache();
+    const cache = new ColorLutCache();
     const signal = new AbortController().signal;
     const triple = new Float64Array(3);
     let maximumMae = 0;
     let first: Float32Array | null = null;
-    for (const settings of [{ ...NEUTRAL_COLOUR }, strong, warm, strong]) {
+    for (const settings of [{ ...NEUTRAL_COLOR }, strong, warm, strong]) {
       const lut = await cache.get(settings, signal);
       if (!first) first = lut;
       let error = 0;
@@ -731,7 +731,7 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
         const red = (index * 73) % 256;
         const green = (index * 157) % 256;
         const blue = Math.floor(index / 256) * 17;
-        sampleColourLut(lut, red, green, blue, triple);
+        sampleColorLut(lut, red, green, blue, triple);
         const exact = gradePixel([red / 255, green / 255, blue / 255], settings);
         for (let channel = 0; channel < 3; channel++) error += Math.abs(triple[channel]! - exact[channel]!) * 255;
       }
@@ -743,23 +743,23 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
     expect(cache.report).toMatchObject({ peakEntries: 2, bytes: LAYERED_EXPORT_RESOURCES.lutBytes * 2, generated: 3 });
     console.log(`Layered Float32 tetrahedral 65³ LUT maximum mean error: ${maximumMae.toFixed(4)} / 255`);
   });
-  it('evaluates interpolated colour PARAMETERS at the absolute project frame, not original source time or endpoint RGB grades', async () => {
+  it('evaluates interpolated color PARAMETERS at the absolute project frame, not original source time or endpoint RGB grades', async () => {
     const project = document();
     project.clips = [{ ...createClip('animated', 'video', 200, 210), start: 20 }];
     // Started at frame 5, the adjustment's keyframes at 5 and 35 sit on project frames 10 and 40.
     project.adjustments = [look([point(5, { exposure: -2 }), point(35, { exposure: 2 }, 'hold')], 5)];
     expect(calculateLayout(project).clips[0]!.retiming.sourceAt(5)).toBe(205);
-    const settings = sampleTimeline(project, 25)[0]!.colour;
-    expect(settings).toEqual(adjustmentColour(project, 25));
+    const settings = sampleTimeline(project, 25)[0]!.color;
+    expect(settings).toEqual(adjustmentColor(project, 25));
     expect(settings.exposure).toBe(0);
-    const cache = new ColourLutCache();
+    const cache = new ColorLutCache();
     const lut = await cache.get(settings, new AbortController().signal);
     const actual = new Float64Array(3);
-    sampleColourLut(lut, 100, 130, 160, actual);
+    sampleColorLut(lut, 100, 130, 160, actual);
     const source: RGB = [100 / 255, 130 / 255, 160 / 255];
     const correct = gradePixel(source, settings);
-    const left = gradePixel(source, adjustmentColour(project, 10));
-    const right = gradePixel(source, adjustmentColour(project, 40));
+    const left = gradePixel(source, adjustmentColor(project, 10));
+    const right = gradePixel(source, adjustmentColor(project, 40));
     for (let channel = 0; channel < 3; channel++)
       expect(Math.abs(actual[channel]! - correct[channel]!)).toBeLessThan(1 / 255);
     expect(Math.abs(correct[0] - (left[0] + right[0]) / 2)).toBeGreaterThan(4 / 255);
@@ -768,13 +768,13 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
     const target = { width: 8, height: 4 };
     const pixels = target.width * target.height;
     const buffer = Buffer.alloc(pixels * 8);
-    const cache = new ColourLutCache();
+    const cache = new ColorLutCache();
     const signal = new AbortController().signal;
     const bounds = { x: 0, y: 0, ...target };
     const sample = (
       id: string,
       layerId: string,
-      colour: ColourSettings,
+      color: ColorSettings,
       blendWeight: number,
       opacity: number,
     ): PreviewLayer => ({
@@ -785,14 +785,14 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       sourcePosition: 11,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
       detail: { ...NEUTRAL_DETAIL },
-      grade: createColourSettings(),
-      colour,
+      grade: createColorSettings(),
+      color,
       weight: blendWeight,
       blendWeight,
       brightness: 1,
       opacity,
     });
-    const lower = sample('lower', 'video-1', { ...NEUTRAL_COLOUR }, 1, 1);
+    const lower = sample('lower', 'video-1', { ...NEUTRAL_COLOR }, 1, 1);
     // Both sources use the row's evaluated opacity; dissolve weights retain independent source coverage.
     const left = sample('left', 'video-2', strong, 0.4, 0.65);
     const right = sample('right', 'video-2', warm, 0.6, 0.65);
@@ -843,15 +843,15 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       sourcePosition: 0,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
       detail: { ...NEUTRAL_DETAIL },
-      grade: createColourSettings(),
-      colour: { ...strong },
+      grade: createColorSettings(),
+      color: { ...strong },
       weight: 0,
       blendWeight: 1,
       brightness: 0,
       opacity: 1,
     };
     const source = { sample: current, rgb: Buffer.alloc(12, 200), bounds: { x: 0, y: 0, ...target }, original: target };
-    const cache = new ColourLutCache();
+    const cache = new ColorLutCache();
     const signal = new AbortController().signal;
     await composeLayerFrame(buffer, target, [source], cache, signal);
     expect([...output]).toEqual([0, 0, 0, 65535, 0, 0, 0, 65535, 0, 0, 0, 65535, 0, 0, 0, 65535]);
@@ -878,8 +878,8 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       sourcePosition: 0,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
       detail: { ...NEUTRAL_DETAIL },
-      grade: createColourSettings(),
-      colour: { ...NEUTRAL_COLOUR, brightness: 0.2, shadows: 0.4 },
+      grade: createColorSettings(),
+      color: { ...NEUTRAL_COLOR, brightness: 0.2, shadows: 0.4 },
       weight: 1,
       blendWeight: 1,
       brightness: 1,
@@ -889,7 +889,7 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       buffer,
       target,
       [{ sample, rgb, bounds: { x: 1, y: 0, width: 2, height: 2 }, original: { width: 100, height: 100 } }],
-      new ColourLutCache(),
+      new ColorLutCache(),
       new AbortController().signal,
     );
     const output = new Uint16Array(buffer.buffer, buffer.byteOffset, 32);
@@ -900,11 +900,11 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
     }
   });
   it('interrupts LUT construction cooperatively, reuses a partial slot, and rejects undersized group caches', async () => {
-    const cache = new ColourLutCache();
+    const cache = new ColorLutCache();
     const controller = new AbortController();
     const pending = cache.get(strong, controller.signal);
     queueMicrotask(() => controller.abort());
-    await expect(pending).rejects.toThrow('cancelled');
+    await expect(pending).rejects.toThrow('canceled');
     expect(cache.report.generated).toBe(0);
     await cache.get(warm, new AbortController().signal);
     expect(cache.report).toMatchObject({ peakEntries: 1, generated: 1 });
@@ -916,8 +916,8 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
       sourcePosition: 0,
       spatial: { ...NEUTRAL_SPATIAL_POSE },
       detail: { ...NEUTRAL_DETAIL },
-      grade: createColourSettings(),
-      colour: { ...NEUTRAL_COLOUR },
+      grade: createColorSettings(),
+      color: { ...NEUTRAL_COLOR },
       weight: 0.5,
       blendWeight: 0.5,
       brightness: 1,
@@ -934,7 +934,7 @@ describe('bounded CPU-reference animated LUTs and premultiplied groups', () => {
         Buffer.alloc(32),
         { width: 2, height: 2 },
         [source, source],
-        new ColourLutCache(1),
+        new ColorLutCache(1),
         new AbortController().signal,
       ),
     ).rejects.toThrow('every borrowed grade');

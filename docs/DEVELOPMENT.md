@@ -1,26 +1,26 @@
 # Development
 
-The current strict schema requires a `grade` on every clip: twelve graded scalar bases in its `colour`,
+The current strict schema requires a `grade` on every clip: twelve graded scalar bases in its `color`,
 including Temperature (−2…2), Tint, Whites and Blacks (−1…1), Vibrance (−1…2), all neutral 0, plus `hdr` (0–1, neutral 0; a
 detail-stage look applied before grading, see [detail filters](design/DETAIL_FILTERS.md#hdr-look))
 and `localContrast` (−1…1, neutral 0; the local-detail boost split out of HDR, see
 [local contrast](design/DETAIL_FILTERS.md#local-contrast)),
 all eight HSL bands and all four
-colour curves, and 0–64 keyframes at source frames. The project's required `adjustments` array
-holds 0–1,024 ordered, non-overlapping items `{ id, start, duration, colour, keyframes }` with the
-same Colour and keyframes counted from their start ([clip grades and adjustments](design/ROW_APPEARANCE.md)).
+color curves, and 0–64 keyframes at source frames. The project's required `adjustments` array
+holds 0–1,024 ordered, non-overlapping items `{ id, start, duration, color, keyframes }` with the
+same Color and keyframes counted from their start ([clip grades and adjustments](design/ROW_APPEARANCE.md)).
 Grade keyframes require fourteen nullable fields, each enabled one with its own Easing, and a
 boolean `reset` (default keyframe), in control order:
 `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
 `hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`, `localContrast`. Video
-tracks have no Colour, Opacity or keyframes: Opacity is a setting of their `transform`. HSL/curves remain static; speed is
+tracks have no Color, Opacity or keyframes: Opacity is a setting of their `transform`. HSL/curves remain static; speed is
 clip-only (constant or 1–256 source-frame keyframes), and every clip requires a boolean `reverse`.
 `OLDEST_PROJECT_SCHEMA_VERSION` is the current schema: projects and receipt snapshots saved
-before it, with track Colour, are rejected with the reason and left unchanged, with no
+before it, with track Color or British spelling, are rejected with the reason and left unchanged, with no
 load defaults or automatic deletion. A later incompatible change adds its upgrade step to
 [project migrations](../src/shared/project-migrations.ts). CPU/reference/native/GPU
 must use the same [Temperature/Tint gain math](design/TEMPERATURE_AND_TINT.md)
-before Exposure, including intentionally coloured greys and pre-clipping
+before Exposure, including intentionally colored grays and pre-clipping
 neutral-white linear luminance normalization only. Required synthetic validation
 retains neutral identity, axis signs/combined grades, grayscale/HSL boundaries,
 GPU uniform capacity, exact native sharp knees and unchanged pixel/frame/resource
@@ -43,7 +43,7 @@ paths, storage, network and the native toolchain: [DEPLOYMENT.md](DEPLOYMENT.md)
   targets 22/24, not every intervening major version.
 - **FFmpeg/ffprobe 8.0.1**, the tested baseline; FFmpeg 6 is unqualified.
   Other builds need parity tests. Require `libx264`, FFV1, AAC, `lut3d`/`xfade`, raw
-  RGB/lossless RGBA16 and the existing timing/colour filters and bitstream tools.
+  RGB/lossless RGBA16 and the existing timing/color filters and bitstream tools.
   [Build it locally](DEPLOYMENT.md#native-toolchain) with the CI setup script.
 - Browser **WebCodecs** `VideoDecoder` with H.264, module workers, **WebGL2** and
   **AudioWorklet**/`getOutputTimestamp` for music; tests use installed **Google Chrome**
@@ -97,7 +97,7 @@ PASCAP_MEDIA_ROOTS='["/home/you/Videos","/mnt/footage"]' npm run dev
 ```
 
 Generated data is not an original-footage backup; keep it outside footage. It holds
-registries (`videos.json`, `music.json`, version 2), proxies/thumbnails, Import dialog previews, projects, exports/receipts, measurements and scratch.
+registries (`videos.json` version 3, `music.json` version 2), proxies/thumbnails, Import dialog previews, projects, exports/receipts, measurements and scratch.
 Original paths remain identity-checked even with ready proxies; relinking is explicit
 and byte-verified ([relinking](design/SOURCE_RELINK.md)), with no implicit relink or
 migration. Preserve registered bytes/paths, including previously copied sources.
@@ -236,7 +236,7 @@ frames on their way from the video reader worker: a decoder that stops deliverin
 holds the image, buffers and fails after five seconds with an explicit message;
 a late decoder under music keeps the music clock and catches up by dropping
 passed frames, without restarting music; pause/seek/restart and a withheld paused
-seek are cancelled without stale images. These synthetic, memory-only browser
+seek are canceled without stale images. These synthetic, memory-only browser
 checks run in CI; they do not qualify the entire Firefox editor or intended
 hardware. Attachments contain bounded consumed-sample/output-timestamp evidence
 and at most 500 decoder/clock state snapshots around music transitions, not
@@ -349,7 +349,7 @@ automated specs, not a full browser-suite run:
 4. Fix issues and repeat the live checks after the last edit. Run the focused
    specs separately. Never build or reset fixtures while a tab or test run serves
    the same output/cache.
-5. Summarise the states and viewports actually checked and any gaps. If browser
+5. Summarize the states and viewports actually checked and any gaps. If browser
    access is unavailable, report that blocker instead of claiming visual validation.
 
 ### GitHub CI
@@ -438,9 +438,9 @@ definitions ([operation registry](design/ASSISTANT_MCP.md#the-operation-registry
    `operations` in [the registry](../src/shared/operations/index.ts).
 2. Implement its runner in `src/server/operations/<name>.ts` and add it to `runners` in
    [the server registry](../src/server/operations/index.ts); type checking requires one.
-3. Run `npm run operations:catalogue` to update the catalogue in the design guide. Unit tests
+3. Run `npm run operations:catalog` to update the catalog in the design guide. Unit tests
    fail on duplicate names, missing descriptions, schemas JSON Schema cannot express or a
-   stale catalogue.
+   stale catalog.
 4. The editor calls it with `callOperation(name, input)` from [the client](../src/web/operations.ts),
    which validates the response.
 
@@ -495,7 +495,7 @@ spatial coverage $m_i$, group RGB is $C = \sum_i G_i b_i o_i w_i m_i$ and
 coverage is $A = \sum_i o_i w_i m_i$.
 Groups merge bottom-to-top as $\mathrm{result} = C + \mathrm{lower}(1 - A)$,
 without regrading or another opacity multiplier. Opacity is composition coverage,
-not SDR RGB grading; Colour belongs to clip grades and adjustments. Black fades preserve coverage;
+not SDR RGB grading; Color belongs to clip grades and adjustments. Black fades preserve coverage;
 each dissolve remains one group. Serial limits: one original decoder, two intermediate readers,
 one encoder and three native video children per pass. Each video decoder, filter
 and encoder (proxy preparation, export, verification) uses half the host cores,
@@ -508,7 +508,7 @@ and so the proxy, are identical to the CPU decoder's, and it frees about half th
 the CPU decoder their repair was verified with. A failed NVDEC encode is retried once on the CPU,
 which the service then keeps using, and the job says so. While the proxy encodes, one more two-thread decoder
 seeks the original's three comparison frames (beginning, middle and end), one at a time,
-independently of the encode; it stops if the encode fails or is cancelled, and the frames are compared
+independently of the encode; it stops if the encode fails or is canceled, and the frames are compared
 with the proxy only after its own frame-count checks. Camera motion analysis, a background job that runs
 after every other queued job, decodes the proxy with two threads and measures 30-frame
 chunks on at most eight worker threads (host cores − 1), about 2 MB of frames each. Four raw buffers (two RGB8,
@@ -526,13 +526,13 @@ adjustment, keyed or advanced clip grade, local tone, Opacity or Transform edit/
 generalized composited export, regardless
 of Ripple or track ID.
 Processing: [keyframes](LAYERS_AND_KEYFRAMES.md), [retiming/audio](SPEED_AND_AUDIO.md)
-and [grading equations](COLOUR_AND_TIMING.md#colour).
+and [grading equations](COLOR_AND_TIMING.md#color).
 
 Each video track requires `transform: { base, keyframes }`: nine
 complete values (the pose and Opacity) and 0–256 per-setting project-frame keyframes with required
 easing and `reset` (default keyframe); clips have no `spatial` field. Shared
 [spatial mapping](../src/shared/spatial.ts) uses unrounded original-aspect contain
-fit, original-centre pivot and half-open crop bounds; crop does not refit.
+fit, original-center pivot and half-open crop bounds; crop does not refit.
 The pose evaluates at absolute project time and applies to every
 source on the track, each with its own coverage; `sourceAt` supplies recorded-image
 identity, so geometry can move on held images without optical flow. Exact neutral
@@ -568,22 +568,22 @@ real playhead permits editing, with the triangle explicitly capturing a missing
 setting. Sliders never create keyframes. **Placement** contains placement only;
 Track options contains rename, Ripple, ordering and deletion, with visibility separate.
 
-Colour, Speed and Transform always show their capture diamonds while the section is expanded, Colour and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. The per-setting buttons remain alongside the stored enabled-setting chip arrows because not every setting is enabled at every keyframe.
-Each keyframe line has one Previous/Next pair: Colour visits every keyframe of the clip grade
+Color, Speed and Transform always show their capture diamonds while the section is expanded, Color and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. The per-setting buttons remain alongside the stored enabled-setting chip arrows because not every setting is enabled at every keyframe.
+Each keyframe line has one Previous/Next pair: Color visits every keyframe of the clip grade
 or adjustment it edits; Speed visits all retained custom speed source
 keyframes of the selected clip, including off-trim keyframes and original exclusive
 OUT, previewing the nearest mapped image through authoritative retiming. Transform
 visits all its stored track keyframes, including those after the duration, through
 a track-local stored-keyframe cursor whose preview uses the nearest available frame.
 Speed uses a clip-local stored-source cursor, so successive stored keyframes remain reachable
-even when their nearest preview image is the same; Colour keeps no such cursor. Stored time
+even when their nearest preview image is the same; Color keeps no such cursor. Stored time
 stays distinct from actual preview.
-Enabled setting chips in stored Colour keyframe rows carry per-channel native arrows
+Enabled setting chips in stored Color keyframe rows carry per-channel native arrows
 too. All main and stored per-channel arrows visit strictly earlier/later keyframes
 where that channel is nonnull (zero is enabled): the main arrows from the playhead, the chips'
 from their row. Main capture always uses the real displayed project/source frame,
 never an inspected stored time. All visible
-Colour/Transform/clip-speed easing labels read **Easing**, retaining contextual
+Color/Transform/clip-speed easing labels read **Easing**, retaining contextual
 accessible names such as **Clip keyframe easing N**.
 
 Inside timeline clip rectangles, one lane places boxed salmon **●** custom-speed
@@ -591,7 +591,7 @@ source keyframes at authoritative retimed output positions and boxed amber **◆
 keyframes where the clip shows their source frame. Off-trim keyframes are
 omitted; exclusive OUT has a boundary marker seeking the final available frame.
 Click, Enter or Space selects the clip, seeks its nearest mapped image and opens
-Clip → Speed, or the Colour tab's Clip target; a click edits nothing. Both slide by drag or ←/→ (one source
+Clip → Speed, or the Color tab's Clip target; a click edits nothing. Both slide by drag or ←/→ (one source
 frame, Shift ten), one Undo step per valid release; speed keys retime their clip. Track
 Transform keyframes are boxed blue **▼** markers at the top of the track row, one
 per stored keyframe at its project frame (a default keyframe is filled light blue
@@ -638,16 +638,16 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
   frames, editing aids only), `selects` (kept source ranges per recording) and `adjustments`
   (0–1,024 ordered, non-overlapping graded ranges), and a complete required `grade` on every clip,
   including Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves;
-  reject saved `clip.colour` and `clip.correction`. Grade each source with its clip grade, then
+  reject saved `clip.color` and `clip.correction`. Grade each source with its clip grade, then
   the adjustment at that frame, retaining
-  two LUT buffers and existing raw/process budgets. Main Colour controls and keyframes
+  two LUT buffers and existing raw/process budgets. Main Color controls and keyframes
   edit the grade of the selected clip or adjustment. Required track `transform`
   (base and project-frame keyframes, Opacity included) belongs to the track; reject saved
   `clip.spatial`. See
   [clip grades and adjustments](design/ROW_APPEARANCE.md). Required static clip `detail` and boolean `reverse`,
   required unique video/audio membership, grade keyframes with all fourteen nullable
   channels and per-track `ripple`, `transitions`, `openingFade` and `closingFade`; video tracks
-  have no `colour`, `opacity` or `keyframes`. A new track's Transform Opacity starts at 1; a
+  have no `color`, `opacity` or `keyframes`. A new track's Transform Opacity starts at 1; a
   missing saved field is invalid.
   The channels are `temperature`, `tint`,
   `exposure`, `brightness`, `contrast`, `hue`, `saturation`, `vibrance`, `highlights`, `shadows`,
@@ -658,9 +658,9 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
   ID. Require a 0–8 `music` array with unique instance IDs and complete independent
   settings, plus captured audio-source/instance-plan arrays in current receipts.
   Reject and preserve projects/receipt snapshots saved before the current schema, with track
-  Colour, and finished videos, without automatic deletion. Proxy formats,
+  Color or British spelling, and finished videos, without automatic deletion. Proxy formats,
   source protections and native resource budgets remain unchanged; the registries are
-  version 2 (full-content checksums).
+  version 3 (videos) and 2 (music), with full-content checksums.
 - Reuse `JobQueue`, library and backpressured raw/retime helpers: one heavy job,
   bounded threads/buffers, cancellation and owned-scratch cleanup. Keep serial awaits/
   [serial helpers](../src/shared/serial.ts), not parallel media work to satisfy lint.

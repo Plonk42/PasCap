@@ -13,7 +13,7 @@ import { probeVideo } from '../../src/server/probe.js';
 import * as nativeProcesses from '../../src/server/process.js';
 import { runProcess } from '../../src/server/process.js';
 import { audioAssetSchema, musicGainAt, type AudioAsset } from '../../src/shared/audio.js';
-import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOR } from '../../src/shared/color.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { estimateExportSpace } from '../../src/shared/export-space.js';
 import {
@@ -75,7 +75,7 @@ async function rawVideo(config: ServiceConfig, asset: MediaAsset): Promise<Buffe
     '0:v:0',
     '-an',
     '-vf',
-    `scale=160:90:flags=area:in_color_matrix=bt709:out_color_matrix=bt709:in_range=${asset.metadata.colourRange}:out_range=pc,format=rgb24`,
+    `scale=160:90:flags=area:in_color_matrix=bt709:out_color_matrix=bt709:in_range=${asset.metadata.colorRange}:out_range=pc,format=rgb24`,
     '-threads',
     '2',
     '-filter_threads',
@@ -87,7 +87,7 @@ async function rawVideo(config: ServiceConfig, asset: MediaAsset): Promise<Buffe
     'pipe:1',
   ]);
 }
-// The existing native colour contract allows MAE <4/255 after 8-bit limited YUV.
+// The existing native color contract allows MAE <4/255 after 8-bit limited YUV.
 // Measured separately: LUT rounding <=1 level, RGB/YUV round-trip another 2–3.
 function assertPixels(
   document: ProjectDocument,
@@ -103,7 +103,7 @@ function assertPixels(
     for (let index = 0; index < FRAME_BYTES; index += 3) {
       const rgb = gradeChainPixel(
         [pixels[index]! / 255, pixels[index + 1]! / 255, pixels[index + 2]! / 255],
-        sourceGrades(layer.grade, layer.colour).stages,
+        sourceGrades(layer.grade, layer.color).stages,
       );
       for (let channel = 0; channel < 3; channel++) expected[index + channel]! += rgb[channel]! * 255 * layer.weight;
     }
@@ -293,7 +293,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     assets = [];
     for (let index = 0; index < 2; index++) {
       const filename = path.join(directory, 'synthetic-sources', `export-frame-codes-${index}.mp4`);
-      // Flat, time-varying colours expose a wrong source frame numerically, without
+      // Flat, time-varying colors expose a wrong source frame numerically, without
       // resampling/edge ambiguity. One original contains audio which MUST NOT leak.
       await runProcess(config.ffmpeg, [
         '-hide_banner',
@@ -471,7 +471,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       height: EXPORT_PROFILES[profile].height,
       codec: 'h264',
       pixelFormat: 'yuv420p',
-      colourRange: 'tv',
+      colorRange: 'tv',
     });
     return { job, filename: path.join(renderDirectory, 'export.mp4'), renderDirectory, receipt };
   }
@@ -485,8 +485,8 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     'exports static Temperature $temperature / Tint $tint through the native LUT with unchanged frames/fades/resources',
     async ({ temperature, tint }) => {
       const project = document(6);
-      project.clips[0]!.grade.colour = {
-        ...NEUTRAL_COLOUR,
+      project.clips[0]!.grade.color = {
+        ...NEUTRAL_COLOR,
         temperature,
         tint,
         exposure: -0.25,
@@ -532,8 +532,8 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
   it('exports static clip grades through one native LUT per clip', async () => {
     const project = document(6);
     const second = { ...createClip('two', assets[1]!.id, 2, 8), start: 6 };
-    project.clips[0]!.grade.colour = { ...NEUTRAL_COLOUR, temperature: 0.8, exposure: 0.3, saturation: 1.2 };
-    second.grade.colour = { ...NEUTRAL_COLOUR, tint: -0.6, contrast: 1.15, blacks: 0.05, hue: -12, whites: -0.1 };
+    project.clips[0]!.grade.color = { ...NEUTRAL_COLOR, temperature: 0.8, exposure: 0.3, saturation: 1.2 };
+    second.grade.color = { ...NEUTRAL_COLOR, tint: -0.6, contrast: 1.15, blacks: 0.05, hue: -12, whites: -0.1 };
     project.clips.push(second);
     project.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cut', duration: 0 }];
     const captured = structuredClone(projectSchema.parse(project));
@@ -550,7 +550,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
   it('exports >2 clips, repeated graded originals, slow/fast and both directions of every ramp-shaped curve with exact numeric pixels', async () => {
     const project = createProject('native-many', 'Many clips and every speed curve');
     const graded = {
-      ...NEUTRAL_COLOUR,
+      ...NEUTRAL_COLOR,
       contrast: 1.05,
       blacks: 0.05,
       hue: 10,
@@ -561,7 +561,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     // The same static grade on every clip, through one native LUT each.
     project.clips = speeds.map((speed, index) => {
       const clip = createClip(`instance-${index}`, assets[index % 2]!.id, 1 + (index % 4), 19 + (index % 4));
-      clip.grade.colour = structuredClone(graded);
+      clip.grade.color = structuredClone(graded);
       // Every third clip plays backwards through the chunked reverse decoder.
       return { ...clip, speed, reverse: index % 3 === 2 };
     });
@@ -647,7 +647,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     before.clips.push(createClip('two', assets[1]!.id, 2, 10));
     // Both recordings carry the same static grade; the cut pieces keep it.
     for (const clip of before.clips)
-      clip.grade.colour = { ...NEUTRAL_COLOUR, exposure: 0.3, brightness: 0.04, saturation: 0.8 };
+      clip.grade.color = { ...NEUTRAL_COLOR, exposure: 0.3, brightness: 0.04, saturation: 0.8 };
     before.clips[1]!.start = 12;
     before.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cut', duration: 0 }];
     const project = applyCommand(before, removeSelectedRange(before, 'one', { inFrame: 3, outFrame: 6 }, 'one-right'));
@@ -709,7 +709,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
   it('renders a few genuine UHD frames, grading before output-frame one-frame black fades', async () => {
     const project = document(6);
     project.clips[0]!.speed = { mode: 'constant', rate: 2 };
-    project.clips[0]!.grade.colour = { ...NEUTRAL_COLOUR, brightness: 0.1, blacks: 0.25 };
+    project.clips[0]!.grade.color = { ...NEUTRAL_COLOR, brightness: 0.1, blacks: 0.25 };
     project.layers[0]!.openingFade = 1;
     project.layers[0]!.closingFade = 1;
     const result = await completed(project, 'final4k');
@@ -898,7 +898,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
           hasAudio: true,
           codec: 'h264',
           pixelFormat: 'yuv420p',
-          colourRange: 'tv',
+          colorRange: 'tv',
         });
         expect(receipt.verification.audio!.durationErrorSeconds).toBeLessThanOrEqual(framesToSeconds(1));
         expect(receipt.settings.pipeline).toBe('sequential-layered');
@@ -1439,12 +1439,12 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     expect(failure.receiptUrl).toBeNull();
     expect(await readdir(path.join(directory, 'renders'))).not.toContain(failed.id);
     const originalRun = nativeProcesses.runProcess;
-    let cancelled = false;
+    let canceled = false;
     let jobId = '';
     const processSpy = vi.spyOn(nativeProcesses, 'runProcess').mockImplementation((binary, args, options = {}) => {
       const pending = originalRun(binary, args, options);
       if (binary === config.ffmpeg && args.at(-1) === 'music.wav' && args.includes(negative.sourcePath)) {
-        cancelled = true;
+        canceled = true;
         fixture.jobs.cancel(jobId);
       }
       return pending;
@@ -1453,8 +1453,8 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       const job = startExport(project, 'draft720', fixture.library, (id) => (id === positive.id ? positive : negative));
       jobId = job.id;
       const result = await fixture.jobs.wait(job.id);
-      expect(result.state, result.message).toBe('cancelled');
-      expect(cancelled).toBe(true);
+      expect(result.state, result.message).toBe('canceled');
+      expect(canceled).toBe(true);
       expect(result.outputUrl).toBeNull();
       expect(result.receiptUrl).toBeNull();
     } finally {
@@ -1471,7 +1471,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
   it('cancels an active raw retimer, removes its entire job directory and preserves successful exports and saved edits', async () => {
     const originalSuccessful = await readFile(path.join(successfulDirectory, 'export.mp4'));
     const submit = fixture.jobs.submit.bind(fixture.jobs);
-    let cancelled = false;
+    let canceled = false;
     const spy = vi.spyOn(fixture.jobs, 'submit').mockImplementation((kind, label, task, settled = null) =>
       submit(
         kind,
@@ -1481,8 +1481,8 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
             ...context,
             update: (progress, message) => {
               context.update(progress, message);
-              if (!cancelled && message.startsWith('Retiming original')) {
-                cancelled = true;
+              if (!canceled && message.startsWith('Retiming original')) {
+                canceled = true;
                 fixture.jobs.cancel(context.id);
               }
             },
@@ -1495,10 +1495,10 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       const job = startExport(document(36), 'draft720', fixture.library);
       id = job.id;
       const result = await fixture.jobs.wait(id);
-      expect(result.state, result.message).toBe('cancelled');
+      expect(result.state, result.message).toBe('canceled');
       expect(result.outputUrl).toBeNull();
       expect(result.receiptUrl).toBeNull();
-      expect(cancelled).toBe(true);
+      expect(canceled).toBe(true);
     } finally {
       spy.mockRestore();
     }
@@ -1558,14 +1558,14 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     // Direct cancellation before directory creation cannot leave orphan scratch.
     const controller = new AbortController();
     controller.abort();
-    const cancelledId = randomUUID();
+    const canceledId = randomUUID();
     await expect(
       renderExport(document(3), 'draft720', fixture.library, {
-        id: cancelledId,
+        id: canceledId,
         signal: controller.signal,
         update: () => {},
       }),
-    ).rejects.toThrow('cancelled');
-    expect(await readdir(path.join(directory, 'renders'))).not.toContain(cancelledId);
+    ).rejects.toThrow('canceled');
+    expect(await readdir(path.join(directory, 'renders'))).not.toContain(canceledId);
   });
 });

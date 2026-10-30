@@ -26,7 +26,7 @@ const config = createConfig();
 const jobs = new JobQueue();
 const library = new MediaLibrary(config, jobs);
 const store = new ProjectStore(config.dataDir);
-await library.initialise();
+await library.initialize();
 try {
   const assets: MediaAsset[] = [];
   await forEachSerial(names, async (name) => {

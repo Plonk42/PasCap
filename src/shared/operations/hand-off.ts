@@ -8,7 +8,7 @@ const preparation = described(
   'Whether its editing cache is ready, being prepared, or not prepared (including a failed preparation).',
 );
 const analysis = described(
-  z.enum(['analysed', 'analysing', 'missing']),
+  z.enum(['analyzed', 'analyzing', 'missing']),
   'Whether its analysis is cached for the current cache, queued or running, or missing.',
 );
 

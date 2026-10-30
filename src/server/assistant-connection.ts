@@ -33,7 +33,7 @@ export class AssistantConnection {
     this.tokenFile = path.join(dataDir, 'mcp-token');
   }
 
-  /** Records an authorised MCP request, keeping the last name a client gave. */
+  /** Records an authorized MCP request, keeping the last name a client gave. */
   seen(name: string | null, now = new Date()): void {
     this.#last = { at: now.toISOString(), name: name ?? this.#last?.name ?? null };
   }

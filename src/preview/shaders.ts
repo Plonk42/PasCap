@@ -15,12 +15,12 @@ import {
   LOCAL_TONE_FLOOR,
   LOCAL_TONE_RANGE,
   LOCAL_TONE_SLOPE,
-  MID_GREY_STOPS,
+  MID_GRAY_STOPS,
   SHARPEN_GAIN,
   SHARPEN_HALO,
   SHARPEN_THRESHOLD,
 } from '../shared/detail.js';
-import { BLACKS_RANGE, WHITES_RANGE } from '../shared/colour.js';
+import { BLACKS_RANGE, WHITES_RANGE } from '../shared/color.js';
 
 export const vertexShader = `#version 300 es
 precision highp float;
@@ -57,7 +57,7 @@ float ${p}curve${source}_${channel}Value(float value) {
   }
   vec3 left = ${p}curve${source}_${channel}[low];
   vec3 right = ${p}curve${source}_${channel}[high];
-  // Cubic Hermite with shared monotone (x, y, slope) nodes; matches compileColourCurve.
+  // Cubic Hermite with shared monotone (x, y, slope) nodes; matches compileColorCurve.
   float width = right.x - left.x;
   float t = (value - left.x) / width;
   float t2 = t * t;
@@ -77,7 +77,7 @@ const glslVec2Array = (name: string, taps: readonly { x: number; y: number }[]):
 const glslFloatArray = (name: string, values: readonly number[]): string =>
   `const float ${name}[${values.length}] = float[${values.length}](${values.map(glslFloat).join(', ')});`;
 const fineTotal = 1 + DETAIL_FINE_TAPS.reduce((sum, tap) => sum + tap.weight, 0);
-// Edge-aware luma base: range weights against the mean of the centre and first ring.
+// Edge-aware luma base: range weights against the mean of the center and first ring.
 const edgeAwareBase = (
   name: string,
   taps: readonly { x: number; y: number; weight: number }[],
@@ -142,8 +142,8 @@ float toneDistance(float stops) {
 }
 float localToneStops(float base, vec4 localTone) {
   float stops = log2(max(${glslFloat(LOCAL_TONE_FLOOR)}, decode709(clamp(base, 0.0, 1.0)) * exp2(localTone.w)));
-  return ${glslFloat(LOCAL_TONE_SLOPE)} * (localTone.x * toneDistance(${glslFloat(MID_GREY_STOPS)} - stops) +
-                                           localTone.y * toneDistance(stops - ${glslFloat(MID_GREY_STOPS)}));
+  return ${glslFloat(LOCAL_TONE_SLOPE)} * (localTone.x * toneDistance(${glslFloat(MID_GRAY_STOPS)} - stops) +
+                                           localTone.y * toneDistance(stops - ${glslFloat(MID_GRAY_STOPS)}));
 }
 float limitOvershoot(float value, float low, float high) {
   const float halo = ${glslFloat(SHARPEN_HALO)};
@@ -152,12 +152,12 @@ float limitOvershoot(float value, float low, float high) {
   return value;
 }
 // steps: the 1/720-image-height stride in xy, the shift of the 720p-scale measurement taps in zw.
-vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, vec4 steps, vec4 localTone,
+vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 center, vec4 detail, vec4 steps, vec4 localTone,
                   float contrast) {
   vec2 stride = steps.xy;
   bool shifted = any(notEqual(steps.zw, vec2(0.0))) && any(notEqual(detail.xyz, vec3(0.0)));
   vec2 measuredAt = shifted ? coordinate + steps.zw : coordinate;
-  vec3 measured = shifted ? texture(source, measuredAt).rgb : centre;
+  vec3 measured = shifted ? texture(source, measuredAt).rgb : center;
   vec3 denoised = measured;
   vec3 gaussian = measured;
   float low = dot(measured, luma);
@@ -177,11 +177,11 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
         vec3 difference = tap - measured;
         float gap = dot(difference, difference);
         float weight = detailFineDenoise[i] * exp(-gap * detail.w);
-        float colour = detailFineDenoise[i] * exp(-gap * chromaRange);
+        float color = detailFineDenoise[i] * exp(-gap * chromaRange);
         denoised += weight * tap;
         denoisedWeight += weight;
-        chroma += colour * tap;
-        chromaWeight += colour;
+        chroma += color * tap;
+        chromaWeight += color;
       }
     }
     gaussian /= ${glslFloat(fineTotal)};
@@ -191,15 +191,15 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
         vec3 difference = tap - measured;
         float gap = dot(difference, difference);
         float weight = detailWideDenoise[i] * exp(-gap * detail.w);
-        float colour = detailWideDenoise[i] * exp(-gap * chromaRange);
+        float color = detailWideDenoise[i] * exp(-gap * chromaRange);
         denoised += weight * tap;
         denoisedWeight += weight;
-        chroma += colour * tap;
-        chromaWeight += colour;
+        chroma += color * tap;
+        chromaWeight += color;
       }
       denoised /= denoisedWeight;
       chroma /= chromaWeight;
-      // Luma from the tight weights, colour from the wide ones.
+      // Luma from the tight weights, color from the wide ones.
       denoised = chroma + (dot(denoised, luma) - dot(chroma, luma));
     }
   }
@@ -217,7 +217,7 @@ vec3 detailFilter(sampler2D source, vec2 coordinate, vec3 centre, vec4 detail, v
     delta += limitOvershoot(sharpened, min(low, detailBase), max(high, detailBase)) - detailBase;
   }
   if (shifted) {
-    vec3 finer = centre - measured;
+    vec3 finer = center - measured;
     float core = ${glslFloat(DENOISE_DETAIL_CORE * DENOISE_RANGE_SIGMA)} * detail.z;
     denoised += core > 0.0 ? finer * finer * finer / (finer * finer + core * core) : finer;
   }
@@ -243,19 +243,19 @@ uniform vec4 detailStep1;
 uniform vec4 localTone0;
 uniform vec4 localTone1;
 uniform vec2 localContrast;`;
-const detailSample = `vec3 centre = texture(source, coordinate).rgb;
+const detailSample = `vec3 center = texture(source, coordinate).rgb;
   vec4 detail = sourceIndex == 0 ? detail0 : detail1;
   vec4 localTone = sourceIndex == 0 ? localTone0 : localTone1;
   float contrast = sourceIndex == 0 ? localContrast.x : localContrast.y;
-  if (all(equal(detail.xyz, vec3(0.0))) && all(equal(localTone.xyz, vec3(0.0))) && contrast == 0.0) return centre;
+  if (all(equal(detail.xyz, vec3(0.0))) && all(equal(localTone.xyz, vec3(0.0))) && contrast == 0.0) return center;
   vec4 steps = sourceIndex == 0 ? detailStep0 : detailStep1;
-  return detailFilter(source, coordinate, centre, detail, steps, localTone, contrast);`;
+  return detailFilter(source, coordinate, center, detail, steps, localTone, contrast);`;
 
 const singleMain = `void main() {
   vec4 left = vec4(0.0);
   if (coverage.x > 0.0) left = sampleSpatial(source0, tone0, extra0, imageAspect.x,
                             spatialU0, spatialV0, crop0, neutralSpatial.x, 0);
-  outputColour = vec4(left.rgb * left.a * coverage.x * brightness.x, left.a * coverage.x);
+  outputColor = vec4(left.rgb * left.a * coverage.x * brightness.x, left.a * coverage.x);
 }`;
 const groupMain = `void main() {
   vec4 left = vec4(0.0);
@@ -268,7 +268,7 @@ const groupMain = `void main() {
   // Black fades dim graded RGB without reducing the group's coverage.
   vec3 premultiplied = left.rgb * left.a * coverage.x * brightness.x +
                        right.rgb * right.a * coverage.y * brightness.y;
-  outputColour = vec4(premultiplied, left.a * coverage.x + right.a * coverage.y);
+  outputColor = vec4(premultiplied, left.a * coverage.x + right.a * coverage.y);
 }`;
 
 // The uniforms of a clip grade applied before the track's: only in the two-stage variants.
@@ -299,10 +299,10 @@ vec3 ${p}rangeGrade(vec3 code, int sourceIndex) {
   else if (maximum == code.g) h = 60.0 * (2.0 + (code.b - code.r) / chroma);
   else h = 60.0 * (4.0 + (code.r - code.g) / chroma);
   h = mod(h + 360.0, 360.0);
-  const float centres[9] = float[9](0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 270.0, 300.0, 360.0);
+  const float centers[9] = float[9](0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 270.0, 300.0, 360.0);
   int band = 7;
-  for (int i = 0; i < 7; i++) { if (h < centres[i + 1]) { band = i; break; } }
-  float weight = smoothstep(centres[band], centres[band + 1], h);
+  for (int i = 0; i < 7; i++) { if (h < centers[i + 1]) { band = i; break; } }
+  float weight = smoothstep(centers[band], centers[band + 1], h);
   vec3 left = sourceIndex == 0 ? ${p}hsl0[band].xyz : ${p}hsl1[band].xyz;
   vec3 right = sourceIndex == 0 ? ${p}hsl0[(band + 1) % 8].xyz : ${p}hsl1[(band + 1) % 8].xyz;
   vec3 offset = mix(left, right, weight) * smoothstep(0.0, 0.1, chroma);
@@ -350,13 +350,13 @@ export interface FragmentVariant {
   single: boolean;
   /** Runs the detail and local tone kernel on source taps. */
   detail: boolean;
-  /** HSL ranges and colour curves; false keeps the scalar grade only. */
+  /** HSL ranges and color curves; false keeps the scalar grade only. */
   advanced: boolean;
   /** A clip grade applied before the track's. */
   staged: boolean;
 }
 
-// Deliberately implements docs/COLOUR_AND_TIMING.md, not an approximation of eq/hue.
+// Deliberately implements docs/COLOR_AND_TIMING.md, not an approximation of eq/hue.
 export const fragmentShaderFor = ({ single, detail, advanced, staged }: FragmentVariant): string => {
   const gradeCall = staged ? 'stagedGrade' : 'grade';
   const gradeFunctions = (p: string): string => (advanced ? advancedGrade(p) : scalarGradeOnly(p));
@@ -364,7 +364,7 @@ export const fragmentShaderFor = ({ single, detail, advanced, staged }: Fragment
 precision highp float;
 precision highp sampler2D;
 in vec2 uv;
-out vec4 outputColour;
+out vec4 outputColor;
 uniform sampler2D source0;
 uniform sampler2D source1;
 uniform vec4 tone0;
@@ -438,8 +438,8 @@ vec3 scalarGrade(vec3 code, vec4 tone, vec2 extra, vec4 correction, float vibran
   float chroma = tone.w;
   if (vibrance != 0.0) {
     float maximum = max(rgb.r, max(rgb.g, rgb.b));
-    float colourfulness = maximum > 0.0 ? (maximum - min(rgb.r, min(rgb.g, rgb.b))) / maximum : 0.0;
-    float muted = 1.0 - min(1.0, colourfulness);
+    float colorfulness = maximum > 0.0 ? (maximum - min(rgb.r, min(rgb.g, rgb.b))) / maximum : 0.0;
+    float muted = 1.0 - min(1.0, colorfulness);
     chroma *= 1.0 + vibrance * muted;
   }
   float u = chroma * (cb * cos(extra.x) - cr * sin(extra.x));

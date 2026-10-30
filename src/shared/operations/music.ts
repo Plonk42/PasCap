@@ -37,7 +37,7 @@ const placedHit = z
 export const musicAnalysis = defineOperation({
   name: 'music_analysis',
   description:
-    "Read the music of the project's music clips at project frames (where each plays on the timeline, repeated across loops): tempo, meter, beats, downbeats, hits (rhythmic hits that stand out from their surroundings, such as a kick, a snare or a cymbal crash, each with the band that rose most and whether it is strong: the places worth cutting on), key and mode, sections (quiet, build, peak, release) with their loudness and tone (low, mid and high frequency levels), swells (crescendos and decrescendos, sudden or gradual) and silences. Use a frame window for long music. A clip whose music is not analysed yet says so; ask the user to analyse it in Audio → Music.",
+    "Read the music of the project's music clips at project frames (where each plays on the timeline, repeated across loops): tempo, meter, beats, downbeats, hits (rhythmic hits that stand out from their surroundings, such as a kick, a snare or a cymbal crash, each with the band that rose most and whether it is strong: the places worth cutting on), key and mode, sections (quiet, build, peak, release) with their loudness and tone (low, mid and high frequency levels), swells (crescendos and decrescendos, sudden or gradual) and silences. Use a frame window for long music. A clip whose music is not analyzed yet says so; ask the user to analyze it in Audio → Music.",
   input: z
     .object({
       projectId,
@@ -62,8 +62,8 @@ export const musicAnalysis = defineOperation({
             start: frameSchema,
             end: described(frameSchema, 'Exclusive.'),
             analysis: described(
-              z.enum(['analysed', 'analysing', 'missing']),
-              'Whether its beats are known, being found, or not analysed.',
+              z.enum(['analyzed', 'analyzing', 'missing']),
+              'Whether its beats are known, being found, or not analyzed.',
             ),
             tempo: z.object({ bpm: z.number(), confidence: z.number() }).strict().nullable(),
             meter: z.object({ beatsPerBar: z.number().int(), confidence: z.number() }).strict().nullable(),
@@ -136,8 +136,8 @@ export const checkAlignment = defineOperation({
   output: z
     .object({
       revision: revisionReadSchema,
-      beats: described(z.number().int().nonnegative(), 'Beats of the analysed music clips considered.'),
-      hits: described(z.number().int().nonnegative(), 'Strong hits of the analysed music clips considered.'),
+      beats: described(z.number().int().nonnegative(), 'Beats of the analyzed music clips considered.'),
+      hits: described(z.number().int().nonnegative(), 'Strong hits of the analyzed music clips considered.'),
       boundaries: z.array(
         z
           .object({

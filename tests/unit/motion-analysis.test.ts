@@ -1,6 +1,6 @@
 import { ChildProcess } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
-import { analyseProxy, blockSpectra, estimateMotion, measureFrames, parseTelemetry } from '../../src/server/motion.js';
+import { analyzeProxy, blockSpectra, estimateMotion, measureFrames, parseTelemetry } from '../../src/server/motion.js';
 import { MotionPool } from '../../src/server/motion-pool.js';
 import {
   MOTION_ANALYSIS_VERSION,
@@ -33,7 +33,7 @@ function scene(x: number, y: number): number {
   return value;
 }
 
-/** Content point p moves to p + t + zoom·p + rotation·perp(p) about the centre. */
+/** Content point p moves to p + t + zoom·p + rotation·perp(p) about the center. */
 function render(tx: number, ty: number, zoom: number, rotation: number): Uint8Array {
   const frame = new Uint8Array(MOTION_WIDTH * MOTION_HEIGHT);
   const scale = 1 + zoom;
@@ -167,8 +167,8 @@ describe('camera motion estimation', () => {
       // A job reaches the decoder within a microtask, before the failed spawn reports itself on the next tick.
       await Promise.resolve();
       await expect(
-        analyseProxy('/pascap-missing-ffmpeg', 'proxy.mp4', 30, 'verified', controller.signal, () => {}),
-      ).rejects.toThrow('Job cancelled.');
+        analyzeProxy('/pascap-missing-ffmpeg', 'proxy.mp4', 30, 'verified', controller.signal, () => {}),
+      ).rejects.toThrow('Job canceled.');
       const unstarted = (kill.mock.contexts as ChildProcess[]).filter((child) => child.pid === undefined);
       expect(unstarted.map((child) => child.spawnfile)).toEqual([]);
     } finally {

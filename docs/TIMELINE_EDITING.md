@@ -2,14 +2,14 @@
 
 ## Recordings, ranges and clips
 
-Colour belongs to clip grades and adjustments, never to video tracks. Each clip has its own
+Color belongs to clip grades and adjustments, never to video tracks. Each clip has its own
 `grade`, with keyframes at source frames of its recording that stay with its footage through
 trims, moves, splits, cuts, duplicates and Ripple. An adjustment grades every video track over a
 project-time range, after the clip grades; clip edits never move it. A video track owns its
-Transform, including Opacity, which a moved clip adopts. There is no clip colour/correction
+Transform, including Opacity, which a moved clip adopts. There is no clip color/correction
 field. Temperature (−2…2) and Tint (−1…1) are scalars of every grade, neutral 0, with
 independent explicit keyframe capture. Positive Temperature warms; positive Tint adds magenta.
-Their normalized linear gains precede Exposure and intentionally colour greys.
+Their normalized linear gains precede Exposure and intentionally color grays.
 HSL/curves remain static. See [Temperature and Tint](design/TEMPERATURE_AND_TINT.md) and
 [clip grades and adjustments](design/ROW_APPEARANCE.md).
 
@@ -42,7 +42,7 @@ mark the next range and add again. Successful additions keep **Source preview** 
 the same recording/frame, with the applied range unchanged and explicit success
 feedback: **Clip added · mark another range**. The source is not unmounted/reloaded
 for each addition. Failed insertion keeps the review/range and never reports success.
-**Add clip** (labelled with the applied
+**Add clip** (labeled with the applied
 range length) and a compact **Show N clips** popover beside the recording name stay in the sticky source header, including on
 short laptop screens; opening the list does not resize source review. The popup
 shows original ranges/tracks; Escape closes just the popup and **Show** selects, seeks and horizontally
@@ -105,7 +105,7 @@ only to the service user's `~/Videos`; `[]` disables the browser. Selected-path
 registration accepts at most **5,000 absolute video paths per request**, constrained
 to approved roots. Existing read-only fingerprint/probe checks report individual
 failures. Confirming registration queues eligible proxies through the same
-one-heavy-worker queue; ready/in-flight work is reused, and failed/cancelled/
+one-heavy-worker queue; ready/in-flight work is reused, and failed/canceled/
 interrupted preparation requires explicit **Prepare**. Merely opening folders or
 selecting files never starts that work. Music follows the same dialog; see
 [music](SPEED_AND_AUDIO.md#music).
@@ -125,7 +125,7 @@ a stale picture whose timestamp goes backwards, and FFmpeg would then label ever
 later frame from decode timestamps, one frame late in DJI files. Pictures keep their
 own timestamps only in decode order, so recordings with B-frames are refused with an
 explanation, and the black-out preparation fails unless the two frames after each
-damaged range match their own original frames better than their neighbours.
+damaged range match their own original frames better than their neighbors.
 Undamaged originals keep strict decoding and unchanged filters. The diagnostic
 reference rejects damaged recordings, and proxy samples and thumbnails avoid the
 black ranges. Source preview hatches them red on the range strip and motion lanes,
@@ -148,9 +148,9 @@ Import guidance, **without a POST**. Internal dragging of ready registered Media
 into Timeline remains unchanged. Uncertain registration results are not retried
 automatically; check Media/Activity before resubmitting.
 
-The strict current schema requires a complete clip grade (Colour with Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves, plus keyframes), project adjustments, track Transform with Opacity, a boolean clip `reverse`, per-track Ripple, transitions and fades, and a required
+The strict current schema requires a complete clip grade (Color with Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves, plus keyframes), project adjustments, track Transform with Opacity, a boolean clip `reverse`, per-track Ripple, transitions and fades, and a required
 0–8 music track `music` array of clips joined by transitions (`[]` without music); proxy/PCM formats are
-unchanged and the registries are version 2 (full-content checksums). Only generated
+unchanged and the registries are version 3 (videos) and 2 (music), with full-content checksums. Only generated
 proxies/thumbnails, metadata,
 exports/receipts and scratch are created, not duplicate originals. Keep originals
 accessible at their registered paths: moving files or disconnecting a drive fails
@@ -294,7 +294,7 @@ toolbar covering the lanes. Each track header has one **Ripple** toggle icon
 - With Ripple off, a cut keeps the removed gap and other clips' absolute placements. Its
   retained right piece starts at the original output position of the
   retained source IN. Each piece retimes/rounds independently, like a split;
-  invalid overlap/quantisation is rejected. Ripple assembly is available on any track.
+  invalid overlap/quantization is rejected. Ripple assembly is available on any track.
 - Ranges outside the selected clip and slow-motion ranges containing no original
   source frame cannot remove footage; errors preserve document/history and the range.
 - The range is transient editor state, not an autosaved/rendered field, and does not
@@ -409,8 +409,8 @@ and undoable, and never move music, other tracks, Transform keyframes or adjustm
 
 ## Keyframes, time ruler and transitions
 
-Colour keyframes belong to a **clip grade** or an **adjustment**, never to a video track. Each
-has fourteen required nullable channels: twelve scalar colour settings, **HDR** (`hdr`) and
+Color keyframes belong to a **clip grade** or an **adjustment**, never to a video track. Each
+has fourteen required nullable channels: twelve scalar color settings, **HDR** (`hdr`) and
 **Local contrast** (`localContrast`), enabled independently.
 In control order: `temperature`, `tint`, `exposure`,
 `brightness`, `contrast`, `hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`, `localContrast`.
@@ -423,16 +423,16 @@ toward its **next keyframe with that setting enabled**, holds before/after its o
 uses the grade's saved value only when it has no keyed settings.
 **Opacity** is a setting of the track's Transform: `transform.base.opacity` in 0–1, initially 1
 (100%) on new tracks, or its curve once Transform keyframes enable `opacity`, on every clip in the
-track, including both dissolve sources. There is no saved `clip.opacity`, track Colour or
+track, including both dissolve sources. There is no saved `clip.opacity`, track Color or
 additional track multiplier.
 
-The **Colour** tab's Colour section ends with the directly visible keyframe list of the clip
+The **Color** tab's Color section ends with the directly visible keyframe list of the clip
 grade or adjustment it edits (accessible name **Clip keyframes** or **Adjustment keyframes**),
 under a small **Keyframes** heading. Clip keeps
 the playhead Speed controls; Track keeps Transform with Opacity. Track Transform
 keyframes are a separate project-frame list at the end of **Track → Transform**, with their own markers
 (see [spatial transforms](design/SPATIAL_TRANSFORMS.md)).
-Colour, Speed and Transform always show their capture diamonds while the section is expanded, Colour and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. Each diamond is clickable hollow/inactive or filled/active with
+Color, Speed and Transform always show their capture diamonds while the section is expanded, Color and Transform with adjacent per-setting **Previous/Next** buttons; there is no Animate toggle and no stored preference. Each expanded section has one keyframe line with the **number of keyframes**, one **Previous/Next** pair over the same set and **Reset**. The line is hidden while the section is collapsed; the title row and its help stay reachable. Rendering, retained keyframes and read-only constraints never depend on what is shown. Each diamond is clickable hollow/inactive or filled/active with
 `aria-pressed`; inactive is not HTML-disabled. Toggling affects only that channel;
 the first enabled setting creates/last removes the keyframe. Animated values are read-only
 between keyframes with that setting enabled until explicitly captured with the diamond; no slider
@@ -480,8 +480,8 @@ and retimes no clip.
 Inside each timeline clip rectangle, a clip grade's keyframes are amber **◆** markers, one per
 keyframe on the footage the clip shows (a [default keyframe](LAYERS_AND_KEYFRAMES.md#default-keyframes)
 is filled amber with a diamond-and-return-arrow icon); keyframes on trimmed-off
-footage stay in the Colour list only. Click, Enter or Space selects the clip, seeks the image of
-that source frame and opens the Colour tab on **Clip**; a click edits nothing. Drag one
+footage stay in the Color list only. Click, Enter or Space selects the clip, seeks the image of
+that source frame and opens the Color tab on **Clip**; a click edits nothing. Drag one
 horizontally, or press ←/→ (one original source frame along the timeline, Shift ten), to move the
 keyframe with all its settings to another source frame of the recording: drafts preview only, a
 valid release is one Undo step, and Escape, cancellation, blur or an occupied frame restores.
@@ -501,8 +501,8 @@ ruler above the video tracks, so they stay in view however the tracks scroll. It
   (the + in the track's header) covers the selected ruler range, else the selected clip's span; it is
   unavailable, with the reason in its tooltip, without either, over another adjustment or at 1,024.
 - **Select:** a click selects the adjustment, puts the playhead where it was clicked and opens the
-  Colour tab on it; Enter or Space selects it and moves the playhead into it when outside. A plain
-  click on a clip or selecting a track clears it. The Colour tab edits the selected adjustment, even
+  Color tab on it; Enter or Space selects it and moves the playhead into it when outside. A plain
+  click on a clip or selecting a track clears it. The Color tab edits the selected adjustment, even
   with the playhead elsewhere (keyframes are then captured only on its own frames), as it edits a
   selected clip's grade; with nothing selected it edits nothing.
 - **The selected clip's adjustment:** when a clip is selected and the playhead is on it, the
@@ -523,14 +523,14 @@ ruler above the video tracks, so they stay in view however the tracks scroll. It
 - **Keyframes:** an adjustment's keyframes within its range are amber **◆** markers inside it. They
   slide like clip grade markers, staying within the adjustment, through `useKeyframeSlide`: drag or
   ←/→ (one frame, Shift ten), one Undo step per valid release, Delete removes. Click, Enter or Space
-  selects the adjustment, seeks the keyframe and opens the Colour tab.
+  selects the adjustment, seeks the keyframe and opens the Color tab.
 - **With clips:** Ctrl-click (Cmd-click) adds an adjustment to the selection or takes it out, and
   also adds or removes clips without losing the selected adjustments. Dragging any selected clip or
   adjustment moves every selected clip and adjustment by the same frames in one Undo step: clips keep
   their tracks when an adjustment is dragged, adjustments show dashed ghosts while a clip is dragged,
   and anything that cannot go there refuses the whole move. Delete removes the whole selection in one
   Undo step (the toolbar's trash then reads **Delete selected clips and adjustments**, or **Delete
-  selected adjustments**). While two or more clips or adjustments are selected, the Colour tab edits none of them and
+  selected adjustments**). While two or more clips or adjustments are selected, the Color tab edits none of them and
   says so ("1 clip and 1 adjustment are selected: select one to edit its grade").
 - **Copy and paste a grade:** right-click an adjustment (or press the Menu key on it) for **Copy
   grade** and **Paste grade**, which also work from a clip's menu, between clips and adjustments.
@@ -550,7 +550,7 @@ shortcuts.
 ### Channel navigation
 
 Each section's keyframe line has one native **Previous/Next** pair, beside the keyframe count it visits.
-Colour visits the twelve scalar, HDR and Local contrast keyframes of the clip grade or adjustment
+Color visits the twelve scalar, HDR and Local contrast keyframes of the clip grade or adjustment
 it edits. Speed visits all
 retained custom speed source keyframes of the selected clip, including off-trim
 keyframes and original exclusive OUT, previewing the nearest mapped image through
@@ -562,14 +562,14 @@ reachable when several preview the same first/last image. Stored time never repl
 displayed project/source frame for main values or capture. Timeline speed markers
 still omit off-trim keyframes and retain the exclusive-OUT boundary marker.
 
-Per-channel native **Previous/Next** arrows remain beside each main Colour diamond and Transform
+Per-channel native **Previous/Next** arrows remain beside each main Color diamond and Transform
 triangle, because not every setting is enabled at every keyframe.
 Enabled setting chips in stored keyframe rows retain their arrows too.
-All these per-channel arrows are disabled without the relevant neighbour, an opened
+All these per-channel arrows are disabled without the relevant neighbor, an opened
 project, or during any document-preview draft. They seek
 strictly earlier/later keyframes where that channel is not `null` (zero included),
-skipping unrelated enabled settings; Colour's main arrows start from the playhead and its chips
-from their own row. Colour keeps no stored-keyframe cursor: a clip grade keyframe on
+skipping unrelated enabled settings; Color's main arrows start from the playhead and its chips
+from their own row. Color keeps no stored-keyframe cursor: a clip grade keyframe on
 trimmed-off footage previews the clip's nearest image. With keyframes, a setting not enabled at the playhead stays
 read-only until its diamond captures it; sliders never create implicit keyframes. Opacity, in
 Track → Transform, affects composition coverage, not SDR RGB grading.
@@ -691,11 +691,11 @@ toggle persists for the current timeline session, not the renderable document.
 
 ### Snap to beats
 
-**Snap to beats** (metronome icon beside **Snap**) adds the analysed beats or hits of every
+**Snap to beats** (metronome icon beside **Snap**) adds the analyzed beats or hits of every
 music clip ([music analysis](SPEED_AND_AUDIO.md#music-analysis)) to the snap targets of
 every snapping gesture above, so cuts land on the music. Its menu chooses **Off**,
 **Beats**, **Downbeats only**, **Hits** (strong hits only) or **Beats and hits** (beats and
-strong hits); the button, labelled with the last choice, toggles between Off and that
+strong hits); the button, labeled with the last choice, toggles between Off and that
 choice, and the choice is a browser preference. Hits suit music without a steady beat and
 the irregular hits between beats. It works only while **Snap** is on (otherwise the
 button explains why), and Alt still bypasses it. The targets are computed from each music
@@ -703,7 +703,7 @@ clip's current placement, source range and loops at the start of every gesture, 
 follow the clip when it moves, is trimmed or changes recording; a music clip being
 moved or trimmed never snaps to its own beats or hits. Nothing is written to the project:
 bookmarks stay the user's own. While beat snapping is active, the targets it uses appear
-as ticks along the bottom of the time ruler (downbeats taller, strong hits in the colour of
+as ticks along the bottom of the time ruler (downbeats taller, strong hits in the color of
 their band), thinned like the clip ticks below when they are closer than 4 pixels. Music
 without an analysis adds no targets, and music without a steady beat only hits.
 
@@ -742,15 +742,15 @@ music or keyframes and are never rendered or exported.
   to existing boundaries is unchanged. To snap to the music's beats, use
   [Snap to beats](#snap-to-beats) rather than bookmarks.
 
-Each analysed music clip shows its beats as ticks above its tone strip, downbeats
+Each analyzed music clip shows its beats as ticks above its tone strip, downbeats
 taller and brighter, following its placement, source range and loops; when beats are
 closer than 4 pixels only downbeats are drawn, then none. Its hits are short marks standing
-on the tone strip in the colour of their band, strong ones taller, thinned the same way. The
+on the tone strip in the color of their band, strong ones taller, thinned the same way. The
 ticks and marks are display only; the clip also shows the music's structure
 ([music analysis](SPEED_AND_AUDIO.md#music-analysis)).
 
 Adding, moving and deleting are each one Undo step and autosave like other edits.
-Bookmarks are project-wide: not per track, named, coloured or ranged.
+Bookmarks are project-wide: not per track, named, colored or ranged.
 
 Projects are named separate **current-schema** documents with a complete grade on every clip,
 project adjustments, track Transform base/per-setting project-frame keyframes (Opacity included,
@@ -758,10 +758,10 @@ project adjustments, track Transform base/per-setting project-frame keyframes (O
 transitions and opening/closing fades; a missing saved field is invalid. Switching flushes autosave first,
 blocks on failed saves, and resets session selection/history; successful export
 snapshots are independent of the open project. Projects and receipt snapshots saved before the
-current schema, with track Colour, are rejected with the reason and left unchanged, without
+current schema, with track Color or British spelling, are rejected with the reason and left unchanged, without
 fabricated defaults or upgrade. There is no automatic deletion. Saved `clip.opacity` and a
-track's `colour`, `opacity` or `keyframes` are rejected, not ignored or defaulted. Grade
-keyframes require exactly fourteen nullable channels: twelve scalar colour fields (including
+track's `color`, `opacity` or `keyframes` are rejected, not ignored or defaulted. Grade
+keyframes require exactly fourteen nullable channels: twelve scalar color fields (including
 required `temperature`, `tint`, `vibrance`, `whites` and `blacks`), `hdr` and `localContrast`.
 Every grade requires those bases and static HSL/curves; missing fields are invalid.
 Recreate such projects and deliberately import recordings/music
@@ -769,7 +769,7 @@ to reuse registered sources/verified ready proxies. Confirmed project deletion r
 document, never originals, the shared registry/proxy cache or successful exports/
 receipts. Removing a clip is not removing that recording from the import bin;
 use **Remove from project** for that. Proxy formats are
-unchanged; the registries are version 2 (full-content checksums).
+unchanged; the registries are version 3 (videos) and 2 (music), with full-content checksums.
 
 The required `music` array holds **0–8 independent music tracks**. Like a video track,
 each has a unique `id`, gain, Ripple, opening/closing fades, **1–8 clips** (each with a
@@ -804,7 +804,7 @@ A Crossfade overlaps two clips by its duration with two linear fades; a Fade thr
 silence fades the first clip out, then the second in; a Pause leaves a dark dashed slot of silence between them, which the right clip starts after. Transitions or fades that do not
 fit are refused, never shortened. All music clips sum linearly after their
 gain/fades and clamp once after the complete mix; one AudioContext/worklet/output
-clock drives synchronisation, never per-track clocks or queues.
+clock drives synchronization, never per-track clocks or queues.
 See [the multiple-music contract](design/MULTIPLE_MUSIC.md).
 
 ## Media browser and interface scope
@@ -822,7 +822,7 @@ count with **Prepare** (when needed), remove and **Clear selected**, without
 a separate footer or Add button. Unprepared cards say **Not prepared** under their
 name. User imports automatically queue eligible proxies through one heavy
 worker, reusing ready/in-flight work. Manual preparation remains for legacy
-unprepared sources and explicit failed/cancelled retries; manual batches confirm
+unprepared sources and explicit failed/canceled retries; manual batches confirm
 before starting multiple jobs. Startup and hover never queue old recordings.
 
 Prepared recording buttons hover-scrub across the complete source range and show
@@ -871,7 +871,7 @@ record what the user kept and never retime, render or export (assistant sessions
 
 Source preview edits the **active** kept range, the first by default: setting IN/OUT by handle, numeric field,
 I/O marks or **Use best** (best steady range) creates the entry with its first range and later changes that range;
-**Add clip** copies it. The handles stop one frame from the neighbouring kept ranges (their range sliders end
+**Add clip** copies it. The handles stop one frame from the neighboring kept ranges (their range sliders end
 there, Home/End too); typed IN/OUT that overlap or touch another kept range are rejected with an inline
 error, never merged or clamped. **Reset source range** returns to the whole recording (IN = 0, OUT = frame
 count), removing every kept range in one step. The trash after it, **Delete selected kept range**, removes only
@@ -883,14 +883,14 @@ one row per range with its IN → OUT timecodes and length, which makes that ran
 and a trash, **Remove kept range N** (removing the last one keeps the whole recording again). Below the list:
 
 - **New range** keeps a further range of 60 frames, or less where the room ends: from the displayed frame when
-  it is at least one frame from every kept range, otherwise centred in the largest free stretch. It is
+  it is at least one frame from every kept range, otherwise centerd in the largest free stretch. It is
   unavailable, with its reason, without room and at 100 ranges.
 - **Add N clips to timeline**, set apart below (with two or more ranges; **Add N clips to** the target track),
   inserts one clip per kept range in recording order, in one Undo step.
 
 On the range strip, the other kept ranges are lighter outlined blocks: clicking one makes it active (and
 scrubs there), and **Shift-drag** in a free stretch draws a new kept range, which stops one frame from its
-neighbours and becomes active on release (a Shift-click without moving adds nothing). Escape, pointer
+neighbors and becomes active on release (a Shift-click without moving adds nothing). Escape, pointer
 cancellation or lost capture abandon the drawing. Each change is one Undo step, and applying never leaves
 Source preview. The active range is editor-only state; ranges kept before this field
 existed in the browser (`localStorage`) are not read.
@@ -901,7 +901,7 @@ Source preview suggests the best steady stretch of a drone recording, where the 
 moves without brutal changes of angle or speed and, preferably, shows something happen. Once a proxy is verified the recording
 is ready, and a **Camera motion analysis** job measures it in the background: that job
 runs after every other queued job, so a batch import makes all its proxies first. It
-decodes the verified editing proxy at 320 × 180 grey and measures, for
+decodes the verified editing proxy at 320 × 180 gray and measures, for
 every frame, the camera's global motion since the previous one (translation, zoom and
 rotation from block phase correlation, with a robust fit that ignores moving water,
 trees or other subjects). Featureless frames stay unmeasured. Chunks of 30 frames are
@@ -915,13 +915,13 @@ aperture are not kept. This demuxes only that track (about 0.2 s for a 600 MB ru
 recordings without it simply have no telemetry. The result is cached as
 `motion-v3.json` beside the proxy and its thumbnails, tied to the proxy's verification
 time; re-preparing the proxy replaces it, and older `motion-v1.json`/`motion-v2.json`
-caches are ignored (use **Analyse camera motion** to measure again). A failed or
-cancelled measurement leaves the proxy usable; Source preview then offers **Analyse
+caches are ignored (use **Analyze camera motion** to measure again). A failed or
+canceled measurement leaves the proxy usable; Source preview then offers **Analyze
 camera motion**. The original
 is identity-checked and only its subtitle track is read.
 
 Opening a recording reads its analysis, once per session. Directly under the range strip,
-in the same column, the **motion timeline** stacks lanes, each labelled at its top-left;
+in the same column, the **motion timeline** stacks lanes, each labeled at its top-left;
 one playhead line runs through the strip and every lane, and the footage omitted by IN/OUT
 (including a trim draft) is hatched across them. The 44 px image lane plots the **jolts**
 (amber area: how fast the camera movement changes, % of image width per s², up to 8),
@@ -929,7 +929,7 @@ the **movement** in the picture (white line, up to 10 % of width per s) and the 
 movement** (dashed accent line); a 30 px lane follows for each chosen flight data value,
 scaled from its lowest to its highest value in the recording, which its label shows (a
 nearly flat value is widened to a minimum span, such as 5 m of height or 2 m/s of speed,
-so sensor noise does not fill the lane), each in its own colour, matching its swatch in the menu; steady ranges are
+so sensor noise does not fill the lane), each in its own color, matching its swatch in the menu; steady ranges are
 accent bands across every lane, the suggested one strongest. While hovering, every lane
 label shows its value under the pointer (flight data interpolated between its
 once-per-second samples) and the image lane the timecode. Clicking or dragging any lane
@@ -973,7 +973,7 @@ shows its IN frame), like any other range choice, in one Undo step; it reads **I
 ranges at the current allowed movement, in recording order, in one Undo step, and makes the first one active;
 it reads **All in use** once they are. Neither adds anything to the timeline: add the kept ranges from the
 **Kept ranges** list. While its analysis waits or runs, the header shows
-**Camera motion queued…** or its progress. Recordings prepared before this analysis existed show **Analyse
+**Camera motion queued…** or its progress. Recordings prepared before this analysis existed show **Analyze
 camera motion** in the header instead, which queues one **Camera motion analysis** job
 (shown in Activity). Forward
 acceleration seen straight ahead barely changes the picture, so speed changes without
@@ -989,16 +989,16 @@ Close/hidden/offscreen/project switch releases the one review decoder.
 The normal editor shows Media, Preview, the contextual Properties panel and Timeline.
 Panels are resizable/collapsible with browser-local layout persistence; source
 review occupies a docked viewer tab rather than covering the workspace. Main and
-stored Colour, Opacity/Transform values, playback rates and gain share native sliders with
+stored Color, Opacity/Transform values, playback rates and gain share native sliders with
 adjacent exact `NumberField` controls, not read-only outputs or number-only layouts.
-Dragging a Colour, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Properties change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) keep their release-only image update. Each keyboard slider
+Dragging a Color, Opacity, HSL or Transform slider (main or stored) previews the draft value in the image, coalesced to the display rate, without any document, history, autosave or Properties change, and without restarting music. Release commits one validated edit and one Undo step. Escape, pointer cancellation, lost capture, window blur or an invalid value restores the control and the preview. Other sliders (speed, gain) keep their release-only image update. Each keyboard slider
 adjustment is an individual validated edit. Numeric fields retain full entered
 precision, commit on Enter/blur, keep invalid drafts editable and restore on Escape.
 **Clip → Range** uses the full-original bar and exact timecode text fields above.
 Other integer source/placement frames, durations and fades retain exact native
 numeric steppers and existing timecode feedback, without arbitrary timing sliders.
 Source-review IN/OUT fields apply as a pair on Enter or when focus leaves both; Escape restores.
-**Clip / Colour / Track / Audio** separates clip-owned source/placement/speed/Detail, the
+**Clip / Color / Track / Audio** separates clip-owned source/placement/speed/Detail, the
 the grade of the selected clip or adjustment, track-owned Transform (with
 Opacity)/transitions/fades, and music. The header directly exposes
 help; **Workspace options**
@@ -1034,4 +1034,4 @@ qualification are tracked in [#6](https://github.com/Plonk42/PasCap/issues/6),
 PasCap runs natively ([DEPLOYMENT.md](DEPLOYMENT.md)). Actual-commit correctness results are available in
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions).
 
-Every clip grade and adjustment includes static **HSL ranges** and **Colour curves**, each in its own collapsible section of the Colour tab after Colour. They stay active whether or not its twelve scalar channels are keyed, travel with the clip grade or stay with the adjustment, and are copied by split, cut and duplicate with the grade. They are not speed curves or new animation channels. See [the HSL/curves contract](design/HSL_AND_CURVES.md).
+Every clip grade and adjustment includes static **HSL ranges** and **Color curves**, each in its own collapsible section of the Color tab after Color. They stay active whether or not its twelve scalar channels are keyed, travel with the clip grade or stay with the adjustment, and are copied by split, cut and duplicate with the grade. They are not speed curves or new animation channels. See [the HSL/curves contract](design/HSL_AND_CURVES.md).

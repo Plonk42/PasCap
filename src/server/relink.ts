@@ -125,7 +125,7 @@ async function relinkFolder(
     }
     done += file.size;
   });
-  if (context.signal.aborted) throw new ServiceError('Job cancelled.', 499);
+  if (context.signal.aborted) throw new ServiceError('Job canceled.', 499);
   let relinked = 0;
   const missing: string[] = [];
   await forEachSerial(wanted, async (item) => {

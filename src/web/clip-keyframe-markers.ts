@@ -19,7 +19,7 @@ function markerSeekFrame(placed: PlacedClip, sourceFrame: number): number {
 /**
  * The output frame closest to a source frame's image. outputAt is where the continuous
  * position crosses it (forward: first frame showing it; reversed: last), kept on ties;
- * a neighbour on either side wins only when strictly closer.
+ * a neighbor on either side wins only when strictly closer.
  */
 export function nearestOutput(placed: PlacedClip, sourceFrame: number): number {
   const inverse = placed.retiming.outputAt(sourceFrame);
@@ -61,7 +61,7 @@ export function clipKeyframeMarkers(placed: PlacedClip): ClipKeyframeMarker[] {
     });
 }
 
-/** Clip grade keys on the footage the clip shows; keys on trimmed-off footage stay in the Colour tab only. */
+/** Clip grade keys on the footage the clip shows; keys on trimmed-off footage stay in the Color tab only. */
 export function gradeKeyframeMarkers(placed: PlacedClip): ClipKeyframeMarker[] {
   const { sourceIn, sourceOut } = placed.clip;
   return placed.clip.grade.keyframes

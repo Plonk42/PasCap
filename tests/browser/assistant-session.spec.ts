@@ -190,7 +190,7 @@ test('hands off with a brief after showing what the assistant can use, then open
 }) => {
   memory.readiness = {
     recordings: [
-      { id: assets[0]!.id, name: 'pattern-a.mp4', preparation: 'ready', cameraMotion: 'analysed' },
+      { id: assets[0]!.id, name: 'pattern-a.mp4', preparation: 'ready', cameraMotion: 'analyzed' },
       { id: assets[1]!.id, name: 'pattern-b.mp4', preparation: 'ready', cameraMotion: 'missing' },
     ],
     music: [],
@@ -202,14 +202,14 @@ test('hands off with a brief after showing what the assistant can use, then open
       client: 'Visual Studio Code',
     },
   };
-  const analysed: string[] = [];
+  const analyzed: string[] = [];
   await page.route('**/api/media/*/motion', async (route) => {
     const id = new URL(route.request().url()).pathname.split('/')[3]!;
-    analysed.push(id);
+    analyzed.push(id);
     memory.readiness = {
       ...memory.readiness,
       recordings: memory.readiness.recordings.map((item) =>
-        item.id === id ? { ...item, cameraMotion: 'analysing' } : item,
+        item.id === id ? { ...item, cameraMotion: 'analyzing' } : item,
       ),
     };
     await route.fulfill({
@@ -235,12 +235,12 @@ test('hands off with a brief after showing what the assistant can use, then open
   const dialog = page.getByRole('dialog', { name: 'Hand off to an assistant' });
   const readiness = dialog.getByRole('region', { name: 'What the assistant can use' });
   await expect(readiness).toContainText('2 video recordings prepared');
-  await expect(readiness).toContainText('Camera motion not analysed for 1 recording');
+  await expect(readiness).toContainText('Camera motion not analyzed for 1 recording');
   await expect(readiness).toContainText('No music in this project');
   await expect(readiness).toContainText('An export is running');
-  await readiness.getByRole('button', { name: 'Analyse 1' }).click();
-  await expect(readiness).toContainText('1 analysing');
-  expect(analysed).toEqual([assets[1]!.id]);
+  await readiness.getByRole('button', { name: 'Analyze 1' }).click();
+  await expect(readiness).toContainText('1 analyzing');
+  expect(analyzed).toEqual([assets[1]!.id]);
   const connection = dialog.getByRole('region', { name: 'Assistant connection' });
   await expect(connection).toContainText('Visual Studio Code called PasCap just now');
   await connection.getByText('How to connect').click();

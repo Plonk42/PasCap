@@ -79,7 +79,7 @@ export class BrowsePreviews {
   }
 
   async #slot<T>(signal: AbortSignal, task: () => Promise<T>): Promise<T> {
-    if (signal.aborted) throw new ServiceError('Preview cancelled.', 499);
+    if (signal.aborted) throw new ServiceError('Preview canceled.', 499);
     if (this.#active < PREVIEW_LIMITS.active) this.#active++;
     else {
       if (this.#waiting.length >= PREVIEW_LIMITS.waiting)
@@ -91,7 +91,7 @@ export class BrowsePreviews {
         };
         const cancel = (): void => {
           this.#waiting.splice(this.#waiting.indexOf(start), 1);
-          reject(new ServiceError('Preview cancelled.', 499));
+          reject(new ServiceError('Preview canceled.', 499));
         };
         this.#waiting.push(start);
         signal.addEventListener('abort', cancel, { once: true });
@@ -164,7 +164,7 @@ export class BrowsePreviews {
       if (image.length === 0) throw new ServiceError('No picture could be decoded from this recording.', 422);
       return image;
     } catch (error) {
-      if (signal.aborted) throw new ServiceError('Preview cancelled.', 499);
+      if (signal.aborted) throw new ServiceError('Preview canceled.', 499);
       let failure = 'No preview: this file could not be decoded as video.';
       if (timeout.aborted) failure = `Reading a preview took longer than ${PREVIEW_LIMITS.timeoutMs / 1000} seconds.`;
       // Only remember answers about the file itself, not a missing FFmpeg or similar.

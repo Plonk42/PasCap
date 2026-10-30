@@ -120,7 +120,7 @@ export class JobQueue {
   }
   async #runEntry(current: Entry): Promise<void> {
     try {
-      if (current.controller.signal.aborted) throw new ServiceError('Job cancelled.', 499);
+      if (current.controller.signal.aborted) throw new ServiceError('Job canceled.', 499);
       current.job.state = 'running';
       const result = await current.task({
         id: current.job.id,
@@ -134,7 +134,7 @@ export class JobQueue {
       current.job.progress = 1;
       current.job.message = typeof result === 'string' ? result : 'Complete';
     } catch (error) {
-      current.job.state = current.controller.signal.aborted ? 'cancelled' : 'failed';
+      current.job.state = current.controller.signal.aborted ? 'canceled' : 'failed';
       current.job.message = errorMessage(error);
     } finally {
       current.job.finishedAt = new Date().toISOString();

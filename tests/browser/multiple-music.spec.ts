@@ -550,7 +550,7 @@ for (const { width, height } of [
     // Gecko bounds a native wheel event to a page of travel. Exercise successive
     // wheel gestures, rather than assuming one large delta reaches the final lane.
     const extent = await viewport.evaluate((element) => element.scrollHeight);
-    for (let travelled = 0; travelled < extent; travelled += box.height / 2) {
+    for (let traveled = 0; traveled < extent; traveled += box.height / 2) {
       await page.mouse.wheel(0, box.height / 2);
     }
     const last = page.locator(`[data-music-lane="${laneOf('lane-7')}"]`);

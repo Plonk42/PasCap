@@ -1,7 +1,7 @@
 import { createElement, type ComponentProps } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { COLOUR_CONTROLS } from '../../src/shared/colour.js';
+import { COLOR_CONTROLS } from '../../src/shared/color.js';
 import { createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import {
   activeLayerSetting,
@@ -17,7 +17,7 @@ import {
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { Inspector } from '../../src/web/Inspector.js';
 import { ChannelKeyframeNavigation, TrackAnimationControls } from '../../src/web/AnimationControls.js';
-import { adjustmentColourOwner, type ColourOwner } from '../../src/web/colour-owner.js';
+import { adjustmentColorOwner, type ColorOwner } from '../../src/web/color-owner.js';
 import {
   KeyframeNavigationContext,
   keyframeNavigationFrame,
@@ -36,13 +36,13 @@ function point(frame: number, values: Partial<LayerKeyValues>): LayerKeyframe {
 const interleaved = [0, 100, 200].flatMap((start) =>
   KEYFRAME_SETTINGS.map(({ key }, index) => point(start + index * 3, { [key]: 0 })),
 );
-/** The interleaved keyframes of every scalar Colour setting, as an adjustment stores them. */
+/** The interleaved keyframes of every scalar Color setting, as an adjustment stores them. */
 const gradeInterleaved = interleaved.filter((key) => key.values.opacity === null).map(layerKeyAsGradeKey);
 
-/** An adjustment from project frame 0, as the Colour controls edit it: its keyframe frames are timeline frames. */
-function owner(keyframes: LayerKeyframe[]): ColourOwner {
+/** An adjustment from project frame 0, as the Color controls edit it: its keyframe frames are timeline frames. */
+function owner(keyframes: LayerKeyframe[]): ColorOwner {
   const item = { ...createAdjustment('look', 0, 1_000), keyframes: keyframes.map(layerKeyAsGradeKey) };
-  return adjustmentColourOwner(item, 'Look');
+  return adjustmentColorOwner(item, 'Look');
 }
 
 function project(): ProjectDocument {
@@ -109,7 +109,7 @@ function channelMarkup(
   );
 }
 
-describe('ordered per-setting keyframe neighbours', () => {
+describe('ordered per-setting keyframe neighbors', () => {
   it.each(KEYFRAME_SETTINGS)('$label skips every interleaved nonparticipant and uses strict endpoints', ({ key }) => {
     const index = KEYFRAME_SETTINGS.findIndex((setting) => setting.key === key);
     const first = interleaved[index]!;
@@ -136,7 +136,7 @@ describe('ordered per-setting keyframe neighbours', () => {
   });
 
   it.each([-1, 0.5, NaN, Infinity, -Infinity, 2_147_483_648, Number.MAX_SAFE_INTEGER])(
-    'invalid navigation frame %s has no neighbours',
+    'invalid navigation frame %s has no neighbors',
     (frame) => {
       expect(isKeyframeFrame(frame)).toBe(false);
       expect(keyframeNeighbors(interleaved, frame, 'exposure')).toEqual({ previous: null, next: null });
@@ -280,7 +280,7 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
 
   it('retains per-setting arrows beside main diamonds and on chips, with one section union and no sidebar duplicates', () => {
     const document = project();
-    // The Colour tab edits the selected clip's grade.
+    // The Color tab edits the selected clip's grade.
     document.clips[0]!.grade.keyframes = gradeInterleaved;
     document.layers[0]!.transform.keyframes = [0, 20].map((frame) => ({
       ...uniformKeyframe(frame, { ...document.layers[0]!.transform.base }, 'linear'),
@@ -299,7 +299,7 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
           frame: 50,
           drafting: false,
           section: 'clip',
-          sectionRequest: { section: 'colour', nonce: 1 },
+          sectionRequest: { section: 'color', nonce: 1 },
           onSection: vi.fn(),
           onSelectBoundary: vi.fn(),
           onEdit: vi.fn(),
@@ -311,7 +311,7 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
         }),
       ),
     );
-    for (const { label } of COLOUR_CONTROLS) {
+    for (const { label } of COLOR_CONTROLS) {
       expect(inspector.split(`aria-label="Keyframe ${label}"`)).toHaveLength(2);
       // One main pair and three stored participants.
       for (const direction of ['Previous', 'Next'])
@@ -320,15 +320,15 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
     const diamonds = [
       ...inspector.matchAll(/<span class="keyframe-setting-navigation"[\s\S]*?<\/button><\/span><\/span>/g),
     ];
-    // Each scalar Colour setting of the clip grade, the clip Speed diamond and each Transform setting.
-    expect(diamonds).toHaveLength(COLOUR_CONTROLS.length + 1 + SPATIAL_CONTROLS.length);
+    // Each scalar Color setting of the clip grade, the clip Speed diamond and each Transform setting.
+    expect(diamonds).toHaveLength(COLOR_CONTROLS.length + 1 + SPATIAL_CONTROLS.length);
     const speedDiamond = diamonds.findIndex(([markup]) => markup.includes('aria-label="Keyframe Speed"'));
     // The single-setting Speed section relies on its keyframe-line pair, without a duplicate per-setting pair.
     expect(buttons(diamonds.splice(speedDiamond, 1)[0]![0])).toHaveLength(1);
     for (const direction of ['Previous', 'Next'])
       expect(inspector.split(`aria-label="${direction} Speed keyframe"`)).toHaveLength(2);
     for (const { key, label } of SPATIAL_CONTROLS) {
-      // Each Transform setting has one diamond with one Previous/Next pair, like Colour, plus one per stored chip.
+      // Each Transform setting has one diamond with one Previous/Next pair, like Color, plus one per stored chip.
       const chips = document.layers[0]!.transform.keyframes.filter((point) => point.values[key] !== null).length;
       expect(inspector.split(`aria-label="Keyframe ${label}"`)).toHaveLength(2);
       for (const direction of ['Previous', 'Next'])
@@ -344,17 +344,17 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
       expect(controls[2]).toContain(`aria-label="Next ${label} keyframe"`);
     }
     // The clip grade's stored list ends before Transform's.
-    const colourList = inspector.slice(
+    const colorList = inspector.slice(
       inspector.indexOf('aria-label="Clip keyframes'),
       inspector.indexOf('aria-label="Transform keyframes'),
     );
-    const chips = [...colourList.matchAll(/<span class="layer-keyframe-chip"[\s\S]*?<\/button><\/span><\/span>/g)];
+    const chips = [...colorList.matchAll(/<span class="layer-keyframe-chip"[\s\S]*?<\/button><\/span><\/span>/g)];
     expect(chips).toHaveLength(gradeInterleaved.length);
     for (const [markup] of chips) expect(buttons(markup)).toHaveLength(2);
     const sections = [...inspector.matchAll(/<div class="[^"]*section-keyframe-line">[\s\S]*?<\/div>/g)];
     expect(sections).toHaveLength(3);
     expect(inspector).not.toContain('Animate ');
-    for (const label of ['Colour', 'Speed', 'Transform']) {
+    for (const label of ['Color', 'Speed', 'Transform']) {
       const section = sections.find(([markup]) => markup.includes(`aria-label="Next ${label} keyframe"`))![0];
       expect(section).toMatch(/\d+ keyframes?/);
       for (const direction of ['Previous', 'Next'])
@@ -382,7 +382,7 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
       ),
     );
     expect(sidebar).toContain('Track options Track 1');
-    expect(COLOUR_CONTROLS).toHaveLength(14);
+    expect(COLOR_CONTROLS).toHaveLength(14);
     expect(SPATIAL_CONTROLS.map((control) => control.key)).toContain('opacity');
     expect(inspector).toContain('aria-label="Keyframe Opacity"');
     expect(inspector).not.toContain('Keyframe Track opacity');
@@ -393,10 +393,10 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
   });
 });
 
-describe('Colour section union navigation', () => {
-  it.each([0, 10, 20, 30, 40, 2_147_483_647])('visits every scalar Colour setting from frame %s', (frame) => {
+describe('Color section union navigation', () => {
+  it.each([0, 10, 20, 30, 40, 2_147_483_647])('visits every scalar Color setting from frame %s', (frame) => {
     const layer = owner([point(0, { exposure: 0 }), point(20, { temperature: 0, tint: 0 }), point(40, { shadows: 0 })]);
-    const settings = COLOUR_CONTROLS.map(({ key }) => key);
+    const settings = COLOR_CONTROLS.map(({ key }) => key);
     const expected = keyframeNeighbors(layer.keyframes, frame);
     const context = navigation();
     const markup = renderToStaticMarkup(
@@ -404,7 +404,7 @@ describe('Colour section union navigation', () => {
         KeyframeNavigationContext.Provider,
         { value: context },
         createElement(TrackAnimationControls, {
-          label: 'Colour',
+          label: 'Color',
           layer,
           frame,
           settings,
@@ -415,8 +415,8 @@ describe('Colour section union navigation', () => {
     const controls = buttons(markup);
     expect(controls).toHaveLength(2);
     expect(markup).toContain('3 keyframes');
-    expect(controls[0]).toContain('aria-label="Previous Colour keyframe"');
-    expect(controls[1]).toContain('aria-label="Next Colour keyframe"');
+    expect(controls[0]).toContain('aria-label="Previous Color keyframe"');
+    expect(controls[1]).toContain('aria-label="Next Color keyframe"');
     expect(controls[0]!.includes('disabled=""')).toBe(expected.previous === null);
     expect(controls[1]!.includes('disabled=""')).toBe(expected.next === null);
   });

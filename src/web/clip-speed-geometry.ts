@@ -10,7 +10,7 @@ const MAX_RATE = 8;
 const LOG_RANGE = Math.log(MAX_RATE / MIN_RATE);
 export const speedRatePosition = (rate: number): number => 1 - Math.log(rate / MIN_RATE) / LOG_RANGE;
 
-/** Keyboard increments keep the precise entered rate; only pointer edits use 0.001× quantisation. */
+/** Keyboard increments keep the precise entered rate; only pointer edits use 0.001× quantization. */
 export function stepClipSpeedRate(rate: number, delta: number): number {
   const precision = Math.max(2, String(rate).split('.')[1]?.length ?? 0);
   return Math.max(MIN_RATE, Math.min(MAX_RATE, Number((rate + delta).toFixed(precision))));
@@ -74,7 +74,7 @@ export function previewClipSource(project: ProjectDocument, clipId: string, sour
   if (sourceFrame <= placed.clip.sourceIn) return placed.clip.reverse ? last : first;
   if (sourceFrame >= placed.clip.sourceOut) return placed.clip.reverse ? first : last;
   // outputAt is the authoritative FLOOR inverse, useful for trims/cut ranges.
-  // For an explicit preview, a neighbour may show the exact slow-motion
+  // For an explicit preview, a neighbor may show the exact slow-motion
   // source image, or be closer when acceleration drops the requested image.
   return placed.start + nearestOutput(placed, sourceFrame);
 }

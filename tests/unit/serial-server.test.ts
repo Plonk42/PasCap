@@ -161,20 +161,20 @@ describe('serial queue lifecycle', () => {
     const taskGate = deferred();
     const settlementGate = deferred();
     const entered = deferred();
-    let cancelledId = '';
+    let canceledId = '';
     let finished = false;
-    const cancelledTask = vi.fn(async () => {
-      order.push('cancelled:task');
+    const canceledTask = vi.fn(async () => {
+      order.push('canceled:task');
     });
-    const cancelledSettlement = vi.fn(async (job: MediaJob) => {
-      order.push(`cancelled:${job.state}`);
+    const canceledSettlement = vi.fn(async (job: MediaJob) => {
+      order.push(`canceled:${job.state}`);
     });
     const first = queue.submit(
       'prepare',
       'first',
       async () => {
         order.push('first:task');
-        cancelledId = queue.submit('prepare', 'nested submission', cancelledTask, cancelledSettlement).id;
+        canceledId = queue.submit('prepare', 'nested submission', canceledTask, canceledSettlement).id;
         await taskGate.promise;
       },
       async () => {
@@ -184,8 +184,8 @@ describe('serial queue lifecycle', () => {
         order.push('first:settlement:end');
       },
     );
-    expect(queue.get(cancelledId).state).toBe('queued');
-    queue.cancel(cancelledId);
+    expect(queue.get(canceledId).state).toBe('queued');
+    queue.cancel(canceledId);
     taskGate.resolve();
     await entered.promise;
     const waiting = queue.wait(first.id).then((job) => {
@@ -198,16 +198,16 @@ describe('serial queue lifecycle', () => {
     expect(queue.get(late.id).state).toBe('queued');
     expect(finished).toBe(false);
     settlementGate.resolve();
-    const results = await Promise.all([waiting, queue.wait(cancelledId), queue.wait(late.id)]);
-    expect(results.map((job) => job.state)).toEqual(['completed', 'cancelled', 'completed']);
+    const results = await Promise.all([waiting, queue.wait(canceledId), queue.wait(late.id)]);
+    expect(results.map((job) => job.state)).toEqual(['completed', 'canceled', 'completed']);
     expect(finished).toBe(true);
-    expect(cancelledTask).not.toHaveBeenCalled();
-    expect(cancelledSettlement).toHaveBeenCalledOnce();
+    expect(canceledTask).not.toHaveBeenCalled();
+    expect(canceledSettlement).toHaveBeenCalledOnce();
     expect(order).toEqual([
       'first:task',
       'first:settlement:start',
       'first:settlement:end',
-      'cancelled:cancelled',
+      'canceled:canceled',
       'late:task',
     ]);
   });
@@ -278,8 +278,8 @@ describe('serial queue lifecycle', () => {
     expect(closed).toBe(false);
     secondGate.resolve();
     await closing;
-    expect((await queue.wait(first.id)).state).toBe('cancelled');
-    expect((await queue.wait(second.id)).state).toBe('cancelled');
+    expect((await queue.wait(first.id)).state).toBe('canceled');
+    expect((await queue.wait(second.id)).state).toBe('canceled');
     expect(firstTask).toHaveBeenCalledOnce();
     expect(secondTask).not.toHaveBeenCalled();
     expect(firstSettlement).toHaveBeenCalledOnce();

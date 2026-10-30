@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { Writable } from 'node:stream';
 import { setImmediate as yieldToEvents } from 'node:timers/promises';
 import { isDeepStrictEqual } from 'node:util';
-import { isNeutralAdvancedColour, isNeutralLocalTone } from '../shared/colour.js';
+import { isNeutralAdvancedColor, isNeutralLocalTone } from '../shared/color.js';
 import { detailTapCount, isNeutralDetail } from '../shared/detail.js';
 import { gradeUsesLocalTone, type ClipGrade } from '../shared/grade.js';
 import {
@@ -33,7 +33,7 @@ import { ServiceError } from './errors.js';
 import { assertSourceIdentity } from './files.js';
 import { startGpuCompositor, type GpuCompositor, type GpuGroupSource } from './gpu-compositor.js';
 import type { JobContext } from './jobs.js';
-import { ColourLutCache, checkLayeredCancellation } from './layered-colour.js';
+import { ColorLutCache, checkLayeredCancellation } from './layered-color.js';
 import { composeLayerFrame, fittedContent, validateLayerGroup, type LayerFrameSource } from './layered-frame.js';
 import { CompositorPool } from './layered-pool.js';
 import { FFV1_SLICE_ARGUMENTS, NATIVE_THREADS } from './native-threads.js';
@@ -170,17 +170,17 @@ function observed<T>(promise: Promise<T>): Promise<T> {
 }
 
 /**
- * Frames whose CPU path is per-pixel heavy. Neutral, scalar-colour and Opacity/fade frames stay
+ * Frames whose CPU path is per-pixel heavy. Neutral, scalar-color and Opacity/fade frames stay
  * on the CPU: it is exact there and at least as fast as the GPU's loopback transport.
  */
 function usesGpuKernel(sources: readonly LayerFrameSource[]): boolean {
   return sources.some(
     ({ sample }) =>
       !isNeutralDetail(sample.detail) ||
-      !isNeutralLocalTone(sample.colour) ||
-      !isNeutralAdvancedColour(sample.colour) ||
+      !isNeutralLocalTone(sample.color) ||
+      !isNeutralAdvancedColor(sample.color) ||
       !isNeutralLocalTone(sample.grade) ||
-      !isNeutralAdvancedColour(sample.grade) ||
+      !isNeutralAdvancedColor(sample.grade) ||
       !isNeutralSpatial(sample.spatial),
   );
 }
@@ -191,7 +191,7 @@ function gpuSources(sources: readonly LayerFrameSource[]): GpuGroupSource[] {
     bounds,
     parameters: {
       grade: sample.grade,
-      colour: sample.colour,
+      color: sample.color,
       spatial: sample.spatial,
       detail: sample.detail,
       originalWidth: original.width,
@@ -244,7 +244,7 @@ export function layeredDecodeFilter(
   return excerptFilter(
     excerpt,
     `scale=${bounds.width}:${bounds.height}:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:` +
-      `in_range=${asset.metadata.colourRange}:out_range=pc,format=rgb24,` +
+      `in_range=${asset.metadata.colorRange}:out_range=pc,format=rgb24,` +
       `pad=${target.width}:${target.height}:${bounds.x}:${bounds.y}:black,setsar=1`,
     asset.damage,
   );
@@ -354,7 +354,7 @@ function losslessReader(filename: string, offset: number, duration: number, alph
  */
 class SequentialLayeredRenderer {
   readonly #layout;
-  readonly #cache = new ColourLutCache();
+  readonly #cache = new ColorLutCache();
   readonly #rgba: readonly [Buffer, Buffer];
   readonly #rgb: readonly [Buffer, Buffer];
   readonly #retiming: RawRetimingReport[] = [];
@@ -463,8 +463,8 @@ class SequentialLayeredRenderer {
   /** Whether any frame of these clips can need the GPU kernel (keyframes may evaluate neutral). */
   private mayUseGpu(layer: ProjectDocument['layers'][number], clipIndexes: readonly number[]): boolean {
     const { document } = this.options;
-    const heavyGrade = (grade: Pick<ClipGrade, 'colour' | 'keyframes'>) =>
-      gradeUsesLocalTone(grade) || !isNeutralAdvancedColour(grade.colour);
+    const heavyGrade = (grade: Pick<ClipGrade, 'color' | 'keyframes'>) =>
+      gradeUsesLocalTone(grade) || !isNeutralAdvancedColor(grade.color);
     return (
       document.adjustments.some(heavyGrade) ||
       hasGeometryEdits(layer.transform) ||

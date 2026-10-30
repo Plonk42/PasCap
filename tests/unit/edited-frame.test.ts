@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createColourSettings } from '../../src/shared/colour.js';
+import { createColorSettings } from '../../src/shared/color.js';
 import { applyCommand, type EditCommand } from '../../src/shared/commands.js';
 import { editedFrame } from '../../src/shared/edited-frame.js';
 import { createAdjustment } from '../../src/shared/grade.js';
@@ -88,9 +88,9 @@ describe('edited frame', () => {
     ).toBe(30);
   });
 
-  it('is null for a whole adjustment Colour, a track Transform base, kept ranges or nothing at all', () => {
+  it('is null for a whole adjustment Color, a track Transform base, kept ranges or nothing at all', () => {
     expect(
-      after({ type: 'colour', adjustmentId: 'look', colour: { ...createColourSettings(), exposure: 0.5 } }),
+      after({ type: 'color', adjustmentId: 'look', color: { ...createColorSettings(), exposure: 0.5 } }),
     ).toBeNull();
     expect(after({ type: 'transform-setting', layerId, setting: 'opacity', value: 0.5 })).toBeNull();
     expect(after({ type: 'select-set', mediaId: 'rec', ranges: [{ sourceIn: 0, sourceOut: 90 }] })).toBeNull();

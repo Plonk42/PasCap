@@ -104,7 +104,7 @@ or dissolve can start from prefilled frames.
   frame and resumes from it once every frame is present. With music, the audio
   clock continues and late frames are dropped through credit minimums; video
   rejoins at the current audio frame. Music restarts only when its own clock
-  synchronisation fails.
+  synchronization fails.
 - If a required frame has not arrived after five seconds of buffering, playback
   stops with **Video decoder _N_ did not deliver source frame _S_ within 5
   seconds.** A reader failure stops playback with its own message.
@@ -128,7 +128,7 @@ navigation) are paused seeks with a latest-wins rule ([#224](https://github.com/
 Every drawn image is the exact composed frame of some project frame, drawn in request
 order:
 
-- While the frames of one seek decode, a newer request waits instead of cancelling
+- While the frames of one seek decode, a newer request waits instead of canceling
   them: they are drawn, then the latest request. Requests in between are skipped.
 - While requests keep arriving (one within the last 100 ms), the next image may be
   an intermediate frame: in the half of the way to the latest request nearest to it,
@@ -150,7 +150,7 @@ scrub as they do a seek. Decoder lanes, credits and the reader worker are unchan
 
 Source preview uses its own reader worker with one lane, drawing into a canvas
 (`data-source-decoder`). Hover scrubbing and range handles request one exact
-frame each. The frame being decoded is never cancelled: it is drawn, then the
+frame each. The frame being decoded is never canceled: it is drawn, then the
 latest request, skipping the ones in between, so images always appear in request
 order and a fast scrub keeps updating. A request that arrives while another frame
 decodes, for a frame in another GOP, first shows a keyframe between the displayed

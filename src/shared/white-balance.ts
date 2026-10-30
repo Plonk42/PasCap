@@ -1,12 +1,12 @@
-import { decode709 } from './colour.js';
+import { decode709 } from './color.js';
 
 /** Automatic white balance (#218): starting values, tuned on real footage. */
 export const WHITE_BALANCE = Object.freeze({
-  /** Minkowski norm of Shades of Grey (Finlayson & Trezzi) and 1st-order Grey-Edge (van de Weijer et al.). */
+  /** Minkowski norm of Shades of Gray (Finlayson & Trezzi) and 1st-order Gray-Edge (van de Weijer et al.). */
   norm: 6,
-  /** A pixel with any channel at or above this code is clipped: it and its 3×3 neighbourhood are ignored. */
+  /** A pixel with any channel at or above this code is clipped: it and its 3×3 neighborhood are ignored. */
   clippedCode: 250,
-  /** Pixels darker than this linear luma are too noisy to carry colour. */
+  /** Pixels darker than this linear luma are too noisy to carry color. */
   noisyLuma: 0.002,
   /** Full rows and columns at the edges no brighter than this code are letterbox. */
   letterboxCode: 16,
@@ -18,7 +18,7 @@ export const WHITE_BALANCE = Object.freeze({
   unstableTemperature: 0.25,
   /** Share of a cool cast removed (the correction warms)… */
   coolStrength: 0.85,
-  /** …and of a warm one: warm light such as a sunset is only partly neutralised. */
+  /** …and of a warm one: warm light such as a sunset is only partly neutralized. */
   warmStrength: 0.6,
   /** Share of a green or magenta cast removed. */
   tintStrength: 0.8,
@@ -27,7 +27,7 @@ export const WHITE_BALANCE = Object.freeze({
   tintLimit: 0.3,
 });
 
-/** Frames analysed: the playhead and up to `radius` project frames (1 s) on each side, within its clip; shared with Auto adjust. */
+/** Frames analyzed: the playhead and up to `radius` project frames (1 s) on each side, within its clip; shared with Auto adjust. */
 export const WHITE_BALANCE_WINDOW = Object.freeze({ frames: 16, radius: 30 });
 
 /** Encoded BT.709 RGBA bytes, rows top to bottom, as read back from a canvas. */
@@ -37,7 +37,7 @@ export interface AnalysisFrame {
   readonly data: Uint8ClampedArray | Uint8Array;
 }
 
-/** Pixels read per analysed frame: a 720p proxy is read at 320 × 180. */
+/** Pixels read per analyzed frame: a 720p proxy is read at 320 × 180. */
 export const ANALYSIS_PIXELS = 320 * 180;
 
 /** The size a decoded proxy frame is read at for analysis, in the editor and the service alike. */
@@ -46,11 +46,11 @@ export function analysisSize(width: number, height: number): { width: number; he
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
 }
 
-/** One frame's light: the Temperature and Tint that neutralise it exactly, and how far to trust them. */
+/** One frame's light: the Temperature and Tint that neutralize it exactly, and how far to trust them. */
 export interface IlluminantEstimate {
   temperature: number;
   tint: number;
-  /** 0–1: agreement between Shades of Grey and Grey-Edge. */
+  /** 0–1: agreement between Shades of Gray and Gray-Edge. */
   confidence: number;
 }
 
@@ -65,7 +65,7 @@ interface Plane {
   height: number;
   /** Linear R, G and B planes. */
   channels: [Float64Array, Float64Array, Float64Array];
-  /** Clipped (and their neighbours) or noisy pixels. */
+  /** Clipped (and their neighbors) or noisy pixels. */
   excluded: Uint8Array;
 }
 
@@ -160,8 +160,8 @@ function minkowski(sums: Triple, count: number): Triple | null {
   return estimate.every((value) => value > 1e-9) ? estimate : null;
 }
 
-/** Shades of Grey: the Minkowski mean of usable linear pixels. */
-function shadesOfGrey({ channels, excluded }: Plane): Triple | null {
+/** Shades of Gray: the Minkowski mean of usable linear pixels. */
+function shadesOfGray({ channels, excluded }: Plane): Triple | null {
   const sums: Triple = [0, 0, 0];
   let count = 0;
   for (let index = 0; index < excluded.length; index++) {
@@ -189,8 +189,8 @@ function blur(values: Float64Array, width: number, height: number): Float64Array
   return result;
 }
 
-/** 1st-order Grey-Edge: the Minkowski mean of blurred gradient magnitudes, away from excluded pixels. */
-function greyEdge({ width, height, channels, excluded }: Plane): Triple | null {
+/** 1st-order Gray-Edge: the Minkowski mean of blurred gradient magnitudes, away from excluded pixels. */
+function grayEdge({ width, height, channels, excluded }: Plane): Triple | null {
   // The blur and central differences reach two pixels: no excluded pixel may lie within them.
   const nearExcluded = dilate(excluded, width, height, 2);
   const blurred = channels.map((values) => blur(values, width, height));
@@ -227,8 +227,8 @@ export function neutralisingWhiteBalance(illuminant: readonly [number, number, n
 }
 
 /**
- * One frame's light from its usable pixels: the geometric mean of Shades of Grey and Grey-Edge, trusted
- * as far as they agree. Grey-Edge ignores large uniform areas such as sky, sea or grass. Null when the
+ * One frame's light from its usable pixels: the geometric mean of Shades of Gray and Gray-Edge, trusted
+ * as far as they agree. Gray-Edge ignores large uniform areas such as sky, sea or grass. Null when the
  * frame has too few usable pixels or edges (black, clipped or uniform).
  */
 export function frameIlluminant(frame: AnalysisFrame): IlluminantEstimate | null {
@@ -238,11 +238,11 @@ export function frameIlluminant(frame: AnalysisFrame): IlluminantEstimate | null
   if (data.length !== width * height * 4) throw new Error('An analysis frame needs width × height RGBA bytes.');
   const plane = linearPlane(frame);
   if (!plane) return null;
-  const grey = shadesOfGrey(plane);
-  const edges = greyEdge(plane);
-  if (!grey || !edges) return null;
-  const illuminant = grey.map((value, channel) => Math.sqrt(value * edges[channel]!)) as Triple;
-  const confidence = 1 - Math.min(1, angleDegrees(grey, edges) / WHITE_BALANCE.disagreementDegrees);
+  const gray = shadesOfGray(plane);
+  const edges = grayEdge(plane);
+  if (!gray || !edges) return null;
+  const illuminant = gray.map((value, channel) => Math.sqrt(value * edges[channel]!)) as Triple;
+  const confidence = 1 - Math.min(1, angleDegrees(gray, edges) / WHITE_BALANCE.disagreementDegrees);
   return { ...neutralisingWhiteBalance(illuminant), confidence };
 }
 
@@ -282,7 +282,7 @@ export function poolWhiteBalance(estimates: readonly (IlluminantEstimate | null)
 }
 
 /**
- * Project frames analysed around `playhead` within its clip [start, end): the playhead itself, and the
+ * Project frames analyzed around `playhead` within its clip [start, end): the playhead itself, and the
  * other frames shared between the two sides in proportion to their room, evenly spaced up to `radius`.
  */
 export function whiteBalanceWindow(
@@ -292,7 +292,7 @@ export function whiteBalanceWindow(
   radius: number = WHITE_BALANCE_WINDOW.radius,
 ): number[] {
   if (!Number.isSafeInteger(playhead) || playhead < clip.start || playhead >= clip.end)
-    throw new Error('The playhead must be inside the analysed clip.');
+    throw new Error('The playhead must be inside the analyzed clip.');
   const before = Math.min(radius, playhead - clip.start);
   const after = Math.min(radius, clip.end - 1 - playhead);
   const others = Math.max(0, frames - 1);

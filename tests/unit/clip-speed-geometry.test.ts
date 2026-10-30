@@ -38,7 +38,7 @@ describe('clip speed graph geometry and transaction planning', () => {
       }),
     ).toEqual({ frame: 70, rate: 2 });
   });
-  it('retains entered decimal precision through keyboard increments without pointer quantisation or accumulating float noise', () => {
+  it('retains entered decimal precision through keyboard increments without pointer quantization or accumulating float noise', () => {
     expect(stepClipSpeedRate(1.234567, 0.01)).toBe(1.244567);
     expect(stepClipSpeedRate(1.234567, -0.1)).toBe(1.134567);
     expect(stepClipSpeedRate(0.3, -0.1)).toBe(0.2);

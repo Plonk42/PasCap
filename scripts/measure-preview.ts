@@ -7,7 +7,7 @@ import type { PreviewDiagnostics } from '../src/preview/engine.js';
 import { createConfig } from '../src/server/config.js';
 import { extractComparisonFrame, meanAbsoluteError } from '../src/server/library.js';
 import { atomicWrite } from '../src/server/storage.js';
-import { NEUTRAL_COLOUR, type ColourSettings } from '../src/shared/colour.js';
+import { NEUTRAL_COLOR, type ColorSettings } from '../src/shared/color.js';
 import { applyCommand } from '../src/shared/commands.js';
 import { needsLayeredExport } from '../src/shared/export.js';
 import { jobSchema, mediaAssetSchema } from '../src/shared/media.js';
@@ -24,7 +24,7 @@ const measurementProfile = {
   schemaVersion: 6,
   projectSchemaVersion: PROJECT_SCHEMA_VERSION,
   description:
-    'Strict current-schema original two-excerpt row-colour/Temperature/Tint/HSL/curves/seek/transition/native-reference diagnostic: one enabled zero-origin contiguous track, unit row-owned Opacity, static row Colour without HDR, neutral track Transform and detail filters without Transform keys, constant forward 1× speed, no shared project-frame layer points and an empty music array.',
+    'Strict current-schema original two-excerpt row-color/Temperature/Tint/HSL/curves/seek/transition/native-reference diagnostic: one enabled zero-origin contiguous track, unit row-owned Opacity, static row Color without HDR, neutral track Transform and detail filters without Transform keys, constant forward 1× speed, no shared project-frame layer points and an empty music array.',
 } as const;
 const url = process.env['PASCAP_MEASURE_URL'] ?? 'http://127.0.0.1:5173';
 const browser = await chromium.launch({
@@ -34,7 +34,7 @@ const browser = await chromium.launch({
 });
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 // tsx/esbuild preserves nested function names using this helper. Evaluated functions
-// are serialised into the page and cannot otherwise access the Node-side helper.
+// are serialized into the page and cannot otherwise access the Node-side helper.
 await page.addInitScript('globalThis.__name = (fn) => fn;');
 // Keep historical report identifiers/output files separate from new current-schema measurements.
 const directory = path.resolve('.pascap/measurements', reportId);
@@ -51,7 +51,7 @@ try {
   const dimensions = Object.fromEntries(
     library.assets.map((asset) => [asset.id, { width: asset.metadata.width, height: asset.metadata.height }]),
   );
-  // This is the original two-clip colour/seek comparison, not the production
+  // This is the original two-clip color/seek comparison, not the production
   // layered renderer. Reject shared layer points/opacity rather than measure a false baseline.
   if (
     original.schemaVersion !== PROJECT_SCHEMA_VERSION ||
@@ -66,19 +66,19 @@ try {
     );
   const layout = calculateLayout(original);
   const clips = layerClips(original, original.layers[0]!.id);
-  const grades: ColourSettings[] = [
-    { ...NEUTRAL_COLOUR },
-    { ...NEUTRAL_COLOUR, temperature: 0.5 },
-    { ...NEUTRAL_COLOUR, tint: -0.4 },
-    { ...NEUTRAL_COLOUR, exposure: 1 },
-    { ...NEUTRAL_COLOUR, brightness: 0.1 },
-    { ...NEUTRAL_COLOUR, contrast: 1.3 },
-    { ...NEUTRAL_COLOUR, hue: 45 },
-    { ...NEUTRAL_COLOUR, saturation: 0.4 },
-    { ...NEUTRAL_COLOUR, whites: -0.5 },
-    { ...NEUTRAL_COLOUR, blacks: 0.3 },
+  const grades: ColorSettings[] = [
+    { ...NEUTRAL_COLOR },
+    { ...NEUTRAL_COLOR, temperature: 0.5 },
+    { ...NEUTRAL_COLOR, tint: -0.4 },
+    { ...NEUTRAL_COLOR, exposure: 1 },
+    { ...NEUTRAL_COLOR, brightness: 0.1 },
+    { ...NEUTRAL_COLOR, contrast: 1.3 },
+    { ...NEUTRAL_COLOR, hue: 45 },
+    { ...NEUTRAL_COLOR, saturation: 0.4 },
+    { ...NEUTRAL_COLOR, whites: -0.5 },
+    { ...NEUTRAL_COLOR, blacks: 0.3 },
     {
-      ...NEUTRAL_COLOUR,
+      ...NEUTRAL_COLOR,
       temperature: 0.3,
       tint: -0.2,
       exposure: 0.6,
@@ -91,7 +91,7 @@ try {
     },
   ];
   const gpu = await page.evaluate(
-    (settings) => settings.map((grade) => ({ grade, ...window.pascapLab!.verifyColour(grade) })),
+    (settings) => settings.map((grade) => ({ grade, ...window.pascapLab!.verifyColor(grade) })),
     grades,
   );
   const seeks: {
@@ -123,18 +123,18 @@ try {
       }, frame),
     );
   });
-  const colour: { grade: ColourSettings; latencyMs: PreviewDiagnostics['colourLatencyMs'] }[] = [];
+  const color: { grade: ColorSettings; latencyMs: PreviewDiagnostics['colorLatencyMs'] }[] = [];
   await page.evaluate(() => window.pascapLab!.engine.seek(45));
   await forEachSerial(grades, async (grade) => {
     // Each grade replaces both clips' own static grades: an appearance-only update, without saving.
-    const graded = applyCommand(original, { type: 'colour', clipIds: clips.map((clip) => clip.id), colour: grade });
-    colour.push(
+    const graded = applyCommand(original, { type: 'color', clipIds: clips.map((clip) => clip.id), color: grade });
+    color.push(
       await page.evaluate(
         async ({ settings, document }) => {
           const engine = window.pascapLab!.engine;
           engine.updateProjectAppearance(document);
           await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-          return { grade: settings, latencyMs: engine.diagnostics().colourLatencyMs };
+          return { grade: settings, latencyMs: engine.diagnostics().colorLatencyMs };
         },
         { settings: grade, document: graded },
       ),
@@ -217,16 +217,16 @@ try {
   });
   await atomicWrite(
     path.join(directory, 'playback.json'),
-    `${JSON.stringify({ reportId, profile: measurementProfile, date: new Date().toISOString(), browser: browser.version(), gpu, seeks, colour, playback }, null, 2)}\n`,
+    `${JSON.stringify({ reportId, profile: measurementProfile, date: new Date().toISOString(), browser: browser.version(), gpu, seeks, color, playback }, null, 2)}\n`,
   );
 
   const comparisons: { frame: number; meanAbsoluteError8Bit: number }[] = [];
   let reference: unknown = null;
   if (process.argv.includes('--reference')) {
     const snapshot = applyCommand(original, {
-      type: 'colour',
+      type: 'color',
       clipIds: original.clips.map((clip) => clip.id),
-      colour: grades.at(-1)!,
+      color: grades.at(-1)!,
     });
     console.log('Rendering an immutable graded reference for browser/native comparison.');
     const response = await page.evaluate(async (document) => {
@@ -355,7 +355,7 @@ try {
       'Only strict current-schema projects with static scalar clip grades, no adjustments, neutral spatial bases and no spatial keys are measured; older projects are incompatible and never migrated or defaulted.',
       'Diagnostic profile and reference receipt schema versions are independent of the project schema.',
       'This retains the original two-excerpt acceptance measurements, not shared-layer-point or layered-throughput certification.',
-      'Colour latency is engine update to next paint, not full input-event/React latency.',
+      'Color latency is engine update to next paint, not full input-event/React latency.',
       'FPS includes buffering; memory readings are Chromium JS heap, not total decoder/GPU process memory.',
       'Native/proxy comparison is downsampled RGB MAE, including scaling, H.264 4:2:0 and browser conversion.',
       'Integrated-browser performance is diagnostic only; target-GPU acceptance is pending external-browser validation.',
@@ -363,7 +363,7 @@ try {
     ],
     gpu,
     seeks,
-    colour,
+    color,
     playback,
     reference,
     comparisons,

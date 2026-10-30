@@ -33,7 +33,7 @@ describe.skipIf(!enabled)('clip speed curves · exact native maps on disposable 
     config = createConfig({ dataDir: path.join(root, 'cache') });
     jobs = new JobQueue();
     library = new MediaLibrary(config, jobs);
-    await library.initialise();
+    await library.initialize();
     assets = [];
     for (let index = 0; index < 2; index++) {
       const filename = path.join(sources, `coded-${index}.mp4`);
@@ -162,7 +162,7 @@ describe.skipIf(!enabled)('clip speed curves · exact native maps on disposable 
     return receipt;
   }
 
-  it('exports linear, eased and one-frame-held clip curves across a dissolve with exact source/colour/frame parity', async () => {
+  it('exports linear, eased and one-frame-held clip curves across a dissolve with exact source/color/frame parity', async () => {
     const document = createProject('native-clip-curves', 'Disposable custom clip curves');
     const speeds: SpeedCurve[] = [
       {

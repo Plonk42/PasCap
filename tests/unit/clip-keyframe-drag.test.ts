@@ -36,7 +36,7 @@ describe('track Transform keyframe sliding', () => {
     expect(project.layers[0]!.transform.keyframes[1]!.frame).toBe(60);
   });
 
-  it('re-sorts when a key passes its neighbour and may move after the duration', () => {
+  it('re-sorts when a key passes its neighbor and may move after the duration', () => {
     const plan = planTransformKeyframeMove(fixture([30, 60]), 'video-1', 60, 20);
     expect(plan.document.layers[0]!.transform.keyframes.map((key) => key.frame)).toEqual([20, 30]);
     const late = planTransformKeyframeMove(fixture([30, 60]), 'video-1', 60, 5000);

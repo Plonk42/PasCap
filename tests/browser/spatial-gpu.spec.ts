@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import type { CompositeClip, CompositeGroup } from '../../src/preview/compositor.js';
-import { CURVE_CHANNELS, HSL_BANDS } from '../../src/shared/advanced-colour.js';
-import { createColourSettings, gradePixel, NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
+import { CURVE_CHANNELS, HSL_BANDS } from '../../src/shared/advanced-color.js';
+import { createColorSettings, gradePixel, NEUTRAL_COLOR, type RGB } from '../../src/shared/color.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE, type SpatialPose } from '../../src/shared/spatial.js';
 
@@ -52,7 +52,7 @@ const textures = [0, 1].map((slot) =>
 function clip(slot: number, pose: Partial<SpatialPose> = {}, overrides: Partial<CompositeClip> = {}): CompositeClip {
   return {
     slot,
-    settings: { ...NEUTRAL_COLOUR },
+    settings: { ...NEUTRAL_COLOR },
     aspect: textureWidth / textureHeight,
     // Intentionally NOT the texture aspect: geometry must use original metadata.
     originalWidth: 4031,
@@ -158,7 +158,7 @@ function reference(
   return lower;
 }
 
-const advanced = createColourSettings();
+const advanced = createColorSettings();
 advanced.exposure = 0.2;
 HSL_BANDS.forEach((band, i) => {
   advanced.hsl[band] = { hue: i % 2 ? 5 : -4, saturation: -0.1, lightness: 0.012 };
@@ -212,7 +212,7 @@ const allCases: { name: string; groups: CompositeGroup[] }[] = [
               opacity: 0.63,
               blendWeight: 0.37,
               brightness: 0.4,
-              settings: { ...NEUTRAL_COLOUR, exposure: 0.4, hue: 19, saturation: 0.8, blacks: 0.1 },
+              settings: { ...NEUTRAL_COLOR, exposure: 0.4, hue: 19, saturation: 0.8, blacks: 0.1 },
             },
           ),
           clip(
@@ -222,7 +222,7 @@ const allCases: { name: string; groups: CompositeGroup[] }[] = [
               opacity: 0.63,
               blendWeight: 0.63,
               brightness: 0.7,
-              settings: { ...NEUTRAL_COLOUR, exposure: 0.4, hue: 19, saturation: 0.8, blacks: 0.1 },
+              settings: { ...NEUTRAL_COLOR, exposure: 0.4, hue: 19, saturation: 0.8, blacks: 0.1 },
             },
           ),
         ],
@@ -239,7 +239,7 @@ for (const [width, height, advancedOnly] of [
   [3840, 2160, false],
 ] as const) {
   const cases = advancedOnly ? allCases.slice(0, 1) : allCases.slice(1);
-  test(`${advancedOnly ? 'advanced colour' : 'pure GPU'} spatial numeric parity at ${width}×${height}`, async ({
+  test(`${advancedOnly ? 'advanced color' : 'pure GPU'} spatial numeric parity at ${width}×${height}`, async ({
     page,
   }, testInfo) => {
     // Hosted runners measured 28–30 s for UHD software-WebGL parity; keep ~3× headroom.
@@ -254,7 +254,7 @@ for (const [width, height, advancedOnly] of [
       Math.floor(((Math.floor(index / 9) + 0.43) * height) / 9),
     ]);
     const result = await page.evaluate(
-      ({ width, height, cases, textures, points, textureWidth, textureHeight, neutralColour }) => {
+      ({ width, height, cases, textures, points, textureWidth, textureHeight, neutralColor }) => {
         const gpu = (globalThis as unknown as { SpatialGpu: typeof import('../../src/preview/compositor.js') })
           .SpatialGpu;
         const canvas = document.createElement('canvas');
@@ -293,7 +293,7 @@ for (const [width, height, advancedOnly] of [
                       opacity: 1,
                       blendWeight: 1,
                       brightness: 1,
-                      settings: neutralColour,
+                      settings: neutralColor,
                     },
                   ],
                 },
@@ -351,7 +351,7 @@ for (const [width, height, advancedOnly] of [
                       opacity: 1,
                       blendWeight: 1,
                       brightness: 1,
-                      settings: neutralColour,
+                      settings: neutralColor,
                     },
                   ],
                 },
@@ -361,7 +361,7 @@ for (const [width, height, advancedOnly] of [
           // Establish slot zero for the independent raw-texture probe even
           // when the final advanced fixture's last participant used slot one.
           compositor.drawFrame([
-            { clips: [{ ...mixedFixture.groups[0]!.clips[0]!, slot: 0, settings: neutralColour }] },
+            { clips: [{ ...mixedFixture.groups[0]!.clips[0]!, slot: 0, settings: neutralColor }] },
           ]);
           // Constant output has NO texture, geometry mapping or grade. Values
           // around half-byte boundaries distinguish preblend conversion from
@@ -385,8 +385,8 @@ uniform vec4 value;
 uniform highp sampler2D source;
 uniform vec2 coordinate;
 uniform bool sampleTexture;
-out vec4 colour;
-void main() { colour = sampleTexture ? texture(source, coordinate) : value; }`,
+out vec4 color;
+void main() { color = sampleTexture ? texture(source, coordinate) : value; }`,
           );
           gl.compileShader(constantFragment);
           const constantProgram = gl.createProgram()!;
@@ -462,7 +462,7 @@ void main() { colour = sampleTexture ? texture(source, coordinate) : value; }`,
           compositor.gl.getExtension('WEBGL_lose_context')?.loseContext();
         }
       },
-      { width, height, cases, textures, points, textureWidth, textureHeight, neutralColour: NEUTRAL_COLOUR },
+      { width, height, cases, textures, points, textureWidth, textureHeight, neutralColor: NEUTRAL_COLOR },
     );
     // Independent Node-side references; diagnostics do not change GPU inputs,
     // tolerances or assertions. Attach before assertions can stop at the first pixel.
@@ -541,7 +541,7 @@ void main() { colour = sampleTexture ? texture(source, coordinate) : value; }`,
                 opacity: 1,
                 blendWeight: 1,
                 brightness: 1,
-                settings: NEUTRAL_COLOUR,
+                settings: NEUTRAL_COLOR,
               };
               return {
                 groupIndex,
@@ -697,7 +697,7 @@ test('synthetic orientation and dyadic half-open crop edges preserve lower cover
       compositor.dispose();
       compositor.gl.getExtension('WEBGL_lose_context')?.loseContext();
     }
-  }, NEUTRAL_COLOUR);
+  }, NEUTRAL_COLOR);
   expect(result.error).toBe(0);
   expect(result.neutral).toEqual([
     [255, 0, 0, 255],

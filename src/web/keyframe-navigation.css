@@ -20,12 +20,12 @@
 }
 
 /* Unlike optional reset actions, navigation stays visible without hover. */
-.editor-inspector .colour-control-actions .keyframe-setting-navigation > .keyframe-setting-step {
+.editor-inspector .color-control-actions .keyframe-setting-navigation > .keyframe-setting-step {
   opacity: 1;
 }
 
 .keyframe-setting-navigation > button.keyframe-setting-step:disabled,
-.editor-inspector .colour-control-actions .keyframe-setting-navigation > .keyframe-setting-step:disabled {
+.editor-inspector .color-control-actions .keyframe-setting-navigation > .keyframe-setting-step:disabled {
   opacity: 0.4;
 }
 
@@ -40,14 +40,14 @@
   min-width: 0;
 }
 
-.layer-keyed-control .colour-control-actions,
+.layer-keyed-control .color-control-actions,
 .layer-setting-heading .layer-setting-actions {
   flex: 0 0 auto;
   gap: 4px;
   margin-inline-start: auto;
 }
 
-.editor-inspector .colour-control-actions > .icon-button {
+.editor-inspector .color-control-actions > .icon-button {
   width: 28px;
   height: 28px;
 }

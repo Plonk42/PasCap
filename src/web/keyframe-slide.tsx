@@ -361,7 +361,7 @@ type MarkerView = Omit<
 > &
   Partial<Record<`data-${string}`, string | number>> & { children: ReactNode };
 
-/** Every sliding keyframe marker: one element per stored key, identical pointer/keyboard behaviour. */
+/** Every sliding keyframe marker: one element per stored key, identical pointer/keyboard behavior. */
 export function KeyframeMarkers<T extends KeyframeSlideTarget>(
   props: Readonly<{
     slide: KeyframeSlide<T>;

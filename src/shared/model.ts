@@ -42,13 +42,13 @@ const clipFields = z
     detail: described(detailSchema, 'Static detail filters; all 0 is neutral.'),
     grade: described(
       clipGradeSchema,
-      "The clip's own Colour, applied before any adjustment; keyframes at source frames follow the footage.",
+      "The clip's own Color, applied before any adjustment; keyframes at source frames follow the footage.",
     ),
   })
   .strict();
 const sourceRangeOrder = { message: 'Source OUT must be after IN (exclusive).' };
 export const clipSchema = clipFields.refine((clip) => clip.sourceOut > clip.sourceIn, sourceRangeOrder);
-/** A clip as inserted: it starts with a neutral grade, set afterwards with the Colour commands. */
+/** A clip as inserted: it starts with a neutral grade, set afterwards with the Color commands. */
 export const newClipSchema = clipFields
   .omit({ grade: true })
   .refine((clip) => clip.sourceOut > clip.sourceIn, sourceRangeOrder);
@@ -248,7 +248,7 @@ export const selectsSchema = z.record(
 );
 
 /** The only accepted project schema; bump it for every incompatible change. */
-export const PROJECT_SCHEMA_VERSION = 27;
+export const PROJECT_SCHEMA_VERSION = 28;
 
 const baseProjectSchema = z
   .object({
@@ -268,7 +268,7 @@ const baseProjectSchema = z
       })
       .strict(),
     frameRate: rateSchema,
-    colourProfile: z.literal('bt709-sdr'),
+    colorProfile: z.literal('bt709-sdr'),
     layers: z.array(layerSchema).min(1).max(MAX_VIDEO_LAYERS),
     clips: z.array(clipSchema).max(1_000),
     adjustments: adjustmentsSchema,
@@ -324,7 +324,7 @@ export function createProject(id: string, title: string): ProjectDocument {
     title,
     media: { videoIds: [], audioIds: [] },
     frameRate: { ...PROJECT_FPS },
-    colourProfile: 'bt709-sdr',
+    colorProfile: 'bt709-sdr',
     layers: [createLayer(BASE_LAYER_ID, 'Track 1')],
     clips: [],
     adjustments: [],

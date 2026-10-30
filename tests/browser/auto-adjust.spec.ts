@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import {
-  analyseAutoAdjust,
+  analyzeAutoAdjust,
   AUTO_ADJUST_SETTINGS,
   autoAdjustFrames,
   autoAdjustWindow,
@@ -18,15 +18,15 @@ import { createClip, createLayer, createProject, projectSchema, type ProjectDocu
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { analysisSize, frameIlluminant, poolWhiteBalance, type AnalysisFrame } from '../../src/shared/white-balance.js';
 import { analysisFrameArgs } from '../../src/server/stills.js';
-import { autoAdjustCommand } from '../../src/shared/auto-colour.js';
+import { autoAdjustCommand } from '../../src/shared/auto-color.js';
 import { layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { autoAdjustCommands, autoAdjustTarget, type AutoAdjustContext } from '../../src/web/auto-adjust.js';
-import { gradeOwnerOf } from '../../src/web/colour-owner.js';
+import { gradeOwnerOf } from '../../src/web/color-owner.js';
 import { adjustmentFrom0, expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 /**
- * A disposable proxy in the editing-proxy format: 30 black frames, then 90 frames of coloured patches
+ * A disposable proxy in the editing-proxy format: 30 black frames, then 90 frames of colored patches
  * (40 × 36, aligned with the 4:2:0 chroma) shot flat, with lifted blacks and lowered whites, under a
  * blue cast. It replaces pattern-a's proxy in this spec. `scale` enlarges it, keeping the patches aligned.
  */
@@ -55,7 +55,7 @@ async function flatProxy(directory: string, scale = 1): Promise<Buffer> {
   return readFile(output);
 }
 
-async function fulfilRange(route: Route, bytes: Buffer): Promise<void> {
+async function fulfillRange(route: Route, bytes: Buffer): Promise<void> {
   const range = /^bytes=(\d+)-(\d+)$/.exec(route.request().headers()['range'] ?? '');
   if (!range) {
     await route.fulfill({ status: 200, contentType: 'video/mp4', body: bytes });
@@ -130,8 +130,8 @@ test.beforeEach(async ({ page, request }) => {
     if (method === 'GET' && pathname === `/api/media/${assets[0]!.id}/proxy`) {
       proxyReads++;
       if (held) await held;
-      // A cancelled analysis terminates its reader while a read waits.
-      await fulfilRange(route, proxy).catch(() => undefined);
+      // A canceled analysis terminates its reader while a read waits.
+      await fulfillRange(route, proxy).catch(() => undefined);
       return;
     }
     const media = /^\/api\/media\/([^/]+)\/(?:proxy|thumbnail\/\d+)$/.exec(pathname);
@@ -213,12 +213,12 @@ async function pageFrames(page: Page, frames: readonly number[]): Promise<Map<nu
 /** The correction the shared estimator fits to the pixels the page decodes. */
 async function expectedCorrection(page: Page, frames = autoAdjustFrames(30, 120)): Promise<AutoCorrection> {
   const images = await pageFrames(page, frames);
-  const correction = analyseAutoAdjust(frames.map((source) => images.get(source)!));
+  const correction = analyzeAutoAdjust(frames.map((source) => images.get(source)!));
   if (!correction) throw new Error('Expected a correction for these frames.');
   return correction;
 }
 
-/** Source frames a keyframe at `frame` analyses: within 1 s of it, in the flat clip (source 30 at frame 0). */
+/** Source frames a keyframe at `frame` analyzes: within 1 s of it, in the flat clip (source 30 at frame 0). */
 function keyframeFrames(document: ProjectDocument, frame: number): number[] {
   const clip = calculateLayout(document).clips.find((item) => item.clip.id === 'flat')!;
   return autoAdjustWindow(clip, frame).map((projectFrame) => clip.retiming.sourceAt(projectFrame - clip.start));
@@ -296,13 +296,13 @@ async function compareDecodes(
       for (let index = 0; index < left.data.length; index++)
         difference += Math.abs(left.data[index]! - right.data[index]!);
     }
-    // Colour conversion and chroma upsampling round differently, and Chrome's unscaled readback (libyuv)
+    // Color conversion and chroma upsampling round differently, and Chrome's unscaled readback (libyuv)
     // approximates BT.709's blue coefficient (2.0 for 2.112): RGB codes differ by about one on average.
     const meanDifference = difference / (frames.length * size.width * size.height * 3);
     expect(meanDifference, `mean RGB code difference at ${scale}×`).toBeLessThan(1.5);
     const ordered = (images: Map<number, AnalysisFrame>) => frames.map((frame) => images.get(frame)!);
-    const fromBrowser = analyseAutoAdjust(ordered(browser))!;
-    const fromService = analyseAutoAdjust(ordered(service))!;
+    const fromBrowser = analyzeAutoAdjust(ordered(browser))!;
+    const fromService = analyzeAutoAdjust(ordered(service))!;
     for (const setting of AUTO_ADJUST_SETTINGS)
       expect(Math.abs(fromService[setting] - fromBrowser[setting]), `${setting} at ${scale}×`).toBeLessThanOrEqual(
         0.07,
@@ -315,7 +315,7 @@ async function compareDecodes(
   }
 }
 
-/** The service's pixels at the patch centres are the exact BT.709 limited-range conversion of the proxy's codes. */
+/** The service's pixels at the patch centers are the exact BT.709 limited-range conversion of the proxy's codes. */
 async function expectExactConversion(image: AnalysisFrame, frame: number): Promise<void> {
   const { stdout: yuv } = await promisify(execFile)(
     process.env['PASCAP_FFMPEG'] ?? 'ffmpeg',
@@ -337,7 +337,7 @@ async function expectExactConversion(image: AnalysisFrame, frame: number): Promi
     }
 }
 
-test('previews the analysed correction, and Apply sets the eleven settings in one Undo step', async ({ page }) => {
+test('previews the analyzed correction, and Apply sets the eleven settings in one Undo step', async ({ page }) => {
   const before = await current(page);
   const correction = await expectedCorrection(page);
   // Flat footage under a blue cast: warmed, black point lowered and contrast restored.
@@ -373,10 +373,10 @@ test('previews the analysed correction, and Apply sets the eleven settings in on
   await apply(page).click();
   await expect(apply(page)).toHaveCount(0);
   expect(proxyReads).toBe(decoded);
-  // The initial 80% applies exactly the analysed correction.
+  // The initial 80% applies exactly the analyzed correction.
   const expected = applied(before, correction, 0.8);
   await expect.poll(() => current(page)).toEqual(expected);
-  for (const setting of AUTO_ADJUST_SETTINGS) expect(flatGrade(expected).colour[setting]).toBe(correction[setting]);
+  for (const setting of AUTO_ADJUST_SETTINGS) expect(flatGrade(expected).color[setting]).toBe(correction[setting]);
   expect(expected.layers).toEqual(before.layers);
   await expect.poll(() => checksum(page)).toBe(previewed);
   await page.evaluate(() => window.pascapLab!.flush());
@@ -407,7 +407,7 @@ test('Intensity scales the correction, exaggerates it above 80%, and a later App
   await apply(page).click();
   const half = applied(before, correction, 0.5);
   await expect.poll(() => current(page)).toEqual(half);
-  expect(flatGrade(half).colour.contrast).toBe(scaleCorrection(correction, 0.5).contrast);
+  expect(flatGrade(half).color.contrast).toBe(scaleCorrection(correction, 0.5).contrast);
 
   // Reopening shows the intensity last applied; Reset intensity returns to 80%.
   await auto(page).click();
@@ -415,22 +415,22 @@ test('Intensity scales the correction, exaggerates it above 80%, and a later App
   await page.getByRole('button', { name: 'Reset intensity', exact: true }).click();
   await expect(intensity(page)).toHaveValue('80');
   await expect.poll(() => checksum(page)).toBe(suggested);
-  // 100% exaggerates the analysed correction: warmer and more contrast than suggested.
+  // 100% exaggerates the analyzed correction: warmer and more contrast than suggested.
   await intensity(page).fill('100');
   await intensity(page).press('Enter');
   await expect.poll(() => checksum(page)).not.toBe(suggested);
   await apply(page).click();
   const strong = applied(half, correction, 1);
   await expect.poll(() => current(page)).toEqual(strong);
-  expect(flatGrade(strong).colour.temperature).toBeGreaterThan(correction.temperature);
-  expect(flatGrade(strong).colour.contrast).toBeGreaterThan(correction.contrast);
+  expect(flatGrade(strong).color.temperature).toBeGreaterThan(correction.temperature);
+  expect(flatGrade(strong).color.contrast).toBeGreaterThan(correction.contrast);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(half);
 });
 
 test('leaves animated settings and keyframes unchanged and says so', async ({ page }) => {
   const seeded = await current(page);
-  flatGrade(seeded).colour = { ...flatGrade(seeded).colour, exposure: 0.25, hue: 15, hdr: 0.3, vibrance: 0.4 };
+  flatGrade(seeded).color = { ...flatGrade(seeded).color, exposure: 0.25, hue: 15, hdr: 0.3, vibrance: 0.4 };
   flatGrade(seeded).keyframes = [
     layerKeyAsGradeKey(sharedPoint(50, { exposure: 0.5 })),
     layerKeyAsGradeKey(sharedPoint(110, { saturation: 1.3 }, 'smooth')),
@@ -452,10 +452,10 @@ test('leaves animated settings and keyframes unchanged and says so', async ({ pa
   await apply(page).click();
   const expected = applied(seeded, correction, 0.8);
   await expect.poll(() => current(page)).toEqual(expected);
-  const colour = flatGrade(expected).colour;
-  expect([colour.exposure, colour.saturation, colour.hue, colour.hdr]).toEqual([0.25, 1, 15, 0.3]);
-  expect(colour.blacks).toBe(correction.blacks);
-  expect(colour.vibrance).toBe(correction.vibrance);
+  const color = flatGrade(expected).color;
+  expect([color.exposure, color.saturation, color.hue, color.hdr]).toEqual([0.25, 1, 15, 0.3]);
+  expect(color.blacks).toBe(correction.blacks);
+  expect(color.vibrance).toBe(correction.vibrance);
   expect(flatGrade(expected).keyframes).toEqual(flatGrade(seeded).keyframes);
   expect(expected.layers).toEqual(seeded.layers);
 });
@@ -488,7 +488,7 @@ test('Keyframe at playhead keys the eleven settings from the frames around it, o
   const key = flatGrade(once).keyframes[0]!;
   expect(key.frame).toBe(75);
   for (const setting of AUTO_ADJUST_SETTINGS) expect(key.values[setting]).toBe(first[setting]);
-  expect(flatGrade(once).colour).toEqual(flatGrade(before).colour);
+  expect(flatGrade(once).color).toEqual(flatGrade(before).color);
   expect(once.layers).toEqual(before.layers);
 
   // Now animated, Auto starts on a keyframe; another frame is another analysis and another keyframe.
@@ -518,7 +518,7 @@ test('Grade values from the playhead set the clip grade from the second around i
   await choice(page, 'Playhead').check();
   await expect(choice(page, 'Grade values')).toBeChecked();
   await expect(apply(page)).toBeVisible();
-  // A keyframe analyses the same frames: switching to it decodes nothing more.
+  // A keyframe analyzes the same frames: switching to it decodes nothing more.
   const reads = proxyReads;
   await choice(page, 'Keyframe at playhead').check();
   await expect(apply(page)).toBeVisible();
@@ -529,7 +529,7 @@ test('Grade values from the playhead set the clip grade from the second around i
   await expect(apply(page)).toHaveCount(0);
   const expected = applied(before, correction, 0.8);
   await expect.poll(() => current(page)).toEqual(expected);
-  for (const setting of AUTO_ADJUST_SETTINGS) expect(flatGrade(expected).colour[setting]).toBe(correction[setting]);
+  for (const setting of AUTO_ADJUST_SETTINGS) expect(flatGrade(expected).color[setting]).toBe(correction[setting]);
   expect(flatGrade(expected).keyframes).toEqual(flatGrade(before).keyframes);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(before);
@@ -538,7 +538,7 @@ test('Grade values from the playhead set the clip grade from the second around i
 test('the Track source grades each clip of the track on its own in one Undo step, never a keyframe', async ({
   page,
 }) => {
-  // A second flat range replaces the black clip, so that both clips can be analysed.
+  // A second flat range replaces the black clip, so that both clips can be analyzed.
   const seeded = await current(page);
   seeded.clips[1] = { ...seeded.clips[1]!, id: 'later', sourceIn: 40, sourceOut: 120 };
   // The later clip's grade animates Exposure, which applying values leaves to its keyframe.
@@ -583,7 +583,7 @@ test('the Track source grades each clip of the track on its own in one Undo step
     before,
   );
   await expect.poll(() => current(page)).toEqual(expected);
-  expect(expected.clips.map((clip) => clip.grade.colour.temperature)).toEqual([
+  expect(expected.clips.map((clip) => clip.grade.color.temperature)).toEqual([
     corrections.get('flat')!.temperature,
     corrections.get('later')!.temperature,
   ]);
@@ -592,7 +592,7 @@ test('the Track source grades each clip of the track on its own in one Undo step
   expect(await current(page)).toEqual(before);
 });
 
-test('explains when it cannot run, and a cancelled or failed analysis leaves no edit', async ({ page }) => {
+test('explains when it cannot run, and a canceled or failed analysis leaves no edit', async ({ page }) => {
   memory.seed({ ...(await current(page)), adjustments: [adjustmentFrom0(120)] });
   await page.reload();
   await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
@@ -611,16 +611,16 @@ test('explains when it cannot run, and a cancelled or failed analysis leaves no 
   await auto(page).click();
   await choice(page, 'Playhead').check();
   await expect(page.locator('.auto-adjust-panel')).toContainText(
-    'Move the playhead over this clip to analyse 1 s around it.',
+    'Move the playhead over this clip to analyze 1 s around it.',
   );
   await expect(apply(page)).toHaveCount(0);
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 
-  // Each clip of the track is analysed on its own, and the black one has nothing to measure.
+  // Each clip of the track is analyzed on its own, and the black one has nothing to measure.
   await auto(page).click();
   await choice(page, 'Every clip on Track 1').check();
   await expect(page.locator('.auto-adjust-panel').getByRole('alert')).toHaveText(
-    /^Clip 2 \(pattern-a\): These frames are too dark or too uniform to analyse\.$/,
+    /^Clip 2 \(pattern-a\): These frames are too dark or too uniform to analyze\.$/,
   );
   await page.getByRole('button', { name: 'Close', exact: true }).click();
 
@@ -628,7 +628,7 @@ test('explains when it cannot run, and a cancelled or failed analysis leaves no 
   await selectClip(page, 'dark');
   await auto(page).click();
   await expect(page.locator('.auto-adjust-panel').getByRole('alert')).toHaveText(
-    'These frames are too dark or too uniform to analyse.',
+    'These frames are too dark or too uniform to analyze.',
   );
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.locator('.auto-adjust-panel').getByRole('alert')).toHaveCount(0);

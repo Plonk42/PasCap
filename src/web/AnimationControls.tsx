@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { keyframeNeighbors, type KeyframeSetting } from '../shared/keyframes.js';
-import type { ColourOwner } from './colour-owner.js';
+import type { ColorOwner } from './color-owner.js';
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, keySeekHint, useKeyframeNavigation } from './keyframe-navigation.js';
 import './animation-controls.css';
@@ -79,7 +79,7 @@ export function TrackAnimationControls({
   children,
 }: Readonly<{
   label: string;
-  layer: ColourOwner;
+  layer: ColorOwner;
   frame: number;
   settings: readonly KeyframeSetting[];
   disabled: boolean;
@@ -173,7 +173,7 @@ export function ChannelKeyframeNavigation({
   label,
   disabled,
 }: Readonly<{
-  layer: ColourOwner;
+  layer: ColorOwner;
   frame: number;
   setting: KeyframeSetting;
   label: string;

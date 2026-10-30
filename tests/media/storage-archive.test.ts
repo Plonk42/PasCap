@@ -36,8 +36,8 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
       ...createClip('current-clip', 'generated-original', 0, 4),
       speed: { mode: 'constant' as const, rate: 0.5 },
     };
-    clip.grade.colour.temperature = 0.75;
-    clip.grade.colour.tint = -0.65;
+    clip.grade.color.temperature = 0.75;
+    clip.grade.color.tint = -0.65;
     project.clips = [clip];
     project.adjustments = [
       {
@@ -54,7 +54,7 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
     const saved = await store.save(project, 0);
     expect(saved.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     expect(saved.media).toEqual(project.media);
-    expect(saved.clips[0]!.grade.colour).toMatchObject({ temperature: 0.75, tint: -0.65 });
+    expect(saved.clips[0]!.grade.color).toMatchObject({ temperature: 0.75, tint: -0.65 });
     expect(saved.adjustments).toEqual(project.adjustments);
     expect(saved.layers[0]!.transform.keyframes).toEqual(project.layers[0]!.transform.keyframes);
     for (const keyframe of saved.adjustments[0]!.keyframes) {
@@ -204,8 +204,8 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
       { ...valid, layers: [{ ...valid.layers[0]!, transform: { ...valid.layers[0]!.transform, unknown: true } }] },
       { ...valid, clips: [{ ...valid.clips[0]!, spatial: valid.layers[0]!.transform }] },
       { ...valid, unexpected: true },
-      // The removed track appearance: track Colour, keyframes and Opacity.
-      { ...valid, layers: [{ ...valid.layers[0]!, colour: grade.colour }] },
+      // The removed track appearance: track Color, keyframes and Opacity.
+      { ...valid, layers: [{ ...valid.layers[0]!, color: grade.color }] },
       { ...valid, layers: [{ ...valid.layers[0]!, keyframes: [] }] },
       { ...valid, layers: [{ ...valid.layers[0]!, opacity: 1 }] },
       ...(
@@ -214,18 +214,18 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
           ['tint', 1],
         ] as const
       ).flatMap(([setting, limit]) => {
-        const colour: Record<string, unknown> = { ...grade.colour };
-        delete colour[setting];
+        const color: Record<string, unknown> = { ...grade.color };
+        delete color[setting];
         const values = gradeValues();
         delete values[setting];
         return [
-          { ...valid, clips: [{ ...valid.clips[0]!, grade: { ...grade, colour } }] },
+          { ...valid, clips: [{ ...valid.clips[0]!, grade: { ...grade, color } }] },
           { ...valid, clips: [{ ...valid.clips[0]!, [setting]: 0 }] },
-          { ...valid, clips: [{ ...valid.clips[0]!, colour: { ...grade.colour, [setting]: 0.5 } }] },
+          { ...valid, clips: [{ ...valid.clips[0]!, color: { ...grade.color, [setting]: 0.5 } }] },
           gradeKey(values),
           ...[null, -limit - 0.001, limit + 0.001, '0'].map((value) => ({
             ...valid,
-            clips: [{ ...valid.clips[0]!, grade: { ...grade, colour: { ...grade.colour, [setting]: value } } }],
+            clips: [{ ...valid.clips[0]!, grade: { ...grade, color: { ...grade.color, [setting]: value } } }],
           })),
           ...[-limit - 0.001, limit + 0.001, '0'].map((value) => gradeKey({ ...gradeValues(), [setting]: value })),
         ];
@@ -267,7 +267,7 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
     const snapshot = createProject('current-export', 'Current verified export');
     snapshot.clips = [createClip('one', 'generated-original', 0, 2)];
     snapshot.clips[0]!.grade = {
-      colour: { ...snapshot.clips[0]!.grade.colour, temperature: -0.85, tint: 0.9 },
+      color: { ...snapshot.clips[0]!.grade.color, temperature: -0.85, tint: 0.9 },
       keyframes: [
         layerKeyAsGradeKey(
           layerKeyframe(1, { ...EMPTY_KEY_VALUES, exposure: 0.1, temperature: 1, tint: -1 }, 'smooth'),
@@ -330,11 +330,11 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
       }
       const missingGains = [];
       for (const setting of ['temperature', 'tint'] as const) {
-        const colour: Record<string, unknown> = { ...clip.grade.colour };
-        delete colour[setting];
+        const color: Record<string, unknown> = { ...clip.grade.color };
+        delete color[setting];
         missingGains.push({
           ...(await archive(
-            { ...snapshot, clips: [{ ...clip, grade: { ...clip.grade, colour } }] },
+            { ...snapshot, clips: [{ ...clip, grade: { ...clip.grade, color } }] },
             `Missing grade ${setting}`,
           )),
           setting,

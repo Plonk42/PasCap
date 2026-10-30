@@ -70,7 +70,7 @@ export function freeStretchAt(kept: readonly SelectRange[], frame: number, frame
 }
 
 /**
- * Where **Add range** keeps a new range: from the displayed frame when it is free, else centred in the
+ * Where **Add range** keeps a new range: from the displayed frame when it is free, else centerd in the
  * largest free stretch; NEW_SELECT_FRAMES long, or the whole stretch when shorter.
  */
 export function addKeptRange(
@@ -103,7 +103,7 @@ export function insertKeptRange(
   return { ranges: [...kept.slice(0, index), { ...range }, ...kept.slice(index)], index };
 }
 
-/** The kept ranges without one, and the range to edit next: the same one, or its neighbour. */
+/** The kept ranges without one, and the range to edit next: the same one, or its neighbor. */
 export function removeKeptRange(
   kept: readonly SelectRange[],
   index: number,
@@ -113,7 +113,7 @@ export function removeKeptRange(
   return { ranges, active: Math.max(0, Math.min(ranges.length - 1, index < active ? active - 1 : active)) };
 }
 
-/** How far the active kept range's IN and OUT may move: up to one frame from its neighbours. */
+/** How far the active kept range's IN and OUT may move: up to one frame from its neighbors. */
 export function keptRangeBounds(
   kept: readonly SelectRange[],
   active: number,

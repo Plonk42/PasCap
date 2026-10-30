@@ -9,7 +9,7 @@ import { durationSchema, timecodeSchema } from './timecode.js';
 
 const sourceRange = z.object({ sourceIn: frameSchema, sourceOut: frameSchema }).strict();
 const speed = '% of the image width per second';
-const metres = (text: string) => described(z.number().nullable(), `${text}; null where the drone did not record it.`);
+const meters = (text: string) => described(z.number().nullable(), `${text}; null where the drone did not record it.`);
 
 export const describeRecording = defineOperation({
   name: 'describe_recording',
@@ -49,9 +49,9 @@ export const describeRecording = defineOperation({
         'The source ranges the user kept; null when the whole recording is available.',
       ),
       allowedMovement: z.number(),
-      motionAnalysed: described(
+      motionAnalyzed: described(
         z.boolean(),
-        'False when the camera motion has not been analysed yet: there are then no steady ranges to report; ask the user to analyse it.',
+        'False when the camera motion has not been analyzed yet: there are then no steady ranges to report; ask the user to analyze it.',
       ),
       steadyRanges: z.array(
         z
@@ -82,10 +82,10 @@ export const describeRecording = defineOperation({
             flight: described(
               z
                 .object({
-                  height: metres('Mean height above the take-off point in metres'),
-                  horizontalSpeed: metres('Mean horizontal speed in m/s'),
-                  verticalSpeed: metres('Mean vertical speed in m/s, positive upwards'),
-                  distance: metres('Mean distance from home in metres'),
+                  height: meters('Mean height above the take-off point in meters'),
+                  horizontalSpeed: meters('Mean horizontal speed in m/s'),
+                  verticalSpeed: meters('Mean vertical speed in m/s, positive upwards'),
+                  distance: meters('Mean distance from home in meters'),
                 })
                 .strict()
                 .nullable(),

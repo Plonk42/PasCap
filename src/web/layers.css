@@ -167,7 +167,7 @@
   transform: translateX(-50%);
 }
 
-.timeline-key.colour {
+.timeline-key.color {
   bottom: 14px;
   color: #a6d7fd;
 }
@@ -265,7 +265,7 @@
   border-top: 0;
 }
 
-.layer-inspector .colour-control {
+.layer-inspector .color-control {
   display: block;
   margin-top: 11px;
 }
@@ -361,7 +361,7 @@
   width: 72px;
 }
 
-.colour-key-focus {
+.color-key-focus {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -371,7 +371,7 @@
   margin: 3px 14px 10px;
 }
 
-.colour-key-focus .text-button {
+.color-key-focus .text-button {
   font-size: 8px;
 }
 
@@ -380,7 +380,7 @@
   font-size: 9px;
 }
 
-.animate-colour {
+.animate-color {
   display: flex;
   align-items: center;
   gap: 5px;

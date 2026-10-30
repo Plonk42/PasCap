@@ -2,7 +2,7 @@
 
 Current contract for [#123](https://github.com/Plonk42/PasCap/issues/123): three
 static, clip-owned detail filters applied identically in preview and native export,
-plus the keyframable Colour settings **Shadows**, **Highlights**, **HDR** and **Local contrast**
+plus the keyframable Color settings **Shadows**, **Highlights**, **HDR** and **Local contrast**
 of clip grades and adjustments, which share their kernel (see [local Shadows and Highlights](#local-shadows-and-highlights),
 [HDR look](#hdr-look) and [Local contrast](#local-contrast)).
 This describes the implementation contract, not hardware/long-run qualification,
@@ -15,14 +15,14 @@ Implementation authorities: [settings and kernel](../../src/shared/detail.ts),
 
 ## Owner decisions
 
-| Question                | Decision                                                                                                                                              |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Settings                | All three: **Sharpen**, **Clarity** and **Denoise**                                                                                                   |
-| Ownership and animation | Clip-owned and static; no keyframes and no track channels                                                                                             |
-| Pipeline position       | On source pixels **before** the Colour grade, around the inverse-mapped source point (so they follow the track Transform)                             |
-| Original                | Holding **Show original preview** bypasses Colour **and** Detail (with Shift, clip grades and Detail only); geometry, Opacity, fades and music remain |
-| Radius                  | A fraction of the image height, so the 720p preview predicts 720p and UHD exports                                                                     |
-| Denoise kind            | Spatial, edge-preserving (bilateral); no temporal or neighbouring-frame access                                                                        |
+| Question                | Decision                                                                                                                                             |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Settings                | All three: **Sharpen**, **Clarity** and **Denoise**                                                                                                  |
+| Ownership and animation | Clip-owned and static; no keyframes and no track channels                                                                                            |
+| Pipeline position       | On source pixels **before** the Color grade, around the inverse-mapped source point (so they follow the track Transform)                             |
+| Original                | Holding **Show original preview** bypasses Color **and** Detail (with Shift, clip grades and Detail only); geometry, Opacity, fades and music remain |
+| Radius                  | A fraction of the image height, so the 720p preview predicts 720p and UHD exports                                                                    |
+| Denoise kind            | Spatial, edge-preserving (bilateral); no temporal or neighboring-frame access                                                                        |
 
 ## Required data
 
@@ -39,7 +39,7 @@ Neutral values are creation values only, never defaults for missing saved data.
 Split, marked cuts and duplicate copy the clip's detail into each retained piece;
 trims, moves (including to another track) and Ripple leave it unchanged. Detail never
 changes timing, placement, speed, grades, Opacity or music. Projects and receipt snapshots
-saved before the current schema, with track Colour, are rejected with the reason and left unchanged.
+saved before the current schema, with track Color or British spelling, are rejected with the reason and left unchanged.
 
 ## Kernel
 
@@ -54,26 +54,26 @@ BT.709 RGB in 0–1 and luma is $Y = 0.2126R + 0.7152G + 0.0722B$.
 **Larger images are measured at 720p scale.** On an image of $H > 720$ lines, unit taps
 are $H/720$ pixels apart and would skip the pixels between them: a UHD export would then
 sharpen pixel-level grain the preview never shows. So when any of the three settings is
-nonzero, the centre $c_m$ and every Denoise, Clarity and Sharpen tap are taken
+nonzero, the center $c_m$ and every Denoise, Clarity and Sharpen tap are taken
 $s = \tfrac12 \min(1, H/720 - 1)$ pixels further right and down, where each bilinear tap
-averages up to 2×2 pixels; the stages below use $c_m$ as their centre. The finer detail
+averages up to 2×2 pixels; the stages below use $c_m$ as their center. The finer detail
 $f = c - c_m$ is then added back per channel to $D$, eased like noise when Denoise is on:
 $f^3 / (f^2 + \tau^2)$ with $\tau = 0.5\sigma$. At 720 lines and below $s = 0$ and $c_m = c$.
 The [edge-aware base](#edge-aware-base) keeps unshifted taps.
 
-For centre sample $c$ the stages run **Denoise → HDR and Local contrast → Shadows/Highlights → Clarity → Sharpen**:
+For center sample $c$ the stages run **Denoise → HDR and Local contrast → Shadows/Highlights → Clarity → Sharpen**:
 
-1. **Fine ring** (only when Sharpen or Denoise is nonzero): the eight neighbours at
+1. **Fine ring** (only when Sharpen or Denoise is nonzero): the eight neighbors at
    unit offsets $(\pm1, 0), (0, \pm1), (\pm1, \pm1)$ with Gaussian spatial weights
-   $s = e^{-d^2/2}$ (centre 1). Their weighted mean is $G$.
-2. **Denoise** adds the eight neighbours at offsets $(\pm2, 0), (0, \pm2), (\pm2, \pm2)$
+   $s = e^{-d^2/2}$ (center 1). Their weighted mean is $G$.
+2. **Denoise** adds the eight neighbors at offsets $(\pm2, 0), (0, \pm2), (\pm2, \pm2)$
    and weights every tap (fine and wide) by $w \cdot \exp(-\overline{\Delta^2} / (2\sigma^2))$,
-   where $w = e^{-d^2/(2 \cdot 1.5^2)}$ is its own wider spatial Gaussian (centre 1),
+   where $w = e^{-d^2/(2 \cdot 1.5^2)}$ is its own wider spatial Gaussian (center 1),
    $\overline{\Delta^2}$ is the mean squared RGB difference to $c$ and
    $\sigma = 0.1 \cdot \mathrm{denoise}$; the normalized weighted mean is $D_Y$. The same taps
-   with range $2.5\sigma$ give $D_C$: colour noise, which hides no detail, is smoothed far
-   more than luma, while strong colour edges still stop it. $D = D_C + Y(D_Y) - Y(D_C)$ takes
-   its luma from $D_Y$ and its colour from $D_C$; without Denoise $D = c$. The exponent factor
+   with range $2.5\sigma$ give $D_C$: color noise, which hides no detail, is smoothed far
+   more than luma, while strong color edges still stop it. $D = D_C + Y(D_Y) - Y(D_C)$ takes
+   its luma from $D_Y$ and its color from $D_C$; without Denoise $D = c$. The exponent factor
    is capped at $10^{30}$ so tiny strengths stay finite in float32.
 3. **Clarity**: $L$ is a smaller [edge-aware base](#edge-aware-base) of $y = Y(D)$: rings at
    radii 3, 6 and 10 units with spatial $\sigma = 6$ and range $\sigma = 0.1$, so it does not
@@ -82,8 +82,8 @@ For centre sample $c$ the stages run **Denoise → HDR and Local contrast → Sh
 4. **Sharpen** raises $y$ to $s = y + 2 \cdot \mathrm{sharpen} \cdot k(y - Y(G))$, where the soft
    noise threshold $k(d) = d^3 / (d^2 + t^2)$ with $t = 0.004$ (about 1/255) leaves grain and
    compression noise nearly untouched while passing real detail. Using the denoised
-   centre against the raw Gaussian keeps sharpening from re-amplifying removed noise.
-   To avoid halos, $s$ leaves the luma range $[\ell, h]$ of the centre and fine ring (widened
+   center against the raw Gaussian keeps sharpening from re-amplifying removed noise.
+   To avoid halos, $s$ leaves the luma range $[\ell, h]$ of the center and fine ring (widened
    to include $y$) only softly: an excess $e$ beyond it becomes $0.05 \tanh(e / 0.05)$. Small
    overshoots, which make fine texture crisp, are kept; a high-contrast step overshoots by at
    most 0.05 instead of turning into a black or white line. The sharpen term is the limited
@@ -94,9 +94,9 @@ channel, where $D'$ is $D$ after [HDR](#hdr-look) and [Local contrast](#local-co
 [Shadows/Highlights](#local-shadows-and-highlights) ($D' = D$ when all four are 0).
 Clarity and Sharpen measure $y = Y(D)$ before them (and before the finer detail is added
 back), so they never re-amplify the tone change.
-Luma detail is added equally to R, G and B, so it does not create colour
+Luma detail is added equally to R, G and B, so it does not create color
 fringes. At most 41 taps per source pixel without local tone (65 with it), plus the shifted
-centre above 720 lines; Sharpen alone
+center above 720 lines; Sharpen alone
 needs 9, Clarity alone 25, local tone alone 25: Shadows, Highlights, HDR and Local contrast share one base.
 
 **Exact neutral settings are a bypass**: all three zero and the source's summed Shadows,
@@ -110,12 +110,12 @@ Shadows, Highlights, HDR and Local contrast act on a large-scale luma base $B$ a
 they treat an area as a whole: a dark slope is one shadow, but the dark gaps between
 sunlit grass are texture of a bright area. Clarity uses the same construction at a
 smaller scale (radii 3, 6 and 10, spatial $\sigma = 6$, range $\sigma = 0.1$), around the
-measured centre. With $y = Y(D)$:
+measured center. With $y = Y(D)$:
 
 - **Taps**: 24 on rings of eight directions at radii 6, 16 (rotated 22.5°) and 32 units,
   with spatial weight $e^{-r^2/(2\cdot16^2)}$.
 - **Guide**: $g$ is the plain mean of $y$ and the eight radius-6 taps' lumas.
-- **Range weight**: each tap's luma $Y(t)$, and the centre (weight $e^{-(y-g)^2/(2\cdot0.12^2)}$),
+- **Range weight**: each tap's luma $Y(t)$, and the center (weight $e^{-(y-g)^2/(2\cdot0.12^2)}$),
   is weighted by $e^{-(Y(t)-g)^2/(2\cdot0.12^2)}$. Comparing with the guide rather than the
   pixel itself makes a dark pixel within bright texture take its surroundings' base, while
   a strong edge wider than the guide still stops the base crossing it, avoiding halos.
@@ -123,28 +123,28 @@ measured centre. With $y = Y(D)$:
 
 ## Local Shadows and Highlights
 
-**Shadows** and **Highlights** are Colour settings of clip grades and adjustments in **−1…1**,
-neutral 0, keyframed like the other scalar Colour settings. A source's clip grade and adjustment
+**Shadows** and **Highlights** are Color settings of clip grades and adjustments in **−1…1**,
+neutral 0, keyframed like the other scalar Color settings. A source's clip grade and adjustment
 values are summed, within −1…1, for its one kernel pass. Like Lightroom's sliders they are local: they
 brighten or darken an area according to its base brightness, not each pixel by its own
 value, so dark texture in a bright area and bright texture in a dark area keep their
 contrast. The change is an exposure in linear light, in the manner of darktable's tone
-equaliser: it keeps black at black, colour ratios and local contrast.
+equalizer: it keeps black at black, color ratios and local contrast.
 
 - **Base in stops**: $E = \log_2 \max(2^{-16}, \mathrm{EOTF}(B) \cdot 2^{\mathrm{exposure}})$, so
   tones are chosen after the summed evaluated Exposure of both grades (which itself stays in
   the grades): the exposure the two grades apply in sequence.
-  Mid-grey is $E_g = \log_2 0.18$.
-- **Distance from mid-grey**: $r(x) = 0$ below 0, $x^3 - x^4/2$ in 0…1, $x - \tfrac12$ above 1 (a
+  Mid-gray is $E_g = \log_2 0.18$.
+- **Distance from mid-gray**: $r(x) = 0$ below 0, $x^3 - x^4/2$ in 0…1, $x - \tfrac12$ above 1 (a
   ramp with a one-stop smooth knee) and $d(x) = r(x) - r(x - 4)$, which follows the
   distance for up to four stops.
 - **Gain**: $\mathrm{stops} = \tfrac12\,(s\,d(E_g - E) + h\,d(E - E_g))$ for Shadows $s$ and
   Highlights $h$; each linear channel of $D$ is multiplied by $2^{\mathrm{stops}}$ (applied
   as $\mathrm{OETF}(\mathrm{EOTF}(D_i)\,2^{\mathrm{stops}})$).
 
-At +1, Shadows brightens an area more than a stop below mid-grey by half its distance from
-mid-grey in stops, up to two stops for the darkest areas; −1 darkens it as much. Highlights
-does the same above mid-grey (−1 darkens bright areas, by about one stop at white). Mid-grey
+At +1, Shadows brightens an area more than a stop below mid-gray by half its distance from
+mid-gray in stops, up to two stops for the darkest areas; −1 darkens it as much. Highlights
+does the same above mid-gray (−1 darkens bright areas, by about one stop at white). Mid-gray
 never moves and the response on flat areas stays monotonic, with a slope of at least ½ in
 stops. Raised Highlights can clip, like raised Exposure.
 
@@ -156,13 +156,13 @@ two-clip reference and the measurement helper reject them.
 
 **HDR** is an SDR local tone-mapping look, not HDR output, Kelvin or automatic
 exposure: it opens shadows and recovers highlights over large areas while keeping
-local detail, preserving true black, mid-grey and white on flat areas. Its local-detail
+local detail, preserving true black, mid-gray and white on flat areas. Its local-detail
 boost is the separate [Local contrast](#local-contrast) setting; HDR 1 with Local contrast 1
 is the look HDR 1 alone used to give.
 
-- **Data**: required `colour.hdr` in every clip grade and adjustment, **0–1**, neutral 0 on new
+- **Data**: required `color.hdr` in every clip grade and adjustment, **0–1**, neutral 0 on new
   ones, and the thirteenth nullable keyframe channel `hdr`, after `blacks`. It is keyframed,
-  interpolated, held and reset exactly like the other scalar Colour settings: a clip grade's at
+  interpolated, held and reset exactly like the other scalar Color settings: a clip grade's at
   its source position, an adjustment's at its own frames. A source's two values are summed
   within 0–1, and both dissolve sources share the adjustment's. Missing fields are invalid.
 - **Not a grade stage**: it is excluded from the per-pixel grade, its LUTs and LUT
@@ -172,7 +172,7 @@ is the look HDR 1 alone used to give.
 - **Tone**: target luma $y' = B + h\,B(1-B)(1-2B) + (y-B)(1+c)$ with
   [Local contrast](#local-contrast) $c$: the base keeps 0, ½ and 1 while shadows rise and
   highlights fall (monotonic for $h \le 1$); HDR alone keeps the local residual $y-B$.
-- **Colour**: with $\Delta = y' - y$ and blend $b = \min(1, y/0.1)$, each channel becomes
+- **Color**: with $\Delta = y' - y$ and blend $b = \min(1, y/0.1)$, each channel becomes
   $D_i + \Delta + b\,(D_i\,y'/y - D_i - \Delta)$ (just $D_i + \Delta$ at $y = 0$): a
   hue-preserving luma ratio, fading to an additive change in deep shadows where the
   ratio would amplify noise.
@@ -180,23 +180,23 @@ is the look HDR 1 alone used to give.
 Any nonzero HDR base or HDR keyframe requires composited export (keyframes already do).
 In preview, HDR uses the detail program variants below; no texture, buffer, decoder,
 LUT or native process is added. The diagnostic two-clip reference and measurement
-helper reject HDR. The **Colour** tab lists HDR in its Effects group, above Local contrast, with the common slider/exact
+helper reject HDR. The **Color** tab lists HDR in its Effects group, above Local contrast, with the common slider/exact
 field, capture diamond and Previous/Next arrows, live slider preview and one Undo
-per release. The Original preview bypasses it with the rest of Colour.
+per release. The Original preview bypasses it with the rest of Color.
 
 ## Local contrast
 
 **Local contrast** is the local-detail boost split out of HDR, so HDR's tone compression and
 this boost can be judged and set separately.
 
-- **Data**: required `colour.localContrast` in every clip grade and adjustment, **−1…1**,
+- **Data**: required `color.localContrast` in every clip grade and adjustment, **−1…1**,
   neutral 0 on new ones, and the fourteenth nullable keyframe channel `localContrast`, after
   `hdr`. It is keyframed,
-  interpolated, held and reset like the other scalar Colour settings; default keyframes set
+  interpolated, held and reset like the other scalar Color settings; default keyframes set
   it to 0. A source's two values are summed within −1…1. Missing fields are invalid.
 - **Tone**: with HDR $h$ and Local contrast $c$, HDR's target becomes
   $y' = B + h\,B(1-B)(1-2B) + (y-B)(1+c)$ on the shared [edge-aware base](#edge-aware-base)
-  $B$, applied with HDR's hue-preserving colour step. With HDR 0 it is $y' = y + c\,(y-B)$:
+  $B$, applied with HDR's hue-preserving color step. With HDR 0 it is $y' = y + c\,(y-B)$:
   flat areas ($y = B$) never move, +1 doubles the residual and −1 flattens the area to its
   base.
 - **Not a grade stage**: like Shadows, Highlights and HDR, it is excluded from the per-pixel
@@ -204,9 +204,9 @@ this boost can be judged and set separately.
   export; the diagnostic two-clip reference and measurement helper reject it. Preview adds
   one `vec2 localContrast` uniform (one value per source) to the detail variants.
 
-The **Colour** tab lists Local contrast last, below HDR in its Effects group, with the common
+The **Color** tab lists Local contrast last, below HDR in its Effects group, with the common
 slider/exact field, capture diamond, Previous/Next arrows, Reset icon, live slider preview and
-one Undo per release. The Original preview bypasses it with the rest of Colour.
+one Undo per release. The Original preview bypasses it with the rest of Color.
 
 ## Pipeline order
 
@@ -214,8 +214,8 @@ Inverse track Transform mapping → **Detail, HDR, Local contrast, Shadows and H
 then the adjustment's grade (each Temperature/Tint … curves) → black fades → Opacity/spatial coverage and grouped source-over. Detail
 is not graded twice, does not change coverage and leaves the exact-neutral opaque
 letterbox path in place: with a neutral pose the filter runs at each fitted pixel
-centre, whose centre tap equals the byte-indexed sample. The Original preview bypasses
-Colour and Detail, never geometry, Opacity, fades, stacking or music.
+center, whose center tap equals the byte-indexed sample. The Original preview bypasses
+Color and Detail, never geometry, Opacity, fades, stacking or music.
 
 ## Preview, export and resources
 
@@ -232,7 +232,7 @@ texture taps behind an untaken uniform branch. No texture, framebuffer, decoder 
 pass is added; each grade still grades a source once.
 
 Any nonneutral clip detail requires composited export; the static LUT fast path
-cannot represent a neighbourhood filter. The native compositor evaluates the shared
+cannot represent a neighborhood filter. The native compositor evaluates the shared
 kernel on the existing fitted RGB8 frame inside the existing worker bands, before
 LUT or exact grading. No image, mask, LUT or full-frame buffer and no native process
 is added: four raw buffers (22 bytes/pixel), two LUTs and the serial child limits are
@@ -244,11 +244,11 @@ reference and the measurement helper reject nonneutral detail.
 
 When a hardware GPU is available, export renders every track group frame whose CPU path
 is per-pixel heavy with the **same WebGL programs as the preview**: nonneutral detail,
-or Shadows, Highlights, HDR, Local contrast, HSL ranges or colour curves in either grade (clip
+or Shadows, Highlights, HDR, Local contrast, HSL ranges or color curves in either grade (clip
 grade or adjustment) of a source, or nonneutral evaluated Transform geometry on
 either source; Opacity alone does not count. It uses one headless Chrome page the service launches per
 export ([service side](../../src/server/gpu-compositor.ts),
-[page](../../src/gpu-worker/main.ts)). Neutral, scalar-colour and Opacity/fade-only
+[page](../../src/gpu-worker/main.ts)). Neutral, scalar-color and Opacity/fade-only
 frames stay on the CPU compositor, which is exact there (neutral frames stay bit-identical),
 at least as fast as the transport below, and remains the parity reference.
 
@@ -286,14 +286,14 @@ at least as fast as the transport below, and remains the parity reference.
   | Case              | CPU compositor      | As shipped (heavy groups on GPU) | All groups on GPU |
   | ----------------- | ------------------- | -------------------------------- | ----------------- |
   | neutral           | 33.5 (33.3–34.7)    | 33.2 (CPU)                       | 37.7 (37.4–37.9)  |
-  | scalar colour     | 30.3 (30.1–30.5)    | 30.6 (CPU)                       | 35.9 (35.7–36.0)  |
+  | scalar color      | 30.3 (30.1–30.5)    | 30.6 (CPU)                       | 35.9 (35.7–36.0)  |
   | Opacity and fades | 31.7 (31.7–31.8)    | 31.4 (CPU)                       | 35.8 (35.7–36.5)  |
   | HSL + curves      | 41.3 (40.3–43.1)    | 36.4 (35.7–37.4)                 | 35.9 (35.8–37.3)  |
   | spatial pose      | 37.1 (35.3–37.2)    | 35.4 (34.8–35.5)                 | 35.2 (34.9–36.0)  |
   | spatial dissolve  | 55.0 (54.1–55.5)    | 50.1 (49.4–50.9)                 | 50.4 (49.3–50.9)  |
   | detail + HDR      | 219.0 (216.9–223.7) | 39.1 (38.1–39.4)                 | 39.1 (38.7–39.8)  |
 
-  Composition alone is 13 s on the CPU for neutral and scalar-colour frames versus about 20 s
+  Composition alone is 13 s on the CPU for neutral and scalar-color frames versus about 20 s
   through the worker (loopback transport, about 170 ms per UHD frame), so cheap groups stay on
   the CPU. The gain for HSL/curves, spatial poses and dissolves is 2–5 s per 60 frames on this
   host; detail and HDR gain far more. Synthetic noise sources, one host and one GPU: with fewer
@@ -332,14 +332,14 @@ measures a clip's proxy and suggests Denoise and Sharpen; the editor has no such
 constant is in `DETAIL_ESTIMATE` ([detail estimate](../../src/shared/detail-estimate.ts)),
 starting values set on synthetic noise and blur, to tune on real flights.
 
-- **Frames**: up to 8 at the centres of equal slices of the range (or the 1 s window), read
+- **Frames**: up to 8 at the centers of equal slices of the range (or the 1 s window), read
   as full-range luma at the proxy's size, the 720-line scale of the filters' units.
 - **Noise**: Immerkær's estimate $\sigma = \sqrt{\pi/2}\,\overline{|I * M|}/6$ with the
   Laplacian difference $M = [1,-2,1;-2,4,-2;1,-2,1]$, per 16 × 16 block, then the 10th
   percentile over blocks whose mean is within 0.02–0.98 (clipped areas and letterbox show no
   noise), so texture does not count; the median over frames. It reads within 10 % of the
   added noise on synthetic patches.
-- **Blur**: Crété-Roffet's no-reference measure, the share of neighbour differences a 9-tap
+- **Blur**: Crété-Roffet's no-reference measure, the share of neighbor differences a 9-tap
   box blur keeps, horizontally and vertically, the larger; only differences above
   $\max(4/255,\ 4\sqrt2\,\sigma)$ count, so noise does not pass for detail. A crisp edge reads
   about 0.11; Gaussian blur of 1, 2 and 4 pixels about 0.41, 0.68 and 0.87.
@@ -356,9 +356,9 @@ noise, so Denoise is rarely suggested even when the 4K original shows grain.
 
 - Unit: strict schema, neutral bypass, an independent transcription of the kernel
   including the guided base, HDR, Local contrast, Shadows and Highlights (agreement to $10^{-12}$),
-  edge/noise behaviour, HDR black/grey/white preservation, Local contrast detail boost, hue preservation,
+  edge/noise behavior, HDR black/gray/white preservation, Local contrast detail boost, hue preservation,
   no halo at a strong edge, Shadows/Highlights monotonic flat response, fixed black and
-  mid-grey, tone choice after Exposure and untouched dark texture in a bright area, commands,
+  mid-gray, tone choice after Exposure and untouched dark texture in a bright area, commands,
   export routing, one reused LUT while local tone animates and the
   native compositor at 720p and UHD (≤ 0.01/255 before RGBA16 rounding).
 - GPU (SwiftShader in CI): every setting, HDR, Local contrast, Shadows/Highlights with Exposure and

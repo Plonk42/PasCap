@@ -116,7 +116,7 @@ export async function hashFile(
       autoClose: false,
       highWaterMark: 1024 * 1024,
     }) as AsyncIterable<Buffer>) {
-      if (signal?.aborted) throw new ServiceError('Job cancelled.', 499);
+      if (signal?.aborted) throw new ServiceError('Job canceled.', 499);
       hash.update(chunk);
       read += chunk.length;
       if (onProgress && before.size > 0 && read - reported >= 64 * 1024 * 1024) {

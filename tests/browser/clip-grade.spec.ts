@@ -42,7 +42,7 @@ test.beforeEach(async ({ page, request }) => {
 test('clip grade values follow the image in slow motion, and a keyframe at the playhead shows its own value', async ({
   page,
 }) => {
-  await expect(page.locator('.colour-target')).toContainText('this clip only');
+  await expect(page.locator('.color-target')).toContainText('this clip only');
   // Frame 3 shows source frame 1 at position 1.5, between the keyframes: read-only, the image's value.
   await seek(page, 3);
   await expect(exact(page, 'Exposure')).toHaveValue('0.15');
@@ -59,10 +59,10 @@ test('clip grade values follow the image in slow motion, and a keyframe at the p
   await expect.poll(() => memory.saves).toBe(1);
 });
 
-test('the Colour header names the clip and stays pinned while its settings scroll; graded clips are marked', async ({
+test('the Color header names the clip and stays pinned while its settings scroll; graded clips are marked', async ({
   page,
 }) => {
-  const header = page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .colour-target');
+  const header = page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .color-target');
   await expect(header.locator('> span')).toHaveText('Clip 1 of 1 · Track 1 · this clip only');
   const panel = page.locator('.inspector-panel');
   await panel.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));

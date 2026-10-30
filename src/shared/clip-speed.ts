@@ -14,8 +14,8 @@ export const CLIP_SPEED_PRESETS = Object.freeze([
   { id: 'ramp-down', label: 'Ramp down', rates: [2, 0.5] },
   { id: 'accelerate', label: 'Accelerate', rates: [0.5, 0.5, 1, 2, 2] },
   { id: 'decelerate', label: 'Decelerate', rates: [2, 2, 1, 0.5, 0.5] },
-  { id: 'slow-centre', label: 'Slow centre', rates: [2, 1, 0.25, 1, 2] },
-  { id: 'fast-centre', label: 'Fast centre', rates: [0.5, 1, 4, 1, 0.5] },
+  { id: 'slow-center', label: 'Slow center', rates: [2, 1, 0.25, 1, 2] },
+  { id: 'fast-center', label: 'Fast center', rates: [0.5, 1, 4, 1, 0.5] },
 ] as const);
 export type ClipSpeedPreset = (typeof CLIP_SPEED_PRESETS)[number]['id'];
 

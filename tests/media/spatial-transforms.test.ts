@@ -10,7 +10,7 @@ import { JobQueue } from '../../src/server/jobs.js';
 import { renderLayeredExport, type LayeredRenderReport } from '../../src/server/layered-export.js';
 import { MediaLibrary } from '../../src/server/library.js';
 import { runProcess } from '../../src/server/process.js';
-import { NEUTRAL_COLOUR, type ColourSettings, type RGB } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOR, type ColorSettings, type RGB } from '../../src/shared/color.js';
 import { compileDetail, type DetailFilter, type DetailSettings } from '../../src/shared/detail.js';
 import {
   EXPORT_PROFILES,
@@ -88,22 +88,22 @@ interface ReferenceSource {
   rgb: Buffer;
   neutral: boolean;
   /** The clip grade, then the adjustment, each on the previous one's encoded output. */
-  stages: ColourSettings[];
+  stages: ColorSettings[];
   /** Shared detail kernel on this independent bilinear sampler; null when neutral. */
   detail: DetailFilter | null;
   cosine: number;
   sine: number;
   denominatorX: number;
   denominatorY: number;
-  centreX: number;
-  centreY: number;
+  centerX: number;
+  centerY: number;
 }
 
 function uvAt(source: ReferenceSource, x: number, y: number): readonly [number, number] {
   // Independent inverse in physical output pixels, using ORIGINAL aspect. The
   // even-rounded decode rectangle is only used later to sample the fitted RGB.
-  const dx = x + 0.5 - source.centreX;
-  const dy = y + 0.5 - source.centreY;
+  const dx = x + 0.5 - source.centerX;
+  const dy = y + 0.5 - source.centerY;
   return [
     0.5 + (source.cosine * dx + source.sine * dy) / source.denominatorX,
     0.5 + (-source.sine * dx + source.cosine * dy) / source.denominatorY,
@@ -194,8 +194,8 @@ function referenceAlpha(groups: readonly ReferenceSource[][], x: number, y: numb
     let alpha = 0;
     for (const source of group) {
       // Avoid allocating a UV tuple for every pixel in the exhaustive UHD mask.
-      const dx = x + 0.5 - source.centreX;
-      const dy = y + 0.5 - source.centreY;
+      const dx = x + 0.5 - source.centerX;
+      const dy = y + 0.5 - source.centerY;
       const u = 0.5 + (source.cosine * dx + source.sine * dy) / source.denominatorX;
       const v = 0.5 + (-source.sine * dx + source.cosine * dy) / source.denominatorY;
       if (covered(source, u, v)) alpha += source.sample.opacity * source.sample.blendWeight;
@@ -219,7 +219,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     config = createConfig({ dataDir: path.join(root, 'cache') });
     jobs = new JobQueue();
     library = new MediaLibrary(config, jobs);
-    await library.initialise();
+    await library.initialize();
     // Asymmetric, frame-coded patches distinguish orientation, source identity,
     // translation and crop. Non-16:9 sources also expose original-vs-rounded fit.
     for (const [index, [width, height]] of [
@@ -362,7 +362,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       );
       const fit = Math.min(target.width / asset.metadata.width, target.height / asset.metadata.height);
       const radians = (spatial.rotation * Math.PI) / 180;
-      const grades = sourceGrades(sample.grade, sample.colour);
+      const grades = sourceGrades(sample.grade, sample.color);
       prepared.push({
         sample,
         pose: spatial,
@@ -378,8 +378,8 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
         sine: Math.sin(radians),
         denominatorX: fit * asset.metadata.width * spatial.scale,
         denominatorY: fit * asset.metadata.height * spatial.scale,
-        centreX: target.width * (0.5 + spatial.translateX),
-        centreY: target.height * (0.5 + spatial.translateY),
+        centerX: target.width * (0.5 + spatial.translateX),
+        centerY: target.height * (0.5 + spatial.translateY),
       });
     }
     return project.layers.map((row) => prepared.filter((source) => source.sample.layerId === row.id));
@@ -564,13 +564,13 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     changes: Partial<SpatialPose>;
     asset: number;
     detail?: DetailSettings;
-    tone?: Partial<Pick<ColourSettings, 'shadows' | 'highlights' | 'hdr' | 'localContrast' | 'exposure'>>;
+    tone?: Partial<Pick<ColorSettings, 'shadows' | 'highlights' | 'hdr' | 'localContrast' | 'exposure'>>;
   }[] = [
     {
-      name: 'crop with exact inclusive IN/exclusive OUT pixel centres',
+      name: 'crop with exact inclusive IN/exclusive OUT pixel centers',
       asset: 0,
       changes: {
-        // Dyadic UV boundaries at exact pixel centres avoid an ambiguous floating
+        // Dyadic UV boundaries at exact pixel centers avoid an ambiguous floating
         // point tie while still exercising IN inclusion and OUT exclusion.
         cropLeft: 242.5 / 1280,
         cropRight: 1 - 1002.5 / 1280,
@@ -578,7 +578,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
         cropBottom: 1 - 607.5 / 720,
       },
     },
-    { name: 'uniform scale about original centre', asset: 1, changes: { scale: 0.61 } },
+    { name: 'uniform scale about original center', asset: 1, changes: { scale: 0.61 } },
     { name: 'translation in full-canvas fractions', asset: 1, changes: { translateX: 0.19, translateY: -0.23 } },
     { name: 'clockwise rotation', asset: 1, changes: { rotation: 37 } },
     {
@@ -649,7 +649,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     changes: Partial<SpatialPose>,
     asset: number,
     detail: DetailSettings | undefined,
-    tone: Partial<ColourSettings> | undefined,
+    tone: Partial<ColorSettings> | undefined,
     gpu: boolean,
   ): Promise<void> {
     const project = createProject('static-spatial', 'Disposable one-frame spatial test');
@@ -659,7 +659,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     if (tone) {
       // The local tone grades the whole film: an adjustment over the clip's one frame.
       const look = createAdjustment('look', 0, 1);
-      Object.assign(look.colour, tone);
+      Object.assign(look.color, tone);
       project.adjustments = [look];
     }
     project.clips = [clip];
@@ -689,8 +689,8 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
     const right = createClip('right', assets[2]!.id, 2, 3, upper.id);
     left.speed = right.speed = { mode: 'constant', rate: 1 / 3 };
     right.start = 1;
-    base.grade.colour = {
-      ...NEUTRAL_COLOUR,
+    base.grade.color = {
+      ...NEUTRAL_COLOR,
       temperature: 0.7,
       tint: -0.5,
       exposure: 0.2,
@@ -775,8 +775,8 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
           expect(sample.sourceFrame).toBe(sourceIn); // Repeated recorded image.
           expect(sample.sourcePosition).toBeCloseTo(sourceIn + (frame - start) / 3, 12);
           expect(sample.opacity).toBeCloseTo(0.35 + (0.4 * frame) / 3, 12);
-          expect(sample.colour.temperature).toBeCloseTo(-0.8 + (1.7 * frame) / 3, 12);
-          expect(sample.colour.tint).toBeCloseTo(0.6 - (1.3 * frame) / 3, 12);
+          expect(sample.color.temperature).toBeCloseTo(-0.8 + (1.7 * frame) / 3, 12);
+          expect(sample.color.tint).toBeCloseTo(0.6 - (1.3 * frame) / 3, 12);
         }
       }
       const a = sampleTimeline(project, 1).find((sample) => sample.clipId === 'left')!;
@@ -786,7 +786,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
       const dissolve = sampleTimeline(project, 2).filter((sample) => sample.layerId === 'upper');
       expect(dissolve.map((sample) => sample.blendWeight)).toEqual([0.5, 0.5]);
       expect(dissolve[0]!.spatial).toEqual(dissolve[1]!.spatial);
-      expect(dissolve[0]!.colour).toEqual(dissolve[1]!.colour);
+      expect(dissolve[0]!.color).toEqual(dissolve[1]!.color);
       expect(sampleTimeline(project, 0).find((sample) => sample.clipId === 'left')!.brightness).toBe(0);
       expect(sampleTimeline(project, 3).find((sample) => sample.clipId === 'right')!.brightness).toBe(0);
       const work = await mkdtemp(path.join(root, 'compound-'));
@@ -807,7 +807,7 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
           frameCount: 4,
           codec: 'h264',
           pixelFormat: 'yuv420p',
-          colourRange: 'tv',
+          colorRange: 'tv',
           fullDecode: true,
           faststart: true,
           hasAudio: false,
@@ -843,14 +843,14 @@ describe.skipIf(!enabled)('spatial transforms · real native FFmpeg, disposable 
   }, 120_000);
 
   it('720p lossless native parity through the GPU worker: HSL ranges and a master curve', async () => {
-    const project = createProject('gpu-advanced-colour', 'Disposable one-frame advanced colour test');
+    const project = createProject('gpu-advanced-color', 'Disposable one-frame advanced color test');
     const clip = createClip('pattern', assets[1]!.id, 1, 2);
-    clip.grade.colour = {
-      ...NEUTRAL_COLOUR,
+    clip.grade.color = {
+      ...NEUTRAL_COLOR,
       exposure: 0.2,
-      hsl: { ...NEUTRAL_COLOUR.hsl, red: { hue: 12, saturation: -0.3, lightness: 0.04 } },
+      hsl: { ...NEUTRAL_COLOR.hsl, red: { hue: 12, saturation: -0.3, lightness: 0.04 } },
       curves: {
-        ...NEUTRAL_COLOUR.curves,
+        ...NEUTRAL_COLOR.curves,
         master: [
           { x: 0, y: 0 },
           { x: 0.3, y: 0.15 },

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createColourSettings, NEUTRAL_COLOUR, type RGB, type ScalarColourSetting } from '../../src/shared/colour.js';
+import { createColorSettings, NEUTRAL_COLOR, type RGB, type ScalarColorSetting } from '../../src/shared/color.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
-import { adjustmentColour, compositePixel } from '../../src/shared/composition.js';
+import { adjustmentColor, compositePixel } from '../../src/shared/composition.js';
 import { editedFrame } from '../../src/shared/edited-frame.js';
 import { needsLayeredExport } from '../../src/shared/export.js';
 import {
@@ -29,35 +29,35 @@ function project(adjustments: Adjustment[] = []): ProjectDocument {
 
 const warm = (item: Adjustment, temperature: number): Adjustment => ({
   ...item,
-  colour: { ...item.colour, temperature },
+  color: { ...item.color, temperature },
 });
 
 describe('adjustments', () => {
   it('grade every video track within their range and nothing outside it', () => {
     const document = project([warm(createAdjustment('look', 30, 20), 0.5)]);
     for (const frame of [29, 50]) {
-      for (const layer of sampleTimeline(document, frame)) expect(layer.colour).toEqual(NEUTRAL_COLOUR);
+      for (const layer of sampleTimeline(document, frame)) expect(layer.color).toEqual(NEUTRAL_COLOR);
     }
     for (const frame of [30, 49]) {
       const layers = sampleTimeline(document, frame);
       expect(layers.map((layer) => layer.layerId)).toEqual(['video-1', 'video-2']);
-      for (const layer of layers) expect(layer.colour.temperature).toBe(0.5);
+      for (const layer of layers) expect(layer.color.temperature).toBe(0.5);
     }
   });
 
   it('apply after the clip grade, each source keeping its own', () => {
     const document = project([warm(createAdjustment('look', 0, 100), 0.5)]);
-    document.clips[0]!.grade.colour.exposure = 1;
+    document.clips[0]!.grade.color.exposure = 1;
     const [lower, upper] = sampleTimeline(projectSchema.parse(document), 40);
-    expect(lower).toMatchObject({ grade: { exposure: 1 }, colour: { temperature: 0.5, exposure: 0 } });
-    expect(upper).toMatchObject({ grade: { exposure: 0 }, colour: { temperature: 0.5 } });
+    expect(lower).toMatchObject({ grade: { exposure: 1 }, color: { temperature: 0.5, exposure: 0 } });
+    expect(upper).toMatchObject({ grade: { exposure: 0 }, color: { temperature: 0.5 } });
     // Sequential: the clip grade, then the adjustment on its encoded output, never their sum.
     const rgb: RGB = [0.4, 0.3, 0.2];
     const graded = compositePixel([lower!], () => rgb);
-    expect(graded).toEqual(gradeChainPixel(gradeChainPixel(rgb, [lower!.grade]), [lower!.colour]));
+    expect(graded).toEqual(gradeChainPixel(gradeChainPixel(rgb, [lower!.grade]), [lower!.color]));
     // Brightening a stop clips the highlights, which darkening a stop afterwards cannot restore; a sum would.
     const bright: RGB = [0.95, 0.9, 0.85];
-    const darker = { ...lower!, colour: { ...createColourSettings(), exposure: -1 } };
+    const darker = { ...lower!, color: { ...createColorSettings(), exposure: -1 } };
     const restored = compositePixel([darker], () => bright);
     expect(restored[0]).toBeLessThan(bright[0] - 0.1);
     expect(gradeChainPixel(bright, [{ ...lower!.grade, exposure: 0 }])).toEqual(bright);
@@ -82,11 +82,11 @@ describe('adjustments', () => {
       ],
     };
     const document = { adjustments: [item] };
-    expect(adjustmentColour(document, 100).exposure).toBeCloseTo(0);
-    expect(adjustmentColour(document, 105).exposure).toBeCloseTo(0.5);
-    expect(adjustmentColour(document, 110).exposure).toBe(1);
-    expect(adjustmentColour(document, 149).exposure).toBe(1);
-    expect(adjustmentColour(document, 150)).toEqual(NEUTRAL_COLOUR);
+    expect(adjustmentColor(document, 100).exposure).toBeCloseTo(0);
+    expect(adjustmentColor(document, 105).exposure).toBeCloseTo(0.5);
+    expect(adjustmentColor(document, 110).exposure).toBe(1);
+    expect(adjustmentColor(document, 149).exposure).toBe(1);
+    expect(adjustmentColor(document, 150)).toEqual(NEUTRAL_COLOR);
     expect(adjustmentAt([item], 99)).toBeUndefined();
   });
 
@@ -121,7 +121,7 @@ describe('adjustments', () => {
       duration: 60,
       settings: { saturation: 1.3, temperature: 0.2 },
     });
-    expect(added.adjustments[0]!.colour).toEqual({ ...createColourSettings(), saturation: 1.3, temperature: 0.2 });
+    expect(added.adjustments[0]!.color).toEqual({ ...createColorSettings(), saturation: 1.3, temperature: 0.2 });
     expect(() =>
       applyCommand(project(), {
         type: 'adjustment-add',
@@ -190,7 +190,7 @@ describe('adjustments', () => {
 
   it('split into two pieces with the whole grade, each keeping the keyframes within its range', () => {
     let document = applyCommand(project(), { type: 'adjustment-add', adjustmentId: 'a', start: 10, duration: 40 });
-    document = applyCommand(document, { type: 'colour-setting', adjustmentId: 'a', setting: 'saturation', value: 0.5 });
+    document = applyCommand(document, { type: 'color-setting', adjustmentId: 'a', setting: 'saturation', value: 0.5 });
     for (const frame of [5, 30])
       document = applyCommand(document, {
         type: 'layer-key-toggle',
@@ -208,12 +208,12 @@ describe('adjustments', () => {
     const [left, right] = split.adjustments;
     expect(left).toMatchObject({ id: 'a', start: 10, duration: 20 });
     expect(right).toMatchObject({ id: 'b', start: 30, duration: 20 });
-    expect(right!.colour).toEqual(left!.colour);
+    expect(right!.color).toEqual(left!.color);
     expect(left!.keyframes.map((key) => key.frame)).toEqual([5]);
     expect(right!.keyframes.map((key) => key.frame)).toEqual([10]);
     // Each frame keeps its grade.
     for (const frame of [12, 29, 30, 45])
-      expect(sampleTimeline(split, frame)[0]!.colour).toEqual(sampleTimeline(document, frame)[0]!.colour);
+      expect(sampleTimeline(split, frame)[0]!.color).toEqual(sampleTimeline(document, frame)[0]!.color);
     for (const frame of [10, 50])
       expect(() =>
         applyCommand(document, { type: 'adjustment-split', adjustmentId: 'a', frame, newAdjustmentId: 'b' }),
@@ -230,20 +230,20 @@ describe('adjustments', () => {
     expect(sampleTimeline(document, 130)).toEqual([]);
   });
 
-  it('refuse a colour command naming no target or two', () => {
+  it('refuse a color command naming no target or two', () => {
     const document = applyCommand(project(), { type: 'adjustment-add', adjustmentId: 'a', start: 0, duration: 10 });
-    expect(() => applyCommand(document, { type: 'colour', colour: createColourSettings() })).toThrow('Give either');
+    expect(() => applyCommand(document, { type: 'color', color: createColorSettings() })).toThrow('Give either');
     expect(() =>
-      applyCommand(document, { type: 'colour', clipIds: ['lower'], adjustmentId: 'a', colour: createColourSettings() }),
+      applyCommand(document, { type: 'color', clipIds: ['lower'], adjustmentId: 'a', color: createColorSettings() }),
     ).toThrow('Give either');
     const graded = applyCommand(document, {
-      type: 'colour-setting',
+      type: 'color-setting',
       adjustmentId: 'a',
       setting: 'saturation',
       value: 1.4,
     });
-    expect(graded.adjustments[0]!.colour.saturation).toBe(1.4);
-    expect(graded.clips.every((clip) => clip.grade.colour.saturation === 1)).toBe(true);
+    expect(graded.adjustments[0]!.color.saturation).toBe(1.4);
+    expect(graded.clips.every((clip) => clip.grade.color.saturation === 1)).toBe(true);
   });
 
   it(`hold at most ${MAX_ADJUSTMENTS}`, () => {
@@ -303,9 +303,9 @@ describe('Transform Opacity', () => {
   });
 });
 
-function nullValues(): Record<ScalarColourSetting, null> {
-  return Object.fromEntries(GRADE_SETTINGS.map((key) => [key, null])) as Record<ScalarColourSetting, null>;
+function nullValues(): Record<ScalarColorSetting, null> {
+  return Object.fromEntries(GRADE_SETTINGS.map((key) => [key, null])) as Record<ScalarColorSetting, null>;
 }
-function nullEasing(): Record<ScalarColourSetting, null> {
+function nullEasing(): Record<ScalarColorSetting, null> {
   return nullValues();
 }

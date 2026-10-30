@@ -76,7 +76,7 @@ describe('strict spatial settings', () => {
       { keyframes: [] },
       { base: pose(), keyframes: null },
       { ...settings(), opacity: 1 },
-      { ...settings(), colour: {} },
+      { ...settings(), color: {} },
       { ...settings(), base: { ...pose(), exposure: 0 } },
       { ...settings(), base: { ...pose(), rotationDegrees: 0 } },
       settings([{ ...key(0), extra: 1 } as SpatialKeyframe]),
@@ -372,7 +372,7 @@ describe('independent per-setting spatial keyframes', () => {
 });
 
 describe('bounded inverse spatial geometry and independent coverage', () => {
-  it('maps neutral pixel centres, without making outside letterbox coverage opaque', () => {
+  it('maps neutral pixel centers, without making outside letterbox coverage opaque', () => {
     const mapping = compileSpatialMapping(pose(), 1920, 1080, 1280, 720);
     expect(mapping.neutral).toBe(true);
     expectUv(mapped(mapping, 0.5, 0.5), 0.5 / 1280, 0.5 / 720);
@@ -386,7 +386,7 @@ describe('bounded inverse spatial geometry and independent coverage', () => {
     expect(letterboxed.neutral).toBe(true);
   });
 
-  it('uniformly scales about the original centre', () => {
+  it('uniformly scales about the original center', () => {
     const mapping = compileSpatialMapping(pose({ scale: 2 }), 1920, 1080, 1280, 720);
     expectUv(mapped(mapping, 0, 0), 0.25, 0.25);
     expectUv(mapped(mapping, 1280, 720), 0.75, 0.75);

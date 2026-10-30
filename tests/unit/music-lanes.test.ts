@@ -285,7 +285,7 @@ describe('music editing helpers', () => {
     expect(musicEditError('thrown text', 'fallback')).toBe('fallback');
   });
 
-  it('selects an added clip, keeps the selection, else its neighbour on the same track', () => {
+  it('selects an added clip, keeps the selection, else its neighbor on the same track', () => {
     const before = project(lane([clip('a', 0), clip('b', 100), clip('c', 200)]), {
       ...lane([clip('x', 0)]),
       id: 'other',

@@ -49,7 +49,7 @@ export function useWaveform(asset: AudioAsset | undefined): WaveformLevels | nul
   return detail?.key === key ? detail.wave : coarse;
 }
 
-const CENTRE = 22;
+const CENTER = 22;
 const HALF = 20;
 /** The least height of a column in drawing units, so silence stays a visible line. */
 const LEAST = 1.5;
@@ -60,8 +60,8 @@ export function waveformPath({ min, max }: WaveformColumns): string {
   const top = new Array<number>(count);
   const bottom = new Array<number>(count);
   for (let column = 0; column < count; column++) {
-    let upper = CENTRE - max[column]! * HALF;
-    let lower = CENTRE - min[column]! * HALF;
+    let upper = CENTER - max[column]! * HALF;
+    let lower = CENTER - min[column]! * HALF;
     if (lower - upper < LEAST) {
       const middle = (upper + lower) / 2;
       upper = middle - LEAST / 2;

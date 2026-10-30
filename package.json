@@ -16,7 +16,7 @@
     "build": "npm run typecheck && vite build && vite build --config vite.gpu-worker.config.ts && tsc -p tsconfig.server.json && npm run licenses:build",
     "licenses:check": "tsx scripts/licenses.ts --check",
     "licenses:build": "tsx scripts/licenses.ts --build",
-    "operations:catalogue": "tsx scripts/operation-catalogue.ts",
+    "operations:catalog": "tsx scripts/operation-catalog.ts",
     "start": "node dist/server/server/main.js",
     "test": "vitest run",
     "test:watch": "vitest",

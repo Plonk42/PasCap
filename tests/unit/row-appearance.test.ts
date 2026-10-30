@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { ColourLutCache, sampleColourLut } from '../../src/server/layered-colour.js';
-import { createColourSettings, generateCube, gradePixel, NEUTRAL_COLOUR, type RGB } from '../../src/shared/colour.js';
+import { ColorLutCache, sampleColorLut } from '../../src/server/layered-color.js';
+import { createColorSettings, generateCube, gradePixel, NEUTRAL_COLOR, type RGB } from '../../src/shared/color.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
-import { adjustmentColour } from '../../src/shared/composition.js';
+import { adjustmentColor } from '../../src/shared/composition.js';
 import { needsLayeredExport, planExport } from '../../src/shared/export.js';
-import { adjustmentColourAt, createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
+import { adjustmentColorAt, createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe, uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { NEUTRAL_SPATIAL_POSE, SPATIAL_CHANNELS, type SpatialChannel } from '../../src/shared/spatial.js';
 import { sampleTimeline } from '../../src/shared/timeline.js';
-import { adjustmentColourOwner } from '../../src/web/colour-owner.js';
-import { colourResetCommands } from '../../src/web/colour-reset.js';
+import { adjustmentColorOwner } from '../../src/web/color-owner.js';
+import { colorResetCommands } from '../../src/web/color-reset.js';
 import { EARLIER_SCHEMA_VERSIONS } from './project-fixtures.js';
 
 const NO_SETTINGS = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<
@@ -32,16 +32,16 @@ describe('adjustment, clip grade and track Transform ownership', () => {
     const original = fixture();
     const history = new EditHistory(original);
     const next = history.commit({
-      type: 'colour',
+      type: 'color',
       adjustmentId: 'look',
-      colour: { ...NEUTRAL_COLOUR, exposure: 0.5 },
+      color: { ...NEUTRAL_COLOR, exposure: 0.5 },
     });
     expect(next.clips).toEqual(original.clips);
     expect(next.layers).toEqual(original.layers);
     for (const frame of [0, 20]) {
       const sample = sampleTimeline(next, frame)[0]!;
-      expect(sample.colour.exposure).toBe(0.5);
-      expect(sample.grade).toEqual(NEUTRAL_COLOUR);
+      expect(sample.color.exposure).toBe(0.5);
+      expect(sample.grade).toEqual(NEUTRAL_COLOR);
       expect(sample).not.toHaveProperty('correction');
     }
     expect(history.undo()).toEqual(original);
@@ -51,14 +51,14 @@ describe('adjustment, clip grade and track Transform ownership', () => {
 
   it('captures the adjustment value, skips unrelated settings, holds endpoints and reveals unchanged bases after removal', () => {
     let project = fixture();
-    project.adjustments[0]!.colour = { ...NEUTRAL_COLOUR, exposure: 0.5, contrast: 1.2 };
+    project.adjustments[0]!.color = { ...NEUTRAL_COLOR, exposure: 0.5, contrast: 1.2 };
     const item = structuredClone(project.adjustments[0]!);
     project = applyCommand(project, {
       type: 'layer-key-toggle',
       adjustmentId: 'look',
       frame: 10,
       setting: 'exposure',
-      value: adjustmentColourAt(item, 10).exposure,
+      value: adjustmentColorAt(item, 10).exposure,
     });
     project = applyCommand(project, {
       type: 'layer-key-toggle',
@@ -74,9 +74,9 @@ describe('adjustment, clip grade and track Transform ownership', () => {
       setting: 'exposure',
       value: 1.5,
     });
-    expect(adjustmentColour(project, 0).exposure).toBe(0.5);
-    expect(adjustmentColour(project, 20).exposure).toBe(1);
-    expect(adjustmentColour(project, 40).exposure).toBe(1.5);
+    expect(adjustmentColor(project, 0).exposure).toBe(0.5);
+    expect(adjustmentColor(project, 20).exposure).toBe(1);
+    expect(adjustmentColor(project, 40).exposure).toBe(1.5);
     const clips = structuredClone(project.clips);
     for (const frame of [10, 30])
       project = applyCommand(project, {
@@ -86,16 +86,16 @@ describe('adjustment, clip grade and track Transform ownership', () => {
         setting: 'exposure',
         value: 0,
       });
-    expect(adjustmentColour(project, 20)).toEqual({ ...item.colour, contrast: 0 });
-    expect(project.adjustments[0]!.colour).toEqual(item.colour);
+    expect(adjustmentColor(project, 20)).toEqual({ ...item.color, contrast: 0 });
+    expect(project.adjustments[0]!.color).toEqual(item.color);
     expect(project.clips).toEqual(clips);
   });
 
   it('interpolates Temperature independently of Tint and restores each unchanged adjustment base after final removal', () => {
     const original = fixture();
     const item = original.adjustments[0]!;
-    item.colour.temperature = 0.3;
-    item.colour.tint = -0.4;
+    item.color.temperature = 0.3;
+    item.color.tint = -0.4;
     item.keyframes = [
       layerKeyframe(10, { ...EMPTY_KEY_VALUES, temperature: -0.5, tint: 0.6 }, 'linear'),
       layerKeyframe(20, { ...EMPTY_KEY_VALUES, exposure: 0.2 }, 'smooth'),
@@ -106,7 +106,7 @@ describe('adjustment, clip grade and track Transform ownership', () => {
       [20, 0],
       [40, 0.5],
     ] as const)
-      expect(adjustmentColourAt(item, frame)).toEqual({ ...item.colour, temperature, tint: 0.6, exposure: 0.2 });
+      expect(adjustmentColorAt(item, frame)).toEqual({ ...item.color, temperature, tint: 0.6, exposure: 0.2 });
 
     const history = new EditHistory(original);
     const changed = history.commit({
@@ -120,12 +120,12 @@ describe('adjustment, clip grade and track Transform ownership', () => {
       ...item.keyframes[0]!,
       values: { ...item.keyframes[0]!.values, temperature: 0.123456789 },
     });
-    expect(changed.adjustments[0]!.colour).toEqual(item.colour);
+    expect(changed.adjustments[0]!.color).toEqual(item.color);
     expect(changed.clips).toEqual(original.clips);
     expect(history.undo()).toEqual(original);
     expect(history.canUndo).toBe(false);
 
-    const reset = colourResetCommands(adjustmentColourOwner(item, 'Look'), 30).reduce(
+    const reset = colorResetCommands(adjustmentColorOwner(item, 'Look'), 30).reduce(
       (project, command) => applyCommand(project, command),
       original,
     );
@@ -134,7 +134,7 @@ describe('adjustment, clip grade and track Transform ownership', () => {
       item.keyframes[1],
       { ...item.keyframes[2]!, values: { ...item.keyframes[2]!.values, temperature: 0 } },
     ]);
-    expect(reset.adjustments[0]!.colour).toEqual(item.colour);
+    expect(reset.adjustments[0]!.color).toEqual(item.color);
     expect(reset.clips).toEqual(original.clips);
 
     let project = original;
@@ -154,7 +154,7 @@ describe('adjustment, clip grade and track Transform ownership', () => {
       },
       item.keyframes[1],
     ]);
-    expect(adjustmentColour(project, 20)).toEqual({ ...item.colour, tint: 0.6, exposure: 0.2 });
+    expect(adjustmentColor(project, 20)).toEqual({ ...item.color, tint: 0.6, exposure: 0.2 });
     project = applyCommand(project, {
       type: 'layer-key-toggle',
       adjustmentId: 'look',
@@ -163,14 +163,14 @@ describe('adjustment, clip grade and track Transform ownership', () => {
       value: 0,
     });
     expect(project.adjustments[0]!.keyframes).toEqual([item.keyframes[1]]);
-    expect(adjustmentColour(project, 20)).toEqual({ ...item.colour, exposure: 0.2 });
-    expect(project.adjustments[0]!.colour).toEqual(item.colour);
+    expect(adjustmentColor(project, 20)).toEqual({ ...item.color, exposure: 0.2 });
+    expect(project.adjustments[0]!.color).toEqual(item.color);
     expect(project.clips).toEqual(original.clips);
   });
 
   it('makes new/moved clips adopt the destination track’s Transform and Opacity, keeping their own grade', () => {
     let project = fixture();
-    project.clips[0]!.grade.colour.hue = 40;
+    project.clips[0]!.grade.color.hue = 40;
     const destination = createLayer('destination', 'Destination');
     destination.transform.base.opacity = 0.6;
     destination.transform.keyframes = [{ ...uniformKeyframe(0, { ...NO_SETTINGS, scale: 0.5 }, 'hold'), reset: false }];
@@ -184,7 +184,7 @@ describe('adjustment, clip grade and track Transform ownership', () => {
     expect(project.layers.map((layer) => layer.transform)).toEqual(layers.map((layer) => layer.transform));
     const newClip = createClip('new', 'source', 0, 10, destination.id);
     project = applyCommand(project, { type: 'insert', clip: newClip, index: project.clips.length });
-    expect(project.clips.find((clip) => clip.id === 'new')!).not.toHaveProperty('colour');
+    expect(project.clips.find((clip) => clip.id === 'new')!).not.toHaveProperty('color');
     expect(sampleTimeline(project, 20).find((sample) => sample.clipId === 'new')).toMatchObject({
       opacity: 0.6,
       spatial: { scale: 0.5 },
@@ -202,16 +202,16 @@ describe('adjustment, clip grade and track Transform ownership', () => {
     project.layers[0]!.transform.keyframes = [
       { ...uniformKeyframe(100, { ...NO_SETTINGS, rotation: 20 }, 'hold'), reset: false },
     ];
-    project.adjustments[0]!.colour.brightness = 0.1;
+    project.adjustments[0]!.color.brightness = 0.1;
     project.adjustments[0]!.keyframes = [
       layerKeyAsGradeKey(layerKeyframe(100, { ...EMPTY_KEY_VALUES, hue: 20 }, 'hold')),
     ];
-    project.clips[0]!.grade.colour.contrast = 1.3;
+    project.clips[0]!.grade.color.contrast = 1.3;
     const next = applyCommand(project, command);
     const a = next.clips.find((clip) => clip.id === 'a')!;
     const copy = next.clips.find((clip) => clip.id === 'copy')!;
     for (const clip of [a, copy]) {
-      expect(clip).not.toHaveProperty('colour');
+      expect(clip).not.toHaveProperty('color');
       expect(clip).not.toHaveProperty('correction');
       expect(clip.grade).toEqual(project.clips[0]!.grade);
       expect(clip.speed).toEqual(project.clips[0]!.speed);
@@ -223,52 +223,52 @@ describe('adjustment, clip grade and track Transform ownership', () => {
     expect(next.adjustments).toEqual(project.adjustments);
   });
 
-  it('resets only the adjustment and rejects invalid adjustment colour atomically', () => {
+  it('resets only the adjustment and rejects invalid adjustment color atomically', () => {
     const project = fixture();
-    project.adjustments[0]!.colour.exposure = 0.5;
+    project.adjustments[0]!.color.exposure = 0.5;
     const history = new EditHistory(project);
     const reset = history.replace(
-      colourResetCommands(adjustmentColourOwner(project.adjustments[0]!, 'Look'), 0).reduce(
+      colorResetCommands(adjustmentColorOwner(project.adjustments[0]!, 'Look'), 0).reduce(
         (document, command) => applyCommand(document, command),
         project,
       ),
     );
-    expect(reset.adjustments[0]!.colour).toEqual(NEUTRAL_COLOUR);
+    expect(reset.adjustments[0]!.color).toEqual(NEUTRAL_COLOR);
     expect(reset.clips).toEqual(project.clips);
     expect(reset.layers).toEqual(project.layers);
     expect(history.undo()).toEqual(project);
     expect(() =>
-      history.commit({ type: 'colour', adjustmentId: 'look', colour: { ...NEUTRAL_COLOUR, saturation: 3 } }),
+      history.commit({ type: 'color', adjustmentId: 'look', color: { ...NEUTRAL_COLOR, saturation: 3 } }),
     ).toThrow();
     expect(history.current).toEqual(project);
     expect(history.canUndo).toBe(false);
   });
 
-  it('rejects track Colour, saved clip colour fields, incomplete grade colour and every older schema', () => {
+  it('rejects track Color, saved clip color fields, incomplete grade color and every older schema', () => {
     const project = fixture();
     for (const schemaVersion of EARLIER_SCHEMA_VERSIONS)
       expect(projectSchema.safeParse({ ...project, schemaVersion }).success).toBe(false);
     for (const invalid of [
-      { ...project, layers: [{ ...project.layers[0], colour: createColourSettings() }] },
-      { ...project, clips: [{ ...project.clips[0], correction: NEUTRAL_COLOUR }, project.clips[1]] },
-      { ...project, clips: [{ ...project.clips[0], colour: NEUTRAL_COLOUR }, project.clips[1]] },
+      { ...project, layers: [{ ...project.layers[0], color: createColorSettings() }] },
+      { ...project, clips: [{ ...project.clips[0], correction: NEUTRAL_COLOR }, project.clips[1]] },
+      { ...project, clips: [{ ...project.clips[0], color: NEUTRAL_COLOR }, project.clips[1]] },
       {
         ...project,
-        clips: [{ ...project.clips[0], grade: { colour: { exposure: 0 }, keyframes: [] } }, project.clips[1]],
+        clips: [{ ...project.clips[0], grade: { color: { exposure: 0 }, keyframes: [] } }, project.clips[1]],
       },
-      { ...project, adjustments: [{ ...project.adjustments[0], colour: { exposure: 0 } }] },
+      { ...project, adjustments: [{ ...project.adjustments[0], color: { exposure: 0 } }] },
     ])
       expect(projectSchema.safeParse(invalid).success).toBe(false);
     expect(projectSchema.parse(project)).toEqual(project);
-    expect(createLayer('neutral', 'Neutral')).not.toHaveProperty('colour');
+    expect(createLayer('neutral', 'Neutral')).not.toHaveProperty('color');
     expect(createLayer('neutral', 'Neutral').transform.base.opacity).toBe(1);
     expect(createClip('new', 'source', 0, 10)).not.toHaveProperty('correction');
-    expect(createClip('new', 'source', 0, 10).grade).toEqual({ colour: NEUTRAL_COLOUR, keyframes: [] });
+    expect(createClip('new', 'source', 0, 10).grade).toEqual({ color: NEUTRAL_COLOR, keyframes: [] });
   });
 
   it('keeps a static nonneutral clip grade on the cheap path', () => {
     const project = { ...fixture(), adjustments: [] };
-    project.clips[0]!.grade.colour.contrast = 1.2;
+    project.clips[0]!.grade.color.contrast = 1.2;
     expect(needsLayeredExport(project)).toBe(false);
     expect(planExport(project).clips).toHaveLength(2);
   });
@@ -277,8 +277,8 @@ describe('adjustment, clip grade and track Transform ownership', () => {
 describe('single SDR grade and bounded LUT', () => {
   it('short-circuits exact neutral and generates one grade in cube coordinates', () => {
     const rgb: RGB = [0.1, 0.3, 0.7];
-    const row = { ...NEUTRAL_COLOUR, exposure: -2, brightness: 0.05, saturation: 0.4 };
-    expect(gradePixel(rgb, NEUTRAL_COLOUR)).toBe(rgb);
+    const row = { ...NEUTRAL_COLOR, exposure: -2, brightness: 0.05, saturation: 0.4 };
+    expect(gradePixel(rgb, NEUTRAL_COLOR)).toBe(rgb);
     const entries = generateCube(row, 3).trim().split('\n').slice(4);
     expect(entries).toHaveLength(27);
     expect(entries[5]).toBe(
@@ -289,16 +289,16 @@ describe('single SDR grade and bounded LUT', () => {
   });
 
   it('keys evaluated settings, approximates one grade and retains only two reusable arrays', async () => {
-    const cache = new ColourLutCache();
+    const cache = new ColorLutCache();
     const signal = new AbortController().signal;
-    const row = { ...NEUTRAL_COLOUR, contrast: 1.15, brightness: 0.03, shadows: 0.1 };
+    const row = { ...NEUTRAL_COLOR, contrast: 1.15, brightness: 0.03, shadows: 0.1 };
     const first = await cache.get(row, signal);
     expect(await cache.get({ ...row }, signal)).toBe(first);
     const output = new Float64Array(3);
     let error = 0;
     for (let n = 0; n < 4096; n++) {
       const bytes = [(n * 73) % 256, (n * 157) % 256, Math.floor(n / 256) * 17];
-      sampleColourLut(first, bytes[0]!, bytes[1]!, bytes[2]!, output);
+      sampleColorLut(first, bytes[0]!, bytes[1]!, bytes[2]!, output);
       const exact = gradePixel([bytes[0]! / 255, bytes[1]! / 255, bytes[2]! / 255], row);
       for (let c = 0; c < 3; c++) error += Math.abs(output[c]! - exact[c]!) * 255;
     }

@@ -1,35 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { ColourLutCache, sampleColourLut } from '../../src/server/layered-colour.js';
+import { ColorLutCache, sampleColorLut } from '../../src/server/layered-color.js';
 import { composeLayerFrame, type LayerFrameSource } from '../../src/server/layered-frame.js';
 import {
   applyHsl,
-  colourCurveSchema,
-  colourCurveSlopes,
-  compileColourCurve,
+  colorCurveSchema,
+  colorCurveSlopes,
+  compileColorCurve,
   CURVE_CHANNELS,
-  evaluateColourCurve,
+  evaluateColorCurve,
   HSL_BANDS,
-  HSL_CENTRES,
-} from '../../src/shared/advanced-colour.js';
+  HSL_CENTERS,
+} from '../../src/shared/advanced-color.js';
 import {
-  colourSchema,
+  colorSchema,
   compilePixelGrade,
-  createColourSettings,
+  createColorSettings,
   generateCube,
   gradePixel,
-  NEUTRAL_COLOUR,
+  NEUTRAL_COLOR,
   type RGB,
-} from '../../src/shared/colour.js';
+} from '../../src/shared/color.js';
 import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { needsLayeredExport, planExport } from '../../src/shared/export.js';
-import { createAdjustment, gradeColourAt, layerKeyAsGradeKey } from '../../src/shared/grade.js';
+import { createAdjustment, gradeColorAt, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, projectSchema } from '../../src/shared/model.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { sampleTimeline } from '../../src/shared/timeline.js';
-import { clipColourOwner } from '../../src/web/colour-owner.js';
-import { colourResetCommands } from '../../src/web/colour-reset.js';
+import { clipColorOwner } from '../../src/web/color-owner.js';
+import { colorResetCommands } from '../../src/web/color-reset.js';
 import { EARLIER_SCHEMA_VERSIONS } from './project-fixtures.js';
 
 function hueRgb(hue: number): RGB {
@@ -38,46 +38,46 @@ function hueRgb(hue: number): RGB {
   return [value(0), value(-120), value(-240)];
 }
 
-describe('strict current-schema static advanced grade colour', () => {
+describe('strict current-schema static advanced grade color', () => {
   it('creates deeply independent bands and curves for settings, clip grades and adjustments', () => {
-    const a = createColourSettings(),
-      b = createColourSettings();
+    const a = createColorSettings(),
+      b = createColorSettings();
     a.hsl.red.hue = 12;
     a.curves.master[0]!.y = 0.2;
-    expect(b).toEqual(NEUTRAL_COLOUR);
+    expect(b).toEqual(NEUTRAL_COLOR);
     const graded = createClip('graded', 'm', 0, 2);
-    graded.grade.colour.hsl.blue.saturation = -0.3;
-    graded.grade.colour.curves.red[1]!.y = 0.8;
-    expect(createClip('other', 'm', 0, 2).grade.colour).toEqual(NEUTRAL_COLOUR);
+    graded.grade.color.hsl.blue.saturation = -0.3;
+    graded.grade.color.curves.red[1]!.y = 0.8;
+    expect(createClip('other', 'm', 0, 2).grade.color).toEqual(NEUTRAL_COLOR);
     const look = createAdjustment('look', 0, 10);
-    look.colour.hsl.blue.saturation = -0.3;
-    look.colour.curves.red[1]!.y = 0.8;
-    expect(createAdjustment('other', 10, 10).colour).toEqual(NEUTRAL_COLOUR);
+    look.color.hsl.blue.saturation = -0.3;
+    look.color.curves.red[1]!.y = 0.8;
+    expect(createAdjustment('other', 10, 10).color).toEqual(NEUTRAL_COLOR);
   });
   it('requires every field and rejects old schemas, unknown entries and nonfinite data without repair', () => {
     const document = createProject('p', 'P');
     for (const schemaVersion of EARLIER_SCHEMA_VERSIONS)
       expect(projectSchema.safeParse({ ...document, schemaVersion }).success).toBe(false);
     for (const field of ['hsl', 'curves'] as const) {
-      const value = createColourSettings();
+      const value = createColorSettings();
       delete (value as Partial<typeof value>)[field];
-      expect(colourSchema.safeParse(value).success).toBe(false);
+      expect(colorSchema.safeParse(value).success).toBe(false);
     }
     for (const band of HSL_BANDS) {
-      const colour = createColourSettings();
-      delete (colour.hsl as Partial<typeof colour.hsl>)[band];
-      expect(colourSchema.safeParse(colour).success).toBe(false);
+      const color = createColorSettings();
+      delete (color.hsl as Partial<typeof color.hsl>)[band];
+      expect(colorSchema.safeParse(color).success).toBe(false);
       for (const value of [NaN, Infinity, 30.1, -30.1])
         expect(
-          colourSchema.safeParse({
-            ...NEUTRAL_COLOUR,
-            hsl: { ...NEUTRAL_COLOUR.hsl, [band]: { hue: value, saturation: 0, lightness: 0 } },
+          colorSchema.safeParse({
+            ...NEUTRAL_COLOR,
+            hsl: { ...NEUTRAL_COLOR.hsl, [band]: { hue: value, saturation: 0, lightness: 0 } },
           }).success,
         ).toBe(false);
     }
     expect(KEYFRAME_SETTINGS).toHaveLength(15);
     expect(
-      projectSchema.safeParse({ ...document, clips: [{ ...createClip('c', 'm', 0, 2), colour: NEUTRAL_COLOUR }] })
+      projectSchema.safeParse({ ...document, clips: [{ ...createClip('c', 'm', 0, 2), color: NEUTRAL_COLOR }] })
         .success,
     ).toBe(false);
   });
@@ -104,10 +104,10 @@ describe('strict current-schema static advanced grade colour', () => {
     ],
     Array.from({ length: 17 }, (_, i) => ({ x: i / 16, y: i / 16 })),
   ])('rejects malformed curve %#', (...points) => {
-    expect(colourCurveSchema.safeParse(points).success).toBe(false);
+    expect(colorCurveSchema.safeParse(points).success).toBe(false);
   });
   it('accepts nonmonotonic outputs and editable endpoint outputs, and interpolates master before channel', () => {
-    const settings = createColourSettings();
+    const settings = createColorSettings();
     settings.curves.master = [
       { x: 0, y: 0.2 },
       { x: 0.5, y: 0.8 },
@@ -117,7 +117,7 @@ describe('strict current-schema static advanced grade colour', () => {
       { x: 0, y: 1 },
       { x: 1, y: 0 },
     ];
-    expect(colourSchema.parse(settings)).toEqual(settings);
+    expect(colorSchema.parse(settings)).toEqual(settings);
     // Smooth master: endpoint slope 2.2, zero slope at the 0.8 peak → 0.6375 at 0.25.
     const result = gradePixel([0.25, 0.25, 0.25], settings);
     expect(result[0]).toBeCloseTo(0.3625, 12);
@@ -132,7 +132,7 @@ describe('strict current-schema static advanced grade colour', () => {
       { x: 0.7, y: 0.85 },
       { x: 1, y: 0.95 },
     ];
-    const curve = compileColourCurve(points);
+    const curve = compileColorCurve(points);
     for (const point of points) expect(curve(point.x)).toBe(point.y);
     for (let at = 0; at < points.length - 1; at++) {
       const low = Math.min(points[at]!.y, points[at + 1]!.y),
@@ -147,24 +147,24 @@ describe('strict current-schema static advanced grade colour', () => {
     for (const { x } of points.slice(1, -1)) expect(derivative(x, -1)).toBeCloseTo(derivative(x, 1), 4);
     // Interior smoothing: halfway between nodes 0.2→0.45 is not the straight-line midpoint.
     expect(Math.abs(curve(0.325) - 0.525)).toBeGreaterThan(0.01);
-    const line = compileColourCurve([
+    const line = compileColorCurve([
       { x: 0, y: 0.8 },
       { x: 0.3, y: 0.62 },
       { x: 1, y: 0.2 },
     ]);
     for (let step = 0; step <= 20; step++) expect(line(step / 20)).toBeCloseTo(0.8 - 0.6 * (step / 20), 12);
-    expect(colourCurveSlopes(points)[3]).toBe(0);
+    expect(colorCurveSlopes(points)[3]).toBe(0);
   });
   it('preserves exact identity for all-neutral grading and any identity curve point count', () => {
-    const settings = createColourSettings();
+    const settings = createColorSettings();
     for (const channel of CURVE_CHANNELS)
       settings.curves[channel] = Array.from({ length: 16 }, (_, i) => ({ x: i / 15, y: i / 15 }));
     const input: RGB = [0.123456789012, 0.9999999, 0.004];
     expect(gradePixel(input, settings)).toBe(input);
-    expect(evaluateColourCurve(settings.curves.master, input[0])).toBe(input[0]);
+    expect(evaluateColorCurve(settings.curves.master, input[0])).toBe(input[0]);
   });
-  it('protects exact greys, black and white under all extreme HSL offsets', () => {
-    const settings = createColourSettings();
+  it('protects exact grays, black and white under all extreme HSL offsets', () => {
+    const settings = createColorSettings();
     for (const band of HSL_BANDS) settings.hsl[band] = { hue: 30, saturation: 1, lightness: 0.5 };
     for (const value of [0, 0.0001, 0.04, 0.5, 0.9999, 1]) {
       const rgb: RGB = [value, value, value];
@@ -173,7 +173,7 @@ describe('strict current-schema static advanced grade colour', () => {
   });
   it('compiled per-frame grading matches the reference exactly for every stage combination', () => {
     for (let mask = 0; mask < 8; mask++) {
-      const settings = createColourSettings();
+      const settings = createColorSettings();
       if (mask & 1) Object.assign(settings, { exposure: 0.37, hue: -23, saturation: 0.8, blacks: 0.12 });
       if (mask & 2) settings.hsl.red = { hue: 17, saturation: -0.3, lightness: 0.04 };
       if (mask & 4)
@@ -194,83 +194,82 @@ describe('strict current-schema static advanced grade colour', () => {
         expect(compiled(input)).toEqual(gradePixel(input, settings));
     }
     const input: RGB = [0.123456789012, 0.9999999, 0.004];
-    expect(compilePixelGrade(createColourSettings())(input)).toBe(input);
+    expect(compilePixelGrade(createColorSettings())(input)).toBe(input);
   });
-  it('uses incoming complementary circular neighbours with continuous band boundaries and grey influence', () => {
-    const settings = createColourSettings();
+  it('uses incoming complementary circular neighbors with continuous band boundaries and gray influence', () => {
+    const settings = createColorSettings();
     HSL_BANDS.forEach((band, i) => {
       settings.hsl[band] = { hue: i % 2 ? 30 : -30, saturation: i % 2 ? -0.6 : 0.3, lightness: i % 2 ? -0.1 : 0.1 };
     });
-    for (const centre of HSL_CENTRES) {
-      const a = applyHsl(hueRgb(centre - 0.00001), settings.hsl),
-        b = applyHsl(hueRgb(centre + 0.00001), settings.hsl);
+    for (const center of HSL_CENTERS) {
+      const a = applyHsl(hueRgb(center - 0.00001), settings.hsl),
+        b = applyHsl(hueRgb(center + 0.00001), settings.hsl);
       a.forEach((v, i) => expect(Math.abs(v - b[i]!)).toBeLessThan(0.000002));
     }
-    const nearGrey = applyHsl([0.5 + 1e-7, 0.5, 0.5], settings.hsl);
-    expect(Math.abs(nearGrey[0] - 0.5)).toBeLessThan(2e-7);
+    const nearGray = applyHsl([0.5 + 1e-7, 0.5, 0.5], settings.hsl);
+    expect(Math.abs(nearGray[0] - 0.5)).toBeLessThan(2e-7);
   });
   it('keeps advanced settings with scalar keys and reset-keys; advanced static edits are one Undo and require exact layered export', () => {
     const project = createProject('p', 'P');
     project.clips = [createClip('c', 'source', 0, 4)];
     const grade = project.clips[0]!.grade;
-    grade.colour.hsl.red.hue = 12;
-    grade.colour.curves.master[0]!.y = 0.1;
+    grade.color.hsl.red.hue = 12;
+    grade.color.curves.master[0]!.y = 0.1;
     expect(needsLayeredExport(project)).toBe(true);
     expect(() => planExport(project)).toThrow('layered exporter');
     grade.keyframes = [layerKeyAsGradeKey(layerKeyframe(0, { ...EMPTY_KEY_VALUES, exposure: 1 }, 'linear'))];
-    expect(gradeColourAt(grade, 2)).toMatchObject({ exposure: 1, hsl: grade.colour.hsl, curves: grade.colour.curves });
-    expect(sampleTimeline(project, 2)[0]!.grade).toEqual(gradeColourAt(grade, 2));
+    expect(gradeColorAt(grade, 2)).toMatchObject({ exposure: 1, hsl: grade.color.hsl, curves: grade.color.curves });
+    expect(sampleTimeline(project, 2)[0]!.grade).toEqual(gradeColorAt(grade, 2));
     const history = new EditHistory(project);
     const before = structuredClone(project);
     history.replace(
-      colourResetCommands(clipColourOwner(project.clips[0]!, 'clip c'), 0).reduce(
+      colorResetCommands(clipColorOwner(project.clips[0]!, 'clip c'), 0).reduce(
         (document, command) => applyCommand(document, command),
         history.current,
       ),
     );
-    expect(history.current.clips[0]!.grade.colour).toEqual(before.clips[0]!.grade.colour);
+    expect(history.current.clips[0]!.grade.color).toEqual(before.clips[0]!.grade.color);
     expect(history.current.clips[0]!.grade.keyframes[0]!.values.exposure).toBe(0);
     expect(history.undo()).toEqual(before);
     history.commit({
-      type: 'colour',
+      type: 'color',
       clipIds: ['c'],
-      colour: { ...grade.colour, hsl: { ...grade.colour.hsl, red: { hue: 0, saturation: 0, lightness: 0 } } },
+      color: { ...grade.color, hsl: { ...grade.color.hsl, red: { hue: 0, saturation: 0, lightness: 0 } } },
     });
     expect(history.current.clips[0]!.grade.keyframes).toEqual(grade.keyframes);
     expect(history.undo()).toEqual(before);
     expect(
-      applyCommand(project, { type: 'colour', clipIds: ['c'], colour: createColourSettings() }).clips[0]!.grade
-        .keyframes,
+      applyCommand(project, { type: 'color', clipIds: ['c'], color: createColorSettings() }).clips[0]!.grade.keyframes,
     ).toEqual(grade.keyframes);
   });
   it('routes every nonneutral band/curve through layered export and preserves neutral advanced static eligibility', () => {
     const project = createProject('dispatch', 'Dispatch');
     project.clips = [createClip('c', 'source', 0, 4)];
     const grade = project.clips[0]!.grade;
-    grade.colour.exposure = 0.7;
+    grade.color.exposure = 0.7;
     for (const channel of CURVE_CHANNELS)
-      grade.colour.curves[channel] = Array.from({ length: 16 }, (_, i) => ({ x: i / 15, y: i / 15 }));
-    const neutral = structuredClone(grade.colour);
+      grade.color.curves[channel] = Array.from({ length: 16 }, (_, i) => ({ x: i / 15, y: i / 15 }));
+    const neutral = structuredClone(grade.color);
     expect(needsLayeredExport(project)).toBe(false);
     expect(planExport(project).duration).toBe(4);
     for (const band of HSL_BANDS) {
-      grade.colour = structuredClone(neutral);
-      grade.colour.hsl[band].hue = 0.000001;
+      grade.color = structuredClone(neutral);
+      grade.color.hsl[band].hue = 0.000001;
       expect(needsLayeredExport(project)).toBe(true);
       expect(() => planExport(project)).toThrow('layered exporter');
     }
     for (const channel of CURVE_CHANNELS) {
-      grade.colour = structuredClone(neutral);
-      grade.colour.curves[channel][1]!.y += 0.000001;
+      grade.color = structuredClone(neutral);
+      grade.color.curves[channel][1]!.y += 0.000001;
       expect(needsLayeredExport(project)).toBe(true);
       expect(() => planExport(project)).toThrow('layered exporter');
     }
   });
   it('retains the full-appearance cube helper and bounded LUT API without making it the advanced production path', async () => {
-    const cache = new ColourLutCache();
+    const cache = new ColorLutCache();
     const signal = new AbortController().signal,
       sample = new Float64Array(3);
-    const settings = createColourSettings();
+    const settings = createColorSettings();
     HSL_BANDS.forEach((band, i) => {
       settings.hsl[band] = { hue: i % 2 ? 8 : -6, saturation: -0.12, lightness: 0.015 };
     });
@@ -286,7 +285,7 @@ describe('strict current-schema static advanced grade colour', () => {
       maximum = 0;
     for (let i = 0; i < 512; i++) {
       const rgb: RGB = [((i * 73) % 256) / 255, ((i * 157) % 256) / 255, ((i * 29) % 256) / 255];
-      sampleColourLut(first, rgb[0] * 255, rgb[1] * 255, rgb[2] * 255, sample);
+      sampleColorLut(first, rgb[0] * 255, rgb[1] * 255, rgb[2] * 255, sample);
       const expected = gradePixel(rgb, settings);
       expected.forEach((v, channel) => {
         const error = Math.abs(v - sample[channel]!) * 255;
@@ -296,7 +295,7 @@ describe('strict current-schema static advanced grade colour', () => {
     }
     expect(sum / (512 * 3)).toBeLessThan(0.6);
     expect(maximum).toBeLessThan(4);
-    await cache.get(NEUTRAL_COLOUR, signal);
+    await cache.get(NEUTRAL_COLOR, signal);
     await cache.get({ ...settings, exposure: 0.3 }, signal);
     expect(cache.report).toMatchObject({ peakEntries: 2, bytes: 6_591_000, generated: 3 });
     expect(generateCube(settings, 2)).toContain(
@@ -308,7 +307,7 @@ describe('strict current-schema static advanced grade colour', () => {
   it.each(['byte', 'fractional'] as const)(
     'renders a valid sub-cell sharp knee exactly before H264 from %s RGB',
     async (kind) => {
-      const settings = createColourSettings();
+      const settings = createColorSettings();
       const value = kind === 'byte' ? 128 / 255 : 0.500002;
       settings.curves.master = [
         { x: 0, y: 0 },
@@ -327,8 +326,8 @@ describe('strict current-schema static advanced grade colour', () => {
           sourcePosition: 0,
           spatial: { ...NEUTRAL_SPATIAL_POSE, translateX: kind === 'byte' ? 0 : (128 - value * 255) / 4 },
           detail: { ...NEUTRAL_DETAIL },
-          grade: createColourSettings(),
-          colour: colourSchema.parse(settings),
+          grade: createColorSettings(),
+          color: colorSchema.parse(settings),
           weight: 1,
           blendWeight: 1,
           brightness: 1,
@@ -338,7 +337,7 @@ describe('strict current-schema static advanced grade colour', () => {
         bounds: { x: 0, y: 0, ...target },
         original: target,
       };
-      const cache = new ColourLutCache();
+      const cache = new ColorLutCache();
       const buffer = Buffer.alloc(target.width * target.height * 8);
       await composeLayerFrame(buffer, target, [source], cache, new AbortController().signal);
       const output = new Uint16Array(buffer.buffer, buffer.byteOffset, buffer.length / 2);
@@ -350,7 +349,7 @@ describe('strict current-schema static advanced grade colour', () => {
     'grades sharp maximum-point curves after fractional sampling and before fade/dissolve/source-over (scalar+HSL=%s)',
     async (combined) => {
       const target = { width: 4, height: 2 };
-      const settings = createColourSettings();
+      const settings = createColorSettings();
       if (combined) {
         Object.assign(settings, {
           exposure: 0.3,
@@ -387,7 +386,7 @@ describe('strict current-schema static advanced grade colour', () => {
         { x: 0.4, y: 0.7 },
         { x: 1, y: 0.8 },
       ];
-      colourSchema.parse(settings);
+      colorSchema.parse(settings);
       const makeSource = (id: string, rgb: Buffer, blendWeight: number, brightness: number): LayerFrameSource => ({
         sample: {
           clipId: id,
@@ -397,8 +396,8 @@ describe('strict current-schema static advanced grade colour', () => {
           sourcePosition: 0,
           spatial: { ...NEUTRAL_SPATIAL_POSE, translateX: 0.0625 },
           detail: { ...NEUTRAL_DETAIL },
-          grade: createColourSettings(),
-          colour: settings,
+          grade: createColorSettings(),
+          color: settings,
           weight: blendWeight,
           blendWeight,
           brightness,
@@ -412,7 +411,7 @@ describe('strict current-schema static advanced grade colour', () => {
         makeSource('left', Buffer.from([127, 81, 42, 128, 82, 43, 200, 160, 80, 240, 200, 150]), 0.4, 0.3),
         makeSource('right', Buffer.from([20, 180, 90, 40, 160, 100, 70, 140, 110, 100, 120, 130]), 0.6, 0.7),
       ];
-      const cache = new ColourLutCache();
+      const cache = new ColorLutCache();
       const buffer = Buffer.alloc(64);
       const output = new Uint16Array(buffer.buffer, buffer.byteOffset, 32);
       for (let pixel = 0; pixel < 8; pixel++) output.set([10000, 20000, 30000, 65535], pixel * 4);

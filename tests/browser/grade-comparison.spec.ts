@@ -1,7 +1,7 @@
 import { test as browserTest, expect, type Locator, type Page } from '@playwright/test';
 import type { PreviewDiagnostics } from '../../src/preview/engine.js';
 import type { AudioAsset } from '../../src/shared/audio.js';
-import { createColourSettings } from '../../src/shared/colour.js';
+import { createColorSettings } from '../../src/shared/color.js';
 import { createAdjustment, createClipGrade } from '../../src/shared/grade.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
@@ -72,8 +72,8 @@ function singleProject(id: string, title: string, video: MediaAsset): ProjectDoc
   const document = createProject(id, title);
   document.media.videoIds = [video.id];
   const clip = createClip('comparison-clip', video.id, 8, 108, document.layers[0]!.id);
-  clip.grade.colour = {
-    ...createColourSettings(),
+  clip.grade.color = {
+    ...createColorSettings(),
     temperature: 0.2,
     tint: -0.15,
     exposure: 0.7,
@@ -84,13 +84,13 @@ function singleProject(id: string, title: string, video: MediaAsset): ProjectDoc
     whites: -0.25,
     blacks: 0.12,
   };
-  clip.grade.colour.hsl.red = { hue: -12, saturation: -0.3, lightness: 0.04 };
-  clip.grade.colour.curves.master = [
+  clip.grade.color.hsl.red = { hue: -12, saturation: -0.3, lightness: 0.04 };
+  clip.grade.color.curves.master = [
     { x: 0, y: 0.02 },
     { x: 0.4, y: 0.53 },
     { x: 1, y: 0.98 },
   ];
-  clip.grade.colour.curves.blue[1]!.y = 0.8;
+  clip.grade.color.curves.blue[1]!.y = 0.8;
   document.clips = [clip];
   return projectSchema.parse(document);
 }
@@ -128,14 +128,14 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
       clip.speed = { mode: 'constant', rate };
       // Both participants of each dissolve keep a static hue in their own grade,
       // alongside its keyframes, so an incomplete grade bypass would show.
-      clip.grade.colour = { ...createColourSettings(), hue: 15 + index * 10, exposure: 0.15, saturation: 0.8 };
-      clip.grade.colour.hsl.cyan = { hue: index * 5 - 8, saturation: -0.2, lightness: 0.03 };
-      clip.grade.colour.curves.master = [
+      clip.grade.color = { ...createColorSettings(), hue: 15 + index * 10, exposure: 0.15, saturation: 0.8 };
+      clip.grade.color.hsl.cyan = { hue: index * 5 - 8, saturation: -0.2, lightness: 0.03 };
+      clip.grade.color.curves.master = [
         { x: 0, y: 0.015 },
         { x: 0.5, y: 0.6 },
         { x: 1, y: 0.95 },
       ];
-      clip.grade.colour.curves.red[1]!.y = 0.85;
+      clip.grade.color.curves.red[1]!.y = 0.85;
       clip.grade.keyframes = [
         gradePoint(sourceIn, { exposure: 0.5 - index * 0.3, tint: -0.1 + index * 0.1 }, 'smooth'),
         gradePoint(sourceOut - 1, { exposure: -0.3, tint: 0.1 }),
@@ -154,9 +154,9 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
   }
   // One adjustment grades every track after the clip grades; its hue stays unkeyed.
   const adjustment = createAdjustment('comparison-adjustment', 0, 144);
-  adjustment.colour = { ...createColourSettings(), hue: 20, exposure: 0.15, saturation: 0.8 };
-  adjustment.colour.hsl.blue = { hue: 6, saturation: 0.2, lightness: -0.03 };
-  adjustment.colour.curves.green[1]!.y = 0.55;
+  adjustment.color = { ...createColorSettings(), hue: 20, exposure: 0.15, saturation: 0.8 };
+  adjustment.color.hsl.blue = { hue: 6, saturation: 0.2, lightness: -0.03 };
+  adjustment.color.curves.green[1]!.y = 0.55;
   adjustment.keyframes = [
     gradePoint(
       0,
@@ -188,7 +188,7 @@ function layeredProject(videos: readonly MediaAsset[]): ProjectDocument {
   return projectSchema.parse(document);
 }
 
-/** Change colour alone: neutral clip grades and no adjustment; every Transform key, easing and source map stays. */
+/** Change color alone: neutral clip grades and no adjustment; every Transform key, easing and source map stays. */
 function neutralProject(document: ProjectDocument, id: string, title: string): ProjectDocument {
   const neutral = projectSchema.parse({ ...document, id, title });
   for (const clip of neutral.clips) clip.grade = createClipGrade();
@@ -197,7 +197,7 @@ function neutralProject(document: ProjectDocument, id: string, title: string): P
 }
 
 /** Structural oracle independent of pixels, with no hard-coded schema version. */
-function nonColourContract(document: ProjectDocument) {
+function nonColorContract(document: ProjectDocument) {
   const { id: _id, title: _title, clips, adjustments: _adjustments, ...rest } = document;
   return { ...rest, clips: clips.map(({ grade: _grade, ...clip }) => clip) };
 }
@@ -225,7 +225,7 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
 
     const single = singleProject('comparison-single', 'Static grade comparison · memory-only', videos[0]!);
     const layered = layeredProject(videos);
-    const neutral = neutralProject(layered, 'comparison-neutral', 'Neutral colour reference · memory-only');
+    const neutral = neutralProject(layered, 'comparison-neutral', 'Neutral color reference · memory-only');
     const other = singleProject('comparison-other', 'Other grade comparison · memory-only', videos[1]!);
     const playback = createProject('comparison-music', 'Music grade comparison · memory-only');
     playback.media = { videoIds: [videos[0]!.id], audioIds: [song!.id] };
@@ -234,7 +234,7 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
         ...createClip('music-comparison-clip', videos[0]!.id, 0, 120, playback.layers[0]!.id),
         // Forty seconds: four native activations took ~17 s on hosted software rendering (#126).
         speed: { mode: 'constant', rate: 0.1 },
-        grade: { colour: structuredClone(single.clips[0]!.grade.colour), keyframes: [] },
+        grade: { color: structuredClone(single.clips[0]!.grade.color), keyframes: [] },
       },
     ];
     playback.music = [
@@ -374,7 +374,7 @@ async function expectMode(page: Page, ungraded: boolean): Promise<void> {
   await expect(button).toHaveAttribute('aria-pressed', String(ungraded));
   await expect(button).toHaveText('Original');
   expect(await button.evaluate((element) => element.tagName)).toBe('BUTTON');
-  const badge = page.locator('.canvas-stage').getByText('Original · Colour and Detail bypassed', { exact: true });
+  const badge = page.locator('.canvas-stage').getByText('Original · Color and Detail bypassed', { exact: true });
   if (ungraded) await expect(badge).toBeVisible();
   else await expect(badge).toBeHidden();
   expect(await page.evaluate(() => window.pascapLab!.engine.diagnostics().ungraded)).toBe(ungraded);
@@ -602,7 +602,7 @@ test('bypasses clip grades and adjustments across dissolves, retaining coverage,
   // Sixteen full software-rendered readbacks of two grades per source (about 60 s CI-like); hosted runner speed is not a correctness bound.
   test.setTimeout(180_000);
   const { layered, neutral } = comparison;
-  expect(nonColourContract(neutral)).toEqual(nonColourContract(layered));
+  expect(nonColorContract(neutral)).toEqual(nonColorContract(layered));
   expect(neutral.clips.map(({ grade: _grade, ...clip }) => clip)).toEqual(
     layered.clips.map(({ grade: _grade, ...clip }) => clip),
   );
@@ -654,7 +654,7 @@ test('bypasses clip grades and adjustments across dissolves, retaining coverage,
       .filter((sample) => sample.layerId === 'comparison-top')
       .map((sample) => sample.grade.hue),
   ).toEqual([35, 35]);
-  expect(sampleTimeline(layered, 70).map((sample) => sample.colour.hue)).toEqual([20, 20, 20, 20, 20]);
+  expect(sampleTimeline(layered, 70).map((sample) => sample.color.hue)).toEqual([20, 20, 20, 20, 20]);
   expect(sampleTimeline(layered, 72).find((sample) => sample.layerId === 'comparison-black')!.brightness).toBe(0);
   const evidence: {
     frame: number;
@@ -666,9 +666,9 @@ test('bypasses clip grades and adjustments across dissolves, retaining coverage,
   await openFixture(page, layered);
   for (const frame of frames) {
     const samples = sampleTimeline(layered, frame);
-    const withoutColour = ({ colour: _colour, grade: _grade, ...sample }: ReturnType<typeof sampleTimeline>[number]) =>
+    const withoutColor = ({ color: _color, grade: _grade, ...sample }: ReturnType<typeof sampleTimeline>[number]) =>
       sample;
-    expect(samples.map(withoutColour)).toEqual(sampleTimeline(neutral, frame).map(withoutColour));
+    expect(samples.map(withoutColor)).toEqual(sampleTimeline(neutral, frame).map(withoutColor));
     expect(samples.some((sample) => sample.brightness < 1)).toBe(true);
     await seek(page, layered, frame);
     const graded = await capture(page, `graded-${frame}`);
@@ -712,7 +712,7 @@ test('bypasses clip grades and adjustments across dissolves, retaining coverage,
   });
 });
 
-test('a colour edit while original saves once, returns the new grade and has a separate Undo', async ({
+test('a color edit while original saves once, returns the new grade and has a separate Undo', async ({
   page,
   comparison,
 }) => {
@@ -734,7 +734,7 @@ test('a colour edit while original saves once, returns the new grade and has a s
     revision: comparison.single.revision + 1,
     clips: comparison.single.clips.map((clip) => ({
       ...clip,
-      grade: { ...clip.grade, colour: { ...clip.grade.colour, exposure: 1.2 } },
+      grade: { ...clip.grade, color: { ...clip.grade.color, exposure: 1.2 } },
     })),
   });
   await expectMode(page, true);
@@ -868,7 +868,7 @@ for (const { width, height } of [
     await expectMode(page, true);
     await expect(button).toBeInViewport({ ratio: 1 });
     await expect(
-      page.locator('.canvas-stage').getByText('Original · Colour and Detail bypassed', { exact: true }),
+      page.locator('.canvas-stage').getByText('Original · Color and Detail bypassed', { exact: true }),
     ).toBeInViewport({ ratio: 1 });
     await expect
       .poll(() =>

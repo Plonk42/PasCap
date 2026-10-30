@@ -82,7 +82,7 @@ function SpeedRate({
   const edit = (next: number): SpeedSettings => editClipSpeedRate(speed, sourceFrame, next);
   return (
     <div
-      className="colour-control layer-keyed-control speed-rate-control"
+      className="color-control layer-keyed-control speed-rate-control"
       data-animated={speed.mode === 'curve'}
       data-key-at-playhead={active}
     >
@@ -97,7 +97,7 @@ function SpeedRate({
           Speed ×
         </ResetLabel>
         {locked && <LockedCue glyph="○" />}
-        <span className="colour-control-actions">
+        <span className="color-control-actions">
           <span className="keyframe-setting-navigation" data-animated={speed.mode === 'curve'}>
             <button
               type="button"

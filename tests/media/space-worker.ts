@@ -69,7 +69,7 @@ try {
   ]);
   const original = await fingerprintFile(source);
   const library = new MediaLibrary(config, jobs);
-  await library.initialise();
+  await library.initialize();
   const asset = await library.register(source);
   const short = createProject('space-preserved', 'Disposable space safety');
   short.media.videoIds = [asset.id];

@@ -1,10 +1,10 @@
 import { useId } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { continuingSettings, keyframeNeighbors, keySettings, type LayerKeyframe } from '../shared/keyframes.js';
-import { COLOUR_CONTROLS, type ScalarColourSetting } from '../shared/colour.js';
+import { COLOR_CONTROLS, type ScalarColorSetting } from '../shared/color.js';
 import type { ProjectDocument } from '../shared/model.js';
-import type { ColourOwner } from './colour-owner.js';
-import { isClipOwner, ownerNoun, ownerTarget } from './colour-owner.js';
+import type { ColorOwner } from './color-owner.js';
+import { isClipOwner, ownerNoun, ownerTarget } from './color-owner.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import { keyframeNavigationFrame, useKeyframeNavigation } from './keyframe-navigation.js';
@@ -13,12 +13,12 @@ import { RangeSettingControl } from './SettingValueControl.js';
 import { StoredKeyframeList, type StoredKeyframeKind } from './StoredKeyframeList.js';
 
 /** A grade's settings, in control order. */
-const GRADE_KEYFRAME_SETTINGS = COLOUR_CONTROLS;
+const GRADE_KEYFRAME_SETTINGS = COLOR_CONTROLS;
 const SETTING_KEYS = GRADE_KEYFRAME_SETTINGS.map((setting) => setting.key);
 
 interface Props {
   project: ProjectDocument;
-  layer: ColourOwner;
+  layer: ColorOwner;
   frame: number;
   duration: number;
   disabled: boolean;
@@ -27,7 +27,7 @@ interface Props {
 
 function AnimationHelp({ id, clip }: Readonly<{ id: string; clip: boolean }>) {
   return (
-    <HelpPopover label="Animation" className="animation-help" guide="animate-colour-with-keyframes">
+    <HelpPopover label="Animation" className="animation-help" guide="animate-color-with-keyframes">
       <p id={id}>
         Each diamond adds a keyframe for that setting on the whole {clip ? 'clip, on the footage shown' : 'adjustment'},
         at the playhead. Settings keyed together share one keyframe; each can have its own easing.
@@ -55,8 +55,8 @@ function AnimationHelp({ id, clip }: Readonly<{ id: string; clip: boolean }>) {
   );
 }
 
-/** Colour's stored keyframes (clip grade or adjustment), through the shared central inspection cursor. */
-export function ColourKeyframeList({ project, layer, frame, duration, disabled, onEdit }: Readonly<Props>) {
+/** Color's stored keyframes (clip grade or adjustment), through the shared central inspection cursor. */
+export function ColorKeyframeList({ project, layer, frame, duration, disabled, onEdit }: Readonly<Props>) {
   const navigation = useKeyframeNavigation();
   const unavailable = disabled || navigation.disabled;
   const valueId = useId();
@@ -73,14 +73,14 @@ export function ColourKeyframeList({ project, layer, frame, duration, disabled, 
   const navigationFrame = keyframeNavigationFrame(inspection, layer.id, frame);
   const current = inspection !== null || previewAvailable ? navigationFrame : null;
   const context = `${project.id}:${layer.id}`;
-  const kind: StoredKeyframeKind<ScalarColourSetting, LayerKeyframe> = {
+  const kind: StoredKeyframeKind<ScalarColorSetting, LayerKeyframe> = {
     noun: ownerNoun(layer),
     title: isClipOwner(layer) ? 'Clip keyframes' : 'Adjustment keyframes',
     frameNoun: isClipOwner(layer) ? 'source' : 'adjustment',
     settings: GRADE_KEYFRAME_SETTINGS,
-    enabled: (key) => keySettings(key).filter((setting): setting is ScalarColourSetting => setting !== 'opacity'),
+    enabled: (key) => keySettings(key).filter((setting): setting is ScalarColorSetting => setting !== 'opacity'),
     continuing: (key) => continuingSettings(keys, key, SETTING_KEYS),
-    neighbours: (key, setting) => {
+    neighbors: (key, setting) => {
       const { previous, next } = keyframeNeighbors(
         keys,
         keyframeNavigationFrame(navigation.inspection, layer.id, key.frame),
@@ -121,7 +121,7 @@ export function ColourKeyframeList({ project, layer, frame, duration, disabled, 
           }
         };
         return (
-          <div className="keyframe-value colour-control" key={setting.key}>
+          <div className="keyframe-value color-control" key={setting.key}>
             <RangeSettingControl
               setting={setting.key}
               id={`${valueId}-${row}-${setting.key}`}

@@ -9,7 +9,7 @@ import { fingerprintFile } from '../../src/server/files.js';
 import { JobQueue } from '../../src/server/jobs.js';
 import { atomicWrite, ProjectStore } from '../../src/server/storage.js';
 import { audioAssetSchema, type AudioAsset } from '../../src/shared/audio.js';
-import { NEUTRAL_COLOUR, scalarColourValues } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOR, scalarColorValues } from '../../src/shared/color.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { createAdjustment, GRADE_SETTINGS, layerKeyAsGradeKey, type GradeKeyframe } from '../../src/shared/grade.js';
 import {
@@ -138,8 +138,8 @@ describe('multiple-project store', () => {
     const store = new ProjectStore(directory);
     const project = createProject('appearance-saved', 'Independent appearance');
     project.clips = [createClip('shot', 'registered-video', 0, 10)];
-    project.clips[0]!.grade.colour.exposure = 0.5;
-    project.adjustments = [{ ...createAdjustment('look', 0, 10), colour: { ...NEUTRAL_COLOUR, saturation: 1.2 } }];
+    project.clips[0]!.grade.color.exposure = 0.5;
+    project.adjustments = [{ ...createAdjustment('look', 0, 10), color: { ...NEUTRAL_COLOR, saturation: 1.2 } }];
     const saved = await store.save(project, 0);
     expect(await store.load(saved.id)).toEqual(saved);
     const currentPath = path.join(directory, 'projects', `${saved.id}.json`);
@@ -149,10 +149,10 @@ describe('multiple-project store', () => {
     const malformed = [
       { ...saved, clips: [missingGrade] },
       missingAdjustments,
-      { ...saved, adjustments: [{ ...saved.adjustments[0]!, colour: { exposure: 0 } }] },
-      { ...saved, layers: [{ ...saved.layers[0]!, colour: NEUTRAL_COLOUR }] },
-      { ...saved, clips: [{ ...saved.clips[0], correction: NEUTRAL_COLOUR }] },
-      { ...saved, clips: [{ ...saved.clips[0], colour: NEUTRAL_COLOUR }] },
+      { ...saved, adjustments: [{ ...saved.adjustments[0]!, color: { exposure: 0 } }] },
+      { ...saved, layers: [{ ...saved.layers[0]!, color: NEUTRAL_COLOR }] },
+      { ...saved, clips: [{ ...saved.clips[0], correction: NEUTRAL_COLOR }] },
+      { ...saved, clips: [{ ...saved.clips[0], color: NEUTRAL_COLOR }] },
       { ...saved, schemaVersion: 9 },
     ];
     for (const [index, document] of malformed.entries()) {
@@ -329,7 +329,7 @@ describe('multiple-project store', () => {
       [{ ...first, values: missingValue }],
       [{ ...first, values: { ...first.values, rotation: undefined } }],
       [{ ...first, values: { ...first.values, legacy: 1 } }],
-      // Colour belongs to clip grades and adjustments, never to a track.
+      // Color belongs to clip grades and adjustments, never to a track.
       [{ ...first, values: { ...first.values, exposure: null } }],
       [{ ...first, values: { ...first.values, layerOpacity: null } }],
       [{ ...first, values: { ...first.values, clipOpacity: null } }],
@@ -355,10 +355,10 @@ describe('multiple-project store', () => {
       withPose({ ...transform.base, opacity: 1.5 }),
       { ...saved, layers: [{ ...saved.layers[0]!, opacity: 1 }] },
       { ...saved, layers: [{ ...saved.layers[0]!, keyframes: [] }] },
-      { ...saved, layers: [{ ...saved.layers[0]!, colour: NEUTRAL_COLOUR }] },
+      { ...saved, layers: [{ ...saved.layers[0]!, color: NEUTRAL_COLOR }] },
       { ...saved, clips: [{ ...saved.clips[0]!, opacity: 1 }] },
       { ...saved, layers: [{ ...saved.layers[0]!, opacityKeys: [] }] },
-      { ...saved, clips: [{ ...saved.clips[0]!, animation: { opacity: [], colour: [] } }] },
+      { ...saved, clips: [{ ...saved.clips[0]!, animation: { opacity: [], color: [] } }] },
       {
         ...saved,
         clips: [
@@ -378,7 +378,7 @@ describe('multiple-project store', () => {
         ],
       },
       { ...saved, clips: [{ ...saved.clips[0]!, opacity: undefined }] },
-      { ...saved, clips: [{ ...saved.clips[0]!, colour: { exposure: 0 } }] },
+      { ...saved, clips: [{ ...saved.clips[0]!, color: { exposure: 0 } }] },
     ];
     for (const candidate of invalid) {
       expect(projectSchema.safeParse(candidate).success).toBe(false);
@@ -394,7 +394,7 @@ describe('multiple-project store', () => {
     const document = createProject('strict-grades', 'Grades');
     document.clips = [createClip('excerpt', 'registered-video', 500, 600)];
     document.clips[0]!.grade = {
-      colour: { ...NEUTRAL_COLOUR, exposure: 0.25 },
+      color: { ...NEUTRAL_COLOR, exposure: 0.25 },
       keyframes: [gradeKey(550, { tint: 0.1 }), gradeKey(590, { tint: -0.1 }, 'hold')],
     };
     // Counted from the adjustment's start, its keyframes always lie within its range.
@@ -404,7 +404,7 @@ describe('multiple-project store', () => {
         keyframes: Array.from({ length: 64 }, (_, index) => gradeKey(index * 10, { exposure: index % 2 })),
       },
     ];
-    document.adjustments[0]!.keyframes[0] = gradeKey(0, scalarColourValues(NEUTRAL_COLOUR), 'smooth');
+    document.adjustments[0]!.keyframes[0] = gradeKey(0, scalarColorValues(NEUTRAL_COLOR), 'smooth');
     const saved = await store.save(document, 0);
     expect(saved.adjustments[0]!.keyframes).toHaveLength(64);
     expect(Object.keys(saved.adjustments[0]!.keyframes[0]!.values)).toEqual(GRADE_SETTINGS);
@@ -494,7 +494,7 @@ describe('multiple-project store', () => {
     expect((await store.list())[0]).toMatchObject({ compatible: true, revision: 2, clipCount: 4, duration: 85 });
   });
 
-  it('serialises rename against saves and other renames without losing a newer edit', async () => {
+  it('serializes rename against saves and other renames without losing a newer edit', async () => {
     const store = new ProjectStore(await temp());
     const document = await store.create('Flight');
     const edited = { ...document, clips: [createClip('clip-a', 'registered-video', 0, 60)] };
@@ -539,7 +539,7 @@ describe('multiple-project store', () => {
     }
   });
 
-  it('deletes only the chosen project, serialises with saves and prevents a stale tab resurrecting it', async () => {
+  it('deletes only the chosen project, serializes with saves and prevents a stale tab resurrecting it', async () => {
     const directory = await temp();
     const store = new ProjectStore(directory);
     const first = await store.create('Delete me');
@@ -970,10 +970,10 @@ describe('multiple-project HTTP API', () => {
         frameRate: { ...PROJECT_FPS },
         frameCount: 120,
         durationSeconds: framesToSeconds(120),
-        colourPrimaries: 'bt709',
-        colourTransfer: 'bt709',
-        colourSpace: 'bt709',
-        colourRange: 'tv',
+        colorPrimaries: 'bt709',
+        colorTransfer: 'bt709',
+        colorSpace: 'bt709',
+        colorRange: 'tv',
         hasAudio: false,
       },
       status: 'registered',
@@ -994,7 +994,7 @@ describe('multiple-project HTTP API', () => {
       content: null,
       waveform: [],
     });
-    await atomicWrite(path.join(dataDir, 'videos.json'), JSON.stringify({ version: 2, assets: [video] }));
+    await atomicWrite(path.join(dataDir, 'videos.json'), JSON.stringify({ version: 3, assets: [video] }));
     await atomicWrite(path.join(dataDir, 'music.json'), JSON.stringify({ version: 2, assets: [music, secondMusic] }));
     const service = await serviceAt(dataDir);
     const document = projectSchema.parse({
@@ -1154,7 +1154,7 @@ describe('audio registry and HTTP registration boundary', () => {
     const queue = new JobQueue();
     queues.push(queue);
     const audio = new AudioLibrary(createConfig({ dataDir: directory }), queue);
-    await audio.initialise();
+    await audio.initialize();
     audio.list().forEach((asset) => {
       expect(asset.status).toBe('error');
       expect(asset.error).toContain('interrupted');
@@ -1250,7 +1250,7 @@ describe('audio registry and HTTP registration boundary', () => {
 });
 
 describe('bounded streaming PCM peaks', () => {
-  it('handles split sample bytes and normalises signed peaks without losing stereo channel peaks', () => {
+  it('handles split sample bytes and normalizes signed peaks without losing stereo channel peaks', () => {
     const reducer = new PcmPeakReducer(1);
     const samples = Buffer.alloc(8);
     samples.writeInt16LE(0, 0);

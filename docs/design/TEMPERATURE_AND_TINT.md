@@ -2,21 +2,21 @@
 
 Approved contract for [#68](https://github.com/Plonk42/PasCap/issues/68), with
 [automatic white balance](#automatic-white-balance) from [#218](https://github.com/Plonk42/PasCap/issues/218).
-These are normalized **SDR colour controls**, not Kelvin, HDR output or highlight
+These are normalized **SDR color controls**, not Kelvin, HDR output or highlight
 recovery. [Auto adjust](AUTO_ADJUST.md) sets those of a clip grade, as values or keyframes, with the same estimate. This
-guide specifies behaviour and required validation, not completed tests or hardware
+guide specifies behavior and required validation, not completed tests or hardware
 qualification.
 
 ## Ownership, data and controls
 
-Every clip grade and adjustment requires finite `colour.temperature` in **−2…2** and
-`colour.tint` in **−1…1**; new ones start at **0**, neutral. Positive Temperature warms (red relative to
+Every clip grade and adjustment requires finite `color.temperature` in **−2…2** and
+`color.tint` in **−1…1**; new ones start at **0**, neutral. Positive Temperature warms (red relative to
 blue), negative cools; positive Tint adds magenta (red/blue relative to green),
-negative adds green. Nonzero settings intentionally colour greys.
+negative adds green. Nonzero settings intentionally color grays.
 
-Colour belongs to [clip grades and adjustments](ROW_APPEARANCE.md): a clip's grade follows
+Color belongs to [clip grades and adjustments](ROW_APPEARANCE.md): a clip's grade follows
 its footage, and the adjustment covering a project frame grades every video track there, after
-each clip's grade, including both dissolve sources. Video tracks have no Colour.
+each clip's grade, including both dissolve sources. Video tracks have no Color.
 
 Grade keyframes require exactly **fourteen nullable channels**, in control order:
 `temperature`, `tint`, `exposure`, `brightness`, `contrast`,
@@ -28,12 +28,12 @@ skipped. No keyframes for a setting means the grade's saved base; removing its f
 that unchanged base. HSL bands and master/RGB curves remain **static**, not new
 animation channels. Speed is clip-only, never a grade setting.
 
-The **Colour** tab shows Temperature and Tint first in its Colour group (the grade still
+The **Color** tab shows Temperature and Tint first in its Color group (the grade still
 applies them before Exposure). Main and stored
-keyed settings use native sliders (step 0.01) with coloured tracks (Temperature
+keyed settings use native sliders (step 0.01) with colored tracks (Temperature
 blue → yellow, Tint green → magenta), adjacent exact numeric fields,
 and reset to 0 by double-clicking the name. Main capture diamonds are always visible, with adjacent per-setting **Previous/Next** buttons because not every setting is enabled at every keyframe. Its single keyframe-line Previous/Next pair (with the keyframe count) visits every keyframe of the grade it edits.
-Enabled setting chips in stored Colour keyframe rows retain
+Enabled setting chips in stored Color keyframe rows retain
 their per-channel arrows. All main and stored per-channel arrows visit strictly
 earlier/later keyframes where that channel is nonnull (zero is enabled).
 There is no Animate toggle or stored preference.
@@ -45,7 +45,7 @@ playhead are read-only until diamond capture.
 Pointer movement previews the draft in the image without a document change; valid release is one Undo step. Escape/cancellation/capture loss/blur restores control and preview.
 Numeric Enter/blur preserves entered precision; invalid drafts stay editable,
 never clamp or default. Resets affect only the targeted base or existing keyframe;
-Colour Reset on an animated grade preserves its bases and static HSL/curves.
+Color Reset on an animated grade preserves its bases and static HSL/curves.
 
 ## One grading formula
 
@@ -62,29 +62,29 @@ linear RGB. The complete order is inverse BT.709 → Temperature/Tint gains →
 Exposure → Contrast → Brightness → Whites/Blacks → Hue/Saturation/Vibrance → final
 linear clipping and BT.709 encoding → static encoded HSL → master curve → RGB
 curves → black-fade brightness → Opacity/spatial coverage and grouped source-over.
-See [the grading equations](../COLOUR_AND_TIMING.md) for the remaining stages. Shadows,
+See [the grading equations](../COLOR_AND_TIMING.md) for the remaining stages. Shadows,
 Highlights, HDR and Local contrast are local stages on source pixels before this grade; see
 [detail filters](DETAIL_FILTERS.md#local-shadows-and-highlights).
 
 At $T=I=0$, all gains equal 1. Normalization preserves **neutral-white linear
 BT.709 luminance before clipping only**: $0.2126g_R+0.7152g_G+0.0722g_B=1$.
-It is not luminance preservation for arbitrary coloured pixels or the final
-clipped/encoded image, and does not keep greys neutral. HSL's grey protection
-applies to its incoming RGB, which Temperature/Tint may already have coloured.
+It is not luminance preservation for arbitrary colored pixels or the final
+clipped/encoded image, and does not keep grays neutral. HSL's gray protection
+applies to its incoming RGB, which Temperature/Tint may already have colored.
 
 CPU reference, compiled CPU grade, native LUT generation/exact grading,
 diagnostic reference and GPU shaders must use **this same math and stage order**,
 not separate gain approximations. Existing native LUT interpolation, RGBA16 and
-H.264/YUV quantisation remain measured approximations, not different transforms.
+H.264/YUV quantization remain measured approximations, not different transforms.
 Neutral HSL/identity curves retain scalar LUT paths; nonneutral advanced settings
 require exact complete grading through composited export. The Original preview bypasses
-Temperature/Tint and every other colour stage, never Opacity, geometry or fades.
+Temperature/Tint and every other color stage, never Opacity, geometry or fades.
 These appearance-only controls add no decoder, full-frame buffer, LUT array or
 native process; existing frame/pixel/resource and A/V gates remain unchanged.
 
 ## Automatic white balance
 
-**Auto white balance**, a button under Tint in the Colour tab of a **clip grade** (adjustments have none, [#285](https://github.com/Plonk42/PasCap/issues/285)), estimates the light at the playhead and keyframes the grade's Temperature and Tint at the source frame shown there. It only chooses values: no
+**Auto white balance**, a button under Tint in the Color tab of a **clip grade** (adjustments have none, [#285](https://github.com/Plonk42/PasCap/issues/285)), estimates the light at the playhead and keyframes the grade's Temperature and Tint at the source frame shown there. It only chooses values: no
 schema, grade stage, render, export or decoder changes. Its constants live in one
 module, [white-balance.ts](../../src/shared/white-balance.ts), as starting values to tune on real flights.
 
@@ -97,14 +97,14 @@ through `PlacedClip.retiming` (speed and Reverse). A temporary one-decoder reade
 decodes them from the verified proxy, never an original, separate from the timeline and
 source review lanes; each frame is drawn into a canvas of at most 320 × 180 pixels
 (the decoded frame as the compositor uploads it), read back and closed at once. The
-reader is released when done, failed or cancelled.
+reader is released when done, failed or canceled.
 
 **Per frame.** Letterbox rows/columns (no code above 16) are dropped. Pixels with a
-channel at 250 or more, and their 3 × 3 neighbours, are clipped; linear luma below
+channel at 250 or more, and their 3 × 3 neighbors, are clipped; linear luma below
 0.002 is noise; both are ignored. Two estimates of the light $e$ in linear BT.709:
 
-- Shades of Grey: $e_c=\big(\tfrac1n\sum c^6\big)^{1/6}$;
-- 1st-order Grey-Edge: a 3 × 3 binomial blur, central-difference gradient magnitudes
+- Shades of Gray: $e_c=\big(\tfrac1n\sum c^6\big)^{1/6}$;
+- 1st-order Gray-Edge: a 3 × 3 binomial blur, central-difference gradient magnitudes
   per channel, $e_c=\big(\tfrac1n\sum|\nabla c|^6\big)^{1/6}$, away from ignored pixels.
   Large uniform sky, sea or grass have almost no gradient, so they barely count.
 
@@ -135,20 +135,20 @@ current grade. [Auto adjust](AUTO_ADJUST.md) reuses this estimate over 1 s aroun
 
 Projects and version-1 export receipt snapshots must use the **current schema**. Missing
 Temperature/Tint bases or either nullable keyframe field, unknown fields and saved clip
-Colour/correction are invalid. Reject documents and receipt snapshots saved before the current
-schema, with track Colour, clearly with that reason; preserve their bytes and successful outputs, without
+Color/correction are invalid. Reject documents and receipt snapshots saved before the current
+schema, with track Color or British spelling, clearly with that reason; preserve their bytes and successful outputs, without
 compatibility readers, injected defaults, fallback or automatic deletion.
 Receipt/report/proxy/PCM format versions remain independent and unchanged (the
-registries are version 2, with full-content checksums);
+registries are version 3 (videos) and 2 (music), with full-content checksums);
 new reference/measurement metadata identifies the current schema, historical evidence does
 not change.
 
 Required disposable checks cover strict bounds/rejection/preservation, neutral
 identity, both axis signs and combined gains, pre-clipping neutral-white
-luminance, intentionally coloured greys, stage order and unchanged CPU/reference/
+luminance, intentionally colored grays, stage order and unchanged CPU/reference/
 native/GPU error gates. Editing checks cover clip grades and adjustments, independent capture,
-read-only gaps, final-keyframe removal, resets, invalid/cancelled drafts, Undo/Redo and
+read-only gaps, final-keyframe removal, resets, invalid/canceled drafts, Undo/Redo and
 live desktop/compact screenshots. Automatic white balance checks cover the estimator on
 synthetic images (neutral, casts, outlier frame, sky, sunset, letterbox and clipping), the
-window, capture, Undo, cancellation and failure, and that the analysed pixels equal the
+window, capture, Undo, cancellation and failure, and that the analyzed pixels equal the
 compositor input. No real-media jobs or new performance claims.

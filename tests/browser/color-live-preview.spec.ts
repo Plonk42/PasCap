@@ -32,7 +32,7 @@ test.beforeEach(async ({ page, request }) => {
     unexpected.push(`${method} ${pathname}`);
     return route.abort('blockedbyclient');
   });
-  let document = createProject('colour-live-memory', 'Colour live preview · memory-only');
+  let document = createProject('color-live-memory', 'Color live preview · memory-only');
   document.media.videoIds = [asset.id];
   document = applyCommand(document, { type: 'insert', clip: createClip('first', asset.id, 0, 40), index: 0 });
   document = applyCommand(document, { type: 'insert', clip: createClip('second', asset.id, 40, 80), index: 1 });
@@ -70,7 +70,7 @@ async function dragSlider(page: Page, name: string, fraction: number) {
   return slider;
 }
 
-test('a Colour slider drag previews the value without a document, history or save change, and Escape restores it', async ({
+test('a Color slider drag previews the value without a document, history or save change, and Escape restores it', async ({
   page,
 }) => {
   await page.evaluate(() => window.pascapLab!.engine.seek(10));
@@ -100,7 +100,7 @@ test('releasing the drag commits one Undo step and the preview stays on the comm
   const previewed = await checksum(page);
   await page.mouse.up();
   const after = await current(page);
-  expect(after.adjustments[0]!.colour.exposure).toBeGreaterThan(0);
+  expect(after.adjustments[0]!.color.exposure).toBeGreaterThan(0);
   expect(after.adjustments[0]!.keyframes).toEqual(before.adjustments[0]!.keyframes);
   expect(after.clips).toEqual(before.clips);
   await expect.poll(() => checksum(page)).toBe(previewed);
@@ -120,7 +120,7 @@ test('a locked animated slider neither previews nor creates a keyframe', async (
   const graded = await checksum(page);
   const slider = page.getByRole('slider', { name: 'Exposure', exact: true });
   await expect(slider).toBeDisabled();
-  // Below the Colour group: without scrolling, the click would land on the timeline underneath the Properties panel.
+  // Below the Color group: without scrolling, the click would land on the timeline underneath the Properties panel.
   await slider.scrollIntoViewIfNeeded();
   const box = (await slider.boundingBox())!;
   await page.mouse.click(box.x + box.width * 0.8, box.y + box.height / 2);
@@ -129,7 +129,7 @@ test('a locked animated slider neither previews nor creates a keyframe', async (
   expect(memory.saves).toBe(0);
 });
 
-test('Colour has no scope hint; the clip menu moves a clip to its own track in one Undo step', async ({ page }) => {
+test('Color has no scope hint; the clip menu moves a clip to its own track in one Undo step', async ({ page }) => {
   await inspectorTab(page, 'Track');
   const before = await current(page);
   await expect(page.getByText('Grades all', { exact: false })).toHaveCount(0);

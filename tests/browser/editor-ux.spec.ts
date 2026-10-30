@@ -252,16 +252,16 @@ test('selected context precedes compact animation controls and adjusted sections
     await expect(button).toHaveJSProperty('disabled', false);
     await expect(button).toHaveAttribute('title', `No ${direction.toLowerCase()} Exposure keyframe`);
     await expect(
-      page.locator('.section-keyframe-line').getByRole('button', { name: `${direction} Colour keyframe`, exact: true }),
+      page.locator('.section-keyframe-line').getByRole('button', { name: `${direction} Color keyframe`, exact: true }),
     ).toBeDisabled();
   }
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.4');
   await expect(
-    page.getByRole('button', { name: 'Colour section', exact: true }).locator('.inspector-section-modified'),
+    page.getByRole('button', { name: 'Color section', exact: true }).locator('.inspector-section-modified'),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(
-    page.getByRole('button', { name: 'Colour section', exact: true }).locator('.inspector-section-modified'),
+    page.getByRole('button', { name: 'Color section', exact: true }).locator('.inspector-section-modified'),
   ).toHaveCount(0);
 });
 
@@ -509,7 +509,7 @@ test('zero-space recovery stays explicit and tight advisory space is not a false
   expect(submissions).toEqual(['draft720']);
 });
 
-test('a cancelled stale quality check cannot overwrite the current quality or storage allowance', async ({ page }) => {
+test('a canceled stale quality check cannot overwrite the current quality or storage allowance', async ({ page }) => {
   let release!: () => void;
   const gate = new Promise<void>((resolve) => {
     release = resolve;
@@ -549,8 +549,8 @@ test('a failed deferred preview keeps the editor usable and saves pending edits 
   await expect(page.getByRole('button', { name: 'Reload editor', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Play preview', exact: true })).toBeDisabled();
   // Without the preview module there is no lab API: open the selected clip's grade directly.
-  await page.getByRole('tab', { name: 'Colour', exact: true }).click();
-  await expect(page.locator('#inspector-pane .colour-target > span')).toHaveText(/ · this clip only$/);
+  await page.getByRole('tab', { name: 'Color', exact: true }).click();
+  await expect(page.locator('#inspector-pane .color-target > span')).toHaveText(/ · this clip only$/);
   await expect(page.getByRole('button', { name: 'Keyframe Exposure', exact: true })).toBeDisabled();
   const main = page.locator('.keyframe-setting-navigation').filter({
     has: page.getByRole('button', { name: 'Keyframe Exposure', exact: true }),

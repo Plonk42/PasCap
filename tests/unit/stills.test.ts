@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ServiceError } from '../../src/server/errors.js';
-import { ColourLutCache } from '../../src/server/layered-colour.js';
+import { ColorLutCache } from '../../src/server/layered-color.js';
 import { runProcess } from '../../src/server/process.js';
 import {
   composeProjectFrame,
@@ -11,7 +11,7 @@ import {
   STILL_SIZE,
   StillRenderer,
 } from '../../src/server/stills.js';
-import { createColourSettings } from '../../src/shared/colour.js';
+import { createColorSettings } from '../../src/shared/color.js';
 import { compositePixel } from '../../src/shared/composition.js';
 import { createAdjustment, createClipGrade } from '../../src/shared/grade.js';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
@@ -27,7 +27,7 @@ function asset(id: string, width = 1280, height = 720): MediaAsset {
   return {
     id,
     name: `${id}.mp4`,
-    metadata: { width, height, frameCount: 300, colourRange: 'tv' },
+    metadata: { width, height, frameCount: 300, colorRange: 'tv' },
     status: 'ready',
     prepared: {},
   } as unknown as MediaAsset;
@@ -50,7 +50,7 @@ function clip(id: string, mediaId: string, layerId: string, start: number, sourc
 }
 
 function context(read: (media: MediaAsset, sourceFrame: number) => Promise<Buffer>) {
-  return { assetOf: (id: string) => asset(id), decode: read, cache: new ColourLutCache(), signal };
+  return { assetOf: (id: string) => asset(id), decode: read, cache: new ColorLutCache(), signal };
 }
 
 /** Track 1: A dissolving into B; track 2 above at Opacity 0.6, its clip C graded Exposure 0.5; a warm adjustment over all. */
@@ -59,7 +59,7 @@ function dissolveProject(): ProjectDocument {
   const overlay = createLayer('video-2', 'Overlay');
   overlay.transform.base.opacity = 0.6;
   const graded = clip('c', 'rec-c', 'video-2', 0, 100);
-  graded.grade.colour.exposure = 0.5;
+  graded.grade.color.exposure = 0.5;
   return projectSchema.parse({
     ...base,
     layers: [
@@ -67,7 +67,7 @@ function dissolveProject(): ProjectDocument {
       overlay,
     ],
     clips: [clip('a', 'rec-a', 'video-1', 0, 60), clip('b', 'rec-b', 'video-1', 40, 60), graded],
-    adjustments: [{ ...createAdjustment('warm', 30, 40), colour: { ...createColourSettings(), temperature: 0.4 } }],
+    adjustments: [{ ...createAdjustment('warm', 30, 40), color: { ...createColorSettings(), temperature: 0.4 } }],
   });
 }
 
@@ -87,7 +87,7 @@ describe('project stills', () => {
       ['b', 0.5, 1],
       ['c', 1, 0.6],
     ]);
-    expect(samples.map((sample) => [sample.grade.exposure, sample.colour.temperature])).toEqual([
+    expect(samples.map((sample) => [sample.grade.exposure, sample.color.temperature])).toEqual([
       [0, 0.4],
       [0, 0.4],
       [0.5, 0.4],
@@ -107,7 +107,7 @@ describe('project stills', () => {
     expect(error / (checked.length * 3)).toBeLessThan(2);
   });
 
-  it('composes the Original image without Colour and Detail, keeping Opacity and dissolves', async () => {
+  it('composes the Original image without Color and Detail, keeping Opacity and dissolves', async () => {
     const graded = dissolveProject();
     const detailed = {
       ...graded,

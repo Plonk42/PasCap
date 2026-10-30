@@ -38,7 +38,7 @@ export type TelemetryField = Exclude<keyof TelemetrySample, 'time'>;
 
 /**
  * Global camera motion of each proxy frame relative to the previous one: translation in
- * analysis pixels, zoom and clockwise rotation per frame about the image centre. Frame 0
+ * analysis pixels, zoom and clockwise rotation per frame about the image center. Frame 0
  * and frames without a reliable measurement are null. `telemetry` holds the drone's
  * telemetry subtitles, about once per second from `time` seconds: speeds in m/s (vertical
  * positive upwards), height and distance from home in m, ISO, shutter as the denominator
@@ -103,7 +103,7 @@ export interface MotionProfile {
   roughness: number[];
 }
 
-/** Zoom and rotation count as the displacement they cause 100 analysis pixels from the centre. */
+/** Zoom and rotation count as the displacement they cause 100 analysis pixels from the center. */
 export function motionProfile(analysis: MotionAnalysis, fps: number): MotionProfile {
   const perSecond = (100 / MOTION_WIDTH) * fps;
   const components = [

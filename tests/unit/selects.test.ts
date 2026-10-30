@@ -158,7 +158,7 @@ describe('Source preview selects', () => {
     for (const frame of [9, 10, 30, 59, 80]) expect(freeStretchAt(kept, frame, 100)).toBeNull();
   });
 
-  it('add a range from a free displayed frame, else centred in the largest free stretch', () => {
+  it('add a range from a free displayed frame, else centerd in the largest free stretch', () => {
     expect(addKeptRange([], 20, 200)).toEqual({ range: range(20, 80) });
     expect(addKeptRange(kept, 40, 100)).toEqual({ range: range(40, 59) });
     expect(addKeptRange(kept, 2, 100)).toEqual({ range: range(2, 9) });
@@ -181,7 +181,7 @@ describe('Source preview selects', () => {
       expect(insertKeptRange(kept, touching)).toMatchObject({ reason: expect.stringContaining('one frame away') });
   });
 
-  it('remove a range, keeping the edited one or moving to its neighbour', () => {
+  it('remove a range, keeping the edited one or moving to its neighbor', () => {
     const three = [range(0, 10), range(20, 30), range(40, 50)];
     expect(removeKeptRange(three, 1, 1)).toEqual({ ranges: [three[0], three[2]], active: 1 });
     expect(removeKeptRange(three, 2, 2)).toEqual({ ranges: [three[0], three[1]], active: 1 });
@@ -190,7 +190,7 @@ describe('Source preview selects', () => {
     expect(removeKeptRange([range(0, 10)], 0, 0)).toEqual({ ranges: [], active: 0 });
   });
 
-  it('bound the active range one frame from its neighbours', () => {
+  it('bound the active range one frame from its neighbors', () => {
     expect(keptRangeBounds([], 0, 100)).toEqual({ minIn: 0, maxOut: 100 });
     expect(keptRangeBounds(kept, 0, 100)).toEqual({ minIn: 0, maxOut: 59 });
     expect(keptRangeBounds(kept, 1, 100)).toEqual({ minIn: 31, maxOut: 100 });

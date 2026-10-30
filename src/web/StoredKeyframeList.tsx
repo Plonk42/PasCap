@@ -16,7 +16,7 @@ export interface StoredKeyframe<S extends string> {
 }
 
 /**
- * What one keyframe type (a grade's Colour, track Transform) supplies to the shared stored keyframe list.
+ * What one keyframe type (a grade's Color, track Transform) supplies to the shared stored keyframe list.
  * Layout, selection, chips, navigation and the Edit fields are common, so both lists behave alike.
  */
 const FRAME_LABELS = { timeline: 'Timeline frame', source: 'Source frame', adjustment: 'Frame in adjustment' } as const;
@@ -35,7 +35,7 @@ export interface StoredKeyframeKind<S extends string, K extends StoredKeyframe<S
   /** Enabled settings keyed again later; Easing only matters for them. */
   continuing: (key: K) => readonly S[];
   /** The nearest earlier/later keyframe frames enabling this setting, seen from this row. */
-  neighbours: (key: K, setting: S) => { previous: number | undefined; next: number | undefined };
+  neighbors: (key: K, setting: S) => { previous: number | undefined; next: number | undefined };
   seek: (frame: number) => void;
   validateFrame: (key: K, frame: number) => string | null;
   moveFrame: (key: K, frame: number) => void;
@@ -91,7 +91,7 @@ function useStoredKeyframeRows(context: string, keys: readonly { frame: number }
   return current.rows;
 }
 
-const capitalised = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+const capitalized = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 
 function enabledSettings<S extends string, K extends StoredKeyframe<S>>(kind: StoredKeyframeKind<S, K>, key: K) {
   const enabled = kind.enabled(key);
@@ -177,7 +177,7 @@ function StoredKeyframeRow<S extends string, K extends StoredKeyframe<S>>({
         >
           <div className="layer-keyframe-chips" aria-label="Animated settings">
             {settings.map((setting) => {
-              const { previous, next } = kind.neighbours(point, setting.key);
+              const { previous, next } = kind.neighbors(point, setting.key);
               return (
                 <span className="layer-keyframe-chip" key={setting.key}>
                   {setting.label}
@@ -203,7 +203,7 @@ function StoredKeyframeRow<S extends string, K extends StoredKeyframe<S>>({
             {FRAME_LABELS[kind.frameNoun ?? 'timeline']}
             <NumberField
               id={frameId}
-              aria-label={`${capitalised(kind.noun)} keyframe frame ${point.frame}`}
+              aria-label={`${capitalized(kind.noun)} keyframe frame ${point.frame}`}
               {...(describedBy ? { 'aria-describedby': describedBy } : {})}
               min={0}
               max={2_147_483_647}
@@ -217,7 +217,7 @@ function StoredKeyframeRow<S extends string, K extends StoredKeyframe<S>>({
             />
           </label>
           <KeyframeEasing
-            label={`${capitalised(kind.noun)} keyframe easing ${point.frame}`}
+            label={`${capitalized(kind.noun)} keyframe easing ${point.frame}`}
             settingLabel={(setting) => `${setting} easing at ${kind.noun} keyframe ${point.frame}`}
             {...(describedBy ? { describedBy } : {})}
             title="Applies to every setting of this keyframe, toward each setting's next keyframe"

@@ -513,7 +513,7 @@ export function AdjustmentLane(props: Readonly<Props>) {
               aria-label={`Adjustment ${label}${grading ? ' (grades the selected clip)' : ''}`}
               aria-pressed={selected}
               disabled={disabled && !dragging}
-              title={`Adjustment ${label} · grades every track here${grading ? ', including the selected clip' : ''} · Click to edit its Colour; Ctrl-click to select several; drag to move it with its keyframes (and the rest of the selection); Arrow keys: 1 frame, Shift: 10; Delete removes. Alt bypasses snapping.`}
+              title={`Adjustment ${label} · grades every track here${grading ? ', including the selected clip' : ''} · Click to edit its Color; Ctrl-click to select several; drag to move it with its keyframes (and the rest of the selection); Arrow keys: 1 frame, Shift: 10; Delete removes. Alt bypasses snapping.`}
               onPointerDown={(event) => start(event, item, 'move')}
               onClick={(event) => activate(event, item)}
               onKeyDown={(event) => keyboard(event, item, 'move')}

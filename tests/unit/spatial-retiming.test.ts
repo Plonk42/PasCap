@@ -35,7 +35,7 @@ function expectContinuousBounds(map: Retiming, sourceIn: number, sourceOut: numb
 
 describe('continuous original-source retiming for spatial animation', () => {
   it.each([0.1, 0.5, 1, 1.125, 3, 8])(
-    'normalises constant %sx to the rounded clock without changing discrete queries',
+    'normalizes constant %sx to the rounded clock without changing discrete queries',
     (rate) => {
       const map = compileRetiming(base({ mode: 'constant', rate }));
       const duration = Math.max(1, Math.round(30 / rate));
@@ -82,7 +82,7 @@ describe('continuous original-source retiming for spatial animation', () => {
   });
 
   it.each(['ease-in', 'ease-out', 'smooth'] as const)(
-    'exposes the normalised custom %s quadrature clock without flooring',
+    'exposes the normalized custom %s quadrature clock without flooring',
     (interpolation) => {
       const map = compileRetiming(
         base({
@@ -156,7 +156,7 @@ describe('continuous original-source retiming for spatial animation', () => {
       const [first, second] = [1, 2].map((frame) => sampleTimeline(project, frame)[0]!);
       expect(first!.sourceFrame).toBe(7);
       expect(second!.sourceFrame).toBe(7);
-      // Project time, like Colour: a held image still moves on every output frame.
+      // Project time, like Color: a held image still moves on every output frame.
       expect(first!.spatial.translateX).toBeCloseTo(0.01, 12);
       expect(second!.spatial.translateX).toBeCloseTo(0.02, 12);
       expectContinuousBounds(compileRetiming(clip), 7, 37);

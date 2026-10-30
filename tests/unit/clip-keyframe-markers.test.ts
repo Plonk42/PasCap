@@ -85,7 +85,7 @@ describe('clip-owned timeline speed keyframe markers', () => {
     const project = fixture(0, 120, 12);
     project.clips[0]!.speed = speed;
     const { placed, markers } = markersFor(project);
-    // Independently integrate dt = ds / (0.5 + s / 80), normalised to the rounded duration.
+    // Independently integrate dt = ds / (0.5 + s / 80), normalized to the rounded duration.
     const total = 80 * Math.log(4);
     const continuous = (80 * Math.log(1.75) * Math.round(total)) / total;
     expect(placed.duration).toBe(111);

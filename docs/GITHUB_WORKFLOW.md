@@ -1,6 +1,6 @@
 # GitHub workflow
 
-PasCap is a solo, pre-release project. The workflow favours fast iteration: small
+PasCap is a solo, pre-release project. The workflow favors fast iteration: small
 commits straight to `main`, CI as an asynchronous backstop, pull requests only for
 risky changes and GitHub issues only for work worth tracking. Saved projects must
 keep working across changes ([data compatibility](#data-compatibility)).
@@ -9,7 +9,7 @@ keep working across changes ([data compatibility](#data-compatibility)).
 
 | Change                                                                                                                                                             | Route                                            |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------ |
-| **Routine:** UI/editor behaviour, docs, tests, small fixes, refactors                                                                                              | Fast local gate, commit, push to `main`          |
+| **Routine:** UI/editor behavior, docs, tests, small fixes, refactors                                                                                               | Fast local gate, commit, push to `main`          |
 | **Risky:** playback/A-V clock, decoder/compositor, native export/FFmpeg, project schema or persisted formats, source-media safety, CI/scripts, dependency upgrades | Short-lived branch and PR with squash auto-merge |
 
 When unsure, treat the change as risky.
@@ -52,10 +52,10 @@ fix relevant new findings without suppressing them
 When the owner asks for a dev branch that collects several issues and merges as a
 whole after evaluation (no auto-merge):
 
-- Split each issue into steps that keep the tests passing: add the new behaviour
+- Split each issue into steps that keep the tests passing: add the new behavior
   beside the old, then remove the old in its own step.
-- Delete specs of removed behaviour rather than porting them; add focused specs for
-  the new behaviour.
+- Delete specs of removed behavior rather than porting them; add focused specs for
+  the new behavior.
 - Per step, run `npm run check` plus the specs you edited. At the end of each issue,
   run the full suites on CI with `gh workflow run ci.yml --ref <branch>` instead of
   locally: CI shards the Chrome suite across four runners.
@@ -123,11 +123,11 @@ head-branch deletion are enabled.
 - Comment only when it adds information worth keeping: a reproduction, a decision
   or a failing CI run. No per-step checkpoints.
 - [ROADMAP.md](ROADMAP.md) indexes outcomes; issues hold mutable progress. Guides
-  describe current behaviour; history belongs in Git and issues.
+  describe current behavior; history belongs in Git and issues.
 
 | Category      | Meaning                                                |
 | ------------- | ------------------------------------------------------ |
-| `bug`         | Reproducible incorrect behaviour                       |
+| `bug`         | Reproducible incorrect behavior                        |
 | `enhancement` | Product feature or improvement                         |
 | `task`        | Engineering, verification, documentation or operations |
 

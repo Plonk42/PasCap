@@ -1,4 +1,4 @@
-/* Track → Colour: Auto white balance sits under Temperature and Tint, the two settings it keyframes. */
+/* Track → Color: Auto white balance sits under Temperature and Tint, the two settings it keyframes. */
 .auto-white-balance {
   display: flex;
   flex-wrap: wrap;

@@ -200,7 +200,7 @@ test('reorders independently positioned video tracks without altering source ran
   ]);
 });
 
-test('keys track opacity in Transform and colour in an adjustment at project frames, keeping their anchors through trim/reload', async ({
+test('keys track opacity in Transform and color in an adjustment at project frames, keeping their anchors through trim/reload', async ({
   page,
 }) => {
   const id = await addOverlay(page);
@@ -228,16 +228,16 @@ test('keys track opacity in Transform and colour in an adjustment at project fra
   project = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   const sample = sampleTimeline(project, 30).find((layer) => layer.clipId === id)!;
   expect(sample.opacity).toBeCloseTo(0.5);
-  expect(sample.colour.exposure).toBeCloseTo(0);
+  expect(sample.color.exposure).toBeCloseTo(0);
   const opacityKeys = [transformPoint(0, { opacity: 0 }), transformPoint(60, { opacity: 1 })];
   const exposureKeys = [gradePoint(0, { exposure: -1 }), gradePoint(60, { exposure: 1 })];
   expect(project.layers[1]?.transform.keyframes).toEqual(opacityKeys);
   expect(project.adjustments[0]?.keyframes).toEqual(exposureKeys);
   expect(project.clips[1]).not.toHaveProperty('correction');
-  expect(project.adjustments[0]!.colour.exposure).toBe(0);
+  expect(project.adjustments[0]!.color.exposure).toBe(0);
   expect(project.clips[1]).not.toHaveProperty('opacity');
   expect(project.layers[1]!.transform.base.opacity).toBe(0);
-  await expect(page.getByRole('checkbox', { name: 'Animate colour adjustments', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('checkbox', { name: 'Animate color adjustments', exact: true })).toHaveCount(0);
   await inspectorTab(page, 'Clip');
   await page.getByRole('textbox', { name: 'Source IN frame', exact: true }).fill('15');
   await page.getByRole('textbox', { name: 'Source IN frame', exact: true }).press('Enter');
@@ -333,14 +333,14 @@ test('clip speed keys support easing, removal and their own duration while adjus
 
 test('collapses/expands Inspector sections and remembers the choice across reloads', async ({ page }) => {
   await inspectorTab(page, 'Clip grade');
-  const summary = page.getByLabel('Colour section', { exact: true });
+  const summary = page.getByLabel('Color section', { exact: true });
   await summary.click();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeHidden();
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
   await inspectorTab(page, 'Clip grade');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeHidden();
-  await page.getByLabel('Colour section', { exact: true }).click();
+  await page.getByLabel('Color section', { exact: true }).click();
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeVisible();
   await inspectorTab(page, 'Clip');
   await page.getByLabel('Speed section', { exact: true }).click();
@@ -430,7 +430,7 @@ test('source handle drafts cancel cleanly and I/O marks remain independent of ti
   await expect(page.getByRole('spinbutton', { name: 'Source IN', exact: true })).toHaveValue('0');
 });
 
-test('layered native UI export includes keyed opacity and colour in an immutable verified receipt', async ({
+test('layered native UI export includes keyed opacity and color in an immutable verified receipt', async ({
   page,
   request,
 }) => {
@@ -538,7 +538,7 @@ test('plays three simultaneous sources through rate, grade and opacity curves, a
   const dissolve = layout.transitions[0]!;
   const during = sampleTimeline(project, dissolve.start + 7).filter((layer) => layer.layerId === 'video-1');
   expect(during).toHaveLength(2);
-  expect(during[0]?.colour).toEqual(during[1]?.colour);
+  expect(during[0]?.color).toEqual(during[1]?.color);
   expect(during[0]?.opacity).toBe(during[1]?.opacity);
   const rateOf = (id: string): number => {
     const sample = during.find((layer) => layer.clipId === id)!;

@@ -4,10 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { createAdjustment, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, type ProjectDocument } from '../../src/shared/model.js';
-import { adjustmentColourOwner, clipColourOwner } from '../../src/web/colour-owner.js';
+import { adjustmentColorOwner, clipColorOwner } from '../../src/web/color-owner.js';
 import { Inspector } from '../../src/web/Inspector.js';
 import { KeyframeNavigationContext } from '../../src/web/keyframe-navigation.js';
-import { ColourKeyframeList } from '../../src/web/ColourKeyframeList.js';
+import { ColorKeyframeList } from '../../src/web/ColorKeyframeList.js';
 import { RangeSettingControl } from '../../src/web/SettingValueControl.js';
 
 const navigation = {
@@ -19,7 +19,7 @@ const navigation = {
 };
 
 describe('dedicated Inspector keyframe controls', () => {
-  it('labels Clip, Colour, Track and Audio panels; an empty track keeps Opacity in Transform and Colour grades the selected adjustment', () => {
+  it('labels Clip, Color, Track and Audio panels; an empty track keeps Opacity in Transform and Color grades the selected adjustment', () => {
     const render = (project: ProjectDocument, selectedAdjustmentIds: string[] = []): string =>
       renderToStaticMarkup(
         createElement(
@@ -52,30 +52,30 @@ describe('dedicated Inspector keyframe controls', () => {
       return {
         panels,
         clip: markup.slice(markup.indexOf(panels[0]!), markup.indexOf(panels[1]!)),
-        colour: markup.slice(markup.indexOf(panels[1]!), markup.indexOf(panels[2]!)),
+        color: markup.slice(markup.indexOf(panels[1]!), markup.indexOf(panels[2]!)),
         track: markup.slice(markup.indexOf(panels[2]!), markup.indexOf(panels[3]!)),
       };
     };
     const project = createProject('tabs', 'Tabs');
     const markup = render(project);
     const tabs = [...markup.matchAll(/<button[^>]*role="tab"[^>]*>(.*?)<\/button>/g)].map((match) => match[1]);
-    expect(tabs).toEqual(['Clip', 'Colour', 'Track', 'Audio']);
+    expect(tabs).toEqual(['Clip', 'Color', 'Track', 'Audio']);
     expect(markup).not.toContain('Whole video row');
-    expect(markup).not.toContain('Row colour');
-    const { panels, clip: clipPanel, colour: colourPanel, track: trackPanel } = panelsOf(markup);
+    expect(markup).not.toContain('Row color');
+    const { panels, clip: clipPanel, color: colorPanel, track: trackPanel } = panelsOf(markup);
     expect(panels[2]).not.toContain('hidden');
     expect(panels.filter((panel) => panel.includes('hidden'))).toHaveLength(3);
     expect(clipPanel).toContain('Select a clip on Track 1 to edit it.');
     expect(clipPanel).not.toContain('aria-label="Placement section"');
     expect(clipPanel).not.toContain('Opacity');
-    // Without a selected clip or adjustment, the Colour tab only asks to select one.
-    expect(colourPanel).toContain('Select a clip or an adjustment in the timeline to edit its grade.');
-    expect(colourPanel).not.toContain('aria-label="Colour target"');
-    expect(colourPanel).not.toContain('aria-label="New adjustment"');
-    expect(colourPanel).not.toContain('aria-label="Colour section"');
-    expect(colourPanel).not.toContain('Opacity');
-    // The track keeps no Colour: its Opacity is part of its Transform, editable on an empty track.
-    expect(trackPanel).not.toContain('aria-label="Colour section"');
+    // Without a selected clip or adjustment, the Color tab only asks to select one.
+    expect(colorPanel).toContain('Select a clip or an adjustment in the timeline to edit its grade.');
+    expect(colorPanel).not.toContain('aria-label="Color target"');
+    expect(colorPanel).not.toContain('aria-label="New adjustment"');
+    expect(colorPanel).not.toContain('aria-label="Color section"');
+    expect(colorPanel).not.toContain('Opacity');
+    // The track keeps no Color: its Opacity is part of its Transform, editable on an empty track.
+    expect(trackPanel).not.toContain('aria-label="Color section"');
     expect(trackPanel).not.toContain('Track keyframes');
     expect(trackPanel).toContain('aria-label="Transform section"');
     expect(trackPanel).toContain('aria-label="Fades section"');
@@ -94,19 +94,19 @@ describe('dedicated Inspector keyframe controls', () => {
     expect(opacity[0]).not.toContain('disabled');
     expect(transform).toContain('%');
     expect(transform).toContain('aria-label="Keyframe Opacity"');
-    expect(markup).not.toContain('Animate Colour');
+    expect(markup).not.toContain('Animate Color');
     expect(markup).not.toContain('Keyframe Layer opacity');
     expect(markup).not.toContain('Keyframe Clip opacity');
 
-    // A selected adjustment: its stored keyframe list sits inside its Colour section, before HSL ranges.
+    // A selected adjustment: its stored keyframe list sits inside its Color section, before HSL ranges.
     project.adjustments = [createAdjustment('look', 0, 100)];
-    const adjusted = panelsOf(render(project, ['look'])).colour;
-    expect(adjusted).toContain('aria-label="Colour section"');
-    const colourSection = adjusted.slice(
-      adjusted.indexOf('aria-label="Colour section"'),
+    const adjusted = panelsOf(render(project, ['look'])).color;
+    expect(adjusted).toContain('aria-label="Color section"');
+    const colorSection = adjusted.slice(
+      adjusted.indexOf('aria-label="Color section"'),
       adjusted.indexOf('aria-label="HSL ranges section"'),
     );
-    expect(colourSection).toContain('aria-label="Adjustment keyframes adjustment ');
+    expect(colorSection).toContain('aria-label="Adjustment keyframes adjustment ');
     expect(adjusted).not.toContain('aria-label="Keyframes section"');
     expect(adjusted).not.toContain('Opacity');
   });
@@ -144,13 +144,13 @@ describe('dedicated Inspector keyframe controls', () => {
       clip.grade.keyframes = [key];
       const owner =
         noun === 'clip'
-          ? clipColourOwner(clip, 'Clip 1')
-          : adjustmentColourOwner({ ...createAdjustment('look', 0, 50), keyframes: [key] }, 'Adjustment 1');
+          ? clipColorOwner(clip, 'Clip 1')
+          : adjustmentColorOwner({ ...createAdjustment('look', 0, 50), keyframes: [key] }, 'Adjustment 1');
       const markup = renderToStaticMarkup(
         createElement(
           KeyframeNavigationContext.Provider,
           { value: navigation },
-          createElement(ColourKeyframeList, {
+          createElement(ColorKeyframeList, {
             project,
             layer: owner,
             frame: 0,

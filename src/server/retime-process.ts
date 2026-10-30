@@ -244,14 +244,14 @@ async function pumpReversedFrames(
  */
 export async function retimeRawVideo(request: RawRetimingOptions): Promise<RawRetimingReport> {
   const options = { ...request, clip: clipSchema.parse(request.clip) };
-  if (options.signal.aborted) throw new ServiceError('Job cancelled.', 499);
+  if (options.signal.aborted) throw new ServiceError('Job canceled.', 499);
   if (!Number.isSafeInteger(options.frameBytes) || options.frameBytes < 1)
     throw new Error('Raw frame size must be a positive safe integer.');
   if (options.frameBuffer && options.frameBuffer.length !== options.frameBytes)
     throw new Error('The reusable raw frame buffer has the wrong size.');
   Object.freeze(options.clip.speed);
   Object.freeze(options.clip);
-  if (options.signal.aborted) throw new ServiceError('Job cancelled.', 499);
+  if (options.signal.aborted) throw new ServiceError('Job canceled.', 499);
   const retiming = captureRetiming(options.clip, options.retiming);
   let decoded = 0;
   let decoders = 1;

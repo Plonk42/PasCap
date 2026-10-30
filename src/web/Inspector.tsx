@@ -1,18 +1,18 @@
 import { Fragment, memo, useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
-import { COLOUR_CONTROLS, NEUTRAL_COLOUR, type ScalarColourSetting } from '../shared/colour.js';
-import { gradeColourAt } from '../shared/grade.js';
+import { COLOR_CONTROLS, NEUTRAL_COLOR, type ScalarColorSetting } from '../shared/color.js';
+import { gradeColorAt } from '../shared/grade.js';
 import { activeLayerSetting, hasLayerKeys, isKeyframeFrame } from '../shared/keyframes.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
 import { calculateLayout, transitionOffset, type PlacedClip, type TimelineLayout } from '../shared/timeline.js';
-import { ColourCurvesSection, HslRangesSection } from './AdvancedColour.js';
+import { ColorCurvesSection, HslRangesSection } from './AdvancedColor.js';
 import { adjustmentLabel } from './adjustment-ui.js';
 import { TrackAnimationControls } from './AnimationControls.js';
 import { AutoAdjust } from './AutoAdjust.js';
 import { AutoWhiteBalance } from './AutoWhiteBalance.js';
 import { ClipSourceRange } from './ClipSourceRange.js';
-import { COLOUR_GROUPS, colourGroupResetCommands, colourResetCommands } from './colour-reset.js';
+import { COLOR_GROUPS, colorGroupResetCommands, colorResetCommands } from './color-reset.js';
 import { DetailSection } from './DetailControls.js';
 import { shortName, sourceSeconds } from './display.js';
 import { countOf } from './grade-clipboard.js';
@@ -27,19 +27,19 @@ import {
   type InspectorSectionRequest,
   type InspectorSectionTarget,
 } from './InspectorSection.js';
-import { ColourKeyframeList } from './ColourKeyframeList.js';
+import { ColorKeyframeList } from './ColorKeyframeList.js';
 import {
-  adjustmentColourOwner,
-  clipColourOwner,
-  colourTarget,
-  displayedColour,
+  adjustmentColorOwner,
+  clipColorOwner,
+  colorTarget,
+  displayedColor,
   gradeSeekFrame,
   gradeValuePosition,
   isClipOwner,
   ownerNoun,
   ownerTarget,
-  type ColourOwner,
-} from './colour-owner.js';
+  type ColorOwner,
+} from './color-owner.js';
 import { KeyframeNavigationContext, useKeyframeNavigation, type KeyframeNavigation } from './keyframe-navigation.js';
 import { KeyframeToggle } from './KeyframeToggle.js';
 import { clipStartRestriction } from './layer-actions.js';
@@ -62,7 +62,7 @@ interface Props {
   selectedClipId: string | null;
   /** Clips selected together (Ctrl/Cmd-click); one clip's grade is edited only on its own. */
   selectedClipCount?: number;
-  /** The adjustments selected on the timeline; the Colour tab edits one selected alone. */
+  /** The adjustments selected on the timeline; the Color tab edits one selected alone. */
   selectedAdjustmentIds?: readonly string[];
   selectedLayerId: string;
   boundaryId: string | null;
@@ -85,13 +85,13 @@ const NO_ADJUSTMENTS: readonly string[] = [];
 
 const INSPECTOR_MODES: readonly { id: InspectorMode; label: string }[] = [
   { id: 'clip', label: 'Clip' },
-  { id: 'colour', label: 'Colour' },
+  { id: 'color', label: 'Color' },
   { id: 'track', label: 'Track' },
   { id: 'audio', label: 'Audio' },
 ];
 
 const SECTION_TITLES: Record<InspectorSectionTarget, string> = {
-  colour: 'Colour',
+  color: 'Color',
   speed: 'Speed',
   transform: 'Transform',
   transition: 'Transitions',
@@ -102,7 +102,7 @@ function revealInPanel(section: Element, detail: Element | null): void {
   const panel = section.closest<HTMLElement>('.inspector-panel');
   if (!panel) return;
   const pinned = [
-    ...panel.querySelectorAll(':scope > .panel-heading, :scope > [role="tabpanel"]:not([hidden]) > .colour-target'),
+    ...panel.querySelectorAll(':scope > .panel-heading, :scope > [role="tabpanel"]:not([hidden]) > .color-target'),
   ].reduce((height, element) => height + element.getBoundingClientRect().height, 0);
   panel.scrollTop += section.getBoundingClientRect().top - panel.getBoundingClientRect().top - pinned;
   const overflow = (detail?.getBoundingClientRect().bottom ?? 0) - panel.getBoundingClientRect().bottom;
@@ -208,14 +208,14 @@ function InspectorTabs({
 }
 
 interface LayerControlProps {
-  layer: ColourOwner;
+  layer: ColorOwner;
   frame: number;
   resetKey: string;
   disabled: boolean;
   onEdit: Props['onEdit'];
 }
 
-function settingState(layer: ColourOwner, setting: ScalarColourSetting, frame: number) {
+function settingState(layer: ColorOwner, setting: ScalarColorSetting, frame: number) {
   const keyed = hasLayerKeys(layer, setting);
   const active = activeLayerSetting(layer, setting, frame);
   return { keyed, active, editable: !keyed || (isKeyframeFrame(frame) && active) };
@@ -229,9 +229,9 @@ function SettingScope({ scope }: Readonly<{ scope: string }>) {
   );
 }
 
-type ColourControlDefinition = (typeof COLOUR_CONTROLS)[number];
+type ColorControlDefinition = (typeof COLOR_CONTROLS)[number];
 
-function ColourControl({
+function ColorControl({
   layer,
   frame,
   resetKey,
@@ -240,7 +240,7 @@ function ColourControl({
   control,
   value,
   id,
-}: Readonly<LayerControlProps & { control: ColourControlDefinition; value: number; id: string }>) {
+}: Readonly<LayerControlProps & { control: ColorControlDefinition; value: number; id: string }>) {
   const state = settingState(layer, control.key, frame);
   const { scope, hint } = settingPresentation({
     ...state,
@@ -251,12 +251,12 @@ function ColourControl({
   const command = (nextValue: number): EditCommand =>
     state.keyed
       ? { type: 'layer-key-value', ...ownerTarget(layer), frame, setting: control.key, value: nextValue }
-      : { type: 'colour', ...colourTarget(layer), colour: { ...layer.colour, [control.key]: nextValue } };
+      : { type: 'color', ...colorTarget(layer), color: { ...layer.color, [control.key]: nextValue } };
   const commit = (nextValue: number): void => {
     if (!disabled && state.editable) onEdit(command(nextValue));
   };
   return (
-    <div className="colour-control layer-keyed-control" data-animated={state.keyed} data-key-at-playhead={state.active}>
+    <div className="color-control layer-keyed-control" data-animated={state.keyed} data-key-at-playhead={state.active}>
       <RangeSettingControl
         setting={control.key}
         id={id}
@@ -284,7 +284,7 @@ function ColourControl({
   );
 }
 
-function ColourSection({
+function ColorSection({
   project,
   layer,
   frame,
@@ -306,22 +306,22 @@ function ColourSection({
     id: string;
     /** Where the image evaluates the values, when it differs from the frame keyframes are captured at. */
     valueFrame?: number;
-    /** The project frame at the playhead, where Auto analyses a clip grade. */
+    /** The project frame at the playhead, where Auto analyzes a clip grade. */
     playhead?: number;
   }
 >) {
-  const colour = gradeColourAt(layer, frame);
+  const color = gradeColorAt(layer, frame);
   const clipGrade = isClipOwner(layer);
   const noun = ownerNoun(layer);
-  const animated = COLOUR_CONTROLS.some((control) => hasLayerKeys(layer, control.key));
-  const resetCommands = colourResetCommands(layer, frame);
-  const adjusted = COLOUR_CONTROLS.filter(
-    (control) => colour[control.key] !== NEUTRAL_COLOUR[control.key] || hasLayerKeys(layer, control.key),
+  const animated = COLOR_CONTROLS.some((control) => hasLayerKeys(layer, control.key));
+  const resetCommands = colorResetCommands(layer, frame);
+  const adjusted = COLOR_CONTROLS.filter(
+    (control) => color[control.key] !== NEUTRAL_COLOR[control.key] || hasLayerKeys(layer, control.key),
   ).length;
   const canReset = resetCommands.length > 0;
   const resetTitle = animated
     ? `Reset only the enabled settings of this ${noun}’s keyframe at the playhead. Other settings and keyframes stay unchanged.`
-    : `Reset this ${noun}’s Colour. Keyframes stay unchanged.`;
+    : `Reset this ${noun}’s Color. Keyframes stay unchanged.`;
   const reset = (): void => {
     if (disabled || !canReset) return;
     onEdit(resetCommands);
@@ -329,18 +329,18 @@ function ColourSection({
   const pointAtFrame = layer.keyframes.find((key) => key.frame === frame);
   const occupied = pointAtFrame !== undefined && !pointAtFrame.reset;
   let defaultTitle =
-    'Add a default keyframe here: every Colour setting returns to its default and holds until its next keyframe. Earlier frames keep their values.';
+    'Add a default keyframe here: every Color setting returns to its default and holds until its next keyframe. Earlier frames keep their values.';
   if (pointAtFrame?.reset) defaultTitle = 'Remove the default keyframe at the playhead';
   else if (pointAtFrame)
     defaultTitle = 'A keyframe already exists at the playhead; move to another frame for a default keyframe';
   return (
     <InspectorSection
-      id="colour"
-      title="Colour"
-      icon="colour"
+      id="color"
+      title="Color"
+      icon="color"
       modified={adjusted > 0}
       help={
-        <HelpPopover label="Colour animation" guide="colour-speed-and-keyframes">
+        <HelpPopover label="Color animation" guide="color-speed-and-keyframes">
           {clipGrade ? (
             <p>
               These settings grade this clip only, before any adjustment; its keyframes stay with its footage when you
@@ -353,24 +353,24 @@ function ColourSection({
             </p>
           )}
           <p className="editor-help-tip">
-            Tip: hold Original above the preview to see the image without Colour; with Shift only clip grades are
+            Tip: hold Original above the preview to see the image without Color; with Shift only clip grades are
             bypassed, with Alt only adjustments.
           </p>
         </HelpPopover>
       }
     >
       <TrackAnimationControls
-        label="Colour"
+        label="Color"
         layer={layer}
         frame={frame}
-        settings={COLOUR_CONTROLS.map((control) => control.key)}
+        settings={COLOR_CONTROLS.map((control) => control.key)}
         disabled={disabled}
       >
         <button
           type="button"
           className="text-button"
           disabled={disabled || !canReset}
-          aria-label="Reset colour"
+          aria-label="Reset color"
           title={resetTitle}
           onClick={reset}
         >
@@ -403,9 +403,9 @@ function ColourSection({
           />
         )}
       </TrackAnimationControls>
-      <div className="colour-controls">
-        {COLOUR_GROUPS.map((group) => (
-          <ColourGroup
+      <div className="color-controls">
+        {COLOR_GROUPS.map((group) => (
+          <ColorGroup
             key={group.name}
             group={group}
             layer={layer}
@@ -431,7 +431,7 @@ function ColourSection({
           />
         ))}
       </div>
-      <ColourKeyframeList
+      <ColorKeyframeList
         project={project}
         layer={layer}
         frame={frame}
@@ -443,7 +443,7 @@ function ColourSection({
   );
 }
 
-function ColourGroup({
+function ColorGroup({
   group,
   layer,
   frame,
@@ -454,32 +454,32 @@ function ColourGroup({
   afterTint,
   valueFrame,
 }: Readonly<
-  LayerControlProps & { group: (typeof COLOUR_GROUPS)[number]; id: string; afterTint: ReactNode; valueFrame: number }
+  LayerControlProps & { group: (typeof COLOR_GROUPS)[number]; id: string; afterTint: ReactNode; valueFrame: number }
 >) {
-  const colour = displayedColour(layer, frame, valueFrame);
+  const color = displayedColor(layer, frame, valueFrame);
   const headingId = `${id}-group-${group.name.toLowerCase()}`;
-  const neutral = group.settings.every((setting) => colour[setting] === NEUTRAL_COLOUR[setting]);
-  const commands = colourGroupResetCommands(layer, frame, group.settings);
+  const neutral = group.settings.every((setting) => color[setting] === NEUTRAL_COLOR[setting]);
+  const commands = colorGroupResetCommands(layer, frame, group.settings);
   let blocked: string | null = null;
   if (disabled) blocked = 'These settings cannot be edited right now.';
   else if (neutral) blocked = 'Already at their default values.';
   else if (commands.length === 0) blocked = 'Add keyframes to edit these settings before resetting them.';
   return (
-    <fieldset className="colour-group" aria-labelledby={headingId}>
-      <legend className="colour-group-heading">
+    <fieldset className="color-group" aria-labelledby={headingId}>
+      <legend className="color-group-heading">
         <span id={headingId}>{group.name}</span>
         <ResetButton name={`the ${group.name} group`} blocked={blocked} onReset={() => onEdit(commands)} />
       </legend>
       {group.settings.map((setting) => (
         <Fragment key={setting}>
-          <ColourControl
+          <ColorControl
             layer={layer}
             frame={frame}
             resetKey={resetKey}
             disabled={disabled}
             onEdit={onEdit}
-            control={COLOUR_CONTROLS.find((item) => item.key === setting)!}
-            value={colour[setting]}
+            control={COLOR_CONTROLS.find((item) => item.key === setting)!}
+            value={color[setting]}
             id={`${id}-${setting}`}
           />
           {setting === 'tint' && afterTint}
@@ -538,7 +538,7 @@ function SequenceControls({
                 touch, so close any gap or turn Ripple on first.
               </p>
               <p className="editor-help-tip">
-                Tip: if a change is refused, check the neighbouring fades and transitions.
+                Tip: if a change is refused, check the neighboring fades and transitions.
               </p>
             </HelpPopover>
           }
@@ -794,7 +794,7 @@ function SourceRangeSection({
   );
 }
 
-interface ColourTabProps {
+interface ColorTabProps {
   project: ProjectDocument;
   assets: MediaAsset[];
   /** The selected clip, when it is placed. */
@@ -819,7 +819,7 @@ interface ColourTabProps {
   onSeek: (frame: number) => void;
 }
 
-/** Why the Colour tab edits nothing, with nothing or several clips and adjustments selected; null with one. */
+/** Why the Color tab edits nothing, with nothing or several clips and adjustments selected; null with one. */
 function nothingToEdit(clips: number, adjustments: number): string | null {
   if (!clips && !adjustments)
     return 'Select a clip or an adjustment in the timeline to edit its grade. To grade every track over a stretch, draw an adjustment on the adjustment track.';
@@ -836,8 +836,8 @@ function gradeFrames(placed: PlacedClip | undefined, projectFrame: number, sourc
   return { frame: sourceFrame, valueFrame: gradeValuePosition(placed, projectFrame) };
 }
 
-/** Colour, HSL ranges and Colour curves for the selected clip's grade or the selected adjustment. */
-function ColourTab(props: Readonly<ColourTabProps>) {
+/** Color, HSL ranges and Color curves for the selected clip's grade or the selected adjustment. */
+function ColorTab(props: Readonly<ColorTabProps>) {
   const { project, clip, placed, asset, drafting, onEdit, onPreview, onPause, onSeek } = props;
   const navigation = useKeyframeNavigation();
   const items = project.adjustments.filter((candidate) => props.selectedAdjustmentIds.includes(candidate.id));
@@ -868,8 +868,8 @@ function ColourTab(props: Readonly<ColourTabProps>) {
         : null,
     [navigation, item, onSeek],
   );
-  const header = (icon: 'video' | 'colour', title: string, detail: ReactNode, actions?: ReactNode) => (
-    <div className="selected-clip-name inspector-selection colour-target">
+  const header = (icon: 'video' | 'color', title: string, detail: ReactNode, actions?: ReactNode) => (
+    <div className="selected-clip-name inspector-selection color-target">
       <Icon name={icon} size={17} />
       <strong title={title}>{title}</strong>
       <span>{detail}</span>
@@ -879,20 +879,20 @@ function ColourTab(props: Readonly<ColourTabProps>) {
   const empty = nothingToEdit(clip ? Math.max(1, props.selectedClipCount) : 0, items.length);
   if (empty) return <div className="inspector-empty">{empty}</div>;
   const clipName = asset ? shortName(asset.name) : 'Unavailable recording';
-  let owner: ColourOwner;
+  let owner: ColorOwner;
   let frame: number;
   let valueFrame: number;
   let ownerNavigation: KeyframeNavigation;
   let title: string;
   if (item) {
-    owner = adjustmentColourOwner(item, `adjustment ${adjustmentLabel(item)}`);
+    owner = adjustmentColorOwner(item, `adjustment ${adjustmentLabel(item)}`);
     // Keyframes are captured only on the adjustment's own frames.
     frame = props.frame >= item.start && props.frame < item.start + item.duration ? props.frame - item.start : -1;
     valueFrame = frame;
     ownerNavigation = itemNavigation!;
     title = `Adjustment ${adjustmentLabel(item)}`;
   } else {
-    owner = clipColourOwner(clip!, `${props.clipLabel} (${clipName})`);
+    owner = clipColorOwner(clip!, `${props.clipLabel} (${clipName})`);
     ({ frame, valueFrame } = gradeFrames(placed, props.frame, props.sourceFrame));
     ownerNavigation = clipNavigation!;
     title = clipName;
@@ -903,7 +903,7 @@ function ColourTab(props: Readonly<ColourTabProps>) {
       {isClipOwner(owner)
         ? header('video', title, `${props.clipPlace} · this clip only`)
         : header(
-            'colour',
+            'color',
             title,
             'Every track within this range',
             <button
@@ -918,7 +918,7 @@ function ColourTab(props: Readonly<ColourTabProps>) {
             </button>,
           )}
       <KeyframeNavigationContext.Provider value={ownerNavigation}>
-        <ColourSection
+        <ColorSection
           project={project}
           layer={owner}
           frame={frame}
@@ -943,7 +943,7 @@ function ColourTab(props: Readonly<ColourTabProps>) {
         onPause={onPause}
         onPreview={onPreview}
       />
-      <ColourCurvesSection
+      <ColorCurvesSection
         key={`curves:${project.id}:${owner.id}`}
         project={project}
         layer={owner}
@@ -982,7 +982,7 @@ function InspectorPanel({
   children,
 }: Readonly<Props>) {
   const inspectorId = useId();
-  const colourControlId = useId();
+  const colorControlId = useId();
   const expansion = useInspectorExpansion();
   const { setOpen } = expansion;
   const layer = project.layers.find((item) => item.id === selectedLayerId);
@@ -1059,7 +1059,7 @@ function InspectorPanel({
               <SpeedControls
                 project={project}
                 resetKey={project.id}
-                helpId={`${colourControlId}-speed-help`}
+                helpId={`${colorControlId}-speed-help`}
                 clip={clip ?? null}
                 frame={frame}
                 placedDuration={placed?.duration ?? null}
@@ -1086,7 +1086,7 @@ function InspectorPanel({
                   frame={frame}
                   drafting={drafting}
                   resetKey={inputContext}
-                  id={colourControlId}
+                  id={colorControlId}
                   onEdit={onEdit}
                   onPreview={onPreview}
                   onPause={onPause}
@@ -1171,11 +1171,11 @@ function InspectorPanel({
         </div>
         <div
           role="tabpanel"
-          id={`${inspectorId}-colour-panel`}
-          aria-labelledby={`${inspectorId}-colour-tab`}
-          hidden={section !== 'colour'}
+          id={`${inspectorId}-color-panel`}
+          aria-labelledby={`${inspectorId}-color-tab`}
+          hidden={section !== 'color'}
         >
-          <ColourTab
+          <ColorTab
             project={project}
             assets={assets}
             clip={clip && placed ? clip : undefined}
@@ -1190,7 +1190,7 @@ function InspectorPanel({
             layout={layout}
             drafting={drafting}
             resetKey={inputContext}
-            id={colourControlId}
+            id={colorControlId}
             onEdit={onEdit}
             onPreview={onPreview}
             onPause={onPause}
@@ -1227,7 +1227,7 @@ function InspectorPanel({
                 drafting={drafting}
                 onEdit={onEdit}
                 onSelectBoundary={onSelectBoundary}
-                id={colourControlId}
+                id={colorControlId}
               />
             </>
           ) : (

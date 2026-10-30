@@ -59,7 +59,7 @@ function fakeNative(duration = '8.000000\n') {
   };
 }
 
-/** Native calls that run until cancelled, to observe the concurrency bound. */
+/** Native calls that run until canceled, to observe the concurrency bound. */
 function hangingNative() {
   const started: { binary: string; file: string; signal: AbortSignal | undefined; finish: () => void }[] = [];
   vi.mocked(runProcess).mockImplementation(
@@ -72,7 +72,7 @@ function hangingNative() {
           signal: options.signal,
           finish,
         });
-        options.signal?.addEventListener('abort', () => reject(new ServiceError('Job cancelled.', 499)), {
+        options.signal?.addEventListener('abort', () => reject(new ServiceError('Job canceled.', 499)), {
           once: true,
         });
       }),
@@ -268,7 +268,7 @@ describe('Import dialog recording previews', () => {
     controllers[running[0]!]!.abort();
     expect(started[0]!.signal?.aborted).toBe(true);
     expect(await results[running[0]!]).toBe(499);
-    // The freed slot goes to the next queued read, not the cancelled one.
+    // The freed slot goes to the next queued read, not the canceled one.
     await vi.waitFor(() => expect(started).toHaveLength(PREVIEW_LIMITS.active + 1));
     expect(queued.slice(1)).toContain(files.indexOf(started.at(-1)!.file));
 

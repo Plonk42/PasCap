@@ -1,15 +1,15 @@
 import { z } from 'zod';
 import {
-  colourCurveSchema,
+  colorCurveSchema,
   CURVE_CHANNELS,
   HSL_BANDS,
   hslBandSchema,
   isIdentityCurve,
-  type ColourCurvePoint,
+  type ColorCurvePoint,
   type CurveChannel,
   type HslBand,
-} from '../advanced-colour.js';
-import { NEUTRAL_COLOUR, scalarColourValues, type ColourSettings, type ScalarColourSetting } from '../colour.js';
+} from '../advanced-color.js';
+import { NEUTRAL_COLOR, scalarColorValues, type ColorSettings, type ScalarColorSetting } from '../color.js';
 import { described } from '../described.js';
 import { gradeSettingSchema } from '../grade.js';
 
@@ -18,14 +18,14 @@ export const gradeSummarySchema = z
   .object({
     settings: described(
       z.partialRecord(gradeSettingSchema, z.number()),
-      'Scalar Colour settings that differ from neutral; the others are neutral.',
+      'Scalar Color settings that differ from neutral; the others are neutral.',
     ),
     hsl: described(
       z.partialRecord(z.enum(HSL_BANDS), hslBandSchema).optional(),
       'HSL ranges that differ from neutral.',
     ),
     curves: described(
-      z.partialRecord(z.enum(CURVE_CHANNELS), colourCurveSchema).optional(),
+      z.partialRecord(z.enum(CURVE_CHANNELS), colorCurveSchema).optional(),
       'Curves that differ from identity, with their control nodes.',
     ),
     keyframes: described(
@@ -36,25 +36,25 @@ export const gradeSummarySchema = z
   .strict();
 export type GradeSummary = z.infer<typeof gradeSummarySchema>;
 
-export function gradeSummary(grade: { colour: ColourSettings; keyframes: readonly unknown[] }): GradeSummary {
-  const { colour } = grade;
+export function gradeSummary(grade: { color: ColorSettings; keyframes: readonly unknown[] }): GradeSummary {
+  const { color } = grade;
   const settings = Object.fromEntries(
-    Object.entries(scalarColourValues(colour)).filter(
-      ([setting, value]) => value !== NEUTRAL_COLOUR[setting as ScalarColourSetting],
+    Object.entries(scalarColorValues(color)).filter(
+      ([setting, value]) => value !== NEUTRAL_COLOR[setting as ScalarColorSetting],
     ),
   );
   const hsl = Object.fromEntries(
-    HSL_BANDS.filter((band) => Object.values(colour.hsl[band]).some((value) => value !== 0)).map((band) => [
+    HSL_BANDS.filter((band) => Object.values(color.hsl[band]).some((value) => value !== 0)).map((band) => [
       band,
-      colour.hsl[band],
+      color.hsl[band],
     ]),
-  ) as Partial<Record<HslBand, ColourSettings['hsl'][HslBand]>>;
+  ) as Partial<Record<HslBand, ColorSettings['hsl'][HslBand]>>;
   const curves = Object.fromEntries(
-    CURVE_CHANNELS.filter((channel) => !isIdentityCurve(colour.curves[channel])).map((channel) => [
+    CURVE_CHANNELS.filter((channel) => !isIdentityCurve(color.curves[channel])).map((channel) => [
       channel,
-      colour.curves[channel],
+      color.curves[channel],
     ]),
-  ) as Partial<Record<CurveChannel, ColourCurvePoint[]>>;
+  ) as Partial<Record<CurveChannel, ColorCurvePoint[]>>;
   return {
     settings,
     ...(Object.keys(hsl).length > 0 && { hsl }),

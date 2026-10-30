@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { whiteBalanceCommands } from '../../src/shared/auto-colour.js';
+import { whiteBalanceCommands } from '../../src/shared/auto-color.js';
 import { EditHistory, applyCommand } from '../../src/shared/commands.js';
 import { gradeKeyAsLayerKey, layerKeyAsGradeKey, MAX_GRADE_KEYFRAMES } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, KEYFRAME_SETTINGS, layerKeyframe, joiningEasing } from '../../src/shared/keyframes.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { whiteBalanceTarget } from '../../src/web/auto-white-balance.js';
-import { gradeOwnerOf } from '../../src/web/colour-owner.js';
+import { gradeOwnerOf } from '../../src/web/color-owner.js';
 import { analysisAsset as asset } from './analysis-asset.js';
 
 /** Clip A (source 100–400, 1×) then B (reversed 2×, source 0–300) after a 10-frame dissolve. */
@@ -28,7 +28,7 @@ const key = (frame: number, values: Partial<typeof EMPTY_KEY_VALUES>, easing: 'l
   layerKeyAsGradeKey(layerKeyframe(frame, { ...EMPTY_KEY_VALUES, ...values }, easing));
 
 describe('Auto white balance target', () => {
-  it('analyses the graded clip around the playhead through its retiming, reversed clips included', () => {
+  it('analyzes the graded clip around the playhead through its retiming, reversed clips included', () => {
     const document = project();
     const layout = calculateLayout(document);
     const a = whiteBalanceTarget(document, 'a', layout, ASSETS, 100);
@@ -99,7 +99,7 @@ describe('Auto white balance capture', () => {
 
   it('joins an existing keyframe like the diamonds and overwrites only its two values', () => {
     const document = project();
-    grade(document, 'a').colour.exposure = 0.3;
+    grade(document, 'a').color.exposure = 0.3;
     grade(document, 'a').keyframes = [
       key(220, { exposure: 0.5, hue: 4 }, 'smooth'),
       key(300, { exposure: -0.5, temperature: 1.2 }, 'hold'),
@@ -112,7 +112,7 @@ describe('Auto white balance capture', () => {
     expect(point.values).toEqual({ ...owner.keyframes[0]!.values, temperature: 0.214, tint: -0.031 });
     expect(point.easing).toEqual({ ...owner.keyframes[0]!.easing, temperature: easing, tint: easing });
     expect(grade(joined, 'a').keyframes[1]).toEqual(grade(document, 'a').keyframes[1]);
-    expect(grade(joined, 'a').colour).toEqual(grade(document, 'a').colour);
+    expect(grade(joined, 'a').color).toEqual(grade(document, 'a').color);
 
     const rerun = whiteBalanceCommands(gradeOwnerOf(joined, 'a')!, 220, { temperature: -0.1, tint: 0.05 }, CLIP_A);
     expect(rerun.map((command) => command.type)).toEqual(['layer-key-value', 'layer-key-value']);

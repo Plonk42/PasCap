@@ -29,7 +29,7 @@ const STATE_LABELS: Readonly<Record<MediaJob['state'], string>> = {
   running: 'Running',
   completed: 'Completed',
   failed: 'Failed',
-  cancelled: 'Cancelled',
+  canceled: 'Canceled',
 };
 
 export function isActiveJob(job: MediaJob): boolean {
@@ -64,7 +64,7 @@ export function orderActivityJobs(jobs: readonly MediaJob[]): MediaJob[] {
 
 export function activitySummary(jobs: readonly MediaJob[]): string {
   if (!jobs.length) return 'No activity yet';
-  const counts: Record<MediaJob['state'], number> = { running: 0, queued: 0, failed: 0, cancelled: 0, completed: 0 };
+  const counts: Record<MediaJob['state'], number> = { running: 0, queued: 0, failed: 0, canceled: 0, completed: 0 };
   for (const job of jobs) counts[job.state]++;
   return (Object.keys(counts) as MediaJob['state'][])
     .filter((state) => counts[state] > 0)
@@ -75,7 +75,7 @@ export function activitySummary(jobs: readonly MediaJob[]): string {
 /** Only settled jobs are announced; progress polling never changes this text. */
 export function activityResultSummary(job: MediaJob | null): string {
   if (!job || isActiveJob(job)) return '';
-  const detail = (job.state === 'failed' || job.state === 'cancelled') && job.message ? `. ${job.message}` : '';
+  const detail = (job.state === 'failed' || job.state === 'canceled') && job.message ? `. ${job.message}` : '';
   return `${KIND_LABELS[job.kind]} ${job.state}: ${job.label}${detail}`;
 }
 
@@ -113,7 +113,7 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
   const drawer = useRef<HTMLElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const cancellationRequests = useRef(new Set<string>());
-  const [cancelling, setCancelling] = useState<ReadonlySet<string>>(new Set());
+  const [canceling, setCanceling] = useState<ReadonlySet<string>>(new Set());
   const [cancelErrors, setCancelErrors] = useState<Readonly<Record<string, string>>>({});
   const [etas, setEtas] = useState<Readonly<Record<string, string | null>>>({});
   const observed = useRef(new Map<string, readonly ProgressSample[]>());
@@ -175,7 +175,7 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
         changed = true;
       }
     }
-    if (changed) setCancelling(new Set(cancellationRequests.current));
+    if (changed) setCanceling(new Set(cancellationRequests.current));
     setCancelErrors((previous) => {
       const retained = Object.entries(previous).filter(([jobId]) => activeIds.has(jobId));
       return retained.length === Object.keys(previous).length ? previous : Object.fromEntries(retained);
@@ -190,10 +190,10 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
   const cancelJob = async (job: MediaJob): Promise<void> => {
     if (busy || !isActiveJob(job) || cancellationRequests.current.has(job.id)) return;
     cancellationRequests.current.add(job.id);
-    setCancelling(new Set(cancellationRequests.current));
+    setCanceling(new Set(cancellationRequests.current));
     setCancelErrors((previous) => Object.fromEntries(Object.entries(previous).filter(([jobId]) => jobId !== job.id)));
     try {
-      if (await onCancel(job.id)) return; // Accepted is not yet cancelled: wait for the actual job state.
+      if (await onCancel(job.id)) return; // Accepted is not yet canceled: wait for the actual job state.
       setCancelErrors((previous) => ({ ...previous, [job.id]: 'Cancellation was not accepted. Try again.' }));
     } catch (cause) {
       setCancelErrors((previous) => ({
@@ -202,7 +202,7 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
       }));
     }
     cancellationRequests.current.delete(job.id);
-    setCancelling(new Set(cancellationRequests.current));
+    setCanceling(new Set(cancellationRequests.current));
   };
 
   const jobRow = (job: MediaJob) => (
@@ -219,7 +219,7 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
           <span>{Math.round(job.progress * 100)}%</span>
         </div>
       )}
-      {job.kind === 'export' && job.state === 'running' && !cancelling.has(job.id) && (
+      {job.kind === 'export' && job.state === 'running' && !canceling.has(job.id) && (
         <p className="activity-hint activity-job-eta">{etas[job.id] ?? 'Estimating time left…'}</p>
       )}
       <div className="activity-job-times">
@@ -234,12 +234,12 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
           <button
             className="secondary-button"
             aria-label={`Cancel ${job.label}`}
-            disabled={busy || cancelling.has(job.id)}
+            disabled={busy || canceling.has(job.id)}
             onClick={() => {
               void cancelJob(job);
             }}
           >
-            {cancelling.has(job.id) ? 'Cancelling…' : 'Cancel'}
+            {canceling.has(job.id) ? 'Canceling…' : 'Cancel'}
           </button>
         )}
         {job.state === 'completed' && job.outputUrl && (
@@ -257,7 +257,7 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
             Receipt
           </a>
         )}
-        {isActiveJob(job) && cancelling.has(job.id) && (
+        {isActiveJob(job) && canceling.has(job.id) && (
           <span className="activity-hint">Waiting for cancellation confirmation.</span>
         )}
       </div>

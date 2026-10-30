@@ -16,7 +16,7 @@
   flex-wrap: nowrap;
 }
 
-/* A clip with its own grade: the Colour tab's palette icon before its name. */
+/* A clip with its own grade: the Color tab's palette icon before its name. */
 .clip-grade-mark {
   flex: none;
   display: grid;

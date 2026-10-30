@@ -15,7 +15,7 @@ interface Props {
   onTogglePlayback: () => void;
   /** Play covers only the selected timeline range. */
   rangeSelected: boolean;
-  /** Shows the image without Colour and Detail for as long as `active` stays true. */
+  /** Shows the image without Color and Detail for as long as `active` stays true. */
   onHoldOriginal: (mode: OriginalMode | false) => void;
   onSeek: (frame: number) => void;
   /** Start/end of the selected range, else of the timeline. */
@@ -94,7 +94,7 @@ function PreviewActions({
 }
 
 const ORIGINAL_BADGES: Record<OriginalMode, string> = {
-  all: 'Original · Colour and Detail bypassed',
+  all: 'Original · Color and Detail bypassed',
   clip: 'Original · clip grades bypassed',
   adjustment: 'Original · adjustments bypassed',
 };
@@ -175,7 +175,7 @@ export function PreviewPanel({
             className="preview-comparison-toggle"
             aria-label="Show original preview"
             aria-pressed={diagnostics?.ungraded ?? false}
-            title="Hold to show the image without Colour and Detail on every video track, keeping geometry, Opacity, fades and transitions. Hold Shift to bypass only clip grades, Alt only adjustments. Preview only; saved edits and exports are unchanged."
+            title="Hold to show the image without Color and Detail on every video track, keeping geometry, Opacity, fades and transitions. Hold Shift to bypass only clip grades, Alt only adjustments. Preview only; saved edits and exports are unchanged."
             disabled={controlsUnavailable || failed || !diagnostics || status === 'disposed'}
             onPointerDown={pressPointer}
             onPointerUp={() => hold(false)}
@@ -185,7 +185,7 @@ export function PreviewPanel({
             onKeyUp={(event) => keyHold(event, false)}
             onBlur={() => hold(false)}
           >
-            <Icon name="colour" size={14} />
+            <Icon name="color" size={14} />
             Original
           </button>
         </div>

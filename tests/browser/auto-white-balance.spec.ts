@@ -17,13 +17,13 @@ import {
   type AnalysisFrame,
   type WhiteBalance,
 } from '../../src/shared/white-balance.js';
-import { whiteBalanceCommands } from '../../src/shared/auto-colour.js';
-import { gradeOwnerOf } from '../../src/web/colour-owner.js';
+import { whiteBalanceCommands } from '../../src/shared/auto-color.js';
+import { gradeOwnerOf } from '../../src/web/color-owner.js';
 import { adjustmentFrom0, expandedInspectorPreferences, inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
 /**
- * A disposable proxy in the editing-proxy format: 60 black frames, then 60 frames of grey patches
+ * A disposable proxy in the editing-proxy format: 60 black frames, then 60 frames of gray patches
  * (40 × 36, aligned with the 4:2:0 chroma) under a blue cast. It replaces pattern-a's proxy in this spec.
  */
 async function castProxy(directory: string): Promise<Buffer> {
@@ -49,7 +49,7 @@ async function castProxy(directory: string): Promise<Buffer> {
   return readFile(output);
 }
 
-async function fulfilRange(route: Route, bytes: Buffer): Promise<void> {
+async function fulfillRange(route: Route, bytes: Buffer): Promise<void> {
   const range = /^bytes=(\d+)-(\d+)$/.exec(route.request().headers()['range'] ?? '');
   if (!range) {
     await route.fulfill({ status: 200, contentType: 'video/mp4', body: bytes });
@@ -112,8 +112,8 @@ test.beforeEach(async ({ page, request }) => {
     }
     if (method === 'GET' && pathname === `/api/media/${assets[0]!.id}/proxy`) {
       if (held) await held;
-      // A cancelled analysis terminates its reader while a read waits.
-      await fulfilRange(route, proxy).catch(() => undefined);
+      // A canceled analysis terminates its reader while a read waits.
+      await fulfillRange(route, proxy).catch(() => undefined);
       return;
     }
     const media = /^\/api\/media\/([^/]+)\/(?:proxy|thumbnail\/\d+)$/.exec(pathname);
@@ -209,7 +209,7 @@ async function captured(page: Page, expected: ProjectDocument): Promise<void> {
   await expect.poll(() => current(page)).toEqual(expected);
 }
 
-test('analysed pixels are exactly the compositor input of the clip at the playhead', async ({ page }) => {
+test('analyzed pixels are exactly the compositor input of the clip at the playhead', async ({ page }) => {
   await seek(page, 60);
   const comparison = await page.evaluate(async (mediaId) => {
     const lab = window.pascapLab!;
@@ -221,12 +221,12 @@ test('analysed pixels are exactly the compositor input of the clip at the playhe
     let largest = 0;
     for (let y = 1; y < height - 1; y++)
       for (let x = 1; x < width - 1; x++) {
-        const centre = (y * width + x) * 4;
+        const center = (y * width + x) * 4;
         let uniform = true;
         for (let dy = -1; dy <= 1; dy++)
           for (let dx = -1; dx <= 1; dx++)
             for (let channel = 0; channel < 3; channel++)
-              uniform &&= data[((y + dy) * width + x + dx) * 4 + channel] === data[centre + channel];
+              uniform &&= data[((y + dy) * width + x + dx) * 4 + channel] === data[center + channel];
         if (!uniform) continue;
         compared++;
         // Readback rows run bottom-up; compare the inner pixels of the magnified texel.
@@ -234,7 +234,7 @@ test('analysed pixels are exactly the compositor input of the clip at the playhe
           const row = 719 - (y * scale + offset);
           const index = (row * 1280 + x * scale + offset) * 4;
           for (let channel = 0; channel < 3; channel++)
-            largest = Math.max(largest, Math.abs(canvas[index + channel]! - data[centre + channel]!));
+            largest = Math.max(largest, Math.abs(canvas[index + channel]! - data[center + channel]!));
         }
       }
     const patch = (20 * width + 60) * 4;
@@ -244,7 +244,7 @@ test('analysed pixels are exactly the compositor input of the clip at the playhe
   expect(comparison.height).toBe(180);
   expect(comparison.compared).toBeGreaterThan(30_000);
   expect(comparison.largest).toBeLessThanOrEqual(1);
-  // The blue cast survives decoding: blue well above red on a grey patch.
+  // The blue cast survives decoding: blue well above red on a gray patch.
   expect(comparison.patch[2]! - comparison.patch[0]!).toBeGreaterThan(20);
 });
 
@@ -304,7 +304,7 @@ test('follows changing light between two runs and reruns update only their two v
   expect(await current(page)).toEqual(once);
 });
 
-test('explains when it cannot run, and a cancelled or failed analysis leaves no edit', async ({ page }) => {
+test('explains when it cannot run, and a canceled or failed analysis leaves no edit', async ({ page }) => {
   memory.seed({ ...(await current(page)), adjustments: [adjustmentFrom0(120)] });
   await page.reload();
   await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');

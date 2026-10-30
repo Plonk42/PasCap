@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { described } from '../described.js';
 import { frameSchema } from '../model.js';
 
-/** The saved revision a read used, so a result read before or during an edit can be recognised. */
+/** The saved revision a read used, so a result read before or during an edit can be recognized. */
 export const revisionReadSchema = described(
   frameSchema,
   'Saved revision this result was read from; older than your last edit means it is stale, so read again.',
@@ -12,7 +12,7 @@ export const revisionReadSchema = described(
 export type OperationAudience = 'editor' | 'assistant';
 
 /**
- * One service capability. The HTTP route, the typed web client, the catalogue and later the
+ * One service capability. The HTTP route, the typed web client, the catalog and later the
  * MCP tool are generated from it; the server pairs it with its `run` implementation.
  */
 export interface OperationSpec<

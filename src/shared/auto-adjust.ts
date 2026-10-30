@@ -1,14 +1,14 @@
 import {
   clamp01,
-  COLOUR_CONTROLS,
+  COLOR_CONTROLS,
   compilePixelGrade,
-  createColourSettings,
+  createColorSettings,
   decode709,
   encode709,
   temperatureTintGains,
-  type ColourSettings,
+  type ColorSettings,
   type RGB,
-} from './colour.js';
+} from './color.js';
 import { localToneStops } from './detail.js';
 import {
   contentBox,
@@ -26,11 +26,11 @@ import {
 
 /** Auto adjust (#167): starting values, tuned on synthetic fixtures and real flights; see docs/design/AUTO_ADJUST.md. */
 export const AUTO_ADJUST = Object.freeze({
-  /** Source frames analysed, at the centres of equal slices of the clip's range. */
+  /** Source frames analyzed, at the centers of equal slices of the clip's range. */
   frames: 16,
-  /** Centre weight 0.5 + 0.5·exp(−r² / (2σ²)), r the distance from the centre (1 at the corners). */
-  centreSigma: 0.35,
-  /** Reinhard's automatic key: mid-grey, adapted to high- and low-key scenes within these bounds. */
+  /** Center weight 0.5 + 0.5·exp(−r² / (2σ²)), r the distance from the center (1 at the corners). */
+  centerSigma: 0.35,
+  /** Reinhard's automatic key: mid-gray, adapted to high- and low-key scenes within these bounds. */
   key: 0.18,
   minimumKey: 0.09,
   maximumKey: 0.72,
@@ -61,43 +61,43 @@ export const AUTO_ADJUST = Object.freeze({
   rangeTolerance: 1,
   flatContrast: 0.2,
   maximumFlatContrast: 1.4,
-  /** Weight of stops pushed past clipping on the saturated colour anchor. */
+  /** Weight of stops pushed past clipping on the saturated color anchor. */
   clipWeight: 4,
   /** Pull towards no correction, so good footage barely changes. */
-  regularisation: 0.02,
+  regularization: 0.02,
   sweeps: 16,
   lineSearchSteps: 24,
   /** Below this 99.5th percentile luma, footage is dark: halve the stretch rather than amplify noise. */
   lowLight: 0.05,
-  /** Hasler–Süsstrunk colourfulness target, response exponent and bounds of the chroma gain it asks for. */
-  colourfulness: 65,
+  /** Hasler–Süsstrunk colorfulness target, response exponent and bounds of the chroma gain it asks for. */
+  colorfulness: 65,
   saturationExponent: 0.75,
   minimumSaturation: 0.9,
   maximumSaturation: 1.5,
-  /** Below this colourfulness footage is monochrome and keeps Saturation 1 and Vibrance 0. */
+  /** Below this colorfulness footage is monochrome and keeps Saturation 1 and Vibrance 0. */
   monochrome: 5,
   /**
    * A gain above 1 is shared: Saturation takes this share of it (in log terms), Vibrance the rest, so that
-   * this quantile of the pixel saturations, the scene's muted colours, gains it all, up to maximumVibrance.
+   * this quantile of the pixel saturations, the scene's muted colors, gains it all, up to maximumVibrance.
    */
   saturationShare: 0.5,
   mutedQuantile: 0.25,
   maximumVibrance: 1,
   /**
-   * The strong colours, this quantile of the pixel saturations (linear (max − min) / max, as Vibrance
+   * The strong colors, this quantile of the pixel saturations (linear (max − min) / max, as Vibrance
    * measures them), may rise to strongCeiling, or by strongMargin once at or above it: a saturated sky
    * filling a tenth of the frame or more is barely pushed further. Saturation's share gives way first.
    */
   strongQuantile: 0.9,
   strongCeiling: 0.7,
   strongMargin: 0.05,
-  /** Pixels whose colourfulness is measured, shared among the frames. */
+  /** Pixels whose colorfulness is measured, shared among the frames. */
   saturationSamples: 20_000,
   /** Intensity that applies the correction as fitted; above it, up to 100%, the correction is exaggerated. */
   balancedIntensity: 0.8,
 });
 
-/** Fitted tone settings in solve order, with their bounds and regularisation scales. */
+/** Fitted tone settings in solve order, with their bounds and regularization scales. */
 const TONE = [
   { key: 'exposure', low: -1.5, high: 1.5, scale: 1 },
   { key: 'blacks', low: -1, high: 0, scale: 0.6 },
@@ -109,7 +109,7 @@ const TONE = [
 ] as const;
 type ToneSetting = (typeof TONE)[number]['key'];
 type Tone = Record<ToneSetting, number>;
-type Chroma = Pick<ColourSettings, 'saturation' | 'vibrance'>;
+type Chroma = Pick<ColorSettings, 'saturation' | 'vibrance'>;
 const NEUTRAL_CHROMA: Readonly<Chroma> = Object.freeze({ saturation: 1, vibrance: 0 });
 const NEUTRAL_TONE: Readonly<Tone> = Object.freeze({
   exposure: 0,
@@ -121,7 +121,7 @@ const NEUTRAL_TONE: Readonly<Tone> = Object.freeze({
   shadows: 0,
 });
 
-/** The eleven Colour settings Auto adjust sets, in Colour section order. */
+/** The eleven Color settings Auto adjust sets, in Color section order. */
 export const AUTO_ADJUST_SETTINGS = [
   'temperature',
   'tint',
@@ -136,16 +136,16 @@ export const AUTO_ADJUST_SETTINGS = [
   'blacks',
 ] as const;
 export type AutoAdjustSetting = (typeof AUTO_ADJUST_SETTINGS)[number];
-/** Resolved settings at the balanced intensity, each within its Colour bounds. */
+/** Resolved settings at the balanced intensity, each within its Color bounds. */
 export type AutoCorrection = Record<AutoAdjustSetting, number>;
 
 /** Settings that scale geometrically from their neutral 1; the others scale linearly from 0. */
 const MULTIPLICATIVE: ReadonlySet<AutoAdjustSetting> = new Set(['contrast', 'saturation']);
-const BOUNDS = new Map<string, { min: number; max: number }>(COLOUR_CONTROLS.map((control) => [control.key, control]));
+const BOUNDS = new Map<string, { min: number; max: number }>(COLOR_CONTROLS.map((control) => [control.key, control]));
 
 /**
  * The correction at `intensity` (0–1), scaled from neutral by intensity / balancedIntensity: log-gains,
- * offsets and Vibrance linearly, Contrast and Saturation geometrically, each kept within its Colour bounds.
+ * offsets and Vibrance linearly, Contrast and Saturation geometrically, each kept within its Color bounds.
  */
 export function scaleCorrection(correction: Readonly<AutoCorrection>, intensity: number): AutoCorrection {
   if (!Number.isFinite(intensity) || intensity < 0 || intensity > 1)
@@ -160,7 +160,7 @@ export function scaleCorrection(correction: Readonly<AutoCorrection>, intensity:
   ) as AutoCorrection;
 }
 
-/** Source frames analysed: the centres of up to AUTO_ADJUST.frames equal slices of [sourceIn, sourceOut). */
+/** Source frames analyzed: the centers of up to AUTO_ADJUST.frames equal slices of [sourceIn, sourceOut). */
 export function autoAdjustFrames(sourceIn: number, sourceOut: number): number[] {
   const length = sourceOut - sourceIn;
   if (!Number.isSafeInteger(sourceIn) || !Number.isSafeInteger(sourceOut) || length < 1)
@@ -169,7 +169,7 @@ export function autoAdjustFrames(sourceIn: number, sourceOut: number): number[] 
   return Array.from({ length: count }, (_, index) => sourceIn + Math.floor(((index + 0.5) * length) / count));
 }
 
-/** Project frames a keyframe analyses: the playhead and up to 1 s on each side, within its clip [start, end). */
+/** Project frames a keyframe analyzes: the playhead and up to 1 s on each side, within its clip [start, end). */
 export function autoAdjustWindow(clip: { start: number; end: number }, playhead: number): number[] {
   return whiteBalanceWindow(clip, playhead);
 }
@@ -224,9 +224,9 @@ export interface ToneStatistics {
   shadow: number;
   /** Reinhard's adaptive key for this scene. */
   key: number;
-  /** A colour typical of the 99th percentile of the brightest channel: saturated colours clip first. */
+  /** A color typical of the 99th percentile of the brightest channel: saturated colors clip first. */
   saturated: RGB;
-  /** Each frame's deterministic subsample of pixels (RGB triples), for its colourfulness. */
+  /** Each frame's deterministic subsample of pixels (RGB triples), for its colorfulness. */
   samples: Float64Array[];
 }
 
@@ -236,13 +236,13 @@ interface FrameTone extends Omit<ToneStatistics, 'key' | 'samples'> {
   samples: Float64Array;
 }
 
-/** One frame's weighted histograms: pixels weighted towards the centre, noisy ones left out. */
+/** One frame's weighted histograms: pixels weighted towards the center, noisy ones left out. */
 class FrameAccumulator {
   readonly luma = new Histogram();
   readonly brightest = new Histogram();
-  readonly colours = new Float64Array(BINS * 3);
+  readonly colors = new Float64Array(BINS * 3);
   readonly samples: number[] = [];
-  /** Per area: summed luma, pixel count and centre weight. */
+  /** Per area: summed luma, pixel count and center weight. */
   readonly areas: Float64Array;
   logSum = 0;
   #counter = 0;
@@ -265,7 +265,7 @@ class FrameAccumulator {
     this.luma.add(level, weight);
     this.logSum += weight * Math.log(level + 1e-4);
     const index = this.brightest.add(Math.max(...rgb), weight);
-    for (let channel = 0; channel < 3; channel++) this.colours[index * 3 + channel]! += weight * rgb[channel]!;
+    for (let channel = 0; channel < 3; channel++) this.colors[index * 3 + channel]! += weight * rgb[channel]!;
   }
 
   tone(): FrameTone | null {
@@ -282,7 +282,7 @@ class FrameAccumulator {
       white: this.luma.quantile(0.995),
       logAverage: Math.exp(this.logSum / this.luma.total),
       shadow: areas.quantile(AUTO_ADJUST.shadowArea),
-      saturated: [0, 1, 2].map((channel) => this.colours[index * 3 + channel]! / weight) as unknown as RGB,
+      saturated: [0, 1, 2].map((channel) => this.colors[index * 3 + channel]! / weight) as unknown as RGB,
       samples: Float64Array.from(this.samples),
     };
   }
@@ -300,7 +300,7 @@ function frameTone(frame: AnalysisFrame, gains: RGB, samples: number): FrameTone
     Math.max(1, Math.floor((width * height) / samples)),
     columns * Math.ceil(height / size),
   );
-  const weights = centreWeights(width, height);
+  const weights = centerWeights(width, height);
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
       const source = ((box.top + y) * frame.width + box.left + x) * 4;
@@ -315,9 +315,9 @@ function frameTone(frame: AnalysisFrame, gains: RGB, samples: number): FrameTone
   return accumulator.tone();
 }
 
-function centreWeights(width: number, height: number): Float64Array {
+function centerWeights(width: number, height: number): Float64Array {
   const weights = new Float64Array(width * height);
-  const spread = 2 * AUTO_ADJUST.centreSigma ** 2;
+  const spread = 2 * AUTO_ADJUST.centerSigma ** 2;
   for (let y = 0; y < height; y++)
     for (let x = 0; x < width; x++) {
       const dx = (x + 0.5) / width - 0.5;
@@ -336,7 +336,7 @@ function adaptiveKey(logAverage: number, low: number, high: number): number {
 }
 
 /**
- * Pixel statistics of the analysed frames after the white balance gains. Each frame is measured on its
+ * Pixel statistics of the analyzed frames after the white balance gains. Each frame is measured on its
  * own and every statistic is the median over the frames, so one frame facing the sun cannot decide.
  */
 export function toneStatistics(frames: readonly AnalysisFrame[], balance: WhiteBalance): ToneStatistics | null {
@@ -372,10 +372,10 @@ export function toneStatistics(frames: readonly AnalysisFrame[], balance: WhiteB
 export function renderFlat(
   balance: WhiteBalance,
   tone: Readonly<Tone>,
-  colour: Readonly<Chroma> = NEUTRAL_CHROMA,
+  color: Readonly<Chroma> = NEUTRAL_CHROMA,
 ): (balanced: ArrayLike<number>) => RGB {
   const gains = temperatureTintGains(balance);
-  const settings: ColourSettings = { ...createColourSettings(), ...balance, ...tone, ...colour };
+  const settings: ColorSettings = { ...createColorSettings(), ...balance, ...tone, ...color };
   const grade = compilePixelGrade(settings);
   const local = { ...tone, hdr: 0, localContrast: 0 };
   const toned = tone.shadows !== 0 || tone.highlights !== 0;
@@ -394,15 +394,15 @@ function band(value: number, [low, high]: readonly [number, number]): number {
 }
 
 const CLIPPED = 0.999;
-/** Stops by which a colour is pushed past clipping in its brightest channel: 0 when it does not clip. */
-function clippedStops(render: (balanced: ArrayLike<number>) => RGB, colour: RGB): number {
-  if (Math.max(...render(colour)) < CLIPPED) return 0;
+/** Stops by which a color is pushed past clipping in its brightest channel: 0 when it does not clip. */
+function clippedStops(render: (balanced: ArrayLike<number>) => RGB, color: RGB): number {
+  if (Math.max(...render(color)) < CLIPPED) return 0;
   let low = 0;
   let high = 8;
   for (let step = 0; step < 16; step++) {
     const middle = (low + high) / 2;
     const scale = 2 ** -middle;
-    if (Math.max(...render([colour[0] * scale, colour[1] * scale, colour[2] * scale])) >= CLIPPED) low = middle;
+    if (Math.max(...render([color[0] * scale, color[1] * scale, color[2] * scale])) >= CLIPPED) low = middle;
     else high = middle;
   }
   return high;
@@ -412,13 +412,13 @@ function clippedStops(render: (balanced: ArrayLike<number>) => RGB, colour: RGB)
  * Pull towards no correction, so good footage barely changes. Contrast is pulled towards a value that
  * grows with the stretch the black and white points need: flat footage also lost midtone contrast.
  */
-function regularisation(tone: Readonly<Tone>, contrast: number): number {
+function regularization(tone: Readonly<Tone>, contrast: number): number {
   let sum = 0;
   for (const { key, scale } of TONE) {
     const value = key === 'contrast' ? Math.log2(tone.contrast / contrast) : tone[key];
     sum += (value / scale) ** 2;
   }
-  return AUTO_ADJUST.regularisation * sum;
+  return AUTO_ADJUST.regularization * sum;
 }
 
 const middleOf = ([low, high]: readonly [number, number]): number => decode709((low + high) / 2);
@@ -437,7 +437,7 @@ function flatContrast(statistics: ToneStatistics): number {
 /**
  * The tone objective, measured through the real local tone and grade on flat anchors: the log-average near
  * the key (Reinhard's display value key / (1 + key)), black and white points in their bands, saturated
- * colours unclipped, and as little correction as possible. Shadows is not fitted against it: see fitShadows.
+ * colors unclipped, and as little correction as possible. Shadows is not fitted against it: see fitShadows.
  */
 function toneCost(statistics: ToneStatistics, balance: WhiteBalance): (tone: Readonly<Tone>) => number {
   const target = statistics.key / (1 + statistics.key);
@@ -452,7 +452,7 @@ function toneCost(statistics: ToneStatistics, balance: WhiteBalance): (tone: Rea
       band(level(statistics.black), AUTO_ADJUST.black) ** 2 +
       band(level(statistics.white), AUTO_ADJUST.white) ** 2 +
       AUTO_ADJUST.clipWeight * clippedStops(render, statistics.saturated) ** 2 +
-      regularisation(tone, contrast)
+      regularization(tone, contrast)
     );
   };
 }
@@ -510,7 +510,7 @@ function fitTone(statistics: ToneStatistics, balance: WhiteBalance): Tone {
 const SHADOWS = TONE.find(({ key }) => key === 'shadows')!;
 /**
  * The smallest Shadows that lifts the darkest tenth of the areas, through the fitted tone, to at most
- * shadowStops below the log-average, up to its bound. Only Shadows, which changes the areas below mid-grey
+ * shadowStops below the log-average, up to its bound. Only Shadows, which changes the areas below mid-gray
  * and keeps their local contrast, opens them: flattening Contrast or raising Exposure would cost the rest of
  * the picture. Measured on the output, so opened shadow areas are not opened again.
  */
@@ -532,8 +532,8 @@ function fitShadows(statistics: ToneStatistics, balance: WhiteBalance, tone: Rea
   return high;
 }
 
-/** Hasler–Süsstrunk colourfulness of pixels after white balance and tone, on encoded 0–255 values. */
-function colourfulness(samples: Float64Array, render: (balanced: ArrayLike<number>) => RGB): number {
+/** Hasler–Süsstrunk colorfulness of pixels after white balance and tone, on encoded 0–255 values. */
+function colorfulness(samples: Float64Array, render: (balanced: ArrayLike<number>) => RGB): number {
   const count = samples.length / 3;
   let sumRg = 0;
   let sumYb = 0;
@@ -581,28 +581,28 @@ function bySaturation(
 const quantileIndex = (length: number, q: number): number => Math.min(length - 1, Math.floor(q * length));
 
 /**
- * Colour towards a fairly colourful result, from the median frame colourfulness after tone. A gain below 1
- * lowers Saturation. A gain above 1 is shared between Saturation, which raises every colour alike, and
- * Vibrance, which spares colours that are already strong, and no more than the scene's strong colours
+ * Color towards a fairly colorful result, from the median frame colorfulness after tone. A gain below 1
+ * lowers Saturation. A gain above 1 is shared between Saturation, which raises every color alike, and
+ * Vibrance, which spares colors that are already strong, and no more than the scene's strong colors
  * allow: Saturation alone would push a saturated sky, whose uniformity alone makes the scene measure dull,
- * as far as its muted colours.
+ * as far as its muted colors.
  */
 function fitChroma(statistics: ToneStatistics, balance: WhiteBalance, tone: Readonly<Tone>): Chroma {
   const render = renderFlat(balance, tone);
   const frames = statistics.samples.filter((samples) => samples.length > 0);
   if (!frames.length) return NEUTRAL_CHROMA;
-  const measured = median(frames.map((samples) => colourfulness(samples, render)));
+  const measured = median(frames.map((samples) => colorfulness(samples, render)));
   if (measured < AUTO_ADJUST.monochrome) return NEUTRAL_CHROMA;
   const gain = Math.min(
     AUTO_ADJUST.maximumSaturation,
-    Math.max(AUTO_ADJUST.minimumSaturation, (AUTO_ADJUST.colourfulness / measured) ** AUTO_ADJUST.saturationExponent),
+    Math.max(AUTO_ADJUST.minimumSaturation, (AUTO_ADJUST.colorfulness / measured) ** AUTO_ADJUST.saturationExponent),
   );
   if (gain <= 1) return { saturation: gain, vibrance: 0 };
   const sorted = frames.map((samples) => bySaturation(samples, render));
   const at = (q: number): number =>
     median(sorted.map(({ saturations }) => saturations[quantileIndex(saturations.length, q)]!));
   const muted = Math.max(1e-6, 1 - at(AUTO_ADJUST.mutedQuantile));
-  /** Saturation gain^share, and the Vibrance that brings the muted colours to the whole gain. */
+  /** Saturation gain^share, and the Vibrance that brings the muted colors to the whole gain. */
   const mixed = (share: number): Chroma => {
     const saturation = gain ** share;
     return { saturation, vibrance: Math.min(AUTO_ADJUST.maximumVibrance, (gain / saturation - 1) / muted) };
@@ -613,8 +613,8 @@ function fitChroma(statistics: ToneStatistics, balance: WhiteBalance, tone: Read
     const offset = offsets[quantileIndex(offsets.length, AUTO_ADJUST.strongQuantile)]!;
     return frames[index]!.subarray(offset, offset + 3);
   });
-  const allowed = (colour: Chroma): boolean => {
-    const graded = renderFlat(balance, tone, colour);
+  const allowed = (color: Chroma): boolean => {
+    const graded = renderFlat(balance, tone, color);
     return median(strong.map((pixel) => pixelSaturation(graded(pixel)))) <= limit;
   };
   /** The largest value in [0, high] that `fits`, by bisection, given that 0 fits. */
@@ -628,19 +628,19 @@ function fitChroma(statistics: ToneStatistics, balance: WhiteBalance, tone: Read
     }
     return low;
   };
-  // Lowering Saturation's share moves the gain to Vibrance, which raises the strong colours less.
+  // Lowering Saturation's share moves the gain to Vibrance, which raises the strong colors less.
   if (allowed(mixed(0))) return mixed(largest(AUTO_ADJUST.saturationShare, (share) => allowed(mixed(share))));
   const vibrance = largest(mixed(0).vibrance, (value) => allowed({ saturation: 1, vibrance: value }));
   return { saturation: 1, vibrance };
 }
 
 /**
- * A balanced correction for the analysed frames, by analysis through the real grade: white balance as
+ * A balanced correction for the analyzed frames, by analysis through the real grade: white balance as
  * Auto white balance estimates it, then tone, then Saturation and Vibrance. Null when no frame has usable
  * pixels.
  * `illuminants` are the frames' `frameIlluminant` estimates, when the caller already computed them.
  */
-export function analyseAutoAdjust(
+export function analyzeAutoAdjust(
   frames: readonly AnalysisFrame[],
   illuminants: readonly (IlluminantEstimate | null)[] = frames.map(frameIlluminant),
 ): AutoCorrection | null {

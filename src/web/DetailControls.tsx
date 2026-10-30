@@ -46,7 +46,7 @@ export function DetailSection({ project, clip, disabled, onEdit }: Readonly<Prop
             The preview shows the result as you drag.
           </p>
           <p className="editor-help-tip">
-            Tip: hold Original above the preview to see the clip without Colour and Detail.
+            Tip: hold Original above the preview to see the clip without Color and Detail.
           </p>
         </HelpPopover>
       }
@@ -56,7 +56,7 @@ export function DetailSection({ project, clip, disabled, onEdit }: Readonly<Prop
           const fieldId = `${id}-${control.key}`;
           const value = clip.detail[control.key];
           return (
-            <div className="colour-control detail-field" key={control.key}>
+            <div className="color-control detail-field" key={control.key}>
               <span>
                 <ResetLabel
                   htmlFor={fieldId}

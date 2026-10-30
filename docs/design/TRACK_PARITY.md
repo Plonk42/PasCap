@@ -4,13 +4,13 @@ Approved owner choices for [#25](https://github.com/Plonk42/PasCap/issues/25),
 related to [#17](https://github.com/Plonk42/PasCap/issues/17) and
 [#24](https://github.com/Plonk42/PasCap/issues/24).
 This record retains the accepted schema-6 decisions, not the current persistence,
-opacity or colour contract. [#67](https://github.com/Plonk42/PasCap/issues/67) and
+opacity or color contract. [#67](https://github.com/Plonk42/PasCap/issues/67) and
 [#286](https://github.com/Plonk42/PasCap/issues/286) supersede its two-opacity descriptions:
 Opacity is now a setting of each video track's Transform (`transform.base.opacity`, 1 on new
 tracks, overridden by nullable `opacity` in Transform keyframes) on every source, without an
 additional group multiplier, and there is no saved `clip.opacity`. The **Opacity** control is
 in **Track → Transform**; **Placement** contains placement only. #286 also replaces the
-historical body's track Colour and shared track keyframes with
+historical body's track Color and shared track keyframes with
 [clip grades and adjustments](ROW_APPEARANCE.md). The accepted schema-6 body below remains historical. Track visibility,
 Ripple, transitions/fades, grouped dissolves and resource bounds retain their
 semantics. [#35's current contract](MULTIPLE_MUSIC.md) supersedes the
@@ -210,7 +210,7 @@ recompilation, fade/coverage and hidden tails, arbitrary track removal/reorderin
 one-step Undo/Redo, strict save/reopen/old-data rejection and failed atomic edits.
 Native checks retain exact source/frame/packet/pixel and resource assertions,
 source-identity protection, cancellation/reaping and owned-scratch cleanup. Browser
-checks exercise actual pointer/keyboard controls, cancelled/invalid drafts, focus,
+checks exercise actual pointer/keyboard controls, canceled/invalid drafts, focus,
 compact widths, scrolling, track/boundary hit tests and unchanged autosave on previews.
 Run type/unit/build before the isolated browser suite; do not rebuild its served
 output or reset fixtures during that suite.

@@ -2,7 +2,7 @@
 
 Current contract for [#35](https://github.com/Plonk42/PasCap/issues/35), with music tracks that
 hold several clips joined by transitions from [#203](https://github.com/Plonk42/PasCap/issues/203).
-This specifies the required behaviour, not test evidence or release acceptance.
+This specifies the required behavior, not test evidence or release acceptance.
 Usage belongs in [the user guide](../USER_GUIDE.md) and
 [speed and audio](../SPEED_AND_AUDIO.md); resource/storage limits also belong in
 [tracks and keyframes](../LAYERS_AND_KEYFRAMES.md#properties-panel-and-resource-limits) and
@@ -50,19 +50,19 @@ Usage belongs in [the user guide](../USER_GUIDE.md) and
   visible membership; importing does not place music implicitly.
 - Video contracts do not change: 1–8 uniform tracks, required Ripple/transitions/
   opening/closing fades and video track-owned Transform base/per-setting project-frame
-  keyframes, Opacity (0–1) included. Colour belongs to clip grades and adjustments, whose
-  keyframes have fourteen nullable channels: twelve scalar colour fields (including
+  keyframes, Opacity (0–1) included. Color belongs to clip grades and adjustments, whose
+  keyframes have fourteen nullable channels: twelve scalar color fields (including
   `temperature`, `tint`, `vibrance`, `whites` and `blacks`), `hdr` and `localContrast`;
-  HSL/curves remain static. Video tracks have no Colour, Opacity or keyframes of their own,
-  and there is no clip colour/correction or clip opacity. Clip-only constant/custom source-frame
+  HSL/curves remain static. Video tracks have no Color, Opacity or keyframes of their own,
+  and there is no clip color/correction or clip opacity. Clip-only constant/custom source-frame
   speed retains its ownership and retiming, plus a required boolean clip `reverse`.
   [Spatial transforms](SPATIAL_TRANSFORMS.md) and grades do not change music.
 
-Projects and receipt snapshots saved before the current schema, with track Colour, are
+Projects and receipt snapshots saved before the current schema, with track Color or British spelling, are
 rejected with the reason and preserved byte-for-byte, along with finished exports. Do not
 repair or delete them automatically. Video-proxy and current `pcm16-48k-stereo-mono-unity-v3` PCM
-cache formats and source guards are unchanged; the registries are version 2 (full-content
-checksums).
+cache formats and source guards are unchanged; the registries are version 3 (videos) and 2 (music),
+with full-content checksums.
 
 ## Duration, black tails and video fades
 
@@ -126,7 +126,7 @@ Enter/blur commits once, Escape restores, and invalid drafts stay editable.
 Gain uses a native slider plus an exact field: pointer movement is local, release
 commits once; each keyboard adjustment is one edit. Timing gestures keep their
 transient preview and captured geometry. Every accepted edit/add/remove or
-completed gesture is **one Undo step**; unchanged, invalid or cancelled operations
+completed gesture is **one Undo step**; unchanged, invalid or canceled operations
 change neither committed document nor history/autosave. Escape, pointer
 cancellation, capture loss and window blur restore a gesture atomically.
 
@@ -159,7 +159,7 @@ $$
 
 Sum **all** sources linearly after their individual gain/fades, then hard-clamp
 **once**, after the complete sum. No per-source or intermediate clamp,
-normalisation, ducking, effects, hidden gain compensation or source-video audio.
+normalization, ducking, effects, hidden gain compensation or source-video audio.
 Opposite-polarity sources may cancel even when an individual contribution exceeds
 unity. Native AAC is encoded only after the final clamp; it is not bitwise PCM
 equivalence.
@@ -205,7 +205,7 @@ after selected decoding and before publication. Keep one serial heavy worker.
    PCM** range; never store the full original or every loop repetition.
 2. Stream that selected range/loop with its placement silence, gain and fades.
    Pairwise-sum it with the previous full-project stereo **Float64 accumulator**
-   into the next Float64 accumulator. No normalisation or intermediate clamp;
+   into the next Float64 accumulator. No normalization or intermediate clamp;
    values outside −1–1 survive subsequent cancellation.
 3. Verify exact sample counts and delete consumed selected PCM/old accumulator
    before processing the next music clip. At most **two intermediate audio inputs**,
@@ -213,7 +213,7 @@ after selected decoding and before publication. Keep one serial heavy worker.
    selected source, old accumulator, new accumulator.
 4. Feed one final mixed input to AAC, hard-clamping once after all sources.
    Silence/padding and exact output length follow **full project duration**, not
-   video-only duration. Failed/cancelled work cleans only owned scratch/partials;
+   video-only duration. Failed/canceled work cleans only owned scratch/partials;
    originals, saved projects and successful exports/receipts remain untouched.
 
 Audio disk planning is **maximum selected s16 PCM size + two full-project Float64

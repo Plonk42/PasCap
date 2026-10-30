@@ -28,7 +28,7 @@ issue leaves open.
    - CI failure signatures and `bug`s before `enhancement`/`task`;
    - `priority:p0` → `p3`;
    - earliest open outcome milestone (v0.1 before v0.2 before v0.3);
-   - `status:ready` before unlabelled before `status:backlog`;
+   - `status:ready` before unlabeled before `status:backlog`;
    - smaller, self-contained scope first; issues unblocking others first.
 4. Skip, and report why, issues that are `status:blocked` or have open blocked-by
    links, need an owner decision or design approval still open in the issue, need
@@ -42,7 +42,7 @@ issue leaves open.
 For each selected issue, in ranked order:
 
 1. `git pull --ff-only` on `main`. Read the issue, its comments, linked issues and
-   the relevant contract guides; verify current behaviour in the code before
+   the relevant contract guides; verify current behavior in the code before
    changing anything.
 2. Classify the change as routine or risky using the workflow table (when unsure,
    risky). For risky work, `git switch -c issue/<N>-<short-slug> origin/main`

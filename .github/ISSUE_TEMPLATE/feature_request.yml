@@ -38,7 +38,7 @@ body:
     id: acceptance
     attributes:
       label: Acceptance criteria
-      description: Observable behaviour and tests; preserve originals, strict timing/colour validation and bounded native work.
+      description: Observable behavior and tests; preserve originals, strict timing/color validation and bounded native work.
     validations:
       required: true
   - type: textarea

@@ -17,7 +17,7 @@ import {
   planGroupMove,
   splitAdjustmentReason,
 } from '../../src/web/adjustment-ui.js';
-import { createColourSettings } from '../../src/shared/colour.js';
+import { createColorSettings } from '../../src/shared/color.js';
 import {
   copyGradeBlocked,
   pasteGradeCommands,
@@ -208,13 +208,13 @@ describe('clips and adjustments selected together', () => {
     expect(pasteTargetsLabel([b])).toBe('this adjustment');
     expect(pasteTargetsLabel([clip, a, b])).toBe('1 clip and 2 adjustments');
     expect(pasteTargetsLabel([a, b])).toBe('these 2 adjustments');
-    const colour = { ...createColourSettings(), saturation: 0.4 };
-    const pasted = pasteGradeCommands(document, [clip, a], colour).reduce(
+    const color = { ...createColorSettings(), saturation: 0.4 };
+    const pasted = pasteGradeCommands(document, [clip, a], color).reduce(
       (next, command) => applyCommand(next, command),
       document,
     );
-    expect(pasted.clips[0]!.grade).toEqual({ colour, keyframes: [] });
-    expect(item(pasted, 'a')).toMatchObject({ colour, keyframes: [] });
+    expect(pasted.clips[0]!.grade).toEqual({ color, keyframes: [] });
+    expect(item(pasted, 'a')).toMatchObject({ color, keyframes: [] });
     expect(item(pasted, 'b')).toEqual(item(document, 'b'));
   });
 });

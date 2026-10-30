@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { clamp01, decode709, encode709, type ColourSettings, type LocalToneSetting } from './colour.js';
+import { clamp01, decode709, encode709, type ColorSettings, type LocalToneSetting } from './color.js';
 import { described } from './described.js';
 
 /** Clip-owned static detail filters; see docs/design/DETAIL_FILTERS.md. */
@@ -45,7 +45,7 @@ export function detailShift(lines: number): number {
 export const DENOISE_DETAIL_CORE = 0.5;
 /** Denoise range sigma at full strength, in encoded RGB units. */
 export const DENOISE_RANGE_SIGMA = 0.1;
-/** Colour is smoothed with this many times Denoise's range sigma: colour noise goes, colour edges stay. */
+/** Color is smoothed with this many times Denoise's range sigma: color noise goes, color edges stay. */
 export const DENOISE_CHROMA_RANGE = 2.5;
 /** Denoise's spatial Gaussian sigma in units, over both rings. */
 export const DENOISE_SPATIAL_SIGMA = 1.5;
@@ -76,7 +76,7 @@ const SQUARE: readonly (readonly [number, number])[] = [
   [0, -1],
   [1, -1],
 ];
-/** 3×3 and 5×5 rings: Sharpen's Gaussian (sigma 1 unit) and Denoise's spatial weights, centre 1. */
+/** 3×3 and 5×5 rings: Sharpen's Gaussian (sigma 1 unit) and Denoise's spatial weights, center 1. */
 const denoiseWeight = (x: number, y: number): number =>
   Math.exp(-(x * x + y * y) / (2 * DENOISE_SPATIAL_SIGMA * DENOISE_SPATIAL_SIGMA));
 export const DETAIL_FINE_TAPS = SQUARE.map(([x, y]) => ({
@@ -104,7 +104,7 @@ function threeRings(radii: readonly number[], sigma: number): { x: number; y: nu
     }),
   );
 }
-/** Edge-aware bases: the first ring's taps, averaged with the centre, guide the range weights. */
+/** Edge-aware bases: the first ring's taps, averaged with the center, guide the range weights. */
 export const EDGE_GUIDE_TAPS = 8;
 
 /** Clarity's edge-aware mid-scale base, at radii 3, 6 and 10 units: no halos along strong edges. */
@@ -124,7 +124,7 @@ export const HDR_RATIO_FLOOR = 0.1;
 /** Radii 6, 16 and 32 units. */
 export const TONE_BASE_TAPS = threeRings([6, 16, 32], TONE_BASE_SPATIAL_SIGMA);
 
-/** Kernel taps per pixel beyond the centre: the dominant per-pixel cost of these filters. */
+/** Kernel taps per pixel beyond the center: the dominant per-pixel cost of these filters. */
 export function detailTapCount(settings: Readonly<DetailSettings>, localTone: boolean): number {
   return (
     (settings.sharpen > 0 || settings.denoise > 0 ? DETAIL_FINE_TAPS.length : 0) +
@@ -144,14 +144,14 @@ export interface LocalTone {
   /** Shadows and Highlights select tones after Exposure, which itself stays in the grade. */
   exposure: number;
 }
-export function localTone(colour: Pick<ColourSettings, LocalToneSetting | 'exposure'>): LocalTone {
-  const { shadows, highlights, hdr, localContrast, exposure } = colour;
+export function localTone(color: Pick<ColorSettings, LocalToneSetting | 'exposure'>): LocalTone {
+  const { shadows, highlights, hdr, localContrast, exposure } = color;
   return { shadows, highlights, hdr, localContrast, exposure };
 }
 
-/** Shadows/Highlights pivot: linear mid-grey, in stops below white. */
-export const MID_GREY_STOPS = Math.log2(0.18);
-/** At ±1, tones change by this fraction of their distance from mid-grey, in stops... */
+/** Shadows/Highlights pivot: linear mid-gray, in stops below white. */
+export const MID_GRAY_STOPS = Math.log2(0.18);
+/** At ±1, tones change by this fraction of their distance from mid-gray, in stops... */
 export const LOCAL_TONE_SLOPE = 0.5;
 /** ...up to this distance, so the darkest shadows move by at most 2 stops. */
 export const LOCAL_TONE_RANGE = 4;
@@ -163,7 +163,7 @@ function softRamp(x: number): number {
   const knee = clamp01(x);
   return knee ** 3 - knee ** 4 / 2 + Math.max(0, x - 1);
 }
-/** Distance from mid-grey, eased in over the first stop and out after LOCAL_TONE_RANGE. */
+/** Distance from mid-gray, eased in over the first stop and out after LOCAL_TONE_RANGE. */
 function toneDistance(stops: number): number {
   return softRamp(stops) - softRamp(stops - LOCAL_TONE_RANGE);
 }
@@ -172,7 +172,7 @@ export function localToneStops(base: number, tone: Readonly<LocalTone>): number 
   const stops = Math.log2(Math.max(LOCAL_TONE_FLOOR, decode709(clamp01(base)) * 2 ** tone.exposure));
   return (
     LOCAL_TONE_SLOPE *
-    (tone.shadows * toneDistance(MID_GREY_STOPS - stops) + tone.highlights * toneDistance(stops - MID_GREY_STOPS))
+    (tone.shadows * toneDistance(MID_GRAY_STOPS - stops) + tone.highlights * toneDistance(stops - MID_GRAY_STOPS))
   );
 }
 
@@ -243,7 +243,7 @@ export function compileDetail(
   const shiftU = shiftV / aspect;
   const inverseRange = denoiseRangeFactor(denoise);
   const core = DENOISE_DETAIL_CORE * DENOISE_RANGE_SIGMA * denoise;
-  const centre = new Float64Array(3);
+  const center = new Float64Array(3);
   const measured = new Float64Array(3);
   const tap = new Float64Array(3);
   const gaussian = new Float64Array(3);
@@ -254,8 +254,8 @@ export function compileDetail(
   let low = 0;
   let high = 0;
   const chromaRange = inverseRange / (DENOISE_CHROMA_RANGE * DENOISE_CHROMA_RANGE);
-  // Bilateral weights: spatial Gaussian times an encoded-RGB range Gaussian around the measured centre,
-  // a wider one for colour.
+  // Bilateral weights: spatial Gaussian times an encoded-RGB range Gaussian around the measured center,
+  // a wider one for color.
   const bilateral = (weight: number): void => {
     const red = tap[0]! - measured[0]!;
     const green = tap[1]! - measured[1]!;
@@ -291,7 +291,7 @@ export function compileDetail(
       denoised[channel]! /= denoisedWeight;
       chroma[channel]! /= chromaWeight;
     }
-    // Luma from the tight weights, colour from the wide ones.
+    // Luma from the tight weights, color from the wide ones.
     const lift = luma(denoised) - luma(chroma);
     for (let channel = 0; channel < 3; channel++) denoised[channel] = chroma[channel]! + lift;
   };
@@ -350,26 +350,26 @@ export function compileDetail(
   // Finer-than-720p detail passes through, eased below the Denoise threshold.
   const addFiner = (): void => {
     for (let channel = 0; channel < 3; channel++)
-      denoised[channel]! += softThreshold(centre[channel]! - measured[channel]!, core);
+      denoised[channel]! += softThreshold(center[channel]! - measured[channel]!, core);
   };
   const applyLocalTone = (sample: DetailSampler, u: number, v: number): void => {
     const base = luma(denoised);
     const smooth = edgeAwareBase(sample, u, v, base);
     if (residual) toneMap(base, smooth);
     if (toneGain) {
-      // A linear-light gain keeps local contrast and colour ratios, and black at black.
+      // A linear-light gain keeps local contrast and color ratios, and black at black.
       const gain = 2 ** localToneStops(smooth, tone);
       for (let channel = 0; channel < 3; channel++) denoised[channel] = encode709(decode709(denoised[channel]!) * gain);
     }
   };
   return {
     apply(sample, u, v, out) {
-      sample(u, v, centre);
+      sample(u, v, center);
       // Detail is measured at 720p scale (shifted taps) and applied to the full-resolution pixel.
       const mu = u + shiftU;
       const mv = v + shiftV;
       if (shift > 0) sample(mu, mv, measured);
-      else measured.set(centre);
+      else measured.set(center);
       denoised.set(measured);
       denoisedWeight = 1;
       chroma.set(measured);

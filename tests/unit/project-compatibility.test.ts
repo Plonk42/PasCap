@@ -11,7 +11,7 @@ import {
 } from '../../src/shared/project-migrations.js';
 
 const FIXTURES = path.join(import.meta.dirname, '../fixtures/projects');
-/** Projects saved before schema 27, which used track Colour: rejected, never upgraded. */
+/** Projects saved before schema 28, with track Color or British field names: rejected, never upgraded. */
 const UNSUPPORTED = path.join(FIXTURES, 'unsupported');
 const temporary: string[] = [];
 
@@ -53,8 +53,8 @@ describe('project compatibility', () => {
     }
   });
 
-  it('keeps the adjustments, clip grades and Transform Opacity of a schema-27 project through the load', async () => {
-    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-27.json'), 'utf8')) as ProjectDocument;
+  it('keeps the adjustments, clip grades and Transform Opacity of a schema-28 project through the load', async () => {
+    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-28.json'), 'utf8')) as ProjectDocument;
     const loaded = projectSchema.parse(upgradeProject(saved));
     expect(loaded).toEqual(saved);
     expect(loaded.adjustments.length).toBeGreaterThan(1);
@@ -63,7 +63,7 @@ describe('project compatibility', () => {
     expect(loaded.clips.some((clip) => clip.grade.keyframes.length > 0)).toBe(true);
   });
 
-  it('rejects projects saved with track Colour, with the reason, and leaves their files unchanged', async () => {
+  it('rejects projects saved with track Color or British field names, with the reason, and leaves their files unchanged', async () => {
     const dataDir = await mkdtemp(path.join(os.tmpdir(), 'pascap-compatibility-'));
     temporary.push(dataDir);
     await mkdir(path.join(dataDir, 'projects'));
@@ -76,7 +76,9 @@ describe('project compatibility', () => {
       expect(saved.schemaVersion).toBeLessThan(OLDEST_PROJECT_SCHEMA_VERSION);
       const filename = path.join(dataDir, 'projects', `${saved.id}.json`);
       await writeFile(filename, bytes);
-      await expect(store.load(saved.id)).rejects.toThrow('track Colour, which PasCap replaced');
+      await expect(store.load(saved.id)).rejects.toThrow(
+        saved.schemaVersion < 27 ? 'track Color, which PasCap replaced' : 'renamed to American English',
+      );
       expect(await readFile(filename, 'utf8')).toBe(bytes);
       expect(await readdir(path.join(dataDir, 'projects'))).toEqual([`${saved.id}.json`]);
       await rm(filename);

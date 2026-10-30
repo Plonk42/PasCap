@@ -1,48 +1,48 @@
-import { COLOUR_CONTROLS, type ColourSettings } from '../shared/colour.js';
-import { gradeColourAt, gradeKeyAsLayerKey, type Adjustment } from '../shared/grade.js';
+import { COLOR_CONTROLS, type ColorSettings } from '../shared/color.js';
+import { gradeColorAt, gradeKeyAsLayerKey, type Adjustment } from '../shared/grade.js';
 import { activeLayerSetting, type LayerKeyframe } from '../shared/keyframes.js';
 import type { ProjectDocument, VideoClip } from '../shared/model.js';
 import { gradePosition, type PlacedClip } from '../shared/timeline.js';
 import { nearestOutput } from './clip-keyframe-markers.js';
 
 /**
- * What the Colour controls edit: a clip's own grade (keyframes at source frames of its recording) or an adjustment
+ * What the Color controls edit: a clip's own grade (keyframes at source frames of its recording) or an adjustment
  * (keyframes counted from its start), in the track keyframe shape so the same controls edit either. Neither has Opacity.
  */
-export interface ColourOwner {
+export interface ColorOwner {
   /** The clip's or the adjustment's ID. */
   id: string;
   name: string;
-  colour: ColourSettings;
+  color: ColorSettings;
   keyframes: LayerKeyframe[];
   gradeClipId?: string;
   adjustmentId?: string;
 }
 
-export function clipColourOwner(clip: VideoClip, name: string): ColourOwner & { gradeClipId: string } {
+export function clipColorOwner(clip: VideoClip, name: string): ColorOwner & { gradeClipId: string } {
   return {
     id: clip.id,
     name,
-    colour: clip.grade.colour,
+    color: clip.grade.color,
     keyframes: clip.grade.keyframes.map(gradeKeyAsLayerKey),
     gradeClipId: clip.id,
   };
 }
 
-export function adjustmentColourOwner(item: Adjustment, name: string): ColourOwner & { adjustmentId: string } {
+export function adjustmentColorOwner(item: Adjustment, name: string): ColorOwner & { adjustmentId: string } {
   return {
     id: item.id,
     name,
-    colour: item.colour,
+    color: item.color,
     keyframes: item.keyframes.map(gradeKeyAsLayerKey),
     adjustmentId: item.id,
   };
 }
 
-/** A clip's grade as a Colour owner; null when the clip is gone. */
-export function gradeOwnerOf(project: ProjectDocument, clipId: string): (ColourOwner & { gradeClipId: string }) | null {
+/** A clip's grade as a Color owner; null when the clip is gone. */
+export function gradeOwnerOf(project: ProjectDocument, clipId: string): (ColorOwner & { gradeClipId: string }) | null {
   const clip = project.clips.find((item) => item.id === clipId);
-  return clip ? clipColourOwner(clip, '') : null;
+  return clip ? clipColorOwner(clip, '') : null;
 }
 
 /** The source frame a placed clip shows at a project frame, or null off the clip. */
@@ -52,22 +52,22 @@ export function sourceFrameAt(placed: PlacedClip, projectFrame: number): number 
     : null;
 }
 
-export function isClipOwner(owner: ColourOwner): owner is ColourOwner & { gradeClipId: string } {
+export function isClipOwner(owner: ColorOwner): owner is ColorOwner & { gradeClipId: string } {
   return owner.gradeClipId !== undefined;
 }
 
-/** The fields naming what a Colour or keyframe command edits. */
-export function ownerTarget(owner: ColourOwner): { clipId: string } | { adjustmentId: string } {
+/** The fields naming what a Color or keyframe command edits. */
+export function ownerTarget(owner: ColorOwner): { clipId: string } | { adjustmentId: string } {
   return owner.gradeClipId === undefined ? { adjustmentId: owner.id } : { clipId: owner.gradeClipId };
 }
 
-/** The fields naming what a whole-Colour command edits. */
-export function colourTarget(owner: ColourOwner): { clipIds: [string] } | { adjustmentId: string } {
+/** The fields naming what a whole-Color command edits. */
+export function colorTarget(owner: ColorOwner): { clipIds: [string] } | { adjustmentId: string } {
   return owner.gradeClipId === undefined ? { adjustmentId: owner.id } : { clipIds: [owner.gradeClipId] };
 }
 
 /** "clip" or "adjustment", for labels and help. */
-export function ownerNoun(owner: ColourOwner): 'clip' | 'adjustment' {
+export function ownerNoun(owner: ColorOwner): 'clip' | 'adjustment' {
   return isClipOwner(owner) ? 'clip' : 'adjustment';
 }
 
@@ -83,13 +83,13 @@ export function gradeValuePosition(placed: PlacedClip, projectFrame: number): nu
 }
 
 /**
- * The values the Colour controls show: a setting keyed at the playhead's source frame shows that keyframe, which is
+ * The values the Color controls show: a setting keyed at the playhead's source frame shows that keyframe, which is
  * what it edits; the others show the image's own value at `position`.
  */
-export function displayedColour(owner: ColourOwner, frame: number, position: number): ColourSettings {
-  const colour = gradeColourAt(owner, position);
-  if (position === frame) return colour;
-  const keyed = gradeColourAt(owner, frame);
-  for (const { key } of COLOUR_CONTROLS) if (activeLayerSetting(owner, key, frame)) colour[key] = keyed[key];
-  return colour;
+export function displayedColor(owner: ColorOwner, frame: number, position: number): ColorSettings {
+  const color = gradeColorAt(owner, position);
+  if (position === frame) return color;
+  const keyed = gradeColorAt(owner, frame);
+  for (const { key } of COLOR_CONTROLS) if (activeLayerSetting(owner, key, frame)) color[key] = keyed[key];
+  return color;
 }

@@ -11,11 +11,11 @@ import {
   type GpuCompositorOptions,
   type GpuGroupSource,
 } from '../../src/server/gpu-compositor.js';
-import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOR } from '../../src/shared/color.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 
 // A disposable stand-in for the browser: it speaks the page protocol over the same loopback
-// HTTP, with behaviour chosen per test. No real browser, GPU or media is involved.
+// HTTP, with behavior chosen per test. No real browser, GPU or media is involved.
 const FAKE_BROWSER = `
 const url = new URL(process.argv.at(-1));
 const headers = { 'x-pascap-gpu-token': url.hash.slice(1) };
@@ -110,8 +110,8 @@ function source(): GpuGroupSource {
     rgb,
     bounds: { x: 2, y: 1, width: 4, height: 4 },
     parameters: {
-      grade: { ...NEUTRAL_COLOUR },
-      colour: { ...NEUTRAL_COLOUR, hdr: 0.3 },
+      grade: { ...NEUTRAL_COLOR },
+      color: { ...NEUTRAL_COLOR, hdr: 0.3 },
       spatial: { ...NEUTRAL_SPATIAL_POSE },
       detail: { sharpen: 0.3, clarity: 0, denoise: 0 },
       originalWidth: 16,
@@ -201,7 +201,7 @@ describe('GPU compositor worker protocol', () => {
     const { compositor } = await startGpuCompositor(options('hang', { signal: controller.signal }));
     const frame = compositor!.compose(Buffer.alloc(width * height * 8), [source()]);
     setTimeout(() => controller.abort(), 100);
-    await expect(frame).rejects.toEqual(new ServiceError('Job cancelled.', 499));
+    await expect(frame).rejects.toEqual(new ServiceError('Job canceled.', 499));
     await compositor!.close();
     expect(await readdir(profiles)).toEqual([]);
   });
@@ -220,7 +220,7 @@ describe('GPU compositor worker protocol', () => {
 });
 
 describe('GPU compositor helpers', () => {
-  it('recognises software renderers', () => {
+  it('recognizes software renderers', () => {
     for (const renderer of [
       'ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)',
       'ANGLE (Mesa, llvmpipe (LLVM 19.1.1, 256 bits), OpenGL 4.5)',

@@ -105,7 +105,7 @@ export function toggleDefaultSpatialKey(settings: SpatialSettings, frame: number
 }
 
 /**
- * Like Colour Reset: once animated, only the settings enabled at this frame's keyframe
+ * Like Color Reset: once animated, only the settings enabled at this frame's keyframe
  * return to neutral; otherwise the whole base does. Null when nothing would change.
  */
 export function resetSpatial(settings: SpatialSettings, frame: number): SpatialSettings | null {

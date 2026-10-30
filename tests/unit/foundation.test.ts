@@ -105,11 +105,11 @@ describe('editing commands and history', () => {
     expect(calculateLayout(project).clips[1]?.start).toBe(40);
     expect(() => applyCommand(project, { type: 'trim', clipId: 'a', sourceIn: 60, sourceOut: 20 })).toThrow();
   });
-  it('splits preserve colours and external boundaries', () => {
+  it('splits preserve colors and external boundaries', () => {
     let project = applyCommand(sequence(), {
-      type: 'colour',
+      type: 'color',
       clipIds: ['a'],
-      colour: { ...sequence().clips[0]!.grade.colour, exposure: 0.7 },
+      color: { ...sequence().clips[0]!.grade.color, exposure: 0.7 },
     });
     project = applyCommand(project, {
       type: 'transition',
@@ -117,7 +117,7 @@ describe('editing commands and history', () => {
     });
     project = applyCommand(project, { type: 'split', clipId: 'a', sourceFrame: 60, newClipId: 'a2' });
     // Both pieces keep the clip's own grade.
-    expect(project.clips.map((clip) => [clip.id, clip.grade.colour.exposure])).toEqual([
+    expect(project.clips.map((clip) => [clip.id, clip.grade.color.exposure])).toEqual([
       ['a', 0.7],
       ['a2', 0.7],
       ['b', 0],

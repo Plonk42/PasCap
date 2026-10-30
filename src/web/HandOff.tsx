@@ -48,23 +48,23 @@ function useReadiness(projectId: string): { readiness: Readiness | null; error: 
   const [error, setError] = useState('');
   const [tick, setTick] = useState(0);
   useEffect(() => {
-    let cancelled = false;
+    let canceled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     void callOperation('hand_off_readiness', { projectId })
       .then((next) => {
-        if (cancelled) return;
+        if (canceled) return;
         setReadiness(next);
         setError('');
         const pending =
-          next.recordings.some((item) => item.preparation === 'preparing' || item.cameraMotion === 'analysing') ||
-          next.music.some((item) => item.preparation === 'preparing' || item.beats === 'analysing');
+          next.recordings.some((item) => item.preparation === 'preparing' || item.cameraMotion === 'analyzing') ||
+          next.music.some((item) => item.preparation === 'preparing' || item.beats === 'analyzing');
         timer = setTimeout(() => setTick((value) => value + 1), pending ? POLL_MS : IDLE_POLL_MS);
       })
       .catch((cause: unknown) => {
-        if (!cancelled) setError(cause instanceof Error ? cause.message : 'Cannot read what the project is ready for.');
+        if (!canceled) setError(cause instanceof Error ? cause.message : 'Cannot read what the project is ready for.');
       });
     return () => {
-      cancelled = true;
+      canceled = true;
       clearTimeout(timer);
     };
   }, [projectId, tick]);
@@ -106,7 +106,7 @@ function recordingLines({ recordings }: Readiness): ReadinessLine[] {
   const motion = recordings
     .filter((item) => item.preparation === 'ready' && item.cameraMotion === 'missing')
     .map((item) => item.id);
-  const analysing = recordings.filter((item) => item.cameraMotion === 'analysing').length;
+  const analyzing = recordings.filter((item) => item.cameraMotion === 'analyzing').length;
   const ready = recordings.filter((item) => item.preparation === 'ready').length;
   if (!recordings.length)
     return [{ key: 'recordings', ready: false, text: 'No video recordings in this project yet', action: null }];
@@ -126,12 +126,12 @@ function recordingLines({ recordings }: Readiness): ReadinessLine[] {
     lines.push(
       line(
         'motion',
-        `Camera motion analysed (${count(ready, 'prepared recording')}): the assistant can find steady ranges`,
+        `Camera motion analyzed (${count(ready, 'prepared recording')}): the assistant can find steady ranges`,
         [
-          motion.length > 0 && `Camera motion not analysed for ${count(motion.length, 'recording')}`,
-          analysing > 0 && `${analysing} analysing`,
+          motion.length > 0 && `Camera motion not analyzed for ${count(motion.length, 'recording')}`,
+          analyzing > 0 && `${analyzing} analyzing`,
         ],
-        motion.length ? { label: `Analyse ${motion.length}`, run: queue(motion, api.analyseMotion) } : null,
+        motion.length ? { label: `Analyze ${motion.length}`, run: queue(motion, api.analyzeMotion) } : null,
       ),
     );
   return lines;
@@ -147,16 +147,16 @@ function musicLine({ music }: Readiness): ReadinessLine {
     };
   const unprepared = music.filter((item) => item.preparation === 'unprepared').map((item) => item.id);
   const beats = music.filter((item) => item.preparation === 'ready' && item.beats === 'missing').map((item) => item.id);
-  const pending = music.filter((item) => item.preparation === 'preparing' || item.beats === 'analysing').length;
+  const pending = music.filter((item) => item.preparation === 'preparing' || item.beats === 'analyzing').length;
   let action: ReadinessLine['action'] = null;
   if (unprepared.length) action = { label: `Prepare ${unprepared.length}`, run: queue(unprepared, api.prepareAudio) };
-  else if (beats.length) action = { label: `Analyse ${beats.length}`, run: queue(beats, api.analyseMusic) };
+  else if (beats.length) action = { label: `Analyze ${beats.length}`, run: queue(beats, api.analyzeMusic) };
   return line(
     'music',
-    `Music prepared and its beats analysed (${count(music.length, 'recording')})`,
+    `Music prepared and its beats analyzed (${count(music.length, 'recording')})`,
     [
       unprepared.length > 0 && `${count(unprepared.length, 'music recording')} not prepared`,
-      beats.length > 0 && `beats not analysed for ${count(beats.length, 'music recording')}`,
+      beats.length > 0 && `beats not analyzed for ${count(beats.length, 'music recording')}`,
       pending > 0 && `${pending} in progress`,
     ],
     action,
@@ -367,7 +367,7 @@ export function HandOffDialog({
           rows={4}
           maxLength={MAX_BRIEF_NOTES}
           value={notes}
-          placeholder="Style, story, shots to favour or avoid…"
+          placeholder="Style, story, shots to favor or avoid…"
           disabled={submitting}
           onChange={(event) => setNotes(event.target.value)}
         />

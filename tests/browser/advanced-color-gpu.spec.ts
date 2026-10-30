@@ -2,15 +2,15 @@ import { expect, test } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import type { CompositeClip, CompositeGroup } from '../../src/preview/compositor.js';
-import { CURVE_CHANNELS, HSL_BANDS } from '../../src/shared/advanced-colour.js';
+import { CURVE_CHANNELS, HSL_BANDS } from '../../src/shared/advanced-color.js';
 import {
-  createColourSettings,
+  createColorSettings,
   decode709,
   encode709,
   gradePixel,
-  type ColourSettings,
+  type ColorSettings,
   type RGB,
-} from '../../src/shared/colour.js';
+} from '../../src/shared/color.js';
 import { NEUTRAL_DETAIL } from '../../src/shared/detail.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 
@@ -24,7 +24,7 @@ test.beforeAll(async () => {
       minify: false,
       lib: {
         entry: fileURLToPath(new URL('../../src/preview/compositor.ts', import.meta.url)),
-        name: 'ColourGpu',
+        name: 'ColorGpu',
         formats: ['iife'],
       },
     },
@@ -40,12 +40,12 @@ test('advanced SDR GPU parity: all eight ranges, four curves, joint grading and 
   page,
 }, testInfo) => {
   const grades = HSL_BANDS.map((band, i) => {
-    const settings = createColourSettings();
+    const settings = createColorSettings();
     settings.hsl[band] = { hue: i % 2 ? 30 : -30, saturation: i % 2 ? -1 : 1, lightness: i % 2 ? -0.3 : 0.3 };
     return settings;
   });
   for (const channel of CURVE_CHANNELS) {
-    const settings = createColourSettings();
+    const settings = createColorSettings();
     settings.curves[channel] = [
       { x: 0, y: 0.12 },
       { x: 0.3, y: 0.6 },
@@ -54,7 +54,7 @@ test('advanced SDR GPU parity: all eight ranges, four curves, joint grading and 
     ];
     grades.push(settings);
   }
-  const combined = createColourSettings();
+  const combined = createColorSettings();
   combined.temperature = 0.85;
   combined.tint = -0.65;
   combined.exposure = 0.4;
@@ -68,40 +68,40 @@ test('advanced SDR GPU parity: all eight ranges, four curves, joint grading and 
   });
   grades.push(combined);
   await page.route('**/*', (route) =>
-    route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Advanced colour GPU</title>' }),
+    route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Advanced color GPU</title>' }),
   );
   await page.goto('/');
   await page.addScriptTag({ content: script });
   const result = await page.evaluate((grades) => {
-    const gpu = (globalThis as unknown as { ColourGpu: typeof import('../../src/preview/compositor.js') }).ColourGpu;
+    const gpu = (globalThis as unknown as { ColorGpu: typeof import('../../src/preview/compositor.js') }).ColorGpu;
     const compositor = new gpu.Compositor(document.createElement('canvas'));
     const uniforms = compositor.gl.getParameter(compositor.gl.MAX_FRAGMENT_UNIFORM_VECTORS) as number;
     compositor.dispose();
     compositor.gl.getExtension('WEBGL_lose_context')?.loseContext();
-    return { uniforms, grades: grades.map((grade) => gpu.verifyGpuColour(grade)) };
+    return { uniforms, grades: grades.map((grade) => gpu.verifyGpuColor(grade)) };
   }, grades);
   expect(result.uniforms).toBeGreaterThanOrEqual(224);
   for (const grade of result.grades) {
     expect(grade.maxError8Bit).toBeLessThan(2);
     expect(grade.meanAbsoluteError8Bit).toBeLessThan(0.6);
   }
-  await testInfo.attach('advanced-colour-gpu', { body: JSON.stringify(result), contentType: 'application/json' });
+  await testInfo.attach('advanced-color-gpu', { body: JSON.stringify(result), contentType: 'application/json' });
 });
 
 test('a clip grade before its track grade keeps GPU parity, scalar and advanced, at full uniform arrays', async ({
   page,
 }, testInfo) => {
-  const scalar = { ...createColourSettings(), temperature: 0.5, exposure: 0.3, contrast: 1.2, vibrance: 0.4 };
-  const track = { ...createColourSettings(), tint: -0.2, saturation: 1.3, whites: 0.2, blacks: -0.1 };
-  const ranged = createColourSettings();
+  const scalar = { ...createColorSettings(), temperature: 0.5, exposure: 0.3, contrast: 1.2, vibrance: 0.4 };
+  const track = { ...createColorSettings(), tint: -0.2, saturation: 1.3, whites: 0.2, blacks: -0.1 };
+  const ranged = createColorSettings();
   HSL_BANDS.forEach((band, i) => {
     ranged.hsl[band] = { hue: i % 2 ? 10 : -12, saturation: 0.2, lightness: -0.02 };
   });
-  const curved = { ...createColourSettings(), hue: 15 };
+  const curved = { ...createColorSettings(), hue: 15 };
   CURVE_CHANNELS.forEach((channel, c) => {
     curved.curves[channel] = Array.from({ length: 16 }, (_, i) => ({ x: i / 15, y: (i / 15) ** (1.1 - c * 0.05) }));
   });
-  const pairs: [ColourSettings, ColourSettings][] = [
+  const pairs: [ColorSettings, ColorSettings][] = [
     [scalar, track],
     [ranged, track],
     [scalar, curved],
@@ -113,8 +113,8 @@ test('a clip grade before its track grade keeps GPU parity, scalar and advanced,
   await page.goto('/');
   await page.addScriptTag({ content: script });
   const result = await page.evaluate((pairs) => {
-    const gpu = (globalThis as unknown as { ColourGpu: typeof import('../../src/preview/compositor.js') }).ColourGpu;
-    return pairs.map(([grade, settings]) => gpu.verifyGpuColour(settings, grade));
+    const gpu = (globalThis as unknown as { ColorGpu: typeof import('../../src/preview/compositor.js') }).ColorGpu;
+    return pairs.map(([grade, settings]) => gpu.verifyGpuColor(settings, grade));
   }, pairs);
   for (const comparison of result) {
     expect(comparison.maxError8Bit).toBeLessThan(2);
@@ -123,15 +123,15 @@ test('a clip grade before its track grade keeps GPU parity, scalar and advanced,
   await testInfo.attach('clip-grade-gpu', { body: JSON.stringify(result), contentType: 'application/json' });
 });
 
-test('real GPU exact greys, near-grey chroma and circular hue boundaries retain strict pixel bounds', async ({
+test('real GPU exact grays, near-gray chroma and circular hue boundaries retain strict pixel bounds', async ({
   page,
 }, testInfo) => {
   const pixels: number[] = [];
-  for (const grey of [0, 1, 63, 127, 128, 192, 254, 255]) pixels.push(grey, grey, grey, 255);
-  for (const centre of [0, 30, 60, 120, 180, 240, 270, 300, 360]) {
+  for (const gray of [0, 1, 63, 127, 128, 192, 254, 255]) pixels.push(gray, gray, gray, 255);
+  for (const center of [0, 30, 60, 120, 180, 240, 270, 300, 360]) {
     for (const delta of [-0.5, 0, 0.5]) {
       for (const chroma of [0.004, 0.05, 0.1, 0.8]) {
-        const hue = centre + delta;
+        const hue = center + delta;
         for (const offset of [0, -120, -240]) {
           const k = ((((hue + offset) % 360) + 360) % 360) / 60;
           const component = Math.min(1, Math.max(0, Math.abs(k - 3) - 1));
@@ -141,7 +141,7 @@ test('real GPU exact greys, near-grey chroma and circular hue boundaries retain 
       }
     }
   }
-  const settings = createColourSettings();
+  const settings = createColorSettings();
   HSL_BANDS.forEach((band, i) => {
     settings.hsl[band] = { hue: i % 2 ? 30 : -30, saturation: i % 2 ? -1 : 1, lightness: i % 2 ? -0.5 : 0.5 };
   });
@@ -152,7 +152,7 @@ test('real GPU exact greys, near-grey chroma and circular hue boundaries retain 
       y: i % 2 ? 0.15 + c * 0.03 : 0.85 - c * 0.02,
     }));
   });
-  const grades = [createColourSettings(), settings, curved];
+  const grades = [createColorSettings(), settings, curved];
   await page.route('**/*', (route) =>
     route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Boundary GPU only</title>' }),
   );
@@ -160,7 +160,7 @@ test('real GPU exact greys, near-grey chroma and circular hue boundaries retain 
   await page.addScriptTag({ content: script });
   const result = await page.evaluate(
     ({ pixels, grades, spatial }) => {
-      const gpu = (globalThis as unknown as { ColourGpu: typeof import('../../src/preview/compositor.js') }).ColourGpu;
+      const gpu = (globalThis as unknown as { ColorGpu: typeof import('../../src/preview/compositor.js') }).ColorGpu;
       const canvas = document.createElement('canvas');
       canvas.width = pixels.length / 4;
       canvas.height = 1;
@@ -215,7 +215,7 @@ test('real GPU exact greys, near-grey chroma and circular hue boundaries retain 
     expect(metric.mean).toBeLessThan(0.6);
   }
   for (let i = 0; i < 8 * 4; i++) expect(result.outputs[1]![i]).toBe(pixels[i]);
-  await testInfo.attach('exact-grey-circular-boundaries', {
+  await testInfo.attach('exact-gray-circular-boundaries', {
     contentType: 'application/json',
     body: JSON.stringify({ renderer: result.renderer, metrics, pixels: pixels.length / 4 }),
   });
@@ -224,7 +224,7 @@ test('real GPU exact greys, near-grey chroma and circular hue boundaries retain 
 test('single-source specialization and grouped paths preserve all sixteen curve points through repeated switches', async ({
   page,
 }) => {
-  const settings = createColourSettings();
+  const settings = createColorSettings();
   settings.temperature = -0.75;
   settings.tint = 0.9;
   settings.exposure = 0.4;
@@ -237,7 +237,7 @@ test('single-source specialization and grouped paths preserve all sixteen curve 
       y: (point / 15) ** (0.9 + index * 0.08),
     }));
   });
-  const neutral = createColourSettings();
+  const neutral = createColorSettings();
   await page.route('**/*', (route) =>
     route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Fixed GPU paths</title>' }),
   );
@@ -245,7 +245,7 @@ test('single-source specialization and grouped paths preserve all sixteen curve 
   await page.addScriptTag({ content: script });
   const result = await page.evaluate(
     ({ settings, neutral, spatial }) => {
-      const gpu = (globalThis as unknown as { ColourGpu: typeof import('../../src/preview/compositor.js') }).ColourGpu;
+      const gpu = (globalThis as unknown as { ColorGpu: typeof import('../../src/preview/compositor.js') }).ColorGpu;
       const canvas = document.createElement('canvas');
       canvas.width = 17;
       canvas.height = 17;
@@ -294,7 +294,7 @@ test('single-source specialization and grouped paths preserve all sixteen curve 
   });
 });
 
-test('Temperature/Tint GPU extremes tint greys with normalized linear gains before exposure and clipping', async ({
+test('Temperature/Tint GPU extremes tint grays with normalized linear gains before exposure and clipping', async ({
   page,
 }, testInfo) => {
   const axes = [
@@ -311,12 +311,12 @@ test('Temperature/Tint GPU extremes tint greys with normalized linear gains befo
     { temperature: -1, tint: -1, exposure: -1 },
     { temperature: 0.65, tint: -0.45, exposure: 0.4 },
   ];
-  const grades = axes.map((axis) => ({ ...createColourSettings(), ...axis }));
+  const grades = axes.map((axis) => ({ ...createColorSettings(), ...axis }));
   const pixels = Array.from({ length: 17 * 17 * 4 }, (_, index) =>
     index % 4 === 3 ? 255 : (Math.floor(index / 4) * [73, 157, 29][index % 4]!) % 256,
   );
-  const greys = [0, 16, 64, 96, 127, 128, 192, 254, 255];
-  greys.forEach((grey, index) => pixels.splice(index * 4, 4, grey, grey, grey, 255));
+  const grays = [0, 16, 64, 96, 127, 128, 192, 254, 255];
+  grays.forEach((gray, index) => pixels.splice(index * 4, 4, gray, gray, gray, 255));
   await page.route('**/*', (route) =>
     route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>Temperature/Tint GPU</title>' }),
   );
@@ -324,7 +324,7 @@ test('Temperature/Tint GPU extremes tint greys with normalized linear gains befo
   await page.addScriptTag({ content: script });
   const result = await page.evaluate(
     ({ grades, pixels, spatial }) => {
-      const gpu = (globalThis as unknown as { ColourGpu: typeof import('../../src/preview/compositor.js') }).ColourGpu;
+      const gpu = (globalThis as unknown as { ColorGpu: typeof import('../../src/preview/compositor.js') }).ColorGpu;
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 17;
       const compositor = new gpu.Compositor(canvas);
@@ -387,24 +387,24 @@ test('Temperature/Tint GPU extremes tint greys with normalized linear gains befo
     expect(metric.maximum, JSON.stringify(metric)).toBeLessThan(2);
     expect(metric.mean, JSON.stringify(metric)).toBeLessThan(0.6);
   }
-  const grey = result.outputs.map((output) => output.slice(3 * 4, 3 * 4 + 3));
-  expect(grey[1]![0]).toBeGreaterThan(grey[1]![1]!);
-  expect(grey[1]![1]).toBeGreaterThan(grey[1]![2]!);
-  expect(grey[2]![2]).toBeGreaterThan(grey[2]![1]!);
-  expect(grey[2]![1]).toBeGreaterThan(grey[2]![0]!);
-  expect(grey[3]![0]).toBe(grey[3]![2]);
-  expect(grey[3]![0]).toBeGreaterThan(grey[3]![1]!);
-  expect(grey[4]![0]).toBe(grey[4]![2]);
-  expect(grey[4]![1]).toBeGreaterThan(grey[4]![0]!);
+  const gray = result.outputs.map((output) => output.slice(3 * 4, 3 * 4 + 3));
+  expect(gray[1]![0]).toBeGreaterThan(gray[1]![1]!);
+  expect(gray[1]![1]).toBeGreaterThan(gray[1]![2]!);
+  expect(gray[2]![2]).toBeGreaterThan(gray[2]![1]!);
+  expect(gray[2]![1]).toBeGreaterThan(gray[2]![0]!);
+  expect(gray[3]![0]).toBe(gray[3]![2]);
+  expect(gray[3]![0]).toBeGreaterThan(gray[3]![1]!);
+  expect(gray[4]![0]).toBe(gray[4]![2]);
+  expect(gray[4]![1]).toBeGreaterThan(gray[4]![0]!);
   await testInfo.attach('temperature-tint-extremes', {
-    body: JSON.stringify({ renderer: result.renderer, metrics, grey }),
+    body: JSON.stringify({ renderer: result.renderer, metrics, gray }),
     contentType: 'application/json',
   });
 });
 
 test('Temperature/Tint: scalar/single/full switches preserve opacity and fades', async ({ page }, testInfo) => {
   const scalarLeft = {
-    ...createColourSettings(),
+    ...createColorSettings(),
     temperature: 1,
     tint: -0.7,
     exposure: -0.2,
@@ -412,7 +412,7 @@ test('Temperature/Tint: scalar/single/full switches preserve opacity and fades',
     contrast: 0.95,
   };
   const scalarRight = {
-    ...createColourSettings(),
+    ...createColorSettings(),
     temperature: -0.9,
     tint: 1,
     exposure: 0.15,
@@ -437,7 +437,7 @@ test('Temperature/Tint: scalar/single/full switches preserve opacity and fades',
       y: (point / 15) ** (1.15 - index * 0.06),
     }));
   });
-  const source = (slot: number, settings: ColourSettings, changes: Partial<CompositeClip> = {}): CompositeClip => ({
+  const source = (slot: number, settings: ColorSettings, changes: Partial<CompositeClip> = {}): CompositeClip => ({
     slot,
     settings,
     spatial: NEUTRAL_SPATIAL_POSE,
@@ -454,7 +454,7 @@ test('Temperature/Tint: scalar/single/full switches preserve opacity and fades',
   const right = source(1, advancedRight, { blendWeight: 0.65, brightness: 0.8 });
   const lower = source(
     1,
-    { ...createColourSettings(), temperature: -0.35, tint: 0.45 },
+    { ...createColorSettings(), temperature: -0.35, tint: 0.45 },
     { opacity: 0.61, brightness: 0.7 },
   );
   const cases: { name: string; path: 'scalar' | 'single' | 'full'; groups: CompositeGroup[] }[] = [
@@ -532,7 +532,7 @@ test('Temperature/Tint: scalar/single/full switches preserve opacity and fades',
     {
       name: 'neutral scalar clears gains',
       path: 'scalar',
-      groups: [{ clips: [source(0, createColourSettings(), { opacity: 1, brightness: 1 })] }],
+      groups: [{ clips: [source(0, createColorSettings(), { opacity: 1, brightness: 1 })] }],
     },
   ];
   const pixels = [0, 1].map((slot) =>
@@ -547,7 +547,7 @@ test('Temperature/Tint: scalar/single/full switches preserve opacity and fades',
   await page.addScriptTag({ content: script });
   const result = await page.evaluate(
     ({ cases, pixels }) => {
-      const gpu = (globalThis as unknown as { ColourGpu: typeof import('../../src/preview/compositor.js') }).ColourGpu;
+      const gpu = (globalThis as unknown as { ColorGpu: typeof import('../../src/preview/compositor.js') }).ColorGpu;
       const canvas = document.createElement('canvas');
       canvas.width = canvas.height = 17;
       const compositor = new gpu.Compositor(canvas);

@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
-  colourSchema,
+  colorSchema,
   compilePixelGrade,
-  createColourSettings,
+  createColorSettings,
   decode709,
   encode709,
   gradePixel,
-  isNeutralAdvancedColour,
+  isNeutralAdvancedColor,
   temperatureTintGains,
   type RGB,
-} from '../../src/shared/colour.js';
+} from '../../src/shared/color.js';
 import { createAdjustment, gradeKeyframeSchema, layerKeyAsGradeKey } from '../../src/shared/grade.js';
 import { EMPTY_KEY_VALUES, layerKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, PROJECT_SCHEMA_VERSION, projectSchema } from '../../src/shared/model.js';
@@ -20,13 +20,13 @@ const axes = [-2, -1, -0.234567891, 0, 0.123456789, 1, 2];
 
 describe('normalized linear Temperature and Tint', () => {
   it('keeps exact neutral identity and makes new grades neutral without compatibility defaults', () => {
-    const settings = createColourSettings();
+    const settings = createColorSettings();
     expect(temperatureTintGains(settings)).toEqual([1, 1, 1]);
     const input: RGB = [0.123456789, 0.4, 0.78];
     expect(gradePixel(input, settings)).toBe(input);
     expect(compilePixelGrade(settings)(input)).toBe(input);
-    expect(createClip('shot', 'rec', 0, 10).grade.colour).toEqual(settings);
-    expect(createAdjustment('look', 0, 10).colour).toEqual(settings);
+    expect(createClip('shot', 'rec', 0, 10).grade.color).toEqual(settings);
+    expect(createAdjustment('look', 0, 10).color).toEqual(settings);
     expect(Object.keys(layerKeyAsGradeKey(layerKeyframe(0, EMPTY_KEY_VALUES, 'linear')).values)).toHaveLength(14);
     const project = createProject('strict', 'Strict');
     expect(project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
@@ -38,16 +38,16 @@ describe('normalized linear Temperature and Tint', () => {
     ] as const) {
       const incomplete = { ...settings };
       delete (incomplete as Partial<typeof settings>)[channel];
-      expect(colourSchema.safeParse(incomplete).success).toBe(false);
+      expect(colorSchema.safeParse(incomplete).success).toBe(false);
       const key = layerKeyAsGradeKey(layerKeyframe(0, { ...EMPTY_KEY_VALUES, exposure: 0 }, 'linear'));
       expect(gradeKeyframeSchema.safeParse(key).success).toBe(true);
       const values: Partial<typeof key.values> = { ...key.values };
       delete values[channel];
       expect(gradeKeyframeSchema.safeParse({ ...key, values }).success).toBe(false);
       for (const value of [-limit - 0.000001, limit + 0.000001, NaN, Infinity, -Infinity, null, undefined])
-        expect(colourSchema.safeParse({ ...settings, [channel]: value }).success).toBe(false);
+        expect(colorSchema.safeParse({ ...settings, [channel]: value }).success).toBe(false);
       for (const value of [-limit, 0, 0.123456789, limit])
-        expect(colourSchema.parse({ ...settings, [channel]: value })[channel]).toBe(value);
+        expect(colorSchema.parse({ ...settings, [channel]: value })[channel]).toBe(value);
     }
   });
 
@@ -63,8 +63,8 @@ describe('normalized linear Temperature and Tint', () => {
     }
   });
 
-  it('intentionally warms/cools and magenta/green-tints greys while preserving pre-clipping linear luminance', () => {
-    const neutral = createColourSettings();
+  it('intentionally warms/cools and magenta/green-tints grays while preserving pre-clipping linear luminance', () => {
+    const neutral = createColorSettings();
     for (const temperature of [-1, 1]) {
       const result = gradePixel([0.3, 0.3, 0.3], { ...neutral, temperature });
       expect((result[0] - result[2]) * temperature).toBeGreaterThan(0);
@@ -82,7 +82,7 @@ describe('normalized linear Temperature and Tint', () => {
 
   it('applies independent gains before exposure, contrast and brightness, never in encoded or chroma space', () => {
     const settings = {
-      ...createColourSettings(),
+      ...createColorSettings(),
       temperature: 0.7,
       tint: -0.6,
       exposure: 0.4,
@@ -99,13 +99,13 @@ describe('normalized linear Temperature and Tint', () => {
     const gain = decode709(contrasted + 0.04 * contrasted * (1 - contrasted)) / y;
     const expected = linear.map((value) => encode709(value * gain));
     gradePixel(input, settings).forEach((value, channel) => expect(value).toBeCloseTo(expected[channel]!, 12));
-    expect(isNeutralAdvancedColour(settings)).toBe(true);
+    expect(isNeutralAdvancedColor(settings)).toBe(true);
   });
 
   it('matches the reference exactly when compiling correction and sharp advanced settings once per frame', () => {
     for (const temperature of axes) {
       for (const tint of axes) {
-        const settings = { ...createColourSettings(), temperature, tint, exposure: -0.2, saturation: 0.8, hue: 15 };
+        const settings = { ...createColorSettings(), temperature, tint, exposure: -0.2, saturation: 0.8, hue: 15 };
         settings.hsl.red = { hue: 12, saturation: -0.3, lightness: 0.02 };
         settings.curves.master = [
           { x: 0, y: 0.02 },

@@ -121,7 +121,7 @@
   height: calc(100% - 30px);
 }
 
-/* Hits standing on the tone strip, in its band colours, with a dark halo over the waveform; strong ones taller. */
+/* Hits standing on the tone strip, in its band colors, with a dark halo over the waveform; strong ones taller. */
 .music-body .music-hits {
   position: absolute;
   inset: 0;
@@ -157,7 +157,7 @@
   stroke: #8cc7ff;
 }
 
-/* Sections tint the clip behind the waveform, labelled at their top right when wide enough. */
+/* Sections tint the clip behind the waveform, labeled at their top right when wide enough. */
 .music-body .music-section {
   position: absolute;
   top: 0;
@@ -432,7 +432,7 @@
   margin-top: 4px;
 }
 
-/* A music transition's button sits on its lane, centred in the 74 px clip. */
+/* A music transition's button sits on its lane, centerd in the 74 px clip. */
 .music-instance-lane .boundary-button.music-boundary {
   top: 28px;
   color: #ccd4f2;

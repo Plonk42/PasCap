@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { AudioAsset } from '../../src/shared/audio.js';
-import { NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { NEUTRAL_COLOR } from '../../src/shared/color.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
@@ -49,9 +49,9 @@ test.beforeEach(async ({ page, request }) => {
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
 });
 
-/** Colour's keyframe line visits every stored adjustment keyframe. */
-function colourStep(page: Page, direction: 'Previous' | 'Next'): Locator {
-  return page.getByRole('button', { name: `${direction} Colour keyframe`, exact: true });
+/** Color's keyframe line visits every stored adjustment keyframe. */
+function colorStep(page: Page, direction: 'Previous' | 'Next'): Locator {
+  return page.getByRole('button', { name: `${direction} Color keyframe`, exact: true });
 }
 
 async function currentProject(page: Page): Promise<ProjectDocument> {
@@ -191,11 +191,11 @@ test('the adjustment list labels time/value/easing, retains reordered input focu
   await setProject(page, document);
   await inspectorTab(page, 'Adjustment');
   const keys = adjustmentKeyframes(page);
-  await colourStep(page, 'Next').click();
+  await colorStep(page, 'Next').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
-  await colourStep(page, 'Next').click();
+  await colorStep(page, 'Next').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(70);
-  await colourStep(page, 'Previous').click();
+  await colorStep(page, 'Previous').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(20);
   const row = await editAdjustmentPoint(page, 20);
   await expect(keys.getByRole('list')).toHaveAccessibleName('Edit adjustment keyframes');
@@ -272,11 +272,11 @@ test('adjustment keyframe navigation reaches its keyframes and previews one at t
   await inspectorTab(page, 'Adjustment');
   const keys = adjustmentKeyframes(page);
   for (const frame of [5, 35, 40, last]) {
-    await colourStep(page, 'Next').click();
+    await colorStep(page, 'Next').click();
     await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
   }
-  await expect(colourStep(page, 'Previous')).toBeEnabled();
-  await colourStep(page, 'Previous').click();
+  await expect(colorStep(page, 'Previous')).toBeEnabled();
+  await colorStep(page, 'Previous').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
   await inspectorTab(page, 'Adjustment');
   const main = page.locator('.keyframe-setting-navigation').filter({
@@ -319,7 +319,7 @@ test('adjustment keyframe navigation reaches its keyframes and previews one at t
   expect((await currentProject(page)).clips.map((clip) => clip.speed)).toEqual(
     document.clips.map((clip) => clip.speed),
   );
-  await page.getByRole('button', { name: 'Reset colour', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset color', exact: true }).click();
   expect((await currentProject(page)).adjustments[0]?.keyframes[0]).toEqual(gradePoint(0, { exposure: 0 }));
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect((await currentProject(page)).adjustments[0]?.keyframes).toEqual(points);
@@ -445,7 +445,7 @@ test('per-track fade/transition timing and positioned Transform key numbers use 
   ]);
 });
 
-test('Colour resets target the adjustment colour or only participating settings at the active keyframe', async ({
+test('Color resets target the adjustment color or only participating settings at the active keyframe', async ({
   page,
 }) => {
   await inspectorTab(page, 'Adjustment');
@@ -453,11 +453,11 @@ test('Colour resets target the adjustment colour or only participating settings 
   await page.getByRole('slider', { name: 'Saturation', exact: true }).fill('1.3');
   await resetSetting(page, 'Exposure');
   let document = await currentProject(page);
-  expect(document.adjustments[0]?.colour).toMatchObject({ exposure: 0, saturation: 1.3 });
+  expect(document.adjustments[0]?.color).toMatchObject({ exposure: 0, saturation: 1.3 });
   expect(document.adjustments[0]?.keyframes).toEqual([]);
   await page.getByRole('slider', { name: 'Contrast', exact: true }).fill('1.2');
   document = await currentProject(page);
-  const base = { ...document.adjustments[0]!.colour };
+  const base = { ...document.adjustments[0]!.color };
   const other = gradePoint(110, { exposure: 1, saturation: 1.4 }, 'smooth');
   document.adjustments[0]!.keyframes = [gradePoint(5, { exposure: -0.5, saturation: 0.6 }, 'hold'), other];
   await setProject(page, document);
@@ -480,13 +480,13 @@ test('Colour resets target the adjustment colour or only participating settings 
   await resetSetting(page, 'Saturation');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.25');
   document = await currentProject(page);
-  expect(document.adjustments[0]?.colour).toEqual(base);
+  expect(document.adjustments[0]?.color).toEqual(base);
   expect(document.adjustments[0]?.keyframes).toEqual([gradePoint(8, { exposure: 0.25, saturation: 1 }, 'hold'), other]);
-  await page.getByRole('button', { name: 'Reset colour', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset color', exact: true }).click();
   const reset = await currentProject(page);
-  expect(reset.adjustments[0]?.colour).toEqual(base);
+  expect(reset.adjustments[0]?.color).toEqual(base);
   expect(reset.adjustments[0]?.keyframes).toEqual([
-    gradePoint(8, { exposure: NEUTRAL_COLOUR.exposure, saturation: NEUTRAL_COLOUR.saturation }, 'hold'),
+    gradePoint(8, { exposure: NEUTRAL_COLOR.exposure, saturation: NEUTRAL_COLOR.saturation }, 'hold'),
     other,
   ]);
   await expect(page.getByRole('slider', { name: 'Contrast', exact: true })).toHaveValue('1.2');

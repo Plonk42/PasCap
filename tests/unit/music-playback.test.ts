@@ -429,7 +429,7 @@ describe('sample-owned bounded streaming music', () => {
       if (String(url).includes('/other/')) {
         pendingSignal = init!.signal as AbortSignal;
         await new Promise<void>((resolve, reject) => {
-          const cancel = (): void => reject(new DOMException('Cancelled read', 'AbortError'));
+          const cancel = (): void => reject(new DOMException('Canceled read', 'AbortError'));
           pendingSignal!.addEventListener('abort', cancel, { once: true });
           void gate.then(resolve).finally(() => pendingSignal!.removeEventListener('abort', cancel));
         });
@@ -493,7 +493,7 @@ describe('sample-owned bounded streaming music', () => {
     expect(playback.projectFrame()).toBe(20);
     expect(playback.sync()).toBe(true);
   });
-  it.each([0, 1920, 4800])('preserves %s real samples rendered before startup acknowledgement', async (delay) => {
+  it.each([0, 1920, 4800])('preserves %s real samples rendered before startup acknowledgment', async (delay) => {
     await configured();
     await playback.resumeContext();
     holdStart = true;
@@ -522,7 +522,7 @@ describe('sample-owned bounded streaming music', () => {
       expect(nodes[0]!.commands.filter((command) => command.kind === 'start')).toHaveLength(1);
     },
   );
-  it('does not add video quantisation to sub-frame rendered audio drift', async () => {
+  it('does not add video quantization to sub-frame rendered audio drift', async () => {
     await configured();
     await started();
     advance(Math.round(1.75 * MUSIC_SAMPLES_PER_FRAME), 0.5 * MUSIC_SAMPLES_PER_FRAME);
@@ -533,7 +533,7 @@ describe('sample-owned bounded streaming music', () => {
     expect(playback.sync()).toBe(false);
   });
   it.each(['pause', 'dispose', 'abort'] as const)(
-    'invalidates a pending first-sample acknowledgement on %s',
+    'invalidates a pending first-sample acknowledgment on %s',
     async (action) => {
       await configured();
       await playback.resumeContext();
@@ -552,7 +552,7 @@ describe('sample-owned bounded streaming music', () => {
       expect(node.commands.filter((item) => item.kind === 'stop')).toHaveLength(1);
     },
   );
-  it('ignores old acknowledgements and receipts after a warm seek/restart', async () => {
+  it('ignores old acknowledgments and receipts after a warm seek/restart', async () => {
     await configured();
     const node = await started();
     const previous = node.startCommand();

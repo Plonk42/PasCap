@@ -299,7 +299,7 @@ describe('project-time Transform sampling and export dispatch', () => {
       const placed = layout.clips[0]!;
       const sample = sampleTimeline(document, placed.start + 1, layout)[0]!;
       expect(sample.spatial).toEqual(evaluateSpatial(document.layers[0]!.transform, placed.start + 1));
-      expect(sample.colour.exposure).toBe(0.25);
+      expect(sample.color.exposure).toBe(0.25);
       expect(sample.spatial.opacity).toBe(0.5);
       expect(sample.opacity).toBe(0.5);
     },

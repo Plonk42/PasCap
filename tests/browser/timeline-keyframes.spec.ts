@@ -299,7 +299,7 @@ test('Snap uses stationary boundaries/playhead, Alt bypasses it, and timeline fr
   await move(page, start, 58);
   await expect(marker(page, 60)).toHaveClass(/moving/);
   await expect(page.locator('.snap-guide')).toHaveCount(1);
-  // The Transform keyframe marker colour (#c4e9ff).
+  // The Transform keyframe marker color (#c4e9ff).
   await expect(page.locator('.snap-guide')).toHaveCSS('background-color', 'rgb(196, 233, 255)');
   await page.mouse.up();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();

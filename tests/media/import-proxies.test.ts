@@ -96,7 +96,7 @@ function blockWorker(jobs: JobQueue) {
     async (context) =>
       new Promise<void>((resolve, reject) => {
         const abort = (): void => {
-          reject(new ServiceError('Job cancelled.', 499));
+          reject(new ServiceError('Job canceled.', 499));
         };
         if (context.signal.aborted) {
           abort();
@@ -197,7 +197,7 @@ describe.skipIf(!enabled)('automatic video proxy imports · disposable native fi
     expect(await Promise.all(filenames.map((filename) => fingerprintFile(filename)))).toEqual(identities);
   });
 
-  it('does not auto-retry a cancelled admission and permits an explicit native preparation retry', async () => {
+  it('does not auto-retry a canceled admission and permits an explicit native preparation retry', async () => {
     const { sources, config, app, library, jobs } = await fixture();
     const filename = path.join(sources, 'clip.mp4');
     await pattern(config, filename);
@@ -207,7 +207,7 @@ describe.skipIf(!enabled)('automatic video proxy imports · disposable native fi
     expect(accepted.job!.state).toBe('queued');
     jobs.cancel(accepted.job!.id);
     blocker.release();
-    expect((await jobs.wait(accepted.job!.id)).state).toBe('cancelled');
+    expect((await jobs.wait(accepted.job!.id)).state).toBe('canceled');
     expect(library.get(accepted.asset.id)).toMatchObject({ status: 'error', prepared: null });
     expect((await library.importForEditing(sources)).jobs).toEqual([]);
     expect((await library.addForEditing(filename)).job).toBeNull();

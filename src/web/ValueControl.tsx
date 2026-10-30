@@ -10,7 +10,7 @@ export interface ValueControlProps extends Omit<NumberFieldProps, 'min' | 'max' 
   max: number;
   step: number;
   unit?: string;
-  /** Colours the slider track along the setting's axis; purely presentational. */
+  /** Colors the slider track along the setting's axis; purely presentational. */
   tone?: SliderTone;
   /** A CSS background for the track when it depends on context, such as the selected HSL range. */
   track?: string;
@@ -32,7 +32,7 @@ export interface ValueControlState {
   context: Readonly<ValueControlContext>;
   draft: number;
   submitted: number;
-  pointer: Readonly<{ id: number; cancelled: boolean }> | null;
+  pointer: Readonly<{ id: number; canceled: boolean }> | null;
   error: string | null;
 }
 
@@ -66,7 +66,7 @@ export function syncValueControlState(
   return {
     ...createValueControlState(context),
     // Suppress the rest of an interrupted native gesture until its physical release.
-    pointer: state.pointer ? { id: state.pointer.id, cancelled: true } : null,
+    pointer: state.pointer ? { id: state.pointer.id, canceled: true } : null,
   };
 }
 
@@ -103,7 +103,7 @@ function settleExactValueControl(
   value: number,
   validate: NumberFieldProps['validate'],
 ): { state: ValueControlState; commit: number | null } {
-  if (state.context.disabled || state.pointer?.cancelled === false) return { state, commit: null };
+  if (state.context.disabled || state.pointer?.canceled === false) return { state, commit: null };
   const result = settleValueControl(state, value, validate);
   // Exact entry remains available after blur/capture loss even if the OS never delivers pointerup.
   // Keep suppressing that obsolete native range gesture until its physical end.
@@ -119,17 +119,17 @@ export function transitionValueControl(
   const unchanged = { state, commit: null };
   const restore = (): ValueControlState => ({
     ...createValueControlState(state.context),
-    pointer: state.pointer ? { id: state.pointer.id, cancelled: true } : null,
+    pointer: state.pointer ? { id: state.pointer.id, canceled: true } : null,
   });
   switch (action.type) {
     case 'begin':
-      if (state.context.disabled || state.pointer?.cancelled === false) return unchanged;
+      if (state.context.disabled || state.pointer?.canceled === false) return unchanged;
       return {
-        state: { ...state, submitted: state.context.value, pointer: { id: action.pointerId, cancelled: false } },
+        state: { ...state, submitted: state.context.value, pointer: { id: action.pointerId, canceled: false } },
         commit: null,
       };
     case 'change': {
-      if (state.context.disabled || state.pointer?.cancelled) return unchanged;
+      if (state.context.disabled || state.pointer?.canceled) return unchanged;
       if (!state.pointer) return settleValueControl(state, action.value, validate);
       const result = validateValueControlValue(action.value, {
         ...state.context,
@@ -141,7 +141,7 @@ export function transitionValueControl(
       return settleExactValueControl(state, action.value, validate);
     case 'finish':
       if (state.pointer?.id !== action.pointerId) return unchanged;
-      if (state.pointer.cancelled || state.context.disabled)
+      if (state.pointer.canceled || state.context.disabled)
         return { state: createValueControlState(state.context), commit: null };
       return settleValueControl(state, state.draft, validate);
     case 'cancel':
@@ -195,22 +195,22 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
   };
   const cancel = (): void => {
     dispatch({ type: 'cancel' });
-    // Keep only the physical end guard; a cancelled gesture must not consume later Escape presses.
+    // Keep only the physical end guard; a canceled gesture must not consume later Escape presses.
     capture.current?.cancelListeners();
     releaseCapture();
   };
-  const finish = (pointerId: number, cancelled = false): void => {
+  const finish = (pointerId: number, canceled = false): void => {
     const active = capture.current;
     if (active?.id !== pointerId) return;
     capture.current = null;
     active.dispose();
-    if (cancelled) dispatch({ type: 'cancel' });
+    if (canceled) dispatch({ type: 'cancel' });
     dispatch({ type: 'finish', pointerId });
     if (active.element.hasPointerCapture(pointerId)) active.element.releasePointerCapture(pointerId);
   };
   const begin = (event: PointerEvent<HTMLInputElement>): void => {
     if (latest.current.context.disabled || !event.isPrimary || event.button !== 0) return;
-    if (capture.current && current.current.pointer?.cancelled) {
+    if (capture.current && current.current.pointer?.canceled) {
       capture.current.dispose();
       capture.current = null;
     }
@@ -247,7 +247,7 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
   };
 
   useEffect(() => {
-    if (current.current.pointer?.cancelled) {
+    if (current.current.pointer?.canceled) {
       const active = capture.current;
       active?.cancelListeners();
       if (active?.element.hasPointerCapture(active.id)) active.element.releasePointerCapture(active.id);
@@ -263,7 +263,7 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
     [],
   );
 
-  const previewing = state.pointer !== null && !state.pointer.cancelled && state.error === null;
+  const previewing = state.pointer !== null && !state.pointer.canceled && state.error === null;
   const draftValue = previewing && state.draft !== props.value ? state.draft : null;
   const previewed = useRef(false);
   useEffect(() => {
@@ -282,8 +282,8 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
   return (
     <div
       className="value-control"
-      data-dirty={state.pointer?.cancelled === false || state.draft !== props.value}
-      data-pointer-draft={state.pointer !== null && !state.pointer.cancelled}
+      data-dirty={state.pointer?.canceled === false || state.draft !== props.value}
+      data-pointer-draft={state.pointer !== null && !state.pointer.canceled}
       data-unit={Boolean(props.unit)}
       data-tone={props.tone ?? (props.track ? 'custom' : undefined)}
       style={
@@ -320,7 +320,7 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
         }}
         onKeyDown={(event) => {
           const pointer = current.current.pointer;
-          if (pointer?.cancelled) finish(pointer.id);
+          if (pointer?.canceled) finish(pointer.id);
           if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
             event.preventDefault();
             event.stopPropagation();
@@ -333,7 +333,7 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
         id={`${id}-exact`}
         aria-describedby={[props['aria-describedby'], error ? errorId : null].filter(Boolean).join(' ')}
         value={state.draft}
-        disabled={Boolean(props.disabled || state.pointer?.cancelled === false)}
+        disabled={Boolean(props.disabled || state.pointer?.canceled === false)}
         validate={(value) => {
           const result = validateValueControlValue(value, latest.current.props);
           return result.valid ? null : result.error;

@@ -201,7 +201,7 @@ async function waitForCompletion(page: Page): Promise<void> {
 }
 
 async function assertPaused(page: Page, frame: number, musicStarts: number): Promise<void> {
-  // Drain real animation callbacks after the cancelled operation has settled;
+  // Drain real animation callbacks after the canceled operation has settled;
   // this is an ordering barrier, not a playback-speed or wall-time threshold.
   await page.evaluate(
     () =>

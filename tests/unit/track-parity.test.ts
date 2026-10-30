@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_VIDEO_DECODERS } from '../../src/preview/compositor.js';
-import { createColourSettings, gradePixel, NEUTRAL_COLOUR } from '../../src/shared/colour.js';
+import { createColorSettings, gradePixel, NEUTRAL_COLOR } from '../../src/shared/color.js';
 import { applyCommand, EditHistory, type EditCommand } from '../../src/shared/commands.js';
 import { compositePixel } from '../../src/shared/composition.js';
 import {
@@ -63,7 +63,7 @@ function fixture(selectedId = 'middle', ripple = false): ProjectDocument {
   document.adjustments = [
     {
       ...createAdjustment('look', 150, 50),
-      colour: { ...createColourSettings(), saturation: 1.25 },
+      color: { ...createColorSettings(), saturation: 1.25 },
       keyframes: [layerKeyAsGradeKey(layerKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.123456789 }, 'hold'))],
     },
   ];
@@ -160,7 +160,7 @@ describe('strict uniform current-schema tracks', () => {
         false,
       );
     }
-    for (const removed of [{ colour: createColourSettings() }, { opacity: 1 }, { keyframes: [] }])
+    for (const removed of [{ color: createColorSettings() }, { opacity: 1 }, { keyframes: [] }])
       expect(
         projectSchema.safeParse({
           ...document,
@@ -209,8 +209,8 @@ describe('strict uniform current-schema tracks', () => {
     expect(timelineRows(reordered.layers).map((row) => row.layer.id)).toEqual(['sky', 'middle', 'ground']);
     const source = (sample: ReturnType<typeof sampleTimeline>[number]): [number, number, number] =>
       sample.layerId === 'ground' ? [1, 0, 0] : sample.layerId === 'middle' ? [0, 1, 0] : [0, 0, 1];
-    expect(compositePixel(sampleTimeline(document, 20), source)).toEqual(gradePixel([0, 0, 1], NEUTRAL_COLOUR));
-    expect(compositePixel(sampleTimeline(reordered, 20), source)).toEqual(gradePixel([1, 0, 0], NEUTRAL_COLOUR));
+    expect(compositePixel(sampleTimeline(document, 20), source)).toEqual(gradePixel([0, 0, 1], NEUTRAL_COLOR));
+    expect(compositePixel(sampleTimeline(reordered, 20), source)).toEqual(gradePixel([1, 0, 0], NEUTRAL_COLOR));
     expect(calculateLayout(reordered).duration).toBe(calculateLayout(document).duration);
     for (const layer of reordered.layers) expect(layer).toEqual(document.layers.find((item) => item.id === layer.id));
     const removed = oneStep(document, { type: 'layer-remove', layerId: 'ground' });
@@ -408,7 +408,7 @@ describe('independent Ripple toggles and packed placements', () => {
       document.layers.forEach((layer) => {
         layer.transform.keyframes = [point(0), point(600)];
       });
-      selected.grade.colour.exposure = 0.123456789;
+      selected.grade.color.exposure = 0.123456789;
       document.layers.find((layer) => layer.id === layerId)!.transform.base.opacity = 0.654321;
       document.layers.find((layer) => layer.id === targetId)!.transform.base.opacity = 0.345678;
       const plan = planTimelineDrop(

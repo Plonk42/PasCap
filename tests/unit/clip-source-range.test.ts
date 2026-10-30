@@ -237,7 +237,7 @@ describe('atomic clip source-range plans', () => {
       { ...uniformKeyframe(600, { ...NEUTRAL_SPATIAL_POSE, rotation: 90 }, 'smooth'), reset: false },
       { ...uniformKeyframe(1_000, { ...NO_TRANSFORM, opacity: 0.4 }, 'linear'), reset: false },
     ];
-    clip.grade.colour.temperature = 0.25;
+    clip.grade.color.temperature = 0.25;
     clip.grade.keyframes = [layerKeyAsGradeKey(layerKeyframe(10, { ...EMPTY_KEY_VALUES, exposure: 0.5 }, 'smooth'))];
     project.adjustments = [
       {
@@ -299,7 +299,7 @@ describe('atomic clip source-range plans', () => {
     ['dissolve exceeds retained duration', 'cross-dissolve', true, 'out', 120, 100],
     ['positioned dissolve loses exact overlap', 'cross-dissolve', false, 'out', 250, 300],
     ['positioned black fade gains a gap', 'fade-through-black', false, 'out', 250, 220],
-    ['positioned cut would overlap its neighbour', 'cut', false, 'out', 400, 300],
+    ['positioned cut would overlap its neighbor', 'cut', false, 'out', 400, 300],
   ] as const)('rejects %s atomically', (_name, type, ripple, edge, boundary, secondStart) => {
     const project = rangeProject(ripple);
     project.clips[1]!.start = secondStart;

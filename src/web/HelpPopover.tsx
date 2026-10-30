@@ -9,7 +9,7 @@ const USER_GUIDE_URL = 'https://github.com/Plonk42/PasCap/blob/main/docs/USER_GU
 interface Props {
   label: string;
   className?: string;
-  /** Heading anchor in docs/USER_GUIDE.md holding the exact behaviour. */
+  /** Heading anchor in docs/USER_GUIDE.md holding the exact behavior. */
   guide?: string;
   children: ReactNode;
 }

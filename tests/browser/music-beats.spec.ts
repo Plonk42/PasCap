@@ -475,8 +475,8 @@ test('hits show as band marks where they play, in the readout and list, and Hits
 
 test('without an analysis there are no ticks, structure or beats to snap to', async ({ page }) => {
   await open(page);
-  await expect(page.getByRole('status').filter({ hasText: 'Tempo and beats not analysed' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Analyse music', exact: true })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Tempo and beats not analyzed' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Analyze music', exact: true })).toBeVisible();
   await expect(page.locator('.music-beats, .music-section, .music-tone')).toHaveCount(0);
   await expect(page.getByText('Music structure', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Snap to beats', exact: true }).click();

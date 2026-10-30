@@ -36,7 +36,7 @@ function download(name: string, text: string): void {
 
 /**
  * Asks where to save before anything is awaited, while the click still allows a file dialog.
- * Browsers without a save dialog download the file instead. Returns null when cancelled.
+ * Browsers without a save dialog download the file instead. Returns null when canceled.
  */
 export async function chooseProjectFile(title: string): Promise<ProjectFileWriter | null> {
   const name = projectFileName(title);
