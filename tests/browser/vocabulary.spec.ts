@@ -57,7 +57,7 @@ for (const viewport of [
     await page.goto('/?project=preview-lab');
     await expect(page.getByRole('button', { name: 'Select track Track 1', exact: true })).toBeEnabled();
     const tracks = page.getByRole('complementary', { name: 'Video tracks', exact: true });
-    await expect(tracks.locator('.layer-sidebar-title')).toHaveText(['Video tracks · 1 / 8', 'Adjustments · 0 / 1']);
+    await expect(tracks.locator('.layer-sidebar-title')).toHaveText(['Video tracks · 1 / 8', 'Adjustments · 1']);
     await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
     expect(await page.locator('.layer-select').evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
       true,

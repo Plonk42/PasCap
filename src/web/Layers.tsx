@@ -115,7 +115,6 @@ function LayerName({
 export function Layers({
   project,
   selectedId,
-  selectedAdjustmentCount,
   scrollTop,
   surfaceHeight,
   viewportHeight,
@@ -130,7 +129,6 @@ export function Layers({
 }: Readonly<{
   project: ProjectDocument;
   selectedId: string;
-  selectedAdjustmentCount: number;
   scrollTop: number;
   surfaceHeight: number;
   viewportHeight: number | null;
@@ -202,9 +200,7 @@ export function Layers({
           title="Adjustments grade every video track over their range, after each clip's own grade"
         >
           <Icon name="colour" size={14} />
-          <span className="layer-sidebar-title">
-            Adjustments · {selectedAdjustmentCount} / {project.adjustments.length}
-          </span>
+          <span className="layer-sidebar-title">Adjustments · {project.adjustments.length}</span>
           <button
             className="text-button layer-add"
             aria-label="Add adjustment"
