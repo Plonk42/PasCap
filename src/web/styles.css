@@ -1033,6 +1033,11 @@ svg {
   flex-direction: column;
 }
 
+/* The panel is only a programmatic focus target (after a marker or adjustment is deleted), not a control. */
+.timeline-panel:focus {
+  outline: none;
+}
+
 .timeline-toolbar {
   display: flex;
   align-items: center;

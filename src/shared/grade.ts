@@ -91,7 +91,7 @@ export function createClipGrade(): ClipGrade {
 }
 
 /** Adjustment items of a project; see docs/design/CLIP_GRADES_AND_ADJUSTMENTS.md. */
-export const MAX_ADJUSTMENTS = 64;
+export const MAX_ADJUSTMENTS = 1024;
 const LAST_FRAME = 2_147_483_647;
 
 export const adjustmentSchema = z

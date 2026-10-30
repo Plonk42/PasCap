@@ -184,7 +184,7 @@ edits real projects with it, so saved data must keep working. Details are in
 - v1.3 (dev branch `grading-284`), owner-approved #273/#286: every clip requires
   `grade: { colour, keyframes }` (0–64 keys at original-source frames, fourteen nullable
   channels), evaluated at the continuous source position (one frame lower when reversed) and kept
-  with the footage through every clip edit. Projects require `adjustments`: 0–64 items
+  with the footage through every clip edit. Projects require `adjustments`: 0–1,024 items
   `{ id, start, duration, colour, keyframes }`, ascending, never overlapping, each grading
   **every video track** within `[start, start + duration)` with hard edges; 0–64 keys counted from
   the item start, always within its range (a move or trim that would leave one outside is

@@ -46,7 +46,7 @@ fields, filenames and URLs retain their technical spelling.
 
 Colour belongs to clip grades and adjustments ([#286](https://github.com/Plonk42/PasCap/issues/286)).
 Every clip requires `grade: { colour, keyframes }`, keyed at source frames so it follows its
-footage; the project requires `adjustments`, 0–64 ordered, non-overlapping items
+footage; the project requires `adjustments`, 0–1,024 ordered, non-overlapping items
 `{ id, start, duration, colour, keyframes }` that grade every video track within their range,
 after each clip's grade, with keyframes counted from their start. Both carry the same complete
 Colour: twelve scalar settings, HDR, Local contrast and static HSL/curves. Fourteen nullable
