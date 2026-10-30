@@ -549,6 +549,11 @@ body {
   scroll-padding-top: 45px;
 }
 
+/* ...and in the Colour tab, its pinned header of up to three lines. */
+.product-workspace .inspector-panel:has(> [role='tabpanel']:not([hidden]) > .colour-target) {
+  scroll-padding-top: 125px;
+}
+
 .product-workspace .boundary-button {
   font-size: 10px;
   padding: 2px 6px;

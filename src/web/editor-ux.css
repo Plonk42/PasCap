@@ -41,8 +41,12 @@
   color: var(--accent);
 }
 
-/* The Colour tab's target: the clip or adjustment it edits, with Delete for an adjustment. */
+/* The Colour tab's target: the clip or adjustment it edits, with Delete for an adjustment, pinned under the tabs. */
 .product-workspace .inspector-selection.colour-target {
+  position: sticky;
+  top: 45px;
+  z-index: 4;
+  background: var(--surface);
   grid-template-columns: 18px minmax(0, 1fr) auto;
   row-gap: 2px;
 }

@@ -16,6 +16,17 @@
   flex-wrap: nowrap;
 }
 
+/* A clip with its own grade: a small colour wheel before its name. */
+.clip-grade-mark {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-right: -4px;
+  border-radius: 50%;
+  background: conic-gradient(#f07a6a, #f0d070, #7fd27f, #6fd0d8, #7088f0, #d07ad8, #f07a6a);
+  box-shadow: 0 0 0 1px #0a2418;
+}
+
 /* Speed keys are salmon ◆ boxes slightly shorter than the clip grade markers (which overlap the clip's
  * bottom edge by 19px), between the clip label and those markers.
  */

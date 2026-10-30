@@ -223,7 +223,8 @@ test('selected context precedes compact animation controls and adjusted sections
   await expect(selection).toContainText('pattern-a');
   await expect(selection).toContainText('Clip 1 of 1');
   await inspectorTab(page, 'Clip grade');
-  await expect(selection).toContainText('This clip only');
+  await expect(selection).toContainText('Clip 1 of 1');
+  await expect(selection).toContainText('this clip only');
   expect(
     await selection.evaluate((element) =>
       Boolean(
@@ -549,7 +550,7 @@ test('a failed deferred preview keeps the editor usable and saves pending edits 
   await expect(page.getByRole('button', { name: 'Play preview', exact: true })).toBeDisabled();
   // Without the preview module there is no lab API: open the selected clip's grade directly.
   await page.getByRole('tab', { name: 'Colour', exact: true }).click();
-  await expect(page.locator('#inspector-pane .colour-target > span')).toHaveText('This clip only');
+  await expect(page.locator('#inspector-pane .colour-target > span')).toHaveText(/ · this clip only$/);
   await expect(page.getByRole('button', { name: 'Keyframe Exposure', exact: true })).toBeDisabled();
   const main = page.locator('.keyframe-setting-navigation').filter({
     has: page.getByRole('button', { name: 'Keyframe Exposure', exact: true }),

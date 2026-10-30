@@ -372,7 +372,9 @@ and incompatible fades/transitions/overlaps reject the edit rather than being sh
 The **Colour** Properties tab edits the grade of what you select on the timeline. Its pinned
 header names it.
 
-- A selected **clip**: its own **grade**. The header names the clip and says **This clip only**.
+- A selected **clip**: its own **grade**. The header names the clip and its place, such as
+  **Clip 2 of 3 · Track 1 · this clip only**. A small colour wheel before a clip's name on the
+  timeline shows that it has a grade of its own.
 - A selected **adjustment**: one grade of every video track over a stretch of the film, after
   each clip's own grade. The header names it by its range, such as **Adjustment 01:12:05 –
   01:20:00**, and says **Every track within this range**; its trash deletes it with its

@@ -14,7 +14,7 @@ import {
 import type { AudioAsset } from '../shared/audio.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { ColourSettings } from '../shared/colour.js';
-import { adjustmentAt, GRADE_SETTINGS } from '../shared/grade.js';
+import { adjustmentAt, GRADE_SETTINGS, isNeutralClipGrade } from '../shared/grade.js';
 import { KEYFRAME_SETTINGS } from '../shared/keyframes.js';
 import { resolveMediaSelection, type MediaSelections } from '../shared/media-selection.js';
 import type { MediaAsset } from '../shared/media.js';
@@ -1858,6 +1858,9 @@ export function Timeline(props: Readonly<Props>) {
                       ))}
                     </span>
                     <span className="timeline-clip-label">
+                      {!isNeutralClipGrade(clip.grade) && (
+                        <span className="clip-grade-mark" title="This clip has its own grade" />
+                      )}
                       <strong>{shortName(name)}</strong>
                       <small>
                         {sourceSeconds(currentPlaced.duration)}

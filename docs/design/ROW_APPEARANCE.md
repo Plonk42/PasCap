@@ -131,7 +131,9 @@ Transform or Opacity edits; the measurement helper needs the same static clip gr
 The Colour sections live in the **Colour** Properties tab (**Clip / Colour / Track / Audio**). It
 edits the grade of what is selected on the timeline, named in its pinned header:
 
-- A selected **clip**: its grade. The header names its recording and says **This clip only**.
+- A selected **clip**: its grade. The header names its recording and its place (**Clip 2 of 3 ·
+  Track 1 · this clip only**). A small colour wheel before a clip's name on the timeline marks a
+  clip with its own grade (any setting off neutral, or keyframes).
 - A selected **adjustment**: named by its range (**Adjustment 01:12:05 – 01:20:00**) with
   **Every track within this range** and a trash, **Delete adjustment**, which removes it and its
   keyframes. Adjustments are created on the adjustment track
