@@ -491,7 +491,7 @@ Delete or Backspace removes it.
 
 The project's adjustments sit on one **adjustment track**, a 36-pixel lane pinned under the time
 ruler above the video tracks, so they stay in view however the tracks scroll. Its header reads
-**Adjustments · N / 64**. Each adjustment is drawn over its range and named by it
+**Adjustments · selected / N**. Each adjustment is drawn over its range and named by it
 (**Adjustment 00:00:10 – 00:01:00**, OUT exclusive), with no other name.
 
 - **Create:** drag across an empty stretch of the track to draw a new adjustment, in either
@@ -499,7 +499,7 @@ ruler above the video tracks, so they stay in view however the tracks scroll. It
   red where it would overlap another adjustment, and a valid release adds a neutral adjustment in one
   Undo step and selects it. A click on the empty track only moves the playhead. **Add adjustment**
   (the + in the track's header) covers the selected ruler range, else the selected clip's span; it is
-  unavailable, with the reason in its tooltip, without either, over another adjustment or at 64.
+  unavailable, with the reason in its tooltip, without either, over another adjustment or at 1,024.
 - **Select:** a click selects the adjustment, puts the playhead where it was clicked and opens the
   Colour tab on it; Enter or Space selects it and moves the playhead into it when outside. A plain
   click on a clip or selecting a track clears it. The Colour tab edits the selected adjustment, even

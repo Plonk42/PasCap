@@ -57,7 +57,7 @@ A clip grade is what one shot needs. It belongs to the clip
 ## Adjustments
 
 An adjustment is what happens at a moment of the film: one grade of **every video track** over
-a project-time range. The project's `adjustments` hold at most **64** items
+a project-time range. The project's `adjustments` hold at most **1,024** items
 `{ id, start, duration, colour, keyframes }`, in timeline order and never overlapping. An item
 grades `[start, start + duration)` with hard edges, after each clip's grade. A look for one track
 only is a clip grade.
@@ -74,7 +74,7 @@ only is a clip grade.
   `adjustment-split` (at a project `frame` inside it, the second piece named `newAdjustmentId`;
   each piece keeps the keyframes within its range). The
   Colour and `layer-key-*` commands take an `adjustmentId`, with frames counted from its start.
-  An overlap or a 65th item is refused with the reason. Each edit is one Undo step. The assistant
+  An overlap or a 1,025th item is refused with the reason. Each edit is one Undo step. The assistant
   has every one of them.
 
 For example, clips A and B on two tracks under one adjustment with Exposure 0.5 both get that

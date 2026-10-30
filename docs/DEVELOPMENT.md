@@ -7,7 +7,7 @@ and `localContrast` (−1…1, neutral 0; the local-detail boost split out of HD
 [local contrast](design/DETAIL_FILTERS.md#local-contrast)),
 all eight HSL bands and all four
 colour curves, and 0–64 keyframes at source frames. The project's required `adjustments` array
-holds 0–64 ordered, non-overlapping items `{ id, start, duration, colour, keyframes }` with the
+holds 0–1,024 ordered, non-overlapping items `{ id, start, duration, colour, keyframes }` with the
 same Colour and keyframes counted from their start ([clip grades and adjustments](design/ROW_APPEARANCE.md)).
 Grade keyframes require fourteen nullable fields, each enabled one with its own Easing, and a
 boolean `reset` (default keyframe), in control order:
@@ -636,7 +636,7 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
   rejection, cache exclusion and HTTP guards.
 - Keep **the strict current schema**: required project `bookmarks` (at most 1,000 unique ascending
   frames, editing aids only), `selects` (kept source ranges per recording) and `adjustments`
-  (0–64 ordered, non-overlapping graded ranges), and a complete required `grade` on every clip,
+  (0–1,024 ordered, non-overlapping graded ranges), and a complete required `grade` on every clip,
   including Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves;
   reject saved `clip.colour` and `clip.correction`. Grade each source with its clip grade, then
   the adjustment at that frame, retaining

@@ -367,6 +367,7 @@ describe('main diamonds with per-setting arrows and stored-channel navigation', 
         createElement(Layers, {
           project: document,
           selectedId: 'video-1',
+          selectedAdjustmentCount: 0,
           scrollTop: 0,
           surfaceHeight: 198,
           viewportHeight: 200,

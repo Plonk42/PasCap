@@ -1566,6 +1566,7 @@ export function Timeline(props: Readonly<Props>) {
         <Layers
           project={project}
           selectedId={selectedLayerId}
+          selectedAdjustmentCount={props.selectedAdjustmentIds.length}
           scrollTop={verticalScroll}
           surfaceHeight={surfaceHeight}
           viewportHeight={viewportHeight}
@@ -1858,12 +1859,12 @@ export function Timeline(props: Readonly<Props>) {
                       ))}
                     </span>
                     <span className="timeline-clip-label">
+                      <strong>{shortName(name)}</strong>
                       {!isNeutralClipGrade(clip.grade) && (
                         <span className="clip-grade-mark" title="This clip has its own grade">
-                          <Icon name="colour" size={12} />
+                          <Icon name="colour" size={14} />
                         </span>
                       )}
-                      <strong>{shortName(name)}</strong>
                       <small>
                         {sourceSeconds(currentPlaced.duration)}
                         {speedLabel(clip)}

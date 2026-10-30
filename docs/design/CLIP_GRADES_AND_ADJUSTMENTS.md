@@ -85,7 +85,7 @@ Every clip requires `grade: { colour, keyframes }`.
 
 ### Adjustment items (owner)
 
-The project requires `adjustments`, the single adjustment track: an array of at most **64**
+The project requires `adjustments`, the single adjustment track: an array of at most **1,024**
 items `{ id, start, duration, colour, keyframes }`, sorted by `start`, **never overlapping**.
 
 - An item grades **every video track** within `[start, start + duration)`. There is no

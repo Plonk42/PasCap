@@ -338,7 +338,7 @@ export const editCommandSchema = z.discriminatedUnion('type', [
   }),
   command(
     'adjustment-add',
-    'Add an adjustment: a grade of every video track over a range, after clip grades. No overlaps; at most 64.',
+    'Add an adjustment: a grade of every video track over a range, after clip grades. No overlaps; at most 1024.',
     {
       adjustmentId: described(idSchema, 'Unused ID of the new adjustment.'),
       start: described(frameSchema, 'Its first project frame.'),

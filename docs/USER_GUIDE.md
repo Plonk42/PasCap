@@ -15,7 +15,7 @@ Removing a clip or music track does not remove the imported recording.
 
 Projects use **a strict current format**. Every clip has its own **grade** (complete Colour with
 Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves, plus keyframes
-at source frames of its recording); the project has a required `adjustments` array of up to 64
+at source frames of its recording); the project has a required `adjustments` array of up to 1,024
 **adjustments**, each a grade of every video track over a range of the timeline; every video
 track has its Transform (base plus per-setting project-frame keyframes, **Opacity** included),
 Ripple, transitions and opening/closing fades. Projects also require a `bookmarks` array of project frames (`[]` on new projects) and a `music` array of 0–8 independent
@@ -395,7 +395,7 @@ An adjustment stays at its place in the film: trimming, moving, rippling or dele
 moves it, and it never makes the project longer. Its keyframes count from its start (the
 **Adjustment keyframes** list shows **Frame in adjustment**). Adjustments sit on the adjustment
 track, pinned under the time ruler: drag across an empty stretch to draw one, or use **+** in its
-header to cover the selected ruler range or clip (adjustments never overlap, and at most 64 exist;
+header to cover the selected ruler range or clip (adjustments never overlap, and at most 1,024 exist;
 otherwise **+** is unavailable and says why); click one to edit it in the Colour tab, drag it
 to move it with its keyframes (amber ◆ markers inside it), drag its edges to trim it, press **S** to
 split it at the playhead and Delete to remove it. When a clip is selected, the adjustment grading it

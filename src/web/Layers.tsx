@@ -1,6 +1,5 @@
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import type { EditCommand } from '../shared/commands.js';
-import { MAX_ADJUSTMENTS } from '../shared/grade.js';
 import { MAX_VIDEO_LAYERS, type ProjectDocument, type VideoLayer } from '../shared/model.js';
 import './adjustment-lane.css';
 import { HelpPopover } from './HelpPopover.js';
@@ -116,6 +115,7 @@ function LayerName({
 export function Layers({
   project,
   selectedId,
+  selectedAdjustmentCount,
   scrollTop,
   surfaceHeight,
   viewportHeight,
@@ -130,6 +130,7 @@ export function Layers({
 }: Readonly<{
   project: ProjectDocument;
   selectedId: string;
+  selectedAdjustmentCount: number;
   scrollTop: number;
   surfaceHeight: number;
   viewportHeight: number | null;
@@ -202,7 +203,7 @@ export function Layers({
         >
           <Icon name="colour" size={14} />
           <span className="layer-sidebar-title">
-            Adjustments · {project.adjustments.length} / {MAX_ADJUSTMENTS}
+            Adjustments · {selectedAdjustmentCount} / {project.adjustments.length}
           </span>
           <button
             className="text-button layer-add"
