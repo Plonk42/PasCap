@@ -24,8 +24,8 @@ Milestone v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)) moves Colo
 source frames so it follows its footage, and up to 1,024 adjustments grade every video track over
 a range of the film, after each clip's grade. Its
 [decision record](design/CLIP_GRADES_AND_ADJUSTMENTS.md) lists what is implemented (#273,
-#285 to #288, including adjustments on the timeline and through MCP) and what remains: the
-UX evaluation (#289). Video tracks keep Transform, Ripple, transitions and fades;
+#285 to #288, including adjustments on the timeline and through MCP), evaluated by the owner
+(#289). Video tracks keep Transform, Ripple, transitions and fades;
 **Opacity** is the ninth Transform setting (0–1, initially 1 on new tracks), keyed like the
 others on every clip, including both dissolve sources, without an additional track
 multiplier. Its slider lives in **Track → Transform** and works on empty tracks;

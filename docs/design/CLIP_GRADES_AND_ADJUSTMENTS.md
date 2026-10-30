@@ -6,7 +6,8 @@ v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)). **Status: decided; 
 ([#285](https://github.com/Plonk42/PasCap/issues/285)) and adjustment items replacing track
 Colour ([#286](https://github.com/Plonk42/PasCap/issues/286)) and items on the timeline
 ([#287](https://github.com/Plonk42/PasCap/issues/287), with the Colour tab following the
-selection) are implemented on the v1.3 branch, and so are items through MCP (#288); the UX evaluation (#289) is not.** The
+selection) are implemented, and so are items through MCP (#288); the owner validated the UX
+evaluation (#289) on 2026-10-30.** The
 current contracts are [clip grades and adjustments](ROW_APPEARANCE.md),
 [spatial transforms](SPATIAL_TRANSFORMS.md) (with Opacity), [HSL and curves](HSL_AND_CURVES.md),
 [Temperature and Tint](TEMPERATURE_AND_TINT.md), [detail filters](DETAIL_FILTERS.md) and

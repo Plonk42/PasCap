@@ -181,7 +181,7 @@ edits real projects with it, so saved data must keep working. Details are in
   explicit capture and one-step gestures.
   Compare bypasses all Colour, including Temperature/Tint, and clip Detail, never coverage or geometry.
   See [Temperature and Tint](../docs/design/TEMPERATURE_AND_TINT.md).
-- v1.3 (dev branch `grading-284`), owner-approved #273/#286: every clip requires
+- v1.3, owner-approved #273/#286: every clip requires
   `grade: { colour, keyframes }` (0–64 keys at original-source frames, fourteen nullable
   channels), evaluated at the continuous source position (one frame lower when reversed) and kept
   with the footage through every clip edit. Projects require `adjustments`: 0–1,024 items
