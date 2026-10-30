@@ -41,7 +41,7 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
     project.clips = [clip];
     project.adjustments = [
       {
-        ...createAdjustment('look', 0, 8),
+        ...createAdjustment('look', 0, 6000),
         keyframes: [
           layerKeyAsGradeKey(layerKeyframe(0, { ...EMPTY_KEY_VALUES, temperature: -1 }, 'linear')),
           layerKeyAsGradeKey(layerKeyframe(5000, { ...EMPTY_KEY_VALUES, exposure: 0.25, tint: 1 }, 'ease-out')),
@@ -276,7 +276,7 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
     };
     snapshot.adjustments = [
       {
-        ...createAdjustment('look', 0, 2),
+        ...createAdjustment('look', 0, 100),
         keyframes: [layerKeyAsGradeKey(layerKeyframe(50, { ...EMPTY_KEY_VALUES, saturation: 1.2 }, 'linear'))],
       },
     ];

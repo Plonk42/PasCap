@@ -65,7 +65,7 @@ function sequence(ripple = true, retimed = false): ProjectDocument {
   document.media.videoIds = assets.map((asset) => asset.id);
   document.layers[0]!.ripple = ripple;
   document.adjustments = [
-    adjustmentFrom0(300, [gradePoint(12, { exposure: 0.25 }), gradePoint(500, { tint: 0.1 }, 'hold')]),
+    adjustmentFrom0(600, [gradePoint(12, { exposure: 0.25 }), gradePoint(500, { tint: 0.1 }, 'hold')]),
   ];
   const first = { ...createClip('a', assets[0]!.id, 15, 105), start: 30 };
   if (retimed) first.speed = { mode: 'constant', rate: 0.5 };

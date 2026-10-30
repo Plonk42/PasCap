@@ -506,16 +506,14 @@ for (const viewport of [
       });
     }
 
-    test('enabled-row chip navigation skips other channels and captures the real frame at a clamped preview', async ({
-      page,
-    }) => {
+    test('enabled-row chip navigation skips other channels without editing', async ({ page }) => {
       const document = await fixture(page, (document) => {
         document.adjustments[0]!.keyframes = [
           gradePoint(0, { exposure: 0, saturation: 0.65 }),
           gradePoint(10, { tint: 0 }),
           gradePoint(30, { exposure: 1 }),
           gradePoint(40, { saturation: 0.5 }),
-          gradePoint(140, { exposure: 2 }),
+          gradePoint(80, { exposure: 2 }),
         ];
       });
       await inspectorTab(page, 'Adjustment');
@@ -528,27 +526,11 @@ for (const viewport of [
       await chip(0, 'Next Exposure keyframe').press('Enter');
       await previewAt(page, document, 30);
       await expect(chip(0, 'Next Exposure keyframe')).toBeFocused();
-      // The keyframe after the adjustment's range previews its last frame and stays in place.
-      await expect(adjustmentKeyframes(page).locator('[data-keyframe-frame="140"]')).toContainText('Outside duration');
       await chip(30, 'Next Exposure keyframe').focus();
       await chip(30, 'Next Exposure keyframe').press('Space');
-      await previewAt(page, document, 89);
-      await expect(diamond(page, 'Exposure')).toHaveAttribute('aria-pressed', 'false');
-      await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toBeDisabled();
-      await expect(page.getByRole('spinbutton', { name: 'Exposure', exact: true })).toHaveValue(String(1 + 59 / 110));
-      await unchanged(page, document);
-      await diamond(page, 'Exposure').focus();
-      await diamond(page, 'Exposure').press('Enter');
-      const expected = structuredClone(document);
-      expected.adjustments[0]!.keyframes.splice(4, 0, gradePoint(89, { exposure: 1 + 59 / 110 }));
-      expect(await current(page)).toEqual(expected);
-      await page.evaluate(() => window.pascapLab!.flush());
-      expect(memory.saves).toBe(1);
+      await previewAt(page, document, 80);
       await expect(diamond(page, 'Exposure')).toHaveAttribute('aria-pressed', 'true');
-      // The capture is exactly one history step.
-      await page.getByRole('button', { name: 'Undo', exact: true }).click();
-      expect(await current(page)).toEqual(document);
-      await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+      await unchanged(page, document);
     });
 
     test('Speed header visits every retained clip source key, including off-trim keys, without editing', async ({

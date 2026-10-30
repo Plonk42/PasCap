@@ -58,7 +58,7 @@ describe('project compatibility', () => {
     const loaded = projectSchema.parse(upgradeProject(saved));
     expect(loaded).toEqual(saved);
     expect(loaded.adjustments.length).toBeGreaterThan(1);
-    expect(loaded.adjustments[0]!.keyframes.some((key) => key.frame < 0)).toBe(true);
+    expect(loaded.adjustments[0]!.keyframes.length).toBeGreaterThan(0);
     expect(loaded.layers[0]!.transform.base.opacity).toBeLessThan(1);
     expect(loaded.clips.some((clip) => clip.grade.keyframes.length > 0)).toBe(true);
   });

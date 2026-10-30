@@ -94,8 +94,9 @@ items `{ id, start, duration, colour, keyframes }`, sorted by `start`, **never o
   with keyframes.
 - `colour` has the clip grade's fields. `keyframes` (at most **64**) have the clip grade's
   shape, with frames **relative to the item's start**. Moving the item moves its animation. A
-  left trim rebases the offsets so each key keeps its project frame. Keys outside the range are
-  kept, so trimming back restores them; `start + frame` stays within 0–2,147,483,647.
+  left trim rebases the offsets so each key keeps its project frame. Keys always lie within the
+  item's range (frames 0 to duration − 1): a move or trim that would leave one outside is refused,
+  and the user makes the item longer to key later frames.
 - Items stay at their project frames when clips are trimmed, moved, rippled, split or deleted:
   they never follow clips. They do not extend the project duration.
 - Splitting an item gives both pieces the whole grade and every key, rebased.

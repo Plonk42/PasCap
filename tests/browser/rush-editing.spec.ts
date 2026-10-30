@@ -156,7 +156,7 @@ function omittedHeadSequence(): ProjectDocument {
     { ...createClip('c', assets[0]!.id, 60, 90), start: 60 },
   ];
   document.adjustments = [
-    adjustmentFrom0(90, [gradePoint(12, { exposure: 0.3 }), gradePoint(500, { hue: 20 }, 'hold')]),
+    adjustmentFrom0(600, [gradePoint(12, { exposure: 0.3 }), gradePoint(500, { hue: 20 }, 'hold')]),
   ];
   return projectSchema.parse(document);
 }
@@ -742,7 +742,7 @@ test('Q and W retain the mapped displayed frame, ripple dissolves and recover bo
   document.layers[0]!.openingFade = 5;
   document.clips[0]!.speed = { mode: 'constant', rate: 0.5 };
   document.adjustments = [
-    adjustmentFrom0(300, [gradePoint(12, { exposure: 0.25 }), gradePoint(500, { hue: 30 }, 'smooth')]),
+    adjustmentFrom0(600, [gradePoint(12, { exposure: 0.25 }), gradePoint(500, { hue: 30 }, 'smooth')]),
   ];
   await fixture(page, document);
   const before = await current(page);
@@ -832,7 +832,7 @@ test('I/O middle removal is transient then one edit, preserving absolute adjustm
   const document = dissolvedSequence();
   document.adjustments = [
     {
-      ...adjustmentFrom0(250, [
+      ...adjustmentFrom0(1100, [
         gradePoint(
           15,
           {
@@ -952,7 +952,7 @@ test('overlay middle cuts keep their gap and neighbours fixed; visible quick tri
 }) => {
   const document = sequence();
   document.adjustments = [
-    adjustmentFrom0(200, [gradePoint(10, { exposure: 0.2 }), gradePoint(500, { hue: 25 }, 'hold')]),
+    adjustmentFrom0(600, [gradePoint(10, { exposure: 0.2 }), gradePoint(500, { hue: 25 }, 'hold')]),
   ];
   const upper = createLayer('upper', 'Track 2', false);
   upper.transform.base.opacity = 0.8;
@@ -1057,7 +1057,7 @@ test('prefix, suffix and whole Ripple track cuts retain only necessary IDs and u
 }) => {
   const document = dissolvedSequence();
   document.layers[0]!.transform.keyframes = [transformPoint(20, { opacity: 0.7 })];
-  document.adjustments = [adjustmentFrom0(200, [gradePoint(800, { exposure: 0.5 }, 'hold')])];
+  document.adjustments = [adjustmentFrom0(900, [gradePoint(800, { exposure: 0.5 }, 'hold')])];
   const cases = [
     { name: 'prefix', inFrame: 0, outFrame: 20, sourceIn: 35, sourceOut: 105 },
     { name: 'suffix', inFrame: 70, outFrame: 90, sourceIn: 15, sourceOut: 85 },
@@ -1564,7 +1564,7 @@ test('native reorder of a cut excerpt commits its post-removal ripple ghost and 
   let document = sequence();
   document.clips[0] = { ...document.clips[0]!, sourceIn: 0, sourceOut: 120 };
   document.adjustments = [
-    adjustmentFrom0(210, [gradePoint(10, { exposure: 0.2 }), gradePoint(500, { hue: 20 }, 'hold')]),
+    adjustmentFrom0(600, [gradePoint(10, { exposure: 0.2 }), gradePoint(500, { hue: 20 }, 'hold')]),
   ];
   document = applyCommand(document, {
     type: 'transition',

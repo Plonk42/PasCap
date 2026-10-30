@@ -356,12 +356,12 @@ export const editCommandSchema = z.discriminatedUnion('type', [
     duration: described(frameSchema.min(1), 'Its new length in frames.'),
     keyframes: described(
       z.enum(['move', 'stay']),
-      'move: keyframes move with it; stay: they keep their project frames, as in a trim.',
+      'move: keyframes move with it; stay: they keep their project frames, as in a trim. Refused if a keyframe would fall outside the new range.',
     ),
   }),
   command(
     'adjustment-split',
-    'Split an adjustment: both pieces keep its whole grade and every keyframe at its project frame.',
+    'Split an adjustment: both pieces keep its whole grade and the keyframes within their ranges.',
     {
       adjustmentId,
       frame: described(frameSchema, 'First frame of the second piece, strictly inside it.'),

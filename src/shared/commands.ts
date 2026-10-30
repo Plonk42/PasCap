@@ -105,10 +105,18 @@ function colourOwner(next: ProjectDocument, command: ColourTargetFields): { owne
     save: () => {
       if (owner.keyframes.some((key) => key.values.opacity !== null))
         throw new Error('Opacity belongs to the track Transform, not to a grade.');
+      if (command.clipId === undefined) requireKeysWithin(owner.keyframes, (target as Adjustment).duration);
       target.colour = owner.colour;
       target.keyframes = owner.keyframes.map(layerKeyAsGradeKey);
     },
   };
+}
+
+function requireKeysWithin(keyframes: readonly { frame: number }[], duration: number): void {
+  if (keyframes.some((key) => key.frame < 0 || key.frame >= duration))
+    throw new Error(
+      `Adjustment keyframes must stay within the adjustment (frames 0–${duration - 1}). Move or remove them, or make the adjustment longer.`,
+    );
 }
 
 function requiredAdjustment(next: ProjectDocument, adjustmentId: string): Adjustment {
@@ -736,7 +744,7 @@ function overlappingAdjustment(items: readonly Adjustment[], start: number, dura
   );
 }
 
-/** Both pieces keep the whole grade and every keyframe; the second's are rebased onto its start. */
+/** Both pieces keep the whole grade; each keeps the keyframes within its range, the second's rebased onto its start. */
 function splitAdjustment(next: ProjectDocument, command: Extract<EditCommand, { type: 'adjustment-split' }>): void {
   const item = requiredAdjustment(next, command.adjustmentId);
   if (command.frame <= item.start || command.frame >= item.start + item.duration)
@@ -751,8 +759,11 @@ function splitAdjustment(next: ProjectDocument, command: Extract<EditCommand, { 
     id: command.newAdjustmentId,
     start: command.frame,
     duration: item.duration - offset,
-    keyframes: item.keyframes.map((key) => ({ ...structuredClone(key), frame: key.frame - offset })),
+    keyframes: item.keyframes
+      .filter((key) => key.frame >= offset)
+      .map((key) => ({ ...structuredClone(key), frame: key.frame - offset })),
   });
+  item.keyframes = item.keyframes.filter((key) => key.frame < offset);
   item.duration = offset;
   next.adjustments.sort((left, right) => left.start - right.start);
 }
@@ -795,6 +806,7 @@ function editAdjustment(
     // Staying keyframes keep their project frame: their offset changes by the start's change.
     const shift = command.keyframes === 'stay' ? item.start - command.start : 0;
     item.keyframes = item.keyframes.map((key) => ({ ...key, frame: key.frame + shift }));
+    requireKeysWithin(item.keyframes, command.duration);
     item.start = command.start;
     item.duration = command.duration;
   }

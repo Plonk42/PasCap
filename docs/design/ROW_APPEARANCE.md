@@ -63,15 +63,16 @@ grades `[start, start + duration)` with hard edges, after each clip's grade. A l
 only is a clip grade.
 
 - Its keyframes (at most **64**) have the clip grade's shape, with frames counted from its start
-  (0 is its first frame). They may lie before its start (negative) or after its end, while
-  `start + frame` stays a project frame, so trimming back restores them.
+  (0 is its first frame) and always lie within its range: to key later frames, make the item
+  longer first. A move or trim that would leave a keyframe outside is refused with the reason.
 - Items keep their project frames when clips are trimmed, moved, rippled, split or deleted: they
   never follow clips. They never extend the project duration.
 - Commands: `adjustment-add` (`adjustmentId`, `start`, `duration` and optional `settings`, the
   scalar Colour settings it starts with; the others neutral),
   `adjustment-remove`, `adjustment-range` (new `start` and `duration`; with `keyframes: 'move'`
   the keyframes move with the item, with `'stay'`, a trim, they keep their project frames) and
-  `adjustment-split` (at a project `frame` inside it, the second piece named `newAdjustmentId`). The
+  `adjustment-split` (at a project `frame` inside it, the second piece named `newAdjustmentId`;
+  each piece keeps the keyframes within its range). The
   Colour and `layer-key-*` commands take an `adjustmentId`, with frames counted from its start.
   An overlap or a 65th item is refused with the reason. Each edit is one Undo step. The assistant
   has every one of them.
@@ -155,7 +156,7 @@ a clip grade has **Auto** and **Auto white balance**
 - An adjustment's diamonds key its frame at the playhead (unavailable outside its range); its list
   is **Adjustment keyframes**,
   counted from its start (**Frame in adjustment**), and **Go to adjustment keyframe N** seeks the
-  keyframe, or the adjustment's nearest frame for a keyframe outside its range.
+  keyframe.
 
 **Copy grade** and **Paste grade** in a clip's or an adjustment's context menu copy a grade without
 keyframes and replace the right-clicked one's grade (or every selected clip's and adjustment's, when
