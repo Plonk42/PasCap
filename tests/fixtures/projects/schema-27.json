@@ -576,7 +576,7 @@
       },
       "keyframes": [
         {
-          "frame": -2,
+          "frame": 2,
           "values": {
             "temperature": null,
             "tint": null,

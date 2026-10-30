@@ -114,8 +114,8 @@ export const adjustmentSchema = z
         .array(
           gradeKeyframeSchemaFor(
             described(
-              z.number().int().min(-LAST_FRAME).max(LAST_FRAME),
-              'Frame counted from the adjustment start (0 is its first frame); it may lie outside its range, even before it, while start + frame stays a project frame.',
+              z.number().int().nonnegative().max(LAST_FRAME),
+              'Frame counted from the adjustment start (0 is its first frame), within its duration; make the adjustment longer first to key later frames.',
             ),
             'An adjustment keyframe must have at least one enabled setting.',
           ),
@@ -129,12 +129,9 @@ export const adjustmentSchema = z
   .refine((item) => item.start + item.duration <= LAST_FRAME, {
     message: 'Adjustment OUT exceeds the supported integer project-frame range.',
   })
-  .refine(
-    (item) => item.keyframes.every((key) => item.start + key.frame >= 0 && item.start + key.frame <= LAST_FRAME),
-    {
-      message: 'Adjustment keyframes exceed the supported integer project-frame range.',
-    },
-  );
+  .refine((item) => item.keyframes.every((key) => key.frame < item.duration), {
+    message: 'Adjustment keyframes must lie within the adjustment.',
+  });
 export type Adjustment = z.infer<typeof adjustmentSchema>;
 
 /** In timeline order, never overlapping, with unique IDs. */

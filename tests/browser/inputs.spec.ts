@@ -252,12 +252,11 @@ test('the adjustment list labels time/value/easing, retains reordered input focu
   ).toBeVisible();
 });
 
-test('adjustment keyframe navigation reaches its keyframes and previews one after its range at the nearest frame', async ({
+test('adjustment keyframe navigation reaches its keyframes and previews one at the last frame of the adjustment', async ({
   page,
 }) => {
   let document = await currentProject(page);
   document = applyCommand(document, { type: 'trim', clipId: 'clip-a', sourceIn: 30, sourceOut: 90 });
-  // Both clips' own 2× speed keep the last keyframe after the timeline and the adjustment covering it.
   for (const clipId of ['clip-a', 'clip-b'])
     document = applyCommand(document, { type: 'speed', clipId, speed: { mode: 'constant', rate: 2 } });
   const last = calculateLayout(document).duration - 1;
@@ -266,11 +265,10 @@ test('adjustment keyframe navigation reaches its keyframes and previews one afte
       gradePoint(5, { exposure: 0.2 }, 'hold'),
       gradePoint(35, { exposure: 0.2 }, 'smooth'),
       gradePoint(40, { exposure: 0.2 }),
-      gradePoint(110, { exposure: 0.2 }, 'hold'),
+      gradePoint(last, { exposure: 0.2 }, 'hold'),
     ]),
   ];
   await setProject(page, document);
-  expect(last).toBeLessThan(110);
   await inspectorTab(page, 'Adjustment');
   const keys = adjustmentKeyframes(page);
   for (const frame of [5, 35, 40, last]) {
@@ -278,13 +276,6 @@ test('adjustment keyframe navigation reaches its keyframes and previews one afte
     await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(frame);
   }
   await expect(colourStep(page, 'Previous')).toBeEnabled();
-  const outside = await editAdjustmentPoint(page, 110);
-  await expect(outside.locator('.keyframe-row-skipped')).toHaveText('Outside duration');
-  await expect(outside.getByRole('button', { name: 'Go to adjustment keyframe 110', exact: true })).toHaveAttribute(
-    'title',
-    `Stored frame in adjustment 110; preview the nearest available frame ${last}. The keyframe stays in place.`,
-  );
-  await expect(keys.locator('.keyframe-row-skipped')).toHaveCount(1);
   await colourStep(page, 'Previous').click();
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(40);
   await inspectorTab(page, 'Adjustment');
@@ -295,10 +286,7 @@ test('adjustment keyframe navigation reaches its keyframes and previews one afte
   const previous = main.getByRole('button', { name: 'Previous Exposure keyframe', exact: true });
   const next = main.getByRole('button', { name: 'Next Exposure keyframe', exact: true });
   await expect(previous).toHaveAttribute('title', 'Go to frame in adjustment 35.');
-  await expect(next).toHaveAttribute(
-    'title',
-    `Stored frame in adjustment 110; preview the nearest available frame ${last}. The keyframe stays in place.`,
-  );
+  await expect(next).toHaveAttribute('title', `Go to frame in adjustment ${last}.`);
   await next.focus();
   await next.press('Enter');
   await expect.poll(() => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame)).toBe(last);
@@ -325,7 +313,7 @@ test('adjustment keyframe navigation reaches its keyframes and previews one afte
   await diamond.click();
   await commitNumber(page, 'Exposure', '1.5');
   const points = (await currentProject(page)).adjustments[0]!.keyframes;
-  expect(points.map((point) => point.frame)).toEqual([0, 5, 35, 40, 110]);
+  expect(points.map((point) => point.frame)).toEqual([0, 5, 35, 40, last]);
   expect(points.find((point) => point.frame === 35)).toEqual(gradePoint(35, { exposure: 0.3 }, 'smooth'));
   expect(points.find((point) => point.frame === 0)).toEqual(gradePoint(0, { exposure: 1.5 }));
   expect((await currentProject(page)).clips.map((clip) => clip.speed)).toEqual(

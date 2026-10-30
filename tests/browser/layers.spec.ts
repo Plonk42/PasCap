@@ -626,7 +626,7 @@ test('edits adjustment values outside the source excerpt and the adjustment with
   const original = project.clips[0]!;
   project.adjustments = [
     {
-      ...adjustmentFrom0(60),
+      ...adjustmentFrom0(120),
       keyframes: [gradePoint(5, { saturation: 0.2, exposure: -0.5 }, 'smooth'), gradePoint(110, { exposure: 2 })],
     },
   ];
@@ -640,7 +640,6 @@ test('edits adjustment values outside the source excerpt and the adjustment with
   expect(await page.evaluate(() => window.pascapLab!.project()!.adjustments[0]!.keyframes[0]!.frame)).toBe(5);
   await keyFrame.press('Enter');
   const outside = await editAdjustmentPoint(page, 110);
-  await expect(outside.locator('.keyframe-row-skipped')).toHaveText('Outside duration');
   await outside.getByRole('spinbutton', { name: 'Exposure keyframe value 110', exact: true }).fill('3');
   await adjustmentKeyframes(page).getByRole('button', { name: 'Go to adjustment keyframe 8', exact: true }).click();
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.7');
@@ -655,7 +654,7 @@ test('edits adjustment values outside the source excerpt and the adjustment with
 test('source-range choices are per project and do not alter already inserted excerpts', async ({ page }) => {
   const keyed = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   const anchors = [gradePoint(20, { exposure: 0.3 }), gradePoint(70, { saturation: 0.6 }, 'smooth')];
-  keyed.adjustments = [{ ...adjustmentFrom0(60), keyframes: anchors }];
+  keyed.adjustments = [{ ...adjustmentFrom0(80), keyframes: anchors }];
   await page.evaluate((document) => window.pascapLab!.setDocument(document), keyed);
   await sourceAtPointer(page, 'pattern-a.mp4', 0.25);
   await page.getByRole('spinbutton', { name: 'Source IN', exact: true }).fill('30');

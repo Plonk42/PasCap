@@ -187,8 +187,8 @@ edits real projects with it, so saved data must keep working. Details are in
   with the footage through every clip edit. Projects require `adjustments`: 0–64 items
   `{ id, start, duration, colour, keyframes }`, ascending, never overlapping, each grading
   **every video track** within `[start, start + duration)` with hard edges; 0–64 keys counted from
-  the item start (negative allowed while `start + frame` stays a project frame), moving with it
-  (`adjustment-range` `move`) or keeping their project frames (`stay`, a trim). Items never follow
+  the item start, always within its range (a move or trim that would leave one outside is
+  refused), moving with it (`adjustment-range` `move`) or keeping their project frames (`stay`, a trim). Items never follow
   clips and never extend duration. Each source is graded by its clip grade, then the item at that
   project frame, in sequence (each stage clips and encodes; local tone summed once in the detail
   kernel). Static export requires no adjustments and unkeyed scalar clip grades without local

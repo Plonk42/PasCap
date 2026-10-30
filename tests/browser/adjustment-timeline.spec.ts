@@ -188,6 +188,19 @@ test('an adjustment keyframe slides within its adjustment', async ({ page }) => 
   await expect.poll(async () => (await current(page)).adjustments[0]!.keyframes).toEqual([]);
 });
 
+test('an adjustment keyframe can be dragged to the last frame of its adjustment but not past it', async ({ page }) => {
+  const marker = item(page, 'a').locator('[data-adjustment-keyframe="5"]');
+  // Snapping would pull the marker onto the adjustment's exclusive OUT (frame 30); it lands on the last frame instead.
+  const release = await press(page, marker, 14.5, false);
+  await expect(item(page, 'a')).not.toHaveClass(/invalid/);
+  await expect(page.locator('.error-banner')).toHaveCount(0);
+  await release();
+  await expect.poll(async () => (await current(page)).adjustments[0]!.keyframes.map((key) => key.frame)).toEqual([19]);
+  const far = await press(page, item(page, 'a').locator('[data-adjustment-keyframe="19"]'), 40, false);
+  await far();
+  expect((await current(page)).adjustments[0]!.keyframes.map((key) => key.frame)).toEqual([19]);
+});
+
 /** Presses the empty adjustment track at `from` and drags to `to`, in project frames, with Alt. */
 async function draw(page: Page, from: number, to: number): Promise<() => Promise<void>> {
   const lane = (await page.locator('.adjustment-lane').boundingBox())!;
@@ -264,7 +277,9 @@ test('Add adjustment covers the ruler range or the selected clip, with the reaso
   await expect(page.locator('#inspector-pane .colour-target strong')).toHaveText('Adjustment 00:02:02 – 00:02:15');
 });
 
-test('Split and Delete act on the selected adjustment, keeping its grade and keyframes', async ({ page }) => {
+test('Split and Delete act on the selected adjustment, each piece keeping its grade and its keyframes', async ({
+  page,
+}) => {
   await body(page, 'a').focus();
   await body(page, 'a').press('Enter');
   await seek(page, 10);
@@ -283,7 +298,7 @@ test('Split and Delete act on the selected adjustment, keeping its grade and key
     ]);
   const pieces = (await current(page)).adjustments;
   expect(pieces[0]!.keyframes.map((key) => key.frame)).toEqual([5]);
-  expect(pieces[1]!.keyframes.map((key) => key.frame)).toEqual([-5]);
+  expect(pieces[1]!.keyframes).toEqual([]);
   await expect(body(page, pieces[1]!.id)).toHaveAttribute('aria-pressed', 'true');
   await page.getByRole('button', { name: 'Delete selected adjustment', exact: true }).click();
   await expect.poll(() => ranges(page)).toHaveLength(2);
