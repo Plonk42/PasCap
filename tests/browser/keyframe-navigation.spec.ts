@@ -732,7 +732,7 @@ test('all fifteen setting buttons remain present and disabled throughout a nativ
   };
   await show('Exposure');
   await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .colour-target > span')).toHaveText(
-    'This clip only',
+    / · this clip only$/,
   );
   for (const { label } of KEYFRAME_SETTINGS) {
     await show(label);

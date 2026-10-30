@@ -54,17 +54,19 @@
   background: #d89b7499;
 }
 
+/* Inside the band, so it never covers the adjustment track under the ruler; cut short when the band is narrow. */
 .timeline-ruler-range-readout {
-  position: absolute;
-  left: 50%;
-  top: calc(100% + 3px);
-  transform: translateX(-50%);
-  padding: 1px 5px;
-  border-radius: 3px;
-  background: #e9bea5;
-  color: #2c2019;
+  display: block;
+  overflow: hidden;
+  padding: 0 4px;
+  color: #fff7f0;
   font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
   font-variant-numeric: tabular-nums;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-shadow: 0 0 2px #2c2019;
   white-space: nowrap;
 }
 

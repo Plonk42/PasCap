@@ -42,7 +42,7 @@ test.beforeEach(async ({ page, request }) => {
 test('clip grade values follow the image in slow motion, and a keyframe at the playhead shows its own value', async ({
   page,
 }) => {
-  await expect(page.locator('.colour-target')).toContainText('This clip only');
+  await expect(page.locator('.colour-target')).toContainText('this clip only');
   // Frame 3 shows source frame 1 at position 1.5, between the keyframes: read-only, the image's value.
   await seek(page, 3);
   await expect(exact(page, 'Exposure')).toHaveValue('0.15');
@@ -57,4 +57,26 @@ test('clip grade values follow the image in slow motion, and a keyframe at the p
   const edited = await current(page);
   expect(edited.layers).toEqual(document.layers);
   await expect.poll(() => memory.saves).toBe(1);
+});
+
+test('the Colour header names the clip and stays pinned while its settings scroll; graded clips are marked', async ({
+  page,
+}) => {
+  const header = page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .colour-target');
+  await expect(header.locator('> span')).toHaveText('Clip 1 of 1 · Track 1 · this clip only');
+  const panel = page.locator('.inspector-panel');
+  await panel.evaluate((element) => element.scrollTo({ top: element.scrollHeight }));
+  await expect.poll(() => panel.evaluate((element) => element.scrollTop)).toBeGreaterThan(300);
+  const tabs = (await page.locator('.inspector-panel > .panel-heading').boundingBox())!;
+  const pinned = (await header.boundingBox())!;
+  expect(Math.abs(pinned.y - (tabs.y + tabs.height))).toBeLessThan(1);
+  // A clip with keyframes or any setting off neutral shows the mark; a neutral one does not.
+  const mark = page.locator('[data-clip-id="one"] .clip-grade-mark');
+  await expect(mark).toHaveCount(1);
+  await page.evaluate(() => {
+    const project = structuredClone(window.pascapLab!.project()!);
+    project.clips[0]!.grade.keyframes = [];
+    window.pascapLab!.setDocument(project);
+  });
+  await expect(mark).toHaveCount(0);
 });
