@@ -121,7 +121,7 @@ export interface AdjustmentCreation {
   error: string;
 }
 
-/** A new neutral adjustment over frames [start, end); overlaps and the 64-adjustment limit are refused. */
+/** A new neutral adjustment over frames [start, end); overlaps and the adjustment limit are refused. */
 export function planAdjustmentCreation(
   project: ProjectDocument,
   adjustmentId: string,

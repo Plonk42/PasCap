@@ -256,7 +256,7 @@ describe('adjustments', () => {
       applyCommand(projectSchema.parse(document), {
         type: 'adjustment-add',
         adjustmentId: 'extra',
-        start: 1_000,
+        start: MAX_ADJUSTMENTS * 2 + 10,
         duration: 1,
       }),
     ).toThrow(`at most ${MAX_ADJUSTMENTS}`);

@@ -670,7 +670,7 @@ only owned scratch, never originals, saved projects or successful outputs.
 
 The current schema **is strict**, including a required clip `grade` (complete `colour` with
 Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves, and 0–64
-source-frame keyframes), required project `adjustments` (0–64 ordered, non-overlapping items with
+source-frame keyframes), required project `adjustments` (0–1,024 ordered, non-overlapping items with
 the same Colour and keyframes counted from their start), no clip colour/correction/spatial
 fields, a required boolean clip `reverse`, and track `transform` base/nine-value
 project-frame keyframes (Opacity included), required unique `media.videoIds` / `media.audioIds`

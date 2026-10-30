@@ -780,7 +780,7 @@ collection; another project's membership and immutable export snapshots are unaf
 Only strict current-schema projects and project snapshots in version-1 export receipts are interpreted.
 Every clip requires a complete `grade`: Colour, including `temperature`, `tint`, `vibrance`,
 `whites`, `blacks`, `hdr` and `localContrast` bases and static HSL/curves, and 0–64 keyframes at
-source frames. The required `adjustments` array holds 0–64 ordered, non-overlapping items with
+source frames. The required `adjustments` array holds 0–1,024 ordered, non-overlapping items with
 the same Colour and keyframes counted from their start. Missing fields and clip
 colour/correction are invalid.
 Every clip requires constant or 1–256-keyframe custom-curve speed and a boolean `reverse`; every video track

@@ -21,7 +21,7 @@ and Denoise and the keyable HDR look and Local contrast follow [#123's contract]
 qualification claim.
 Milestone v1.3 ([#284](https://github.com/Plonk42/PasCap/issues/284)) moves Colour to
 [clip grades and adjustments](design/ROW_APPEARANCE.md): every clip has its own grade, keyed at
-source frames so it follows its footage, and up to 64 adjustments grade every video track over
+source frames so it follows its footage, and up to 1,024 adjustments grade every video track over
 a range of the film, after each clip's grade. Its
 [decision record](design/CLIP_GRADES_AND_ADJUSTMENTS.md) lists what is implemented (#273,
 #285 to #288, including adjustments on the timeline and through MCP) and what remains: the
