@@ -271,7 +271,7 @@ test('advanced adjustment settings stay with the adjustment; selecting a clip sh
   await field.fill('31');
   await field.press('Enter');
   await page.locator('[data-clip-id="two"] .timeline-clip-body').click();
-  await expect(page.locator('#inspector-pane .colour-target > span')).toHaveText('This clip only');
+  await expect(page.locator('#inspector-pane .colour-target > span')).toHaveText(/ · this clip only$/);
   await expect(field).toHaveValue('0');
   await expect(field).toBeEnabled();
   await field.fill('-4.23456789');

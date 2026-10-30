@@ -112,7 +112,7 @@ test('four accessible tabs preserve selection across clips, populated/empty trac
   // The Colour tab edits what is selected: a clip's own grade, nothing on an empty track.
   await selectClip(page, 'upper-clip');
   await expect(list).toHaveCount(0);
-  await expect(page.locator('#inspector-pane .colour-target > span')).toHaveText('This clip only');
+  await expect(page.locator('#inspector-pane .colour-target > span')).toHaveText(/ · this clip only$/);
   await page.getByRole('button', { name: 'Select track Empty row', exact: true }).click();
   const hint =
     'Select a clip or an adjustment in the timeline to edit its grade. To grade every track over a stretch, draw an adjustment on the adjustment track.';

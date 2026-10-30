@@ -259,7 +259,8 @@ toolbar covering the lanes. Each track header has one **Ripple** toggle icon
   These are shrinking operations. Handles or Restore full recording recover omitted
   footage. Repeating an unchanged endpoint trim adds no history entry.
 - **Drag on the time ruler** to select a project-frame range (OUT exclusive): a
-  highlighted band on the ruler, with an IN – OUT timecode readout below it for as long
+  highlighted band on the ruler, with its IN – OUT timecode written inside it (cut short with an
+  ellipsis when the band is narrow) for as long
   as the range stays selected, and a hatched
   overlay on the part of the selected clip it covers. The preview follows the moving
   edge (its first or last removed frame). Snapping (eight pixels, Alt bypasses) and

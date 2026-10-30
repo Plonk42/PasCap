@@ -97,12 +97,14 @@ const SECTION_TITLES: Record<InspectorSectionTarget, string> = {
   transition: 'Transitions',
 };
 
-/** Bring a section to the top of the Inspector panel, then its detail into view, without scrolling the workspace. */
+/** Bring a section to the top of the Inspector panel, under its pinned rows, then its detail into view. */
 function revealInPanel(section: Element, detail: Element | null): void {
   const panel = section.closest<HTMLElement>('.inspector-panel');
   if (!panel) return;
-  const padding = Number.parseFloat(getComputedStyle(panel).scrollPaddingTop) || 0;
-  panel.scrollTop += section.getBoundingClientRect().top - panel.getBoundingClientRect().top - padding;
+  const pinned = [
+    ...panel.querySelectorAll(':scope > .panel-heading, :scope > [role="tabpanel"]:not([hidden]) > .colour-target'),
+  ].reduce((height, element) => height + element.getBoundingClientRect().height, 0);
+  panel.scrollTop += section.getBoundingClientRect().top - panel.getBoundingClientRect().top - pinned;
   const overflow = (detail?.getBoundingClientRect().bottom ?? 0) - panel.getBoundingClientRect().bottom;
   if (overflow > 0) panel.scrollTop += overflow;
 }
@@ -800,6 +802,8 @@ interface ColourTabProps {
   placed: PlacedClip | undefined;
   asset: MediaAsset | undefined;
   clipLabel: string;
+  /** "Clip 2 of 3 · Track 1": tells apart clips of one recording. */
+  clipPlace: string;
   selectedClipCount: number;
   frame: number;
   /** The source frame the selected clip shows at the playhead, or null off the clip. */
@@ -897,7 +901,7 @@ function ColourTab(props: Readonly<ColourTabProps>) {
   return (
     <>
       {isClipOwner(owner)
-        ? header('video', title, 'This clip only')
+        ? header('video', title, `${props.clipPlace} · this clip only`)
         : header(
             'colour',
             title,
@@ -1008,10 +1012,7 @@ function InspectorPanel({
         return;
       }
       const element = title.closest('.inspector-section');
-      // Colour starts from the header naming the clip or adjustment it edits.
-      const top =
-        target === 'colour' ? (element?.parentElement?.querySelector(':scope > .colour-target') ?? element) : element;
-      if (element && top) revealInPanel(top, element.querySelector('[data-selected="true"]'));
+      if (element) revealInPanel(element, element.querySelector('[data-selected="true"]'));
     };
     frameId = requestAnimationFrame(reveal);
     return () => cancelAnimationFrame(frameId);
@@ -1181,6 +1182,7 @@ function InspectorPanel({
             placed={placed}
             asset={asset}
             clipLabel={`clip ${trackPosition + 1}`}
+            clipPlace={`Clip ${trackPosition + 1} of ${trackClips.length} · ${layer?.name ?? ''}`}
             selectedClipCount={selectedClipCount}
             frame={frame}
             sourceFrame={sourceFrame}

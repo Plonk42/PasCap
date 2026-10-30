@@ -125,7 +125,7 @@ export async function colourTarget(page: Page, target: 'Clip' | 'Adjustment'): P
   const tab = page.getByRole('tab', { name: 'Colour', exact: true });
   if ((await tab.getAttribute('aria-selected')) !== 'true') await tab.dispatchEvent('click');
   await expect(page.locator('#inspector-pane [role="tabpanel"]:not([hidden]) .colour-target > span')).toHaveText(
-    target === 'Clip' ? 'This clip only' : 'Every track within this range',
+    target === 'Clip' ? / · this clip only$/ : 'Every track within this range',
   );
 }
 

@@ -1196,6 +1196,12 @@ test('missing, outside and empty ranges are rejected; click and Escape restore; 
   await markRange(page, 20, 31);
   await expectCutOverlay(page, 20, 31);
   await expect(page.locator('.timeline-ruler-range-readout')).toHaveText('00:00:20 – 00:01:01');
+  // The readout sits inside the band, cut short there, never over the adjustment track below.
+  const band = (await rulerRange(page).boundingBox())!;
+  const readout = (await page.locator('.timeline-ruler-range-readout').boundingBox())!;
+  expect(readout.x).toBeGreaterThanOrEqual(band.x);
+  expect(readout.x + readout.width).toBeLessThanOrEqual(band.x + band.width + 0.5);
+  expect(readout.y + readout.height).toBeLessThanOrEqual(band.y + band.height + 0.5);
   await page.keyboard.down('Alt');
   await page.mouse.move(await rulerX(60), await rulerY());
   await page.mouse.down();
