@@ -3,6 +3,7 @@ import {
   MOTION_ANALYSIS_VERSION,
   motionProfile,
   smoothRanges,
+  steadyLimits,
   type MotionAnalysis,
   type TelemetrySample,
 } from '../../src/shared/motion-analysis.js';
@@ -72,7 +73,7 @@ describe('recording shots', () => {
 
   it('reports the steady ranges around a jolt with their movement and flight data, in source order', () => {
     const telemetry = Array.from({ length: 21 }, (_, second) => sample(second, 50 + second));
-    const { shots, stillShare } = recordingShots(analysis(telemetry), [], undefined, 2, FPS);
+    const { shots, stillShare } = recordingShots(analysis(telemetry), [], undefined, steadyLimits(2), FPS);
     expect(shots.map((shot) => [shot.motion, shot.sourceIn < 290, shot.sourceOut > 320])).toEqual([
       ['pan left', true, false],
       ['tilt down', false, true],
@@ -91,10 +92,10 @@ describe('recording shots', () => {
       { sourceIn: 100, sourceOut: 200 },
       { sourceIn: 400, sourceOut: 430 },
     ];
-    const { shots } = recordingShots(analysis(), [], kept, 2, FPS);
+    const { shots } = recordingShots(analysis(), [], kept, steadyLimits(2), FPS);
     // 400–430 is one second, shorter than a steady range.
     expect(shots.map((shot) => [shot.sourceIn, shot.sourceOut])).toEqual([[100, 200]]);
-    const damaged = recordingShots(analysis(), [{ start: 100, end: 160 }], undefined, 2, FPS).shots;
+    const damaged = recordingShots(analysis(), [{ start: 100, end: 160 }], undefined, steadyLimits(2), FPS).shots;
     expect(damaged.some((shot) => shot.sourceIn < 160 && shot.sourceOut > 100)).toBe(false);
     expect(damaged[0]!.flight).toBeNull();
   });
@@ -141,20 +142,20 @@ describe('ranking steady ranges', () => {
       { seconds: 20, movement: nearlyStill },
       { seconds: 7, movement: orbit },
     ]);
-    const { shots } = recordingShots(motion, [], undefined, 2, FPS);
+    const { shots } = recordingShots(motion, [], undefined, steadyLimits(2), FPS);
     expect(shots.map((shot) => [shot.kind, shot.rank])).toEqual([
       ['approach', 2],
       ['static', 3],
       ['orbit', 1],
     ]);
     // Source preview suggests the same range as the assistant's rank 1.
-    const ranges = smoothRanges(motionProfile(motion, FPS), 2, FPS);
+    const ranges = smoothRanges(motionProfile(motion, FPS), steadyLimits(2), FPS);
     expect(ranges[0]).toMatchObject({ sourceIn: shots[0]!.sourceIn });
     const best = rankedSmoothRanges(motion, ranges, FPS)[0]!;
     expect([best.sourceIn, best.sourceOut]).toEqual([shots[2]!.sourceIn, shots[2]!.sourceOut]);
     // Use best in Media keeps the same range.
-    expect(bestSteadyRange(motion, [], 2, FPS)).toEqual(best);
-    expect(bestSteadyRange(stretches([{ seconds: 1, movement: orbit }]), [], 2, FPS)).toBeNull();
+    expect(bestSteadyRange(motion, [], steadyLimits(2), FPS)).toEqual(best);
+    expect(bestSteadyRange(stretches([{ seconds: 1, movement: orbit }]), [], steadyLimits(2), FPS)).toBeNull();
   });
 
   it('names orbits, reveals, approaches and other moves from the picture and the flight data', () => {

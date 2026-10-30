@@ -3,17 +3,27 @@ import { describe, expect, it, vi } from 'vitest';
 import { analyzeProxy, blockSpectra, estimateMotion, measureFrames, parseTelemetry } from '../../src/server/motion.js';
 import { MotionPool } from '../../src/server/motion-pool.js';
 import {
+  FLIGHT_SPEED_RANGE,
   MOTION_ANALYSIS_VERSION,
   MOTION_HEIGHT,
   MOTION_WIDTH,
   motionAnalysisSchema,
   motionProfile,
   smoothRanges,
+  steadyLimits,
   STILL_SPEED,
+  telemetryAt,
   type MotionAnalysis,
 } from '../../src/shared/motion-analysis.js';
 
 const FPS = 30000 / 1001;
+
+/** A measured profile without flight data. */
+const measured = (roughness: number[], speed: number[]) => ({
+  roughness,
+  speed,
+  flightSpeed: roughness.map(() => null),
+});
 
 let seed = 7;
 const random = (): number => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -188,7 +198,7 @@ describe('smooth ranges', () => {
     });
     const profile = motionProfile(analysis(tx), FPS);
     expect(Math.max(...profile.roughness.slice(120, 300))).toBeLessThan(0.5);
-    const [best, ...others] = smoothRanges(profile, 2, FPS);
+    const [best, ...others] = smoothRanges(profile, steadyLimits(2), FPS);
     expect(best!.sourceIn).toBeGreaterThan(55);
     expect(best!.sourceIn).toBeLessThan(110);
     expect(best!.sourceOut).toBeGreaterThan(330);
@@ -199,35 +209,44 @@ describe('smooth ranges', () => {
 
   it('suggests the whole recording when it is steady from start to end', () => {
     const profile = motionProfile(analysis([null, ...Array.from({ length: 299 }, () => 1)]), FPS);
-    expect(smoothRanges(profile, 2, FPS)).toEqual([{ sourceIn: 0, sourceOut: 300 }]);
+    expect(smoothRanges(profile, steadyLimits(2), FPS)).toEqual([{ sourceIn: 0, sourceOut: 300 }]);
   });
 
   it('leaves out a steady range where the camera does not move at all', () => {
     const roughness = Array.from({ length: 600 }, (_, frame) => (frame >= 280 && frame < 320 ? 5 : 0));
     const hoverThenPan = Array.from({ length: 600 }, (_, frame) => (frame < 300 ? 0.1 : 3));
-    expect(smoothRanges({ roughness, speed: hoverThenPan }, 2, FPS)).toEqual([{ sourceIn: 326, sourceOut: 600 }]);
+    expect(smoothRanges(measured(roughness, hoverThenPan), steadyLimits(2), FPS)).toEqual([
+      { sourceIn: 326, sourceOut: 600 },
+    ]);
     // A few moving frames among still ones do not make a hover interesting; a slow drift does.
     const nudged = hoverThenPan.map((speed, frame) => (frame === 100 ? 3 : speed));
-    expect(smoothRanges({ roughness, speed: nudged }, 2, FPS)).toHaveLength(1);
+    expect(smoothRanges(measured(roughness, nudged), steadyLimits(2), FPS)).toHaveLength(1);
     const drift = hoverThenPan.map((speed, frame) => (frame < 300 ? STILL_SPEED + 0.1 : speed));
-    expect(smoothRanges({ roughness, speed: drift }, 2, FPS)).toHaveLength(2);
+    expect(smoothRanges(measured(roughness, drift), steadyLimits(2), FPS)).toHaveLength(2);
   });
 
   it('bridges a short jolt but not a long one, and needs two seconds', () => {
-    const moving = (roughness: number[]) => ({ roughness, speed: roughness.map(() => 3) });
+    const moving = (roughness: number[]) =>
+      measured(
+        roughness,
+        roughness.map(() => 3),
+      );
     const rough = (start: number, length: number) =>
       moving(Array.from({ length: 600 }, (_, frame) => (frame >= start && frame < start + length ? 5 : 0)));
-    expect(smoothRanges(rough(300, 10), 2, FPS)).toEqual([{ sourceIn: 0, sourceOut: 600 }]);
-    expect(smoothRanges(rough(300, 30), 2, FPS)).toEqual([
+    expect(smoothRanges(rough(300, 10), steadyLimits(2), FPS)).toEqual([{ sourceIn: 0, sourceOut: 600 }]);
+    expect(smoothRanges(rough(300, 30), steadyLimits(2), FPS)).toEqual([
       { sourceIn: 0, sourceOut: 294 },
       { sourceIn: 336, sourceOut: 600 },
     ]);
-    expect(smoothRanges(moving(Array.from({ length: 50 }, () => 0)), 2, FPS)).toEqual([]);
+    expect(smoothRanges(moving(Array.from({ length: 50 }, () => 0)), steadyLimits(2), FPS)).toEqual([]);
   });
 
   it('never includes or bridges damaged frames, even shorter than a bridged jolt', () => {
-    const profile = { roughness: Array.from({ length: 600 }, () => 0), speed: Array.from({ length: 600 }, () => 3) };
-    expect(smoothRanges(profile, 2, FPS, [{ start: 300, end: 305 }])).toEqual([
+    const profile = measured(
+      Array.from({ length: 600 }, () => 0),
+      Array.from({ length: 600 }, () => 3),
+    );
+    expect(smoothRanges(profile, steadyLimits(2), FPS, [{ start: 300, end: 305 }])).toEqual([
       { sourceIn: 0, sourceOut: 294 },
       { sourceIn: 311, sourceOut: 600 },
     ]);
@@ -235,9 +254,70 @@ describe('smooth ranges', () => {
 
   it('suggests more footage as the tolerance rises', () => {
     const roughness = Array.from({ length: 600 }, (_, frame) => (frame < 100 ? 3 : 1));
-    const profile = { roughness, speed: roughness.map(() => 3) };
-    expect(smoothRanges(profile, 2, FPS)[0]).toEqual({ sourceIn: 106, sourceOut: 600 });
-    expect(smoothRanges(profile, 4, FPS)[0]).toEqual({ sourceIn: 0, sourceOut: 600 });
+    const profile = measured(
+      roughness,
+      roughness.map(() => 3),
+    );
+    expect(smoothRanges(profile, steadyLimits(2), FPS)[0]).toEqual({ sourceIn: 106, sourceOut: 600 });
+    expect(smoothRanges(profile, steadyLimits(4), FPS)[0]).toEqual({ sourceIn: 0, sourceOut: 600 });
+  });
+
+  it('keeps only frames whose jolts reach the minimum of the allowed movement', () => {
+    const roughness = Array.from({ length: 600 }, (_, frame) => (frame < 300 ? 0.5 : 1.5));
+    const profile = measured(
+      roughness,
+      roughness.map(() => 3),
+    );
+    expect(smoothRanges(profile, { ...steadyLimits(2), movement: [1, 2] }, FPS)).toEqual([
+      { sourceIn: 306, sourceOut: 600 },
+    ]);
+    expect(smoothRanges(profile, { ...steadyLimits(2), movement: [0, 1] }, FPS)).toEqual([
+      { sourceIn: 0, sourceOut: 294 },
+    ]);
+  });
+
+  it('keeps only frames flown within the flight speed range, judging none where the drone recorded no speed', () => {
+    const roughness = Array.from({ length: 900 }, () => 0);
+    const speed = roughness.map(() => 3);
+    // 2 m/s for 10 s, then 8 m/s, with no speed recorded over the last 10 s.
+    const flightSpeed = roughness.map((_, frame) => {
+      if (frame < 300) return 2;
+      return frame < 600 ? 8 : null;
+    });
+    const profile = { roughness, speed, flightSpeed };
+    const limits = (low: number, high: number) => ({ ...steadyLimits(2), flightSpeed: [low, high] as const });
+    expect(smoothRanges(profile, limits(0, 5), FPS)).toEqual([
+      { sourceIn: 0, sourceOut: 294 },
+      { sourceIn: 606, sourceOut: 900 },
+    ]);
+    expect(smoothRanges(profile, limits(5, 10), FPS)).toEqual([{ sourceIn: 306, sourceOut: 900 }]);
+    // At the slider's top the maximum is open.
+    expect(smoothRanges(profile, limits(5, FLIGHT_SPEED_RANGE.max), FPS)).toEqual([{ sourceIn: 306, sourceOut: 900 }]);
+    const faster = { ...profile, flightSpeed: flightSpeed.map((value) => value && value * 3) };
+    expect(smoothRanges(faster, limits(7, 20), FPS)).toEqual([{ sourceIn: 306, sourceOut: 900 }]);
+    expect(smoothRanges(faster, limits(7, 19), FPS)).toEqual([{ sourceIn: 606, sourceOut: 900 }]);
+  });
+
+  it('reads the flight speed of every frame like the flight data lanes', () => {
+    const telemetry = [0, 1, 2].map((time) => ({
+      time: time + 0.5,
+      horizontalSpeed: time === 1 ? null : 2 + 2 * time,
+      verticalSpeed: null,
+      height: null,
+      distance: null,
+      iso: null,
+      shutter: null,
+      ev: null,
+      digitalZoom: null,
+    }));
+    const tx = [null, ...Array.from({ length: 149 }, () => 1)];
+    const { flightSpeed } = motionProfile({ ...analysis(tx), telemetry }, FPS);
+    expect(flightSpeed).toHaveLength(150);
+    flightSpeed.forEach((value, frame) => expect(value).toBe(telemetryAt(telemetry, 'horizontalSpeed', frame, FPS)));
+    expect(flightSpeed.slice(0, 15).every((value) => value === null)).toBe(true);
+    expect(flightSpeed[15]).toBe(2);
+    expect(flightSpeed[90]).toBe(6);
+    expect(flightSpeed[149]).toBeNull();
   });
 
   it('rejects analyses whose arrays do not match the frame count', () => {

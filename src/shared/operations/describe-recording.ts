@@ -20,7 +20,7 @@ export const describeRecording = defineOperation({
       mediaId: described(idSchema, 'ID of a video recording in the project, from describe_project.'),
       allowedMovement: described(
         z.number().min(SMOOTH_TOLERANCE.min).max(SMOOTH_TOLERANCE.max).optional(),
-        `How much the movement may change in a steady range (${SMOOTH_TOLERANCE.min}–${SMOOTH_TOLERANCE.max}, lower is steadier), as in Source preview; defaults to the session brief's, else ${SMOOTH_TOLERANCE.initial}.`,
+        `How much the movement may change in a steady range (${SMOOTH_TOLERANCE.min}–${SMOOTH_TOLERANCE.max}, lower is steadier), the maximum of Source preview's Allowed movement, with no minimum or flight speed limit; defaults to the session brief's, else ${SMOOTH_TOLERANCE.initial}.`,
       ),
       sheet: described(
         z.boolean().default(false),

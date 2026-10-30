@@ -1,4 +1,13 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+} from 'react';
 import { NumberField, validateNumberDraft, type NumberFieldProps, type NumberValidation } from './NumberField.js';
 import { SLIDER_INSTRUCTIONS_ID } from './SharedInstructions.js';
 import './value-control.css';
@@ -150,11 +159,8 @@ export function transitionValueControl(
   }
 }
 
-/** Native range gestures draft locally; NumberField keeps its mounted precise text editor. */
-export function ValueControl(props: Readonly<ValueControlProps>) {
-  const generatedId = useId();
-  const id = props.id ?? generatedId;
-  const errorId = `${id}-slider-error`;
+/** One native slider's draft/commit lifecycle, shared by ValueControl and each end of a RangeControl. */
+export function useValueGesture(props: Readonly<ValueControlProps>) {
   const context: ValueControlContext = {
     value: props.value,
     min: props.min,
@@ -278,7 +284,51 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
     [],
   );
 
-  const error = state.error;
+  return {
+    state,
+    error: state.error,
+    /** Escape anywhere in the control restores an invalid draft. */
+    restoreInvalid: (event: KeyboardEvent): void => {
+      if (event.key === 'Escape' && !event.nativeEvent.isComposing && state.error) dispatch({ type: 'restore' });
+    },
+    slider: {
+      value: state.draft,
+      onChange: (event: ChangeEvent<HTMLInputElement>) =>
+        dispatch({ type: 'change', value: Number(event.currentTarget.value) }),
+      onPointerDown: begin,
+      onPointerUp: (event: PointerEvent<HTMLInputElement>) => finish(event.pointerId),
+      onPointerCancel: (event: PointerEvent<HTMLInputElement>) => finish(event.pointerId, true),
+      onLostPointerCapture: (event: PointerEvent<HTMLInputElement>) => {
+        if (capture.current?.id === event.pointerId) cancel();
+      },
+      onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
+        const pointer = current.current.pointer;
+        if (pointer?.canceled) finish(pointer.id);
+        if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
+          event.preventDefault();
+          event.stopPropagation();
+          dispatch({ type: 'restore' });
+        }
+      },
+    },
+    exact: {
+      value: state.draft,
+      disabled: Boolean(props.disabled || state.pointer?.canceled === false),
+      validate: (value: number) => {
+        const result = validateValueControlValue(value, latest.current.props);
+        return result.valid ? null : result.error;
+      },
+      onCommit: (value: number) => dispatch({ type: 'exact', value }),
+    },
+  };
+}
+
+/** Native range gestures draft locally; NumberField keeps its mounted precise text editor. */
+export function ValueControl(props: Readonly<ValueControlProps>) {
+  const generatedId = useId();
+  const id = props.id ?? generatedId;
+  const errorId = `${id}-slider-error`;
+  const { state, error, restoreInvalid, slider, exact } = useValueGesture(props);
   return (
     <div
       className="value-control"
@@ -292,9 +342,7 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
           ...(props.track ? { '--value-track': props.track } : {}),
         } as CSSProperties
       }
-      onKeyDownCapture={(event) => {
-        if (event.key === 'Escape' && !event.nativeEvent.isComposing && state.error) dispatch({ type: 'restore' });
-      }}
+      onKeyDownCapture={restoreInvalid}
     >
       <input
         id={id}
@@ -308,37 +356,15 @@ export function ValueControl(props: Readonly<ValueControlProps>) {
         min={props.min}
         max={props.max}
         step={props.step}
-        value={state.draft}
         disabled={props.disabled}
         title={props.hint}
-        onChange={(event) => dispatch({ type: 'change', value: Number(event.currentTarget.value) })}
-        onPointerDown={begin}
-        onPointerUp={(event) => finish(event.pointerId)}
-        onPointerCancel={(event) => finish(event.pointerId, true)}
-        onLostPointerCapture={(event) => {
-          if (capture.current?.id === event.pointerId) cancel();
-        }}
-        onKeyDown={(event) => {
-          const pointer = current.current.pointer;
-          if (pointer?.canceled) finish(pointer.id);
-          if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
-            event.preventDefault();
-            event.stopPropagation();
-            dispatch({ type: 'restore' });
-          }
-        }}
+        {...slider}
       />
       <NumberField
         {...props}
         id={`${id}-exact`}
         aria-describedby={[props['aria-describedby'], error ? errorId : null].filter(Boolean).join(' ')}
-        value={state.draft}
-        disabled={Boolean(props.disabled || state.pointer?.canceled === false)}
-        validate={(value) => {
-          const result = validateValueControlValue(value, latest.current.props);
-          return result.valid ? null : result.error;
-        }}
-        onCommit={(value) => dispatch({ type: 'exact', value })}
+        {...exact}
       />
       {props.unit && <small className="value-control-unit">{props.unit}</small>}
       {error && (

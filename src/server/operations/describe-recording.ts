@@ -2,7 +2,7 @@ import type { describeRecording } from '../../shared/operations/describe-recordi
 import { durationOf } from '../../shared/operations/timecode.js';
 import { projectVideoIds } from '../../shared/projects.js';
 import { recordingShots, type SteadyShot } from '../../shared/recording-shots.js';
-import { SMOOTH_TOLERANCE } from '../../shared/motion-analysis.js';
+import { SMOOTH_TOLERANCE, steadyLimits } from '../../shared/motion-analysis.js';
 import { formatTimecode, framesToSeconds, PROJECT_FPS } from '../../shared/timing.js';
 import { ServiceError } from '../errors.js';
 import type { OperationRunner, ServiceContext } from './context.js';
@@ -38,7 +38,7 @@ export const runDescribeRecording: OperationRunner<typeof describeRecording> = a
   const analysis = await library.motion(mediaId);
   const kept = project.selects[mediaId];
   const { shots, stillShare } = analysis
-    ? recordingShots(analysis, asset.damage, kept, tolerance, FPS)
+    ? recordingShots(analysis, asset.damage, kept, steadyLimits(tolerance), FPS)
     : { shots: [], stillShare: null };
   const shown = sheet ? pictured(shots, images.sheetCells) : [];
   const middles = shown.map((shot) => Math.floor((shot.sourceIn + shot.sourceOut) / 2));

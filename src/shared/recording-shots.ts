@@ -8,6 +8,7 @@ import {
   type MotionAnalysis,
   type MotionProfile,
   type SmoothRange,
+  type SteadyLimits,
   type TelemetrySample,
 } from './motion-analysis.js';
 import type { SelectRange } from './model.js';
@@ -167,10 +168,10 @@ export function rankedSmoothRanges(
 export function bestSteadyRange(
   analysis: MotionAnalysis,
   damage: readonly DamagedRange[],
-  allowedMovement: number,
+  limits: SteadyLimits,
   fps: number,
 ): SmoothRange | null {
-  const ranges = smoothRanges(motionProfile(analysis, fps), allowedMovement, fps, damage);
+  const ranges = smoothRanges(motionProfile(analysis, fps), limits, fps, damage);
   return rankedSmoothRanges(analysis, ranges, fps)[0] ?? null;
 }
 
@@ -233,11 +234,11 @@ export function recordingShots(
   analysis: MotionAnalysis,
   damage: readonly DamagedRange[],
   kept: readonly SelectRange[] | undefined,
-  allowedMovement: number,
+  limits: SteadyLimits,
   fps: number,
 ): { shots: SteadyShot[]; stillShare: number } {
   const profile = motionProfile(analysis, fps);
-  const described = smoothRanges(profile, allowedMovement, fps, damage)
+  const described = smoothRanges(profile, limits, fps, damage)
     .flatMap((range) => intersect(range, kept, SMOOTH_MIN_SECONDS * fps))
     .sort((left, right) => left.sourceIn - right.sourceIn)
     .map((range) => describeShot(analysis, profile, range, fps));

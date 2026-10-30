@@ -324,3 +324,151 @@
   color: #bbcabf;
   font-size: 11px;
 }
+
+/* Two sliders share one track: only their thumbs take the pointer, and the span between them is filled. */
+.range-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px auto 64px auto;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.range-control-track {
+  --thumb: 10px;
+  position: relative;
+  grid-area: 1 / 1;
+  min-width: 0;
+  height: 28px;
+}
+
+.range-control-track::before,
+.range-control-track::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.range-control-track::before {
+  left: 0;
+  right: 0;
+  background: #496852;
+}
+
+.range-control-track::after {
+  left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--range-low));
+  right: calc(var(--thumb) / 2 + (100% - var(--thumb)) * (1 - var(--range-high)));
+  background: var(--accent);
+}
+
+.product-workspace .range-control-track > input[type='range'] {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  pointer-events: none;
+}
+
+.product-workspace .range-control[data-low-on-top] .range-control-track > input.low {
+  z-index: 2;
+}
+
+.product-workspace .range-control-track > input[type='range']::-webkit-slider-runnable-track {
+  height: 3px;
+  background: transparent;
+}
+
+.product-workspace .range-control-track > input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: var(--thumb);
+  height: var(--thumb);
+  margin-top: -3.5px;
+  background: var(--accent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px #101812;
+  cursor: ew-resize;
+  pointer-events: auto;
+}
+
+.product-workspace .range-control-track > input[type='range']::-moz-range-track {
+  height: 3px;
+  background: transparent;
+}
+
+.product-workspace .range-control-track > input[type='range']::-moz-range-thumb {
+  width: var(--thumb);
+  height: var(--thumb);
+  background: var(--accent);
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px #101812;
+  cursor: ew-resize;
+  pointer-events: auto;
+}
+
+.range-control-track > input[type='range']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.range-control-track > input[type='range'][aria-invalid='true']::-webkit-slider-thumb {
+  background: var(--error);
+}
+
+.range-control-track > input[type='range'][aria-invalid='true']::-moz-range-thumb {
+  background: var(--error);
+}
+
+.range-control > .number-field {
+  display: contents;
+}
+
+/* Fixed cells keep the row in place while a field shows its pending or error line below it. */
+.range-control > :nth-child(2) .number-field-input {
+  grid-area: 1 / 2;
+}
+
+.range-control-dash {
+  grid-area: 1 / 3;
+}
+
+.range-control > :nth-child(4) .number-field-input {
+  grid-area: 1 / 4;
+}
+
+.range-control-unit {
+  grid-area: 1 / 5;
+}
+
+.product-workspace .range-control .number-field-input {
+  width: 100%;
+  min-width: 0;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+.range-control-dash,
+.range-control-unit {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.range-control :is(.number-field-hint, .number-field-pending, .number-field-error) {
+  grid-column: 1 / -1;
+}
+
+.range-control:has(input[type='range']:disabled) {
+  opacity: 0.45;
+}

@@ -1,4 +1,9 @@
-import type { MotionProfile, TelemetryField, TelemetrySample } from '../shared/motion-analysis.js';
+import {
+  telemetryAt,
+  type MotionProfile,
+  type TelemetryField,
+  type TelemetrySample,
+} from '../shared/motion-analysis.js';
 
 export type SeriesKey = TelemetryField;
 
@@ -179,15 +184,5 @@ export function seriesValue(
   frame: number,
   fps: number,
 ): number | null {
-  const field = spec.key;
-  const seconds = frame / fps;
-  const next = telemetry.findIndex((sample) => sample.time > seconds);
-  if (next === 0) return null;
-  const a = telemetry[next === -1 ? telemetry.length - 1 : next - 1];
-  const from = a?.[field] ?? null;
-  if (a === undefined || from === null) return null;
-  const b = next === -1 ? undefined : telemetry[next];
-  const to = b?.[field] ?? null;
-  if (b === undefined || to === null) return seconds - a.time <= 1 ? from : null;
-  return from + ((to - from) * (seconds - a.time)) / (b.time - a.time);
+  return telemetryAt(telemetry, spec.key, frame, fps);
 }

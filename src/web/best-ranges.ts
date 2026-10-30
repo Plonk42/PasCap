@@ -5,7 +5,7 @@ import { bestSteadyRange } from '../shared/recording-shots.js';
 import { forEachSerial } from '../shared/serial.js';
 import { api } from './api.js';
 import { mediaReady } from './display.js';
-import { knownMotion, motionKey, rememberMotion, useAllowedMovement } from './SmoothRange.js';
+import { knownMotion, motionKey, rememberMotion, useSteadyLimits } from './SmoothRange.js';
 
 const POLL_MS = 2000;
 
@@ -38,13 +38,13 @@ function skipReason(asset: MediaAsset, lookup: Lookup | undefined): string | nul
 
 /**
  * What keeping the best steady range of each recording would change: the range Use best keeps
- * at the current Allowed movement, replacing every kept range of the recording.
+ * at the current Allowed movement and Flight speed, replacing every kept range of the recording.
  */
 export function useBestRanges(
   assets: readonly MediaAsset[],
   selects: ProjectDocument['selects'] | undefined,
 ): BestRangesPlan {
-  const [tolerance] = useAllowedMovement();
+  const [limits] = useSteadyLimits();
   const [lookups, setLookups] = useState<ReadonlyMap<string, Lookup>>(new Map());
   const [poll, setPoll] = useState(0);
   const readyKey = assets
@@ -92,7 +92,7 @@ export function useBestRanges(
       }
       const reason = analysis ? null : skipReason(asset, lookup);
       const rate = asset.metadata.frameRate;
-      const best = analysis && bestSteadyRange(analysis, asset.damage, tolerance, rate.numerator / rate.denominator);
+      const best = analysis && bestSteadyRange(analysis, asset.damage, limits, rate.numerator / rate.denominator);
       if (!best) {
         plan.skipped.push({ name: asset.name, reason: reason ?? 'no steady range of 2 s or more' });
         continue;
@@ -105,7 +105,7 @@ export function useBestRanges(
     }
     return plan;
     // The analyses come from the session cache, which `lookups` follows.
-  }, [assets, lookups, selects, tolerance]);
+  }, [assets, lookups, selects, limits]);
 }
 
 export function recordingCount(count: number): string {

@@ -1,5 +1,6 @@
 import type { EditCommand } from '../../shared/commands.js';
 import type { ProjectDocument } from '../../shared/model.js';
+import { steadyLimits } from '../../shared/motion-analysis.js';
 import type { compareRecordings, recordingSheet, still, timelineSheet } from '../../shared/operations/pictures.js';
 import { projectVideoIds } from '../../shared/projects.js';
 import { recordingShots } from '../../shared/recording-shots.js';
@@ -110,7 +111,7 @@ async function defaultRange(
   const analysis = await library.motion(mediaId);
   if (analysis) {
     const tolerance = await allowedMovementFor(sessions, project.id);
-    const { shots } = recordingShots(analysis, asset.damage, kept, tolerance, FPS);
+    const { shots } = recordingShots(analysis, asset.damage, kept, steadyLimits(tolerance), FPS);
     const best = shots.find((shot) => shot.rank === 1);
     if (best) return { sourceIn: best.sourceIn, sourceOut: best.sourceOut };
   }

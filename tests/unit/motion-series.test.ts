@@ -72,11 +72,15 @@ describe('motion timeline series', () => {
 
   it('plots camera motion on a fixed scale so recordings compare', () => {
     const speed = [0, CAMERA_MOTION_MAX / 2, CAMERA_MOTION_MAX];
-    expect(cameraMotionPath({ speed, roughness: [0, 0, 0] }, 3, identity)).toBe('M0.5,0.0 L1.5,0.5 L2.5,1.0');
+    expect(cameraMotionPath({ speed, roughness: [0, 0, 0], flightSpeed: [null, null, null] }, 3, identity)).toBe(
+      'M0.5,0.0 L1.5,0.5 L2.5,1.0',
+    );
   });
 
   it('stops camera motion at the last measured proxy frame when the original has one more', () => {
     const speed = [0, CAMERA_MOTION_MAX];
-    expect(cameraMotionPath({ speed, roughness: [0, 0] }, 3, identity)).toBe('M0.5,0.0 L1.5,1.0');
+    expect(cameraMotionPath({ speed, roughness: [0, 0], flightSpeed: [null, null] }, 3, identity)).toBe(
+      'M0.5,0.0 L1.5,1.0',
+    );
   });
 });

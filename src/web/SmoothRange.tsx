@@ -14,12 +14,17 @@ import { damagedAt, type MediaAsset, type MediaJob } from '../shared/media.js';
 import type { MediaSelection } from '../shared/media-selection.js';
 import type { SelectRange } from '../shared/model.js';
 import {
+  FLIGHT_SPEED_RANGE,
   motionProfile,
+  MOVEMENT_RANGE,
   smoothRanges,
   SMOOTH_TOLERANCE,
+  steadyLimits,
+  type Bounds,
   type MotionAnalysis,
   type MotionProfile,
   type SmoothRange,
+  type SteadyLimits,
   type TelemetrySample,
 } from '../shared/motion-analysis.js';
 import { rankedSmoothRanges, shotKind, type ShotKind } from '../shared/recording-shots.js';
@@ -43,10 +48,11 @@ import {
 } from './motion-series.js';
 import { Popover } from './Popover.js';
 import { readPreference, writePreference } from './preferences.js';
+import { RangeControl } from './RangeControl.js';
 import { ResetLabel, resetBlocked } from './SettingValueControl.js';
-import { ValueControl } from './ValueControl.js';
 
 const TOLERANCE_PREFERENCE = 'pascap-smooth-tolerance';
+const LIMITS_PREFERENCE = 'pascap-steady-limits';
 const COLLAPSED_PREFERENCE = 'pascap-smooth-panel-collapsed';
 const SERIES_PREFERENCE = 'pascap-motion-timeline-series';
 const POLL_MS = 1000;
@@ -82,30 +88,52 @@ function readTolerance(): number {
   return value >= SMOOTH_TOLERANCE.min && value <= SMOOTH_TOLERANCE.max ? value : SMOOTH_TOLERANCE.initial;
 }
 
-let allowedMovement: number | null = null;
-const toleranceListeners = new Set<() => void>();
-
-function currentTolerance(): number {
-  allowedMovement ??= readTolerance();
-  return allowedMovement;
+function validBounds(value: unknown, range: { min: number; max: number }): value is [number, number] {
+  if (!Array.isArray(value) || value.length !== 2) return false;
+  const [low, high]: unknown[] = value;
+  return typeof low === 'number' && typeof high === 'number' && range.min <= low && low < high && high <= range.max;
 }
 
-function subscribeTolerance(listener: () => void): () => void {
-  toleranceListeners.add(listener);
+function readLimits(): SteadyLimits {
+  try {
+    const stored: unknown = JSON.parse(readPreference(LIMITS_PREFERENCE) ?? 'null');
+    if (typeof stored === 'object' && stored !== null) {
+      const { movement, flightSpeed } = stored as Record<string, unknown>;
+      if (validBounds(movement, MOVEMENT_RANGE) && validBounds(flightSpeed, FLIGHT_SPEED_RANGE))
+        return { movement, flightSpeed };
+    }
+  } catch {
+    // An unreadable preference falls back to the earlier single Allowed movement.
+  }
+  // The single Allowed movement kept before it became a range is that range's maximum.
+  return steadyLimits(readTolerance());
+}
+
+const INITIAL_LIMITS = steadyLimits();
+let keptLimits: SteadyLimits | null = null;
+const limitsListeners = new Set<() => void>();
+
+function currentLimits(): SteadyLimits {
+  keptLimits ??= readLimits();
+  return keptLimits;
+}
+
+function subscribeLimits(listener: () => void): () => void {
+  limitsListeners.add(listener);
   return () => {
-    toleranceListeners.delete(listener);
+    limitsListeners.delete(listener);
   };
 }
 
-function keepTolerance(value: number): void {
-  allowedMovement = value;
-  writePreference(TOLERANCE_PREFERENCE, String(value));
-  for (const listener of toleranceListeners) listener();
+function keepLimits(value: SteadyLimits): void {
+  keptLimits = value;
+  writePreference(LIMITS_PREFERENCE, JSON.stringify(value));
+  for (const listener of limitsListeners) listener();
 }
 
-/** The kept Allowed movement, shared by every steady-range suggestion. */
-export function useAllowedMovement(): [number, (value: number) => void] {
-  return [useSyncExternalStore(subscribeTolerance, currentTolerance), keepTolerance];
+/** The kept Allowed movement and Flight speed ranges, shared by every steady-range suggestion. */
+export function useSteadyLimits(): [SteadyLimits, (value: SteadyLimits) => void] {
+  return [useSyncExternalStore(subscribeLimits, currentLimits), keepLimits];
 }
 
 /** Identifies a recording's verified proxy, whose analysis is kept for the session. */
@@ -147,13 +175,13 @@ export interface SmoothRangeState {
   ranges: readonly SmoothRange[];
   /** What the best range shows; null without one. */
   bestKind: ShotKind | null;
-  /** The allowed movement in effect, including a slider drag in progress. */
-  tolerance: number;
-  /** The kept allowed movement, without a drag in progress. */
-  savedTolerance: number;
-  setTolerance: (value: number) => void;
-  /** A slider drag's value, or null when it ends or is canceled. */
-  previewTolerance: (value: number | null) => void;
+  /** The limits in effect, including a slider drag in progress. */
+  limits: SteadyLimits;
+  /** The kept limits, without a drag in progress. */
+  savedLimits: SteadyLimits;
+  setLimits: (value: SteadyLimits) => void;
+  /** A slider drag's limits, or null when it ends or is canceled. */
+  previewLimits: (value: SteadyLimits | null) => void;
   find: () => void;
 }
 
@@ -162,9 +190,9 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
   const ready = mediaReady(asset);
   const key = motionKey(asset);
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
-  const [savedTolerance, setTolerance] = useAllowedMovement();
-  const [draftTolerance, setDraftTolerance] = useState<number | null>(null);
-  const tolerance = draftTolerance ?? savedTolerance;
+  const [savedLimits, setLimits] = useSteadyLimits();
+  const [draftLimits, setDraftLimits] = useState<SteadyLimits | null>(null);
+  const limits = draftLimits ?? savedLimits;
   const controller = useRef<AbortController | null>(null);
 
   const start = useCallback((): AbortSignal => {
@@ -241,8 +269,8 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
   const profile = useMemo(() => (analysis ? motionProfile(analysis, fps) : null), [analysis, fps]);
   const ranges = useMemo(
     () =>
-      analysis && profile ? rankedSmoothRanges(analysis, smoothRanges(profile, tolerance, fps, asset.damage), fps) : [],
-    [analysis, profile, tolerance, fps, asset.damage],
+      analysis && profile ? rankedSmoothRanges(analysis, smoothRanges(profile, limits, fps, asset.damage), fps) : [],
+    [analysis, profile, limits, fps, asset.damage],
   );
   const best = ranges[0];
   const bestKind = analysis && best ? shotKind(analysis, best.sourceIn, best.sourceOut, fps) : null;
@@ -253,10 +281,10 @@ export function useSmoothRange(asset: MediaAsset): SmoothRangeState {
     telemetry,
     ranges,
     bestKind,
-    tolerance,
-    savedTolerance,
-    setTolerance,
-    previewTolerance: setDraftTolerance,
+    limits,
+    savedLimits,
+    setLimits,
+    previewLimits: setDraftLimits,
     find,
   };
 }
@@ -363,15 +391,17 @@ interface ImageLaneProps {
   ranges: readonly SmoothRange[];
   roughness: string;
   cameraMotion: string;
-  toleranceY: number;
+  /** Where the dashed Allowed movement lines sit; no low line while the range starts at zero. */
+  lowY: number | null;
+  highY: number;
   hover: number | null;
-  /** Shown instead of the legend while the dashed line is hovered or dragged. */
-  tolerance: number | null;
+  /** Shown instead of the legend while a dashed line is hovered or dragged. */
+  movement: Bounds | null;
 }
 
 /** Image jolts, camera movement and the allowed movement, with the legend or the values under the pointer. */
 function ImageLane(props: Readonly<ImageLaneProps>) {
-  const { asset, profile, ranges, hover, tolerance } = props;
+  const { asset, profile, ranges, hover, movement } = props;
   const count = asset.metadata.frameCount;
   let label = (
     <>
@@ -379,8 +409,13 @@ function ImageLane(props: Readonly<ImageLaneProps>) {
       <span className="series camera">Movement</span>
     </>
   );
-  if (tolerance !== null)
-    label = <span className="tolerance">Allowed movement {tolerance.toFixed(1)} · drag the line</span>;
+  if (movement !== null)
+    label = (
+      <span className="tolerance">
+        Allowed movement {movement[0].toFixed(1)} – {movement[1].toFixed(1)} · drag{' '}
+        {props.lowY === null ? 'the line' : 'a line'}
+      </span>
+    );
   else if (hover !== null && damagedAt(asset.damage, hover))
     label = (
       <>
@@ -403,7 +438,10 @@ function ImageLane(props: Readonly<ImageLaneProps>) {
         <path className="source-motion-roughness" d={props.roughness} />
         <path className="source-motion-area camera" d={areaUnder(props.cameraMotion)} />
         <path className="source-motion-line camera" d={props.cameraMotion} />
-        <line className="source-motion-tolerance" x1={0} x2={count} y1={props.toleranceY} y2={props.toleranceY} />
+        <line className="source-motion-tolerance" x1={0} x2={count} y1={props.highY} y2={props.highY} />
+        {props.lowY !== null && (
+          <line className="source-motion-tolerance low" x1={0} x2={count} y1={props.lowY} y2={props.lowY} />
+        )}
       </svg>
       <span className="source-motion-readout" aria-hidden="true">
         {label}
@@ -420,16 +458,21 @@ interface SeriesLaneProps {
   count: number;
   ranges: readonly SmoothRange[];
   value: number | null;
+  /** Heights (0–100 viewBox) of the limits drawn on this lane. */
+  limits: readonly number[];
 }
 
 /** One flight data value on its own min–max scale, labeled with that extent or its value under the pointer. */
-function SeriesLane({ spec, d, extent, count, ranges, value }: Readonly<SeriesLaneProps>) {
+function SeriesLane({ spec, d, extent, count, ranges, value, limits }: Readonly<SeriesLaneProps>) {
   return (
     <div className="source-motion-plot" data-lane={spec.key} style={{ '--series': spec.color } as CSSProperties}>
       <svg viewBox={`0 0 ${count} 100`} preserveAspectRatio="none" aria-hidden="true">
         <Bands ranges={ranges} />
         <path className="source-motion-area" d={areaUnder(d)} />
         <path className="source-motion-line" d={d} />
+        {limits.map((y) => (
+          <line key={y} className="source-motion-limit" x1={0} x2={count} y1={y} y2={y} />
+        ))}
       </svg>
       <span className="source-motion-readout" aria-hidden="true">
         <span className="series">{value === null ? spec.label : `${spec.label} ${spec.format(value)}`}</span>
@@ -439,13 +482,27 @@ function SeriesLane({ spec, d, extent, count, ranges, value }: Readonly<SeriesLa
   );
 }
 
-type Drag = { kind: 'scrub' | 'tolerance'; pointer: number };
+type Drag = { kind: 'scrub' | 'low' | 'high'; pointer: number };
 
-/** The tolerance whose dashed line sits at y (0–100 from the top of the image lane), on the slider's steps. */
-function toleranceAt(y: number): number {
+/** The jolts whose dashed line sits at y (0–100 from the top of the image lane), on the slider's steps. */
+function toleranceAt(y: number, lowest: number, highest: number): number {
   const value = ((100 - y) / PLOT_SPAN) * ROUGHNESS_MAX;
-  const stepped = Math.round(value / SMOOTH_TOLERANCE.step) * SMOOTH_TOLERANCE.step;
-  return Number(Math.max(SMOOTH_TOLERANCE.min, Math.min(SMOOTH_TOLERANCE.max, stepped)).toFixed(1));
+  const stepped = Math.round(value / MOVEMENT_RANGE.step) * MOVEMENT_RANGE.step;
+  return Number(Math.max(lowest, Math.min(highest, stepped)).toFixed(1));
+}
+
+/** A line dragged up to the other one stops a step before it. */
+function draggedMovement([low, high]: Bounds, end: 'low' | 'high', y: number): Bounds {
+  const step = MOVEMENT_RANGE.step;
+  return end === 'low'
+    ? [toleranceAt(y, MOVEMENT_RANGE.min, high - step), high]
+    : [low, toleranceAt(y, low + step, MOVEMENT_RANGE.max)];
+}
+
+/** Where a flight speed limit sits on its lane, or null at an open end or off the lane's scale. */
+function limitY(value: number, open: number, scale: { low: number; high: number } | null): number | null {
+  if (!scale || value === open || value < scale.low || value > scale.high) return null;
+  return laneY((value - scale.low) / (scale.high - scale.low));
 }
 
 /** Steady ranges in source order, as kept ranges. */
@@ -466,7 +523,7 @@ function sameRanges(kept: readonly SelectRange[], ranges: readonly SmoothRange[]
 }
 
 function useAllHint(count: number, applied: boolean): string {
-  if (!count) return 'No steady range of 2 s or more at this allowed movement';
+  if (!count) return 'No steady range of 2 s or more within these limits';
   if (applied) return `The kept ranges are the ${count} steady ranges`;
   return `Keep the ${count} steady ranges, replacing the kept ranges; adds nothing to the timeline`;
 }
@@ -476,7 +533,7 @@ function suggestionText(best: SmoothRange | undefined, kind: ShotKind | null, ap
     return {
       span: '',
       label: 'No steady range to use',
-      hint: 'No steady range of 2 s or more at this allowed movement',
+      hint: 'No steady range of 2 s or more within these limits',
     };
   const from = formatTimecode(best.sourceIn, rate);
   const to = formatTimecode(best.sourceOut, rate);
@@ -518,7 +575,7 @@ function Lanes({
   disabled,
   onFrame,
 }: Readonly<MotionLanesProps & { profile: MotionProfile }>) {
-  const { telemetry, ranges, tolerance, setTolerance } = smooth;
+  const { telemetry, ranges, limits, setLimits } = smooth;
   const count = asset.metadata.frameCount;
   const rate = asset.metadata.frameRate;
   const fps = rate.numerator / rate.denominator;
@@ -532,7 +589,7 @@ function Lanes({
         const scale = seriesScale(spec, telemetry, count, fps);
         const extent =
           scale === null || scale.min === scale.max ? '' : `${spec.format(scale.min)} – ${spec.format(scale.max)}`;
-        return { spec, extent, d: seriesPath(spec, telemetry, count, fps, laneY) };
+        return { spec, extent, scale, d: seriesPath(spec, telemetry, count, fps, laneY) };
       }),
     [lanes, telemetry, count, fps],
   );
@@ -540,17 +597,21 @@ function Lanes({
   const cameraMotion = useMemo(() => cameraMotionPath(profile, count, plotY), [profile, count]);
   const drag = useRef<Drag | null>(null);
   const [hover, setHover] = useState<number | null>(null);
-  const [nearLine, setNearLine] = useState(false);
+  const [nearLine, setNearLine] = useState<'low' | 'high' | null>(null);
   const [adjusting, setAdjusting] = useState(false);
-  const toleranceY = plotY(tolerance / ROUGHNESS_MAX);
+  const [lowMovement, highMovement] = limits.movement;
+  const highY = plotY(highMovement / ROUGHNESS_MAX);
+  const lowY = lowMovement > MOVEMENT_RANGE.min ? plotY(lowMovement / ROUGHNESS_MAX) : null;
   const position = (event: ReactPointerEvent<HTMLDivElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
     const x = Math.max(0, Math.min(1, (event.clientX - box.left) / box.width));
     const y = event.clientY - box.top;
+    const distance = (lineY: number | null) => (lineY === null ? Infinity : Math.abs(y - (lineY / 100) * IMAGE_PX));
+    const nearest: 'low' | 'high' = distance(lowY) < distance(highY) ? 'low' : 'high';
     return {
       frame: Math.min(count - 1, Math.floor(x * count)),
       y: (y / IMAGE_PX) * 100,
-      onLine: Math.abs(y - (toleranceY / 100) * IMAGE_PX) <= LINE_GRAB_PX,
+      line: Math.min(distance(lowY), distance(highY)) <= LINE_GRAB_PX ? nearest : null,
     };
   };
   const end = (): void => {
@@ -559,7 +620,7 @@ function Lanes({
   };
   const leave = (): void => {
     setHover(null);
-    setNearLine(false);
+    setNearLine(null);
   };
   const at = (value: number): string => `${count === 1 ? 0 : (value / (count - 1)) * 100}%`;
 
@@ -567,25 +628,25 @@ function Lanes({
     <div
       className="source-motion"
       data-disabled={disabled || undefined}
-      data-near-tolerance={(nearLine && !disabled) || adjusting || undefined}
-      title="Click or drag to scrub; drag the dashed line to change the allowed movement"
+      data-near-tolerance={(nearLine !== null && !disabled) || adjusting || undefined}
+      title="Click or drag to scrub; drag a dashed line to change the allowed movement"
       onPointerDown={(event) => {
         if (disabled || event.button !== 0) return;
         const point = position(event);
         event.currentTarget.setPointerCapture(event.pointerId);
-        drag.current = { kind: point.onLine ? 'tolerance' : 'scrub', pointer: event.pointerId };
-        if (point.onLine) setAdjusting(true);
+        drag.current = { kind: point.line ?? 'scrub', pointer: event.pointerId };
+        if (point.line) setAdjusting(true);
         else onFrame(point.frame);
       }}
       onPointerMove={(event) => {
         const current = drag.current;
         const point = position(event);
-        if (current?.pointer === event.pointerId && current.kind === 'tolerance') {
-          setTolerance(toleranceAt(point.y));
+        if (current?.pointer === event.pointerId && current.kind !== 'scrub') {
+          setLimits({ ...limits, movement: draggedMovement(limits.movement, current.kind, point.y) });
           return;
         }
         setHover(point.frame);
-        setNearLine(point.onLine);
+        setNearLine(point.line);
         if (current?.pointer === event.pointerId) onFrame(point.frame);
       }}
       onPointerLeave={leave}
@@ -598,11 +659,12 @@ function Lanes({
         ranges={ranges}
         roughness={roughness}
         cameraMotion={cameraMotion}
-        toleranceY={toleranceY}
+        lowY={lowY}
+        highY={highY}
         hover={hover}
-        tolerance={adjusting || (nearLine && drag.current === null) ? tolerance : null}
+        movement={adjusting || (nearLine !== null && drag.current === null) ? limits.movement : null}
       />
-      {paths.map(({ spec, d, extent }) => (
+      {paths.map(({ spec, d, extent, scale }) => (
         <SeriesLane
           key={spec.key}
           spec={spec}
@@ -611,6 +673,14 @@ function Lanes({
           count={count}
           ranges={ranges}
           value={hover === null ? null : seriesValue(spec, telemetry, hover, fps)}
+          limits={
+            spec.key === 'horizontalSpeed'
+              ? [
+                  limitY(limits.flightSpeed[0], FLIGHT_SPEED_RANGE.min, scale),
+                  limitY(limits.flightSpeed[1], FLIGHT_SPEED_RANGE.max, scale),
+                ].filter((y) => y !== null)
+              : []
+          }
         />
       ))}
       <span
@@ -723,10 +793,10 @@ export function CameraMotionPanel({
   onUseAll,
   onKeyDown,
 }: Readonly<PanelProps>) {
-  const { profile, telemetry, ranges, bestKind, savedTolerance, setTolerance, previewTolerance } = smooth;
-  const toleranceId = useId();
+  const { profile, telemetry, ranges, bestKind, savedLimits, setLimits, previewLimits } = smooth;
   const { collapsed } = view;
   const available = useMemo(() => availableSeries(telemetry), [telemetry]);
+  const flightData = available.some((spec) => spec.key === 'horizontalSpeed');
   const best = ranges[0];
   const applied = best?.sourceIn === range.sourceIn && best?.sourceOut === range.sourceOut;
   const { span, label, hint } = suggestionText(best, bestKind, applied, asset.metadata.frameRate);
@@ -760,7 +830,8 @@ export function CameraMotionPanel({
             over approaches and nearly still footage; Use all keeps every steady range.
           </p>
           <p className="editor-help-tip">
-            Tip: drag the dashed line, or move Allowed movement, to accept more or less movement.
+            Tip: drag the dashed lines, or move Allowed movement and Flight speed, to choose how steady and how fast the
+            footage is.
           </p>
         </HelpPopover>
         {profile ? (
@@ -812,32 +883,87 @@ export function CameraMotionPanel({
       </div>
       {profile && !collapsed && (
         <div className="smooth-panel-controls">
-          <div className="smooth-panel-tolerance">
-            <ResetLabel
-              htmlFor={toleranceId}
-              title="Right accepts more camera movement; left suggests only very steady footage"
-              name="Allowed movement"
-              blocked={resetBlocked(savedTolerance === SMOOTH_TOLERANCE.initial, disabled)}
-              onReset={() => setTolerance(SMOOTH_TOLERANCE.initial)}
-            >
-              Allowed movement
-            </ResetLabel>
-            <ValueControl
-              id={toleranceId}
-              aria-label="Allowed movement"
-              min={SMOOTH_TOLERANCE.min}
-              max={SMOOTH_TOLERANCE.max}
-              step={SMOOTH_TOLERANCE.step}
-              value={savedTolerance}
+          <LimitSetting
+            name="Allowed movement"
+            title="Jolts a steady range may have: raise the minimum to keep only lively footage, lower the maximum for only very steady footage"
+            range={MOVEMENT_RANGE}
+            value={savedLimits.movement}
+            initial={INITIAL_LIMITS.movement}
+            disabled={disabled}
+            onCommit={(movement) => setLimits({ ...savedLimits, movement })}
+            onDraft={(movement) => previewLimits(movement && { ...savedLimits, movement })}
+          />
+          {flightData && (
+            <LimitSetting
+              name="Flight speed"
+              title={`Speed the drone flies at in a steady range; at ${FLIGHT_SPEED_RANGE.max} m/s the maximum has no limit`}
+              range={FLIGHT_SPEED_RANGE}
+              unit="m/s"
+              value={savedLimits.flightSpeed}
+              initial={INITIAL_LIMITS.flightSpeed}
               disabled={disabled}
-              resetKey="allowed-movement"
-              onCommit={setTolerance}
-              onDraft={previewTolerance}
+              onCommit={(flightSpeed) => setLimits({ ...savedLimits, flightSpeed })}
+              onDraft={(flightSpeed) => previewLimits(flightSpeed && { ...savedLimits, flightSpeed })}
             />
-          </div>
+          )}
           <LaneChooser available={available} shown={view.shown} onShown={view.show} />
         </div>
       )}
     </section>
+  );
+}
+
+interface LimitSettingProps {
+  name: string;
+  title: string;
+  range: { min: number; max: number; step: number };
+  unit?: string;
+  value: Bounds;
+  initial: Bounds;
+  disabled: boolean;
+  onCommit: (value: Bounds) => void;
+  onDraft: (value: Bounds | null) => void;
+}
+
+/** A named minimum–maximum range of the steady-range limits, with its Reset. */
+function LimitSetting({
+  name,
+  title,
+  range,
+  unit,
+  value,
+  initial,
+  disabled,
+  onCommit,
+  onDraft,
+}: Readonly<LimitSettingProps>) {
+  const id = useId();
+  const atInitial = value[0] === initial[0] && value[1] === initial[1];
+  return (
+    <div className="smooth-panel-tolerance">
+      <ResetLabel
+        htmlFor={id}
+        title={title}
+        name={name}
+        blocked={resetBlocked(atInitial, disabled)}
+        onReset={() => onCommit(initial)}
+      >
+        {name}
+      </ResetLabel>
+      <RangeControl
+        id={id}
+        aria-label={name}
+        min={range.min}
+        max={range.max}
+        step={range.step}
+        {...(unit === undefined ? {} : { unit })}
+        value={value}
+        disabled={disabled}
+        title={title}
+        resetKey={name}
+        onCommit={onCommit}
+        onDraft={onDraft}
+      />
+    </div>
   );
 }

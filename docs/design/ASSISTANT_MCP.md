@@ -311,12 +311,12 @@ Read; for editor and assistant. Read every appearance value of one video track: 
 
 Read; for editor and assistant. Map where a video recording is usable and how its camera moves, measured from its camera motion analysis and the drone's flight data, inside the ranges the user kept: its steady ranges in source order with their length, picture movement (% of the image width per second), roughness, a camera move name (static, pan, tilt, push in, pull out, rotate; a sideways flight looks like a pan), what they show (orbit, reveal, move, approach, static), their rank (1 = the best, as Source preview suggests it) and mean flight data, plus damaged frames and how much of it hovers still. It never says what the footage shows: with sheet true, it also returns a contact sheet with the middle frame of each steady range (the best-ranked ones when they do not all fit), for you to judge. To compare several recordings, compare_recordings shows them in one picture; recording_sheet shows any other frames.
 
-| Input             | Type    | Description                                                                                                                                   |
-| ----------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `projectId`       | string  | ID of the saved project, whose kept ranges and session brief apply.                                                                           |
-| `mediaId`         | string  | ID of a video recording in the project, from describe_project.                                                                                |
-| `allowedMovement` | number  | How much the movement may change in a steady range (0.5–6, lower is steadier), as in Source preview; defaults to the session brief's, else 2. |
-| `sheet`           | boolean | True adds a contact sheet of the middle frames of the steady ranges.                                                                          |
+| Input             | Type    | Description                                                                                                                                                                                                      |
+| ----------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId`       | string  | ID of the saved project, whose kept ranges and session brief apply.                                                                                                                                              |
+| `mediaId`         | string  | ID of a video recording in the project, from describe_project.                                                                                                                                                   |
+| `allowedMovement` | number  | How much the movement may change in a steady range (0.5–6, lower is steadier), the maximum of Source preview's Allowed movement, with no minimum or flight speed limit; defaults to the session brief's, else 2. |
+| `sheet`           | boolean | True adds a contact sheet of the middle frames of the steady ranges.                                                                                                                                             |
 
 #### `music_analysis`
 

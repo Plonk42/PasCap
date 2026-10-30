@@ -4,11 +4,15 @@ import { createColorSettings } from '../../src/shared/color.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { mediaAssetSchema, type MediaAsset } from '../../src/shared/media.js';
 import {
+  FLIGHT_SPEED_RANGE,
   MOTION_ANALYSIS_VERSION,
   motionProfile,
+  MOVEMENT_RANGE,
   SMOOTH_TOLERANCE,
   smoothRanges,
+  steadyLimits,
   type MotionAnalysis,
+  type SteadyLimits,
 } from '../../src/shared/motion-analysis.js';
 import { rankedSmoothRanges } from '../../src/shared/recording-shots.js';
 import {
@@ -2079,7 +2083,8 @@ test('the motion timeline shows jolts, allowed movement and the best steady rang
   const fps = 30000 / 1001;
   const analysis = jerkyThenSteady(asset);
   const profile = motionProfile(analysis, fps);
-  const best = (tolerance: number) => rankedSmoothRanges(analysis, smoothRanges(profile, tolerance, fps), fps)[0]!;
+  const best = (tolerance: number) =>
+    rankedSmoothRanges(analysis, smoothRanges(profile, steadyLimits(tolerance), fps), fps)[0]!;
   const steady = best(SMOOTH_TOLERANCE.initial);
   const tolerant = best(SMOOTH_TOLERANCE.max);
   const seconds = (part: { sourceIn: number; sourceOut: number }): string =>
@@ -2126,10 +2131,11 @@ test('the motion timeline shows jolts, allowed movement and the best steady rang
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', String(steady.sourceIn));
   await expect(use).toBeDisabled();
   await expect(use).toHaveText('In use');
-  // Dragging the slider previews the suggestion before release; Escape restores it.
-  const allowed = page.getByRole('slider', { name: 'Allowed movement', exact: true });
+  // Dragging the maximum's thumb previews the suggestion before release; Escape restores it.
+  const allowed = page.getByRole('slider', { name: 'Allowed movement maximum', exact: true });
   const allowedBox = (await allowed.boundingBox())!;
-  await page.mouse.move(allowedBox.x + allowedBox.width * 0.25, allowedBox.y + allowedBox.height / 2);
+  const thumbAt = 5 + (allowedBox.width - 10) * (SMOOTH_TOLERANCE.initial / MOVEMENT_RANGE.max);
+  await page.mouse.move(allowedBox.x + thumbAt, allowedBox.y + allowedBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(allowedBox.x + allowedBox.width + 20, allowedBox.y + allowedBox.height / 2, { steps: 4 });
   await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.max)));
@@ -2145,7 +2151,7 @@ test('the motion timeline shows jolts, allowed movement and the best steady rang
   expect(omitted[0]).toBeCloseTo((timelineBox!.width * steady.sourceIn) / 120, 0);
   expect(omitted[1]).toBeCloseTo((timelineBox!.width * (120 - steady.sourceOut)) / 120, 0);
 
-  await page.getByRole('slider', { name: 'Allowed movement', exact: true }).fill(String(SMOOTH_TOLERANCE.max));
+  await page.getByRole('slider', { name: 'Allowed movement maximum', exact: true }).fill(String(SMOOTH_TOLERANCE.max));
   await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
   await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.max)));
   await expect(use).toBeEnabled();
@@ -2186,7 +2192,7 @@ test('the motion timeline shows jolts, allowed movement and the best steady rang
   await expect(row).toHaveAttribute('data-collapsed', 'true');
   await expect(timeline).toHaveCount(0);
   await expect(use).toHaveCount(0);
-  await expect(page.getByRole('slider', { name: 'Allowed movement', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('slider', { name: 'Allowed movement maximum', exact: true })).toHaveCount(0);
   await expect(page.locator('summary[aria-label="Flight data lanes"]')).toHaveCount(0);
   await expect(row.locator('.smooth-panel-summary')).toContainText(seconds(tolerant));
   await page.getByRole('button', { name: 'Close source review', exact: true }).click();
@@ -2201,22 +2207,86 @@ test('the motion timeline shows jolts, allowed movement and the best steady rang
   await expect(row).toHaveAttribute('data-smooth-in', String(tolerant.sourceIn));
   expect(requests).toEqual(['GET']);
 
-  // The dashed line itself is a handle: dragging it to the bottom asks for the steadiest footage only.
+  // A dashed line itself is a handle: dragging the maximum to the bottom asks for the steadiest footage only.
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', /^\d+$/);
   const frameBefore = await page.locator('.source-preview').getAttribute('data-source-frame');
   const box = (await imageLane.boundingBox())!;
   const lineAt = box.y + (lineY(SMOOTH_TOLERANCE.max) / 100) * box.height;
   await page.mouse.move(box.x + box.width * 0.4, lineAt);
   await expect(timeline).toHaveAttribute('data-near-tolerance', 'true');
-  await expect(readout).toContainText('Allowed movement 6.0');
+  await expect(readout).toContainText('Allowed movement 0.0 – 6.0');
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.4, box.y + box.height + 20, { steps: 4 });
   await page.mouse.up();
-  const slider = page.getByRole('slider', { name: 'Allowed movement', exact: true });
-  await expect(slider).toHaveValue(String(SMOOTH_TOLERANCE.min));
-  await expect(tolerance).toHaveAttribute('y1', String(lineY(SMOOTH_TOLERANCE.min)));
+  // It stops a step above the minimum.
+  const slider = page.getByRole('slider', { name: 'Allowed movement maximum', exact: true });
+  await expect(slider).toHaveValue(String(MOVEMENT_RANGE.step));
+  await expect(tolerance).toHaveAttribute('y1', String(lineY(MOVEMENT_RANGE.step)));
   await expect(page.locator('.source-preview')).toHaveAttribute('data-source-frame', frameBefore!);
   expect(timelineOf(await current(page))).toEqual(timelineOf(before));
+  await expectOnlyRangesSaved(page);
+});
+
+test('the Allowed movement minimum and the Flight speed range narrow the steady ranges, kept as preferences', async ({
+  page,
+}) => {
+  const asset = assets[0]!;
+  const fps = 30000 / 1001;
+  const analysis = jerkyThenSteady(asset);
+  const profile = motionProfile(analysis, fps);
+  const best = (limits: SteadyLimits) => rankedSmoothRanges(analysis, smoothRanges(profile, limits, fps), fps)[0];
+  const initial = best(steadyLimits())!;
+  const fastLimits: SteadyLimits = { ...steadyLimits(), flightSpeed: [5.5, FLIGHT_SPEED_RANGE.max] };
+  const fast = best(fastLimits)!;
+  expect(fast.sourceIn).toBeGreaterThan(initial.sourceIn);
+  expect(best({ ...fastLimits, movement: [1.5, 2] })).toBeUndefined();
+  await page.route(`**/api/media/${asset.id}/motion`, (route) => route.fulfill({ json: { analysis, job: null } }));
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  const row = page.locator('.smooth-panel');
+  await expect(row).toHaveAttribute('data-smooth-in', String(initial.sourceIn));
+  const flightLane = page.locator('[data-lane="horizontalSpeed"]');
+  await expect(flightLane.locator('.source-motion-limit')).toHaveCount(0);
+
+  // Flight speed keeps only the footage flown from 5.5 m/s, and its lane marks that limit.
+  await page.getByRole('slider', { name: 'Flight speed minimum', exact: true }).fill('5.5');
+  await expect(row).toHaveAttribute('data-smooth-in', String(fast.sourceIn));
+  await expect(page.getByRole('spinbutton', { name: 'Flight speed minimum', exact: true })).toHaveValue('5.5');
+  await expect(flightLane.locator('.source-motion-limit')).toHaveCount(1);
+
+  // An exact minimum above the maximum stays an unapplied error until Escape restores it.
+  const low = page.getByRole('spinbutton', { name: 'Allowed movement minimum', exact: true });
+  await low.fill('3');
+  await low.press('Enter');
+  await expect(row.getByRole('alert')).toContainText('Enter less than the maximum, 2.');
+  await expect(row).toHaveAttribute('data-smooth-in', String(fast.sourceIn));
+  await low.press('Escape');
+  await expect(low).toHaveValue('0');
+  await expect(row.getByRole('alert')).toHaveCount(0);
+
+  // Raising the minimum draws its own dashed line and can leave no steady range at all.
+  const tolerance = page.locator('.source-motion-tolerance');
+  await expect(tolerance).toHaveCount(1);
+  await page.getByRole('slider', { name: 'Allowed movement minimum', exact: true }).fill('1.5');
+  await expect(tolerance).toHaveCount(2);
+  await expect(row.locator('.smooth-panel-summary')).toHaveText('No steady range of 2 s or more');
+  await expect(page.getByRole('button', { name: /^Use all \d+ steady ranges as kept ranges$/ })).toBeDisabled();
+  expect(await page.evaluate(() => localStorage.getItem('pascap-steady-limits'))).toBe(
+    JSON.stringify({ movement: [1.5, 2], flightSpeed: [5.5, FLIGHT_SPEED_RANGE.max] }),
+  );
+
+  // The limits are kept when the recording is reviewed again; each Reset restores its own range.
+  await page.getByRole('button', { name: 'Close source review', exact: true }).click();
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await expect(page.getByRole('slider', { name: 'Allowed movement minimum', exact: true })).toHaveValue('1.5');
+  await page.getByRole('button', { name: 'Reset Allowed movement', exact: true }).click();
+  await expect(row).toHaveAttribute('data-smooth-in', String(fast.sourceIn));
+  await expect(tolerance).toHaveCount(1);
+  await page.getByRole('button', { name: 'Reset Flight speed', exact: true }).click();
+  await expect(row).toHaveAttribute('data-smooth-in', String(initial.sourceIn));
+  await expect(page.getByRole('button', { name: 'Reset Flight speed', exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
   await expectOnlyRangesSaved(page);
 });
 
@@ -2226,7 +2296,7 @@ test('Use all keeps every steady range as a kept range in one Undo step, adding 
   const asset = assets[0]!;
   const fps = 30000 / 1001;
   const analysis = jerkyThenSteady(asset);
-  const steady = smoothRanges(motionProfile(analysis, fps), SMOOTH_TOLERANCE.initial, fps);
+  const steady = smoothRanges(motionProfile(analysis, fps), steadyLimits(), fps);
   await page.route(`**/api/media/${asset.id}/motion`, (route) => route.fulfill({ json: { analysis, job: null } }));
   const before = await current(page);
   await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
@@ -2253,11 +2323,7 @@ test('Use best in Media keeps the best steady range of each selected recording, 
   const fps = 30000 / 1001;
   const bestOf = (asset: MediaAsset) => {
     const analysis = jerkyThenSteady(asset);
-    const best = rankedSmoothRanges(
-      analysis,
-      smoothRanges(motionProfile(analysis, fps), SMOOTH_TOLERANCE.initial, fps),
-      fps,
-    )[0]!;
+    const best = rankedSmoothRanges(analysis, smoothRanges(motionProfile(analysis, fps), steadyLimits(), fps), fps)[0]!;
     return { sourceIn: best.sourceIn, sourceOut: best.sourceOut };
   };
   let analyzeB = false;

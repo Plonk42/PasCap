@@ -512,40 +512,36 @@
   opacity: 1;
 }
 
+/* One row per limit, names and sliders aligned; Flight data sits at the end of the first row. */
 .smooth-panel-controls {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 400px) minmax(max-content, 1fr);
   align-items: center;
-  gap: 6px 16px;
+  gap: 4px 10px;
   font-size: 12px;
   color: var(--muted);
 }
 
 .smooth-panel-tolerance {
-  display: flex;
-  flex: 0 1 440px;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
+  display: contents;
 }
 
+/* The name stays beside its slider when an error line opens below. */
 .smooth-panel-tolerance .setting-reset-group {
-  flex: none;
+  display: inline-flex;
+  align-self: start;
+  align-items: center;
+  min-height: 28px;
   white-space: nowrap;
 }
 
-.product-workspace .smooth-panel-tolerance .value-control {
-  flex: 1 1 auto;
-  grid-template-columns: minmax(0, 1fr) 72px;
-  min-width: 150px;
-}
-
-.product-workspace .smooth-panel-tolerance .value-control .number-field-input {
-  padding-block: 4px;
+.product-workspace .smooth-panel-tolerance .range-control {
+  grid-template-columns: minmax(90px, 1fr) 58px auto 58px 26px;
 }
 
 .smooth-panel .smooth-panel-lanes-menu {
-  margin-left: auto;
+  grid-area: 1 / 3;
+  justify-self: end;
 }
 
 .smooth-panel .smooth-panel-lanes-menu > summary.editor-popover-trigger {
@@ -555,6 +551,7 @@
   padding: 0 10px;
   border-color: var(--line);
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .source-motion {
@@ -665,6 +662,14 @@
 
 .source-motion[data-near-tolerance] .source-motion-tolerance {
   stroke-width: 2.5;
+}
+
+/* Flight speed limits on its lane; they follow the range, they are not handles. */
+.source-motion-limit {
+  stroke: var(--series);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
 }
 
 .source-motion-series-list {
