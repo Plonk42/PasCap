@@ -96,7 +96,9 @@ configure=(--prefix="$PREFIX" --disable-doc --disable-debug --disable-autodetect
 
 readonly BUILD_DIR=$(mktemp -d "${TMPDIR:-/tmp}/pascap-ffmpeg.XXXXXXXX")
 trap 'rm -rf -- "$BUILD_DIR"' EXIT
-curl --fail --location --retry 3 --silent --show-error \
+# ffmpeg.org intermittently resets or refuses connections; the checksum below guards every retry.
+curl --fail --location --silent --show-error --connect-timeout 30 \
+  --retry 6 --retry-delay 20 --retry-all-errors \
   "https://ffmpeg.org/releases/ffmpeg-$VERSION.tar.xz" \
   --output "$BUILD_DIR/ffmpeg.tar.xz"
 printf '%s  %s\n' "$SHA256" "$BUILD_DIR/ffmpeg.tar.xz" | sha256sum --check --strict
