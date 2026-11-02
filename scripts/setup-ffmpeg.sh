@@ -3,8 +3,8 @@ set -euo pipefail
 
 # Builds the FFmpeg release PasCap is qualified on into a dedicated folder, for CI and local installs.
 # src/shared/toolchain.ts names the same version and components; a unit test keeps them in step.
-readonly VERSION=8.0.1
-readonly SHA256=05ee0b03119b45c0bdb4df654b96802e909e0a752f72e4fe3794f487229e5a41
+readonly VERSION=9.0.2
+readonly SHA256=8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e
 readonly ENCODERS=(libx264 ffv1 aac pcm_s16le)
 readonly FILTERS=(lut3d xfade setparams testsrc2 sine anullsrc)
 readonly BITSTREAM_FILTERS=(setts)

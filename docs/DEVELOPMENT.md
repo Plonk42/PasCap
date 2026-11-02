@@ -41,7 +41,8 @@ paths, storage, network and the native toolchain: [DEPLOYMENT.md](DEPLOYMENT.md)
 
 - **Linux**, npm, **Node 22 LTS ≥22.12.0 or 24 LTS** (`>=22.12.0 <25`). Validation
   targets 22/24, not every intervening major version.
-- **FFmpeg/ffprobe 8.0.1**, the tested baseline; FFmpeg 6 is unqualified.
+- **FFmpeg/ffprobe 9.0.2**, the tested baseline; other releases, including
+  distribution packages, are unqualified.
   Other builds need parity tests. Require `libx264`, FFV1, AAC, `lut3d`/`xfade`, raw
   RGB/lossless RGBA16 and the existing timing/color filters and bitstream tools.
   [Build it locally](DEPLOYMENT.md#native-toolchain) with `npm run setup:ffmpeg -- <folder>`;
@@ -360,7 +361,7 @@ and manual dispatch ([job overview](GITHUB_WORKFLOW.md#ci-and-branch-protection)
 
 - Unit/type/build checks on **Node 22**, plus **Node 24** and `npm audit` on `main`.
 - Native media, four Chrome shards and the scoped Firefox music checks run in
-  parallel on Node 22 with **FFmpeg/ffprobe 8.0.1 built from pinned source** through
+  parallel on Node 22 with **FFmpeg/ffprobe 9.0.2 built from pinned source** through
   a shared [setup action](../.github/actions/setup-ffmpeg/action.yml) and cached
   toolchain, not runner apt FFmpeg 6. Firefox alone runs under Xvfb with Mesa
   llvmpipe and a fail-closed real WebGL2 prerequisite; its software-rendering
@@ -374,7 +375,7 @@ and manual dispatch ([job overview](GITHUB_WORKFLOW.md#ci-and-branch-protection)
   or hardware/performance acceptance claim.
 
 The [FFmpeg setup script](../scripts/setup-ffmpeg.sh) (`npm run setup:ffmpeg` locally)
-verifies the official 8.0.1 source archive SHA-256, enables GPL/libx264 explicitly and
+verifies the official 9.0.2 source archive SHA-256, enables GPL/libx264 explicitly and
 checks the required filters/encoders/bitstream tool. Its version and component lists
 match `QUALIFIED_FFMPEG`/`REQUIRED_FFMPEG` in [the toolchain module](../src/shared/toolchain.ts),
 which the service's startup check uses; a unit test keeps them in step. Its installation directory is cached by script

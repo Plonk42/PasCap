@@ -1,4 +1,4 @@
-name: Set up FFmpeg 8.0.1
+name: Set up FFmpeg 9.0.2
 description: Restore or build the pinned FFmpeg/ffprobe toolchain used by native and browser tests.
 runs:
   using: composite
@@ -11,7 +11,7 @@ runs:
       with:
         path: .ci/ffmpeg
         key: ffmpeg-${{ runner.os }}-${{ runner.arch }}-ubuntu24-${{ hashFiles('scripts/setup-ffmpeg.sh') }}
-    - name: Build or verify FFmpeg 8.0.1
+    - name: Build or verify FFmpeg 9.0.2
       shell: bash
       run: bash scripts/setup-ffmpeg.sh "$GITHUB_WORKSPACE/.ci/ffmpeg"
     - name: Report native toolchain
