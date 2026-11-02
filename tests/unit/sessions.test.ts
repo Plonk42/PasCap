@@ -283,7 +283,12 @@ describe('assistant sessions', () => {
       ['session-start', 1],
     ]);
 
-    for (const label of ['a', 'b', 'c']) await call('editor', 'checkpoint', { projectId: 'flight', label });
+    // Each checkpoint holds different content: identical content is kept once.
+    for (const [index, label] of ['a', 'b', 'c'].entries()) {
+      const document = await projects.load('flight');
+      await projects.save({ ...document, bookmarks: [index + 1] }, document.revision);
+      await call('editor', 'checkpoint', { projectId: 'flight', label });
+    }
     const after = (await call('editor', 'session_status', { projectId: 'flight' })) as {
       checkpoints: { label: string | null }[];
     };
@@ -293,14 +298,45 @@ describe('assistant sessions', () => {
     expect((await projects.list()).map((entry) => entry.id)).toEqual(['flight']);
   });
 
+  it('does not keep a checkpoint of content it already holds, whatever the revision', async () => {
+    const { call, projects } = await setup();
+    const first = await call('editor', 'checkpoint', { projectId: 'flight', label: 'First' });
+    expect(await call('editor', 'checkpoint', { projectId: 'flight', label: 'Again' })).toEqual(first);
+
+    const started = await call('editor', 'session_start', { projectId: 'flight', expectedRevision: 1 });
+    expect(started.checkpointId).toBe(first.id);
+    await call('assistant', 'edit', { projectId: 'flight', expectedRevision: 1, commands: [bookmark(30)] });
+    await call('assistant', 'session_end', { projectId: 'flight', notes: null });
+
+    // The first restore keeps the edited state; restoring again finds the restored content kept already.
+    await call('editor', 'checkpoint_restore', { projectId: 'flight', expectedRevision: 2, checkpointId: first.id });
+    await call('editor', 'checkpoint_restore', { projectId: 'flight', expectedRevision: 3, checkpointId: first.id });
+    expect((await projects.load('flight')).revision).toBe(4);
+    const { checkpoints } = (await call('editor', 'session_status', { projectId: 'flight' })) as {
+      checkpoints: { reason: string; label: string | null }[];
+    };
+    expect(checkpoints.map((entry) => [entry.reason, entry.label?.startsWith('Before restoring') ?? false])).toEqual([
+      ['before-restore', true],
+      ['manual', false],
+    ]);
+
+    // The revision alone never makes a checkpoint new.
+    expect(await call('editor', 'checkpoint', { projectId: 'flight', label: 'Again' })).toEqual(first);
+    await projects.save({ ...(await projects.load('flight')), bookmarks: [60] }, 4);
+    const changed = await call('editor', 'checkpoint', { projectId: 'flight', label: 'Changed' });
+    expect(changed.id).not.toBe(first.id);
+  });
+
   it("refuses the user's restore during an active session without taking a checkpoint", async () => {
     const { call, projects } = await setup({ checkpoints: 2 });
     const kept = await call('editor', 'checkpoint', { projectId: 'flight', label: 'Mine' });
-    await call('editor', 'session_start', { projectId: 'flight', expectedRevision: 1 });
+    const document = await projects.load('flight');
+    await projects.save({ ...document, bookmarks: [30] }, document.revision);
+    await call('editor', 'session_start', { projectId: 'flight', expectedRevision: 2 });
     await expect(
-      call('editor', 'checkpoint_restore', { projectId: 'flight', expectedRevision: 1, checkpointId: kept.id }),
+      call('editor', 'checkpoint_restore', { projectId: 'flight', expectedRevision: 2, checkpointId: kept.id }),
     ).rejects.toMatchObject({ statusCode: 423 });
-    expect((await projects.load('flight')).revision).toBe(1);
+    expect((await projects.load('flight')).revision).toBe(2);
     const { checkpoints } = (await call('editor', 'session_status', { projectId: 'flight' })) as {
       checkpoints: { reason: string }[];
     };

@@ -78,7 +78,7 @@ export const sessionEnd = defineOperation({
 export const checkpoint = defineOperation({
   name: 'checkpoint',
   description:
-    'Keep a copy of the project as it is saved now, to restore later with checkpoint_restore; only the most recent checkpoints of a project are kept.',
+    'Keep a copy of the project as it is saved now, to restore later with checkpoint_restore; only the most recent checkpoints of a project are kept. When a checkpoint with the same content (revision aside) exists, that one is returned instead of a duplicate.',
   input: z
     .object({ projectId, label: described(z.string().max(200).nullable().default(null), 'Short name for it.') })
     .strict(),

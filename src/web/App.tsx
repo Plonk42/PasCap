@@ -1796,14 +1796,14 @@ export function App() {
     if (autosave.current?.dirty)
       throw new Error('Current changes could not be saved. Resolve the save error before using checkpoints.');
   };
-  const takeCheckpoint = async (label: string | null): Promise<boolean> =>
-    (
-      await act(async () => {
-        if (!current.current) throw new Error('No project is open.');
-        await saveBeforeCheckpoint();
-        await callOperation('checkpoint', { projectId: current.current.id, label });
-      })
-    ).ok;
+  const takeCheckpoint = async (label: string | null) => {
+    const result = await act(async () => {
+      if (!current.current) throw new Error('No project is open.');
+      await saveBeforeCheckpoint();
+      return callOperation('checkpoint', { projectId: current.current.id, label });
+    });
+    return result.ok ? result.value : null;
+  };
   const openCheckpointCopy = async (checkpointId: string, suffix: string): Promise<boolean> =>
     (
       await act(async () => {

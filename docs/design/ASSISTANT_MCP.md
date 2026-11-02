@@ -130,8 +130,11 @@ Implemented ([#235](https://github.com/Plonk42/PasCap/issues/235),
 [sessions](../../src/server/sessions.ts)). `<dataDir>/assistant/<id>/session.json` holds the
 project's latest session: `{ projectId, startedAt, startedBy, lastActivityAt, brief,
 checkpointId, edits, endedAt, endedBy, notes }`; `<dataDir>/assistant/<id>/checkpoints/` holds
-checkpoints `{ summary, document }`, the last `PASCAP_ASSISTANT_CHECKPOINTS` (5) per project,
-never removing the active session's own. Neither is part of the project document, export
+checkpoints `{ summary, hash, document }`, the last `PASCAP_ASSISTANT_CHECKPOINTS` (5) per project,
+never removing the active session's own. `hash` is the SHA-256 of the document's canonical JSON
+without `revision` (computed on read for files that predate it): a new checkpoint (manual, session
+start or before a restore) of content a stored one already has returns that one instead of a
+duplicate, so restoring the same checkpoint twice adds nothing. Neither is part of the project document, export
 receipts or compatibility rules; a checkpoint is upgraded and validated like a project file
 when restored.
 
@@ -412,7 +415,7 @@ Read; for editor and assistant. Try up to 64 edit commands against the saved pro
 
 #### `checkpoint`
 
-Write; for editor and assistant. Keep a copy of the project as it is saved now, to restore later with checkpoint_restore; only the most recent checkpoints of a project are kept.
+Write; for editor and assistant. Keep a copy of the project as it is saved now, to restore later with checkpoint_restore; only the most recent checkpoints of a project are kept. When a checkpoint with the same content (revision aside) exists, that one is returned instead of a duplicate.
 
 | Input       | Type           | Description              |
 | ----------- | -------------- | ------------------------ |

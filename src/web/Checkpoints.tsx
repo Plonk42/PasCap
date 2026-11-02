@@ -20,7 +20,7 @@ interface Props {
   busy: boolean;
   error: string;
   restoreFocusTo: RefObject<HTMLElement | null>;
-  onTake: (label: string | null) => Promise<boolean>;
+  onTake: (label: string | null) => Promise<Checkpoint | null>;
   onRestore: (checkpointId: string) => Promise<boolean>;
   /** Opens the checkpoint as a new project; the suffix names it in the new title. */
   onOpenCopy: (checkpointId: string, suffix: string) => Promise<boolean>;
@@ -48,6 +48,7 @@ export function CheckpointsDialog({
   const [checkpoints, setCheckpoints] = useState<Checkpoint[] | null>(null);
   const [loadError, setLoadError] = useState('');
   const [label, setLabel] = useState('');
+  const [notice, setNotice] = useState('');
   const [pending, setPending] = useState(false);
   const running = useRef(false);
   const submitting = busy || pending;
@@ -69,6 +70,7 @@ export function CheckpointsDialog({
     if (running.current) return false;
     running.current = true;
     setPending(true);
+    setNotice('');
     try {
       const ok = await action();
       if (ok && leaves) onClose();
@@ -80,7 +82,17 @@ export function CheckpointsDialog({
     }
   };
   const take = async (): Promise<void> => {
-    if (await run(() => onTake(label.trim() || null))) setLabel('');
+    const taken = { checkpoint: null as Checkpoint | null };
+    const known = checkpoints ?? [];
+    const ok = await run(async () => {
+      taken.checkpoint = await onTake(label.trim() || null);
+      return taken.checkpoint !== null;
+    });
+    if (!ok || !taken.checkpoint) return;
+    setLabel('');
+    const existing = known.find((item) => item.id === taken.checkpoint?.id);
+    // The service returns the checkpoint of identical content instead of keeping a duplicate.
+    if (existing) setNotice(`Nothing changed since “${describe(existing).name}”, so no new checkpoint was kept.`);
   };
 
   return (
@@ -127,6 +139,7 @@ export function CheckpointsDialog({
           Checkpoint
         </button>
       </form>
+      {notice && <output className="activity-hint">{notice}</output>}
       <section aria-labelledby={`${id}-list`}>
         <h3 id={`${id}-list`}>Saved checkpoints</h3>
         {checkpoints === null && !loadError && (

@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { readdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
@@ -19,7 +19,29 @@ import { atomicWrite, SerialWriter, type ProjectStore, type ProjectWriter } from
 
 const CHECKPOINT_ID = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[0-9a-f]{6}$/;
 const MAX_CHECKPOINT_BYTES = 17 * 1024 * 1024;
-const checkpointFileSchema = z.object({ summary: checkpointSummarySchema, document: z.unknown() }).strict();
+const checkpointFileSchema = z
+  .object({
+    summary: checkpointSummarySchema,
+    // Checkpoints taken before the hash existed lack it; it is computed from their document.
+    hash: z.string().optional(),
+    document: z.unknown(),
+  })
+  .strict();
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  // Compares UTF-16 code units, so the hash does not depend on the locale.
+  const keys = Object.keys(value).sort((left, right) => Number(left > right) - Number(left < right));
+  const fields = keys.map((key) => JSON.stringify(key) + ':' + canonical((value as Record<string, unknown>)[key]));
+  return `{${fields.join(',')}}`;
+}
+
+/** Identifies a project's content: every saved bit except the revision, which a restore bumps. */
+function contentHash(document: unknown): string {
+  const { revision: _revision, ...content } = document as Record<string, unknown>;
+  return createHash('sha256').update(canonical(content)).digest('hex');
+}
 
 export type SessionStarter = 'user' | 'assistant';
 
@@ -220,17 +242,21 @@ export class AssistantSessions {
     return path.join(this.directory(projectId), 'checkpoints', `${checkpointId}.json`);
   }
 
+  /** Keeps the project as it is, unless a checkpoint of the same content exists: that one is returned. */
   async #checkpoint(
     document: ProjectDocument,
     reason: CheckpointSummary['reason'],
     label: string | null,
     keep: string | null,
   ): Promise<CheckpointSummary> {
+    const hash = contentHash(document);
+    const existing = (await this.#index(document.id)).find((entry) => entry.hash === hash);
+    if (existing) return existing.summary;
     this.#lastCheckpoint = Math.max(this.clock(), this.#lastCheckpoint + 1);
     const createdAt = new Date(this.#lastCheckpoint).toISOString();
     const id = `${createdAt.replaceAll(':', '-').replace('.', '-')}-${randomBytes(3).toString('hex')}`;
     const summary = { id, createdAt, reason, label, revision: document.revision, title: document.title };
-    await atomicWrite(this.checkpointFile(document.id, id), `${JSON.stringify({ summary, document })}\n`);
+    await atomicWrite(this.checkpointFile(document.id, id), `${JSON.stringify({ summary, hash, document })}\n`);
     const session = await this.current(document.id);
     const kept = new Set([id, keep, session?.endedAt === null ? session.checkpointId : null]);
     // Newest first: the oldest unprotected checkpoints go once there are too many.
@@ -252,6 +278,11 @@ export class AssistantSessions {
 
   /** The project's checkpoints, newest first. */
   async checkpoints(projectId: string): Promise<CheckpointSummary[]> {
+    return (await this.#index(projectId)).map((entry) => entry.summary);
+  }
+
+  /** Each checkpoint's summary and content hash, newest first, reading one file at a time. */
+  async #index(projectId: string): Promise<{ summary: CheckpointSummary; hash: string }[]> {
     const directory = path.join(this.directory(projectId), 'checkpoints');
     let names: string[];
     try {
@@ -260,14 +291,15 @@ export class AssistantSessions {
       if (isNotFound(error)) return [];
       throw error;
     }
-    const summaries: CheckpointSummary[] = [];
+    const entries: { summary: CheckpointSummary; hash: string }[] = [];
     await forEachSerial(
       names.filter((entry) => CHECKPOINT_ID.test(entry.replace(/\.json$/, ''))),
       async (name) => {
-        summaries.push((await this.#readCheckpoint(projectId, name.replace(/\.json$/, ''))).summary);
+        const { summary, hash, document } = await this.#readCheckpoint(projectId, name.replace(/\.json$/, ''));
+        entries.push({ summary, hash: hash ?? contentHash(document) });
       },
     );
-    return summaries.sort((left, right) => right.id.localeCompare(left.id));
+    return entries.sort((left, right) => right.summary.id.localeCompare(left.summary.id));
   }
 
   async #readCheckpoint(projectId: string, checkpointId: string) {

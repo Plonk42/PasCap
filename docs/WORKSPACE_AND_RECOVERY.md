@@ -765,7 +765,8 @@ changes, and a save error stops them. Restore replaces the project in one new re
 history, after checkpointing the current state; during an assistant session it stays
 `aria-disabled` with the reason and the service refuses it (423) before checkpointing anything. The
 list and its limit (`PASCAP_ASSISTANT_CHECKPOINTS`) are those of the assistant, so
-checkpoints from sessions and restores appear in it.
+checkpoints from sessions and restores appear in it. Content already kept is not kept again, whatever
+its revision: **Checkpoint** on an unchanged project says which checkpoint already holds it.
 
 ## Projects, service connection and errors
 

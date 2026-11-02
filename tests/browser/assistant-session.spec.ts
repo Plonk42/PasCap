@@ -369,6 +369,18 @@ test('takes, restores and opens checkpoints from the editor, and refuses a resto
   expect(memory.snapshot().revision).toBe(3);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 
+  // Content that is already kept is not kept again, although a restore bumped the revision.
+  const items = dialog.getByRole('list', { name: 'Checkpoints' }).getByRole('listitem');
+  await dialog.getByRole('button', { name: 'Checkpoint', exact: true }).click();
+  await expect(dialog).toContainText('Nothing changed since \u201cBefore bookmarks\u201d');
+  await expect(items).toHaveCount(2);
+  await items
+    .filter({ hasText: 'Before bookmarks' })
+    .getByRole('button', { name: /^Restore the checkpoint of / })
+    .click();
+  await expect.poll(() => memory.snapshot().revision).toBe(4);
+  await expect(items).toHaveCount(2);
+
   // Opening a checkpoint leaves this project alone and opens a copy.
   await dialog
     .getByRole('listitem')
@@ -379,7 +391,7 @@ test('takes, restores and opens checkpoints from the editor, and refuses a resto
   await expect(page.getByRole('textbox', { name: 'Project title' })).toHaveValue(
     /^Assistant · memory-only \(Before bookmarks\)$/,
   );
-  expect(memory.snapshot().revision).toBe(3);
+  expect(memory.snapshot().revision).toBe(4);
 
   // An assistant session refuses a restore with its reason.
   await page.goto(`/?project=${PROJECT_ID}`);
@@ -391,5 +403,5 @@ test('takes, restores and opens checkpoints from the editor, and refuses a resto
   await expect(restore).toHaveAttribute('aria-disabled', 'true');
   await expect(restore).toHaveAttribute('title', /take over before restoring/);
   await restore.click({ force: true });
-  expect(memory.snapshot().revision).toBe(3);
+  expect(memory.snapshot().revision).toBe(4);
 });

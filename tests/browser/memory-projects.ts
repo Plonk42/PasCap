@@ -48,7 +48,15 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
   let serial = 0;
   let session: MemorySession | null = null;
   const checkpoints: { summary: CheckpointSummary; document: ProjectDocument }[] = [];
-  const keep = (document: ProjectDocument, reason: CheckpointSummary['reason'], label: string | null): void => {
+  const keep = (
+    document: ProjectDocument,
+    reason: CheckpointSummary['reason'],
+    label: string | null,
+  ): CheckpointSummary => {
+    // As the service does, an existing checkpoint of the same content (revision aside) is reused.
+    const content = (item: ProjectDocument): string => JSON.stringify({ ...item, revision: 0 });
+    const existing = checkpoints.find((entry) => content(entry.document) === content(document));
+    if (existing) return existing.summary;
     const id = `2026-10-22T10-00-${String(checkpoints.length).padStart(2, '0')}-000Z-memory`;
     const summary = {
       id,
@@ -59,6 +67,7 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
       title: document.title,
     };
     checkpoints.unshift({ summary, document });
+    return summary;
   };
   const stored = (checkpointId: string): ProjectDocument | undefined =>
     checkpoints.find((entry) => entry.summary.id === checkpointId)?.document ??
@@ -68,10 +77,7 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
     body: { label?: string | null; checkpointId?: string; title?: string; expectedRevision?: number },
     saved: ProjectDocument,
   ): { status?: number; json: unknown } | null => {
-    if (name === 'checkpoint') {
-      keep(saved, 'manual', body.label ?? null);
-      return { json: checkpoints[0]!.summary };
-    }
+    if (name === 'checkpoint') return { json: keep(saved, 'manual', body.label ?? null) };
     if (name !== 'checkpoint_copy' && name !== 'checkpoint_restore') return null;
     if (name === 'checkpoint_restore' && session?.view?.active)
       return {

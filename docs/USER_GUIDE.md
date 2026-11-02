@@ -903,7 +903,9 @@ optional name and choose **Checkpoint**. Each saved checkpoint offers **Restore*
 the project in one step after checkpointing its current state (so you can come back to it), and
 **Open as new project**, which opens it as a separate project and leaves this one unchanged.
 PasCap keeps the most recent checkpoints of a project (five unless the service sets another count),
-including those it takes before an assistant session and before a restore. Restore is unavailable
+including those it takes before an assistant session and before a restore. It never keeps the same
+content twice: if the project is unchanged since a checkpoint, that one is reused (restoring the same
+checkpoint again adds nothing). Restore is unavailable
 while an assistant is editing: take the project back first.
 
 ## Workspace and keyboard
