@@ -709,6 +709,7 @@ async function muxExport(
   else args.push('-map', '0:v:0', '-an');
   // Concat file durations are in microseconds. Reset EVERY packet to exact project ticks
   // so rounding does not accumulate across hundreds of independently encoded chunks.
+  // No -r: from FFmpeg 8.1 it makes stream copy read these ticks in 1001/30000 units.
   args.push(
     '-sn',
     '-dn',
@@ -716,8 +717,6 @@ async function muxExport(
     'copy',
     '-bsf:v',
     'setts=pts=N*1001:dts=N*1001:duration=1001:time_base=1/30000',
-    '-r',
-    FPS,
     '-color_primaries',
     'bt709',
     '-color_trc',
