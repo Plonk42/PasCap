@@ -53,7 +53,13 @@ test.beforeEach(async ({ page, request }) => {
     return asset;
   });
   const payloads: Record<string, unknown> = {
-    '/api/health': { name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 },
+    '/api/health': {
+      name: 'PasCap',
+      milestone: 'editing-and-export',
+      frameRate: '30000/1001',
+      workerConcurrency: 1,
+      toolchain: null,
+    },
     '/api/media': { assets, missing: [] },
     '/api/audio': { assets: [], missing: [] },
     '/api/jobs': { jobs: [] },

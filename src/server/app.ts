@@ -7,6 +7,7 @@ import { z, ZodError } from 'zod';
 import { exportRequestSchema } from '../shared/export.js';
 import { MAX_FOOTAGE_FILES } from '../shared/footage.js';
 import { frameSchema, idSchema, projectSchema } from '../shared/model.js';
+import type { Toolchain } from '../shared/toolchain.js';
 import { AudioLibrary } from './audio.js';
 import { BrowsePreviews } from './browse-previews.js';
 import { createConfig, type ServiceConfig } from './config.js';
@@ -126,7 +127,8 @@ export async function serveRegisteredFile(
   }
 }
 
-export async function createApp(config = createConfig()) {
+/** The service; `toolchain` is its startup check (main.ts), null when nothing was checked. */
+export async function createApp(config = createConfig(), toolchain: Toolchain | null = null) {
   const app = Fastify({ logger: false, bodyLimit: 1_048_576, requestTimeout: 120_000 });
   const jobs = new JobQueue();
   const library = new MediaLibrary(config, jobs);
@@ -177,7 +179,13 @@ export async function createApp(config = createConfig()) {
     await reply.code(status).send(body);
   });
   app.get('/api/health', (_request, reply) =>
-    reply.send({ name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 }),
+    reply.send({
+      name: 'PasCap',
+      milestone: 'editing-and-export',
+      frameRate: '30000/1001',
+      workerConcurrency: 1,
+      toolchain,
+    }),
   );
   app.get('/api/media', async (_request, reply) =>
     reply.send({ assets: library.list(), missing: await library.missing() }),

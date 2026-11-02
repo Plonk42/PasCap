@@ -112,6 +112,12 @@ timestamps/frame counts, 8-bit `yuv420p`, and explicit SDR BT.709 color/range ta
 HDR, untagged color and ambiguous timing are rejected, not silently normalized.
 See [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
 
+Preparation and export run the service's FFmpeg. When it cannot run, lacks a required
+encoder or filter, or is not the tested release, a banner under the header says so
+when the editor opens: preparing and exporting may fail or differ, while opening and
+editing projects still works. **Learn more** explains how to build the tested FFmpeg
+with `npm run setup:ffmpeg`; dismiss the banner with its ×.
+
 ### Damaged recordings
 
 A recording damaged by a bad copy or card can contain video frames no decoder can

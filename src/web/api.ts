@@ -8,6 +8,7 @@ import { motionAnalysisSchema } from '../shared/motion-analysis.js';
 import { idSchema, projectSchema, type ProjectDocument } from '../shared/model.js';
 import { musicAnalysisSchema } from '../shared/music-analysis.js';
 import { projectSummarySchema } from '../shared/projects.js';
+import { toolchainSchema } from '../shared/toolchain.js';
 
 export type ApiErrorKind = 'http' | 'network' | 'timeout' | 'response' | 'aborted' | 'request';
 
@@ -54,6 +55,7 @@ const healthSchema = z
     milestone: z.literal('editing-and-export'),
     frameRate: z.literal('30000/1001'),
     workerConcurrency: z.literal(1),
+    toolchain: toolchainSchema.nullable(),
   })
   .strict();
 export type ServiceHealth = z.infer<typeof healthSchema>;

@@ -100,12 +100,15 @@ license is assumed here. FFmpeg's
 configuration. Do not describe the current libx264-enabled toolchain as an
 LGPL-only or MIT native distribution.
 
-The [CI setup script](../scripts/ci/setup-ffmpeg.sh) builds FFmpeg/ffprobe **8.0.1**
+The [setup script](../scripts/setup-ffmpeg.sh) (`npm run setup:ffmpeg`, also used by
+CI) builds FFmpeg/ffprobe **8.0.1**
 from the official archive, SHA-256
 **05ee0b03119b45c0bdb4df654b96802e909e0a752f72e4fe3794f487229e5a41**, with
 `--disable-autodetect --enable-gpl --enable-libx264 --enable-pthreads
---disable-ffplay`, plus disabled documentation/debug output. It uses the runner's
-libx264 development package. That package revision, patches and native dependency
+--disable-ffplay`, plus disabled documentation/debug output. Its optional `--nvdec`
+adds `--enable-ffnvcodec --enable-nvdec --enable-cuvid` (the MIT-licensed
+nv-codec-headers; the NVIDIA driver is loaded at run time, not linked or shipped). It
+uses the system's libx264 development package. That package revision, patches and native dependency
 closure are **not pinned by the FFmpeg archive checksum**. CI proves tested
 correctness, not a reproducible or cleared native redistribution artifact.
 Developer distro FFmpeg builds can enable many more libraries and have different

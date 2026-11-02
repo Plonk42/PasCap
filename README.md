@@ -80,7 +80,7 @@ targets.
 ## Requirements
 
 - **Linux**, Node.js **22.12+ or 24 LTS** and npm.
-- Native **FFmpeg and ffprobe**. The tested development toolchain is **FFmpeg 8.0.1** with `libx264`, FFV1, AAC and the required color/transition filters. Older distribution packages have not been certified; [local deployment](docs/DEPLOYMENT.md#native-toolchain) shows how to build the tested version.
+- Native **FFmpeg and ffprobe**. The tested development toolchain is **FFmpeg 8.0.1** with `libx264`, FFV1, AAC and the required color/transition filters. Older distribution packages have not been certified: `npm run setup:ffmpeg -- <folder>` builds the tested version ([local deployment](docs/DEPLOYMENT.md#native-toolchain)), and the editor tells you at startup when the configured FFmpeg differs or lacks a component.
 - A current desktop browser with **WebCodecs** (H.264 `VideoDecoder`), **WebGL2** and AudioWorklet. Automated browser tests use Google Chrome.
 - Optional: Google Chrome or Chromium and a hardware GPU speed up heavy exports; an NVIDIA GPU with CUDA speeds up proxy preparation.
 - Enough disk space for generated proxies and export scratch. Long lossless 4K intermediate files can be large; there is no fixed-GB scratch guarantee.

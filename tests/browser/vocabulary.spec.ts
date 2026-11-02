@@ -38,6 +38,7 @@ for (const viewport of [
           milestone: 'editing-and-export',
           frameRate: '30000/1001',
           workerConcurrency: 1,
+          toolchain: null,
         },
         '/api/media': { assets: [recording], missing: [] },
         '/api/audio': { assets: [], missing: [] },

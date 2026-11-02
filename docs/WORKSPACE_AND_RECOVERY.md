@@ -826,6 +826,18 @@ project. Missing/incompatible URL targets do not open a different project withou
 explanation. A service failure exposes **Retry connecting**; a preview failure
 exposes **Retry preview**, preserving the document and timeline position.
 
+Before it listens, the service checks its native toolchain once: it runs the configured
+`ffmpeg` and `ffprobe` (`PASCAP_FFMPEG`, `PASCAP_FFPROBE`, else `PATH`) serially, each
+call bounded to 10 s, records their versions and lists the required encoders, filters and
+bitstream filter FFmpeg lacks ([native toolchain](DEPLOYMENT.md#native-toolchain)). The
+service log names the version; the health response carries the report. Anything other
+than the qualified release with every component puts a banner under the header until
+dismissed (**Dismiss FFmpeg notice**, until the editor reloads), with **Learn more**:
+amber when the release differs (preparation and export may differ or fail), red when
+FFmpeg lacks a component or cannot run (preparing and exporting can fail). Distribution
+builds of the qualified release (its version with a suffix such as `-3ubuntu2`) count as
+qualified. The notice never blocks opening or editing projects.
+
 Playback presents only exact decoded source frames for the clock frame
 ([WebCodecs preview decoding](design/WEBCODECS_PREVIEW.md)). When a required frame
 is late, the previous image stays on screen and the status shows buffering: without

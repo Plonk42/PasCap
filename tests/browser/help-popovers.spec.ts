@@ -29,7 +29,13 @@ test.beforeEach(async ({ page, request }) => {
     const pathname = new URL(route.request().url()).pathname;
     const method = route.request().method();
     const reads: Record<string, unknown> = {
-      '/api/health': { name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 },
+      '/api/health': {
+        name: 'PasCap',
+        milestone: 'editing-and-export',
+        frameRate: '30000/1001',
+        workerConcurrency: 1,
+        toolchain: null,
+      },
       '/api/media': { assets, missing: [] },
       '/api/audio': { assets: audio, missing: [] },
       '/api/jobs': { jobs: [] },

@@ -14,8 +14,8 @@ There is no container package. A Docker/Podman image was planned, then dropped
 published image every user would build it, PasCap needs direct access to the user's
 footage, and its GPU export compositor and NVDEC proxy decoding would need GPU
 passthrough into the container. The pinned toolchain a container would have provided
-is covered by the [toolchain section](#native-toolchain) and
-[#290](https://github.com/Plonk42/PasCap/issues/290).
+is covered by the [toolchain section](#native-toolchain): `npm run setup:ffmpeg` builds
+it and the service checks the configured one at startup.
 
 ## No-copy source access today
 
@@ -181,18 +181,27 @@ retiming, track composition, BT.709 tags, exact frame counts and music/export
 verification depend on it.
 
 To build the qualified version locally, run the
-[CI setup script](../scripts/ci/setup-ffmpeg.sh) with a dedicated absolute prefix
-(it needs `build-essential`, `pkg-config`, `nasm` and `libx264-dev`), then point the
-service at it:
+[setup script](../scripts/setup-ffmpeg.sh) with a dedicated absolute folder (it needs
+`build-essential`, `curl`, `pkg-config`, `nasm` and `libx264-dev`, and names what is
+missing), then point the service at it with the two lines it prints:
 
 ```sh
-bash scripts/ci/setup-ffmpeg.sh "$HOME/.local/opt/ffmpeg-8.0.1"
-PASCAP_FFMPEG="$HOME/.local/opt/ffmpeg-8.0.1/bin/ffmpeg" \
-PASCAP_FFPROBE="$HOME/.local/opt/ffmpeg-8.0.1/bin/ffprobe" npm start
+npm run setup:ffmpeg -- "$HOME/.local/opt/ffmpeg-8.0.1"
+export PASCAP_FFMPEG="$HOME/.local/opt/ffmpeg-8.0.1/bin/ffmpeg"
+export PASCAP_FFPROBE="$HOME/.local/opt/ffmpeg-8.0.1/bin/ffprobe"
+npm start
 ```
 
-The script checks the source archive's SHA-256 and verifies the required encoders,
-filters and bitstream filter. A startup toolchain check and a documented install
-command are tracked in [#290](https://github.com/Plonk42/PasCap/issues/290).
-Redistributing FFmpeg or other binaries follows [licensing](LICENSING.md); none is
-shipped today.
+The script checks the source archive's SHA-256, builds with the configuration CI uses
+and verifies the required encoders, filters and bitstream filter; run again on an
+existing folder, it only verifies it. CI builds its toolchain with the same script.
+Add `--nvdec` (it needs `libffmpeg-nvenc-dev`, the nv-codec-headers) to keep NVIDIA
+hardware decoding for proxy preparation, which `--disable-autodetect` otherwise leaves
+out; the CPU decoder stays the fallback either way.
+
+At startup the service runs the configured `ffmpeg` and `ffprobe` once, logs their
+version and, when they are not the qualified release or lack a required component,
+the editor shows a dismissible notice
+([startup](WORKSPACE_AND_RECOVERY.md#projects-service-connection-and-errors)); editing
+saved projects never depends on it. Redistributing FFmpeg or other binaries follows
+[licensing](LICENSING.md); none is shipped today.
