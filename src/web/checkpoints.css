@@ -1,0 +1,101 @@
+.app-dialog.activity-modal.checkpoints-dialog {
+  width: min(620px, calc(100vw - 48px));
+}
+
+.checkpoints-intro {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.checkpoints-new {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'label label'
+    'field action';
+  gap: 6px 8px;
+  align-items: center;
+}
+
+.checkpoints-new > label {
+  grid-area: label;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.checkpoints-new > input {
+  grid-area: field;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.checkpoints-new > input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.checkpoints-new > button {
+  grid-area: action;
+}
+
+.checkpoints-dialog section > h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.checkpoints-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.checkpoints-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.checkpoints-list li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 40px;
+}
+
+.checkpoint-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+.checkpoint-text strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkpoint-text small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.checkpoints-list button {
+  flex: none;
+}
+
+.checkpoints-list button[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

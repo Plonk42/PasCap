@@ -293,6 +293,20 @@ describe('assistant sessions', () => {
     expect((await projects.list()).map((entry) => entry.id)).toEqual(['flight']);
   });
 
+  it("refuses the user's restore during an active session without taking a checkpoint", async () => {
+    const { call, projects } = await setup({ checkpoints: 2 });
+    const kept = await call('editor', 'checkpoint', { projectId: 'flight', label: 'Mine' });
+    await call('editor', 'session_start', { projectId: 'flight', expectedRevision: 1 });
+    await expect(
+      call('editor', 'checkpoint_restore', { projectId: 'flight', expectedRevision: 1, checkpointId: kept.id }),
+    ).rejects.toMatchObject({ statusCode: 423 });
+    expect((await projects.load('flight')).revision).toBe(1);
+    const { checkpoints } = (await call('editor', 'session_status', { projectId: 'flight' })) as {
+      checkpoints: { reason: string }[];
+    };
+    expect(checkpoints.map((entry) => entry.reason)).toEqual(['session-start', 'manual']);
+  });
+
   it('opens a checkpoint as a new project, leaving the project and its session unchanged', async () => {
     const { call, projects, file } = await setup();
     const started = await call('editor', 'session_start', { projectId: 'flight', expectedRevision: 1 });

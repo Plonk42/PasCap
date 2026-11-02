@@ -292,6 +292,8 @@ export class AssistantSessions {
   ): Promise<ProjectDocument> {
     return this.projects.exclusive(async () => {
       const current = await this.projects.load(projectId);
+      // Refused before the current state is checkpointed, so a refusal never displaces an older checkpoint.
+      await this.#guard(projectId, writer);
       if (current.revision !== expectedRevision)
         throw new ServiceError(
           `The project is at revision ${current.revision}, not ${expectedRevision}: read it again before restoring.`,

@@ -123,6 +123,9 @@ const ShortcutHelp = lazy(() => import('./ShortcutHelp.js').then((module) => ({ 
 const SourceReview = lazy(() => import('./SourceReview.js').then((module) => ({ default: module.SourceReview })));
 const ImportDialog = lazy(() => import('./ImportDialog.js').then((module) => ({ default: module.ImportDialog })));
 const HandOffDialog = lazy(() => import('./HandOff.js').then((module) => ({ default: module.HandOffDialog })));
+const CheckpointsDialog = lazy(() =>
+  import('./Checkpoints.js').then((module) => ({ default: module.CheckpointsDialog })),
+);
 /** The Properties tab holding each section a timeline marker or boundary opens. */
 const INSPECTOR_TABS: Record<InspectorSectionTarget, InspectorMode> = {
   speed: 'clip',
@@ -287,6 +290,7 @@ export function App() {
   const [showProjects, setShowProjects] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showHandOff, setShowHandOff] = useState(false);
+  const [showCheckpoints, setShowCheckpoints] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [showRecovery, setShowRecovery] = useState(false);
@@ -381,6 +385,7 @@ export function App() {
   const projectsTrigger = useRef<HTMLButtonElement>(null);
   const exportTrigger = useRef<HTMLButtonElement>(null);
   const handOffTrigger = useRef<HTMLButtonElement>(null);
+  const checkpointsTrigger = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -1785,33 +1790,51 @@ export function App() {
         await assistant.refresh();
       })
     ).ok;
-  const openBeforeSession = (checkpointId: string): void => {
-    void act(async () => {
-      if (!current.current) throw new Error('No project is open.');
-      const { id, title } = current.current;
-      await flushBeforeSwitch();
-      const copy = await callOperation('checkpoint_copy', {
-        projectId: id,
-        checkpointId,
-        title: `${title} (before assistant)`.slice(0, 200),
-      });
-      installProject((await api.load(copy.projectId)).document);
-      refreshProjectList();
-    });
+  const saveBeforeCheckpoint = async (): Promise<void> => {
+    if (drafting.current) throw new Error('Finish or cancel the current drag first.');
+    await autosave.current?.flush();
+    if (autosave.current?.dirty)
+      throw new Error('Current changes could not be saved. Resolve the save error before using checkpoints.');
   };
-  const restoreBeforeSession = (checkpointId: string): void => {
-    void act(async () => {
-      if (!current.current || !autosave.current) throw new Error('No project is open.');
-      const projectId = current.current.id;
-      await callOperation('checkpoint_restore', {
-        projectId,
-        checkpointId,
-        expectedRevision: autosave.current.revision,
-      });
-      adoptSaved((await api.load(projectId)).document);
-      assistant.dismiss();
-    });
-  };
+  const takeCheckpoint = async (label: string | null): Promise<boolean> =>
+    (
+      await act(async () => {
+        if (!current.current) throw new Error('No project is open.');
+        await saveBeforeCheckpoint();
+        await callOperation('checkpoint', { projectId: current.current.id, label });
+      })
+    ).ok;
+  const openCheckpointCopy = async (checkpointId: string, suffix: string): Promise<boolean> =>
+    (
+      await act(async () => {
+        if (!current.current) throw new Error('No project is open.');
+        const { id, title } = current.current;
+        await flushBeforeSwitch();
+        const tail = ` (${suffix.slice(0, 60)})`;
+        const copy = await callOperation('checkpoint_copy', {
+          projectId: id,
+          checkpointId,
+          title: `${title.slice(0, 200 - tail.length)}${tail}`,
+        });
+        installProject((await api.load(copy.projectId)).document);
+        refreshProjectList();
+      })
+    ).ok;
+  const restoreCheckpoint = async (checkpointId: string): Promise<boolean> =>
+    (
+      await act(async () => {
+        if (!current.current) throw new Error('No project is open.');
+        await saveBeforeCheckpoint();
+        const projectId = current.current.id;
+        await callOperation('checkpoint_restore', {
+          projectId,
+          checkpointId,
+          expectedRevision: autosave.current!.revision,
+        });
+        adoptSaved((await api.load(projectId)).document);
+        assistant.dismiss();
+      })
+    ).ok;
   const reloadEditor = (): void => {
     void act(flushBeforeSwitch).then((result) => {
       if (result.ok) location.reload();
@@ -1876,7 +1899,7 @@ export function App() {
     ],
   );
   const dockStyle = workspaceDockStyle(workspace.layout, workspace.sizes);
-  const modalErrorVisible = showProjects || showExport || showRecovery || importKind !== null;
+  const modalErrorVisible = showProjects || showExport || showRecovery || showCheckpoints || importKind !== null;
 
   return (
     <KeyframeNavigationContext.Provider value={keyframeNavigation}>
@@ -1989,6 +2012,20 @@ export function App() {
             </button>
           </Popover>
           <button
+            ref={checkpointsTrigger}
+            className="secondary-button small"
+            aria-label="Checkpoints"
+            title="Keep a copy of the project as it is, and come back to it later"
+            disabled={!project || busy || draft !== null || connection.state !== 'ready'}
+            onClick={() => {
+              setActionError('');
+              setShowCheckpoints(true);
+            }}
+          >
+            <Icon name="disk" size={15} />
+            Checkpoints
+          </button>
+          <button
             ref={handOffTrigger}
             className="secondary-button small"
             aria-label="Hand off to an assistant"
@@ -2093,8 +2130,8 @@ export function App() {
             restoreReason={
               saveState.state === 'saved' ? null : 'Save or discard the unsaved changes in this editor first.'
             }
-            onRestore={() => restoreBeforeSession(assistant.ended!.checkpointId)}
-            onOpenCopy={() => openBeforeSession(assistant.ended!.checkpointId)}
+            onRestore={() => void restoreCheckpoint(assistant.ended!.checkpointId)}
+            onOpenCopy={() => void openCheckpointCopy(assistant.ended!.checkpointId, 'before assistant')}
             onSeek={seek}
             onDismiss={assistant.dismiss}
           />
@@ -2485,6 +2522,23 @@ export function App() {
               }}
               onHandOff={handOff}
               onClose={() => setShowHandOff(false)}
+            />
+          )}
+          {showCheckpoints && project && (
+            <CheckpointsDialog
+              projectId={project.id}
+              restoreBlocked={
+                assistant.following
+                  ? 'An assistant is editing this project: take over before restoring a checkpoint.'
+                  : null
+              }
+              busy={busy}
+              error={actionError}
+              restoreFocusTo={checkpointsTrigger}
+              onTake={takeCheckpoint}
+              onRestore={restoreCheckpoint}
+              onOpenCopy={openCheckpointCopy}
+              onClose={() => setShowCheckpoints(false)}
             />
           )}
           {importKind !== null && project && (

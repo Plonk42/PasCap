@@ -950,6 +950,12 @@ Follow mode, Take over, restore and the Hand off dialog are implemented
   "… (before assistant)" and opens it, leaving the assistant's version as it is. An **Edit
   log** disclosure lists the session's batches, each with a timecode button seeking to the frame
   it changed. The summary is dismissed with ×.
+- **Checkpoints** (header, [Checkpoints.tsx](../../src/web/Checkpoints.tsx)) lets the user use
+  the same operations without a session: `checkpoint` with an optional name, `session_status`
+  for the list, `checkpoint_restore` and `checkpoint_copy` per row ([#253](https://github.com/Plonk42/PasCap/issues/253)).
+  The editor saves pending changes first. `checkpoint_restore` checks the write lease before it
+  checkpoints the current state, so a restore refused during a session (423) leaves the list as it
+  was.
 - **Hand off** (header, beside Export; [HandOff.tsx](../../src/web/HandOff.tsx)) opens a
   dialog with the brief's fields (notes, a placed music track or Any, target length, most clips,
   and **Steady ranges as in Source preview**, which sends the limits set there that differ from

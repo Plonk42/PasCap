@@ -334,3 +334,62 @@ test('hands off with a brief after showing what the assistant can use, then open
   expect(memory.snapshot('browser-project-1').title).toBe('Assistant · memory-only (before assistant)');
   expect(memory.snapshot().bookmarks).toEqual([30]);
 });
+
+test('takes, restores and opens checkpoints from the editor, and refuses a restore during an assistant session', async ({
+  page,
+}) => {
+  await page.goto(`/?project=${PROJECT_ID}`);
+  await ready(page);
+  const dialog = page.getByRole('dialog', { name: 'Checkpoints' });
+  const open = async (): Promise<void> => {
+    await page.getByRole('button', { name: 'Checkpoints', exact: true }).click();
+    await expect(dialog).toBeVisible();
+  };
+
+  await open();
+  await expect(dialog).toContainText('No checkpoint yet.');
+  await dialog.getByLabel('Name (optional)').fill('Before bookmarks');
+  await dialog.getByRole('button', { name: 'Checkpoint', exact: true }).click();
+  await expect(dialog.getByRole('list', { name: 'Checkpoints' }).getByRole('listitem')).toHaveCount(1);
+  await expect(dialog).toContainText('Before bookmarks');
+  await expect(dialog.getByLabel('Name (optional)')).toHaveValue('');
+  await dialog.getByRole('button', { name: 'Close' }).click();
+
+  await page.evaluate(() => window.pascapLab!.engine.seek(30));
+  await page.getByRole('region', { name: 'Video timeline', exact: true }).focus();
+  await page.keyboard.press('m');
+  await expect.poll(() => bookmarks(page)).toEqual([30]);
+
+  // Restore replaces the project in one new revision, after checkpointing the current state.
+  await open();
+  await dialog.getByRole('button', { name: /^Restore the checkpoint of / }).click();
+  await expect.poll(() => bookmarks(page)).toEqual([]);
+  await expect(dialog.getByRole('list', { name: 'Checkpoints' }).getByRole('listitem')).toHaveCount(2);
+  await expect(dialog).toContainText('Before restoring');
+  expect(memory.snapshot().revision).toBe(3);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+
+  // Opening a checkpoint leaves this project alone and opens a copy.
+  await dialog
+    .getByRole('listitem')
+    .filter({ hasText: 'Before bookmarks' })
+    .getByRole('button', { name: /^Open the checkpoint of / })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('textbox', { name: 'Project title' })).toHaveValue(
+    /^Assistant · memory-only \(Before bookmarks\)$/,
+  );
+  expect(memory.snapshot().revision).toBe(3);
+
+  // An assistant session refuses a restore with its reason.
+  await page.goto(`/?project=${PROJECT_ID}`);
+  await ready(page);
+  memory.session = session(0);
+  await expect(page.locator('.assistant-banner.editing')).toBeVisible();
+  await open();
+  const restore = dialog.getByRole('button', { name: /^Restore the checkpoint of / }).first();
+  await expect(restore).toHaveAttribute('aria-disabled', 'true');
+  await expect(restore).toHaveAttribute('title', /take over before restoring/);
+  await restore.click({ force: true });
+  expect(memory.snapshot().revision).toBe(3);
+});

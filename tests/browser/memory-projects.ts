@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import type { Brief } from '../../src/shared/assistant-session.js';
+import type { Brief, CheckpointSummary } from '../../src/shared/assistant-session.js';
 import { createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import type { OperationOutput } from '../../src/shared/operations/index.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
@@ -12,6 +12,8 @@ export interface MemoryProjects {
   session: MemorySession | null;
   /** What hand_off_readiness reports. */
   readiness: OperationOutput<'hand_off_readiness'>;
+  /** The checkpoints the user took or a restore made, newest first. */
+  readonly checkpoints: readonly { summary: CheckpointSummary; document: ProjectDocument }[];
   readonly saves: number;
 }
 
@@ -45,6 +47,61 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
   let saves = 0;
   let serial = 0;
   let session: MemorySession | null = null;
+  const checkpoints: { summary: CheckpointSummary; document: ProjectDocument }[] = [];
+  const keep = (document: ProjectDocument, reason: CheckpointSummary['reason'], label: string | null): void => {
+    const id = `2026-10-22T10-00-${String(checkpoints.length).padStart(2, '0')}-000Z-memory`;
+    const summary = {
+      id,
+      createdAt: `2026-10-22T10:00:${String(checkpoints.length).padStart(2, '0')}.000Z`,
+      reason,
+      label,
+      revision: document.revision,
+      title: document.title,
+    };
+    checkpoints.unshift({ summary, document });
+  };
+  const stored = (checkpointId: string): ProjectDocument | undefined =>
+    checkpoints.find((entry) => entry.summary.id === checkpointId)?.document ??
+    (session?.view?.checkpointId === checkpointId ? session.checkpoint : undefined);
+  const checkpointReply = (
+    name: string,
+    body: { label?: string | null; checkpointId?: string; title?: string; expectedRevision?: number },
+    saved: ProjectDocument,
+  ): { status?: number; json: unknown } | null => {
+    if (name === 'checkpoint') {
+      keep(saved, 'manual', body.label ?? null);
+      return { json: checkpoints[0]!.summary };
+    }
+    if (name !== 'checkpoint_copy' && name !== 'checkpoint_restore') return null;
+    if (name === 'checkpoint_restore' && session?.view?.active)
+      return {
+        status: 423,
+        json: { error: 'An assistant is editing this project. Take over in the editor to edit it again.' },
+      };
+    const source = stored(body.checkpointId!);
+    if (!source) return { status: 404, json: { error: 'Unknown checkpoint.' } };
+    if (name === 'checkpoint_copy') {
+      const copy = projectSchema.parse({
+        ...source,
+        id: `browser-project-${++serial}`,
+        title: body.title,
+        revision: 1,
+      });
+      documents.set(copy.id, copy);
+      return { json: { projectId: copy.id, title: copy.title } };
+    }
+    if (body.expectedRevision !== saved.revision)
+      return { status: 409, json: { error: 'The memory-only project revision changed.' } };
+    keep(saved, 'before-restore', 'Before restoring');
+    const restored = projectSchema.parse({ ...source, revision: saved.revision + 1 });
+    documents.set(restored.id, restored);
+    return {
+      json: {
+        revision: restored.revision,
+        duration: { frames: calculateLayout(restored).duration, seconds: 0, timecode: '00:00:00' },
+      },
+    };
+  };
   let readiness: OperationOutput<'hand_off_readiness'> = {
     recordings: [],
     music: [],
@@ -54,7 +111,7 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
   // The waveform of a placed synthetic music fixture is a read of its prepared cache.
   await page.route('**/api/ops/music_waveform', (route) => route.continue());
   await page.route(
-    /\/api\/ops\/(session_status|session_start|session_end|checkpoint_restore|checkpoint_copy|hand_off_readiness)$/,
+    /\/api\/ops\/(session_status|session_start|session_end|checkpoint|checkpoint_restore|checkpoint_copy|hand_off_readiness)$/,
     async (route) => {
       const name = new URL(route.request().url()).pathname.slice('/api/ops/'.length);
       const body = route.request().postDataJSON() as {
@@ -62,6 +119,9 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
         expectedRevision?: number;
         brief?: Brief;
         title?: string;
+        label?: string | null;
+        checkpointId?: string;
+        checkpoints?: boolean;
       };
       const saved = documents.get(body.projectId);
       if (!saved) {
@@ -81,15 +141,9 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
         await route.fulfill({ json: session.view });
         return;
       }
-      if (name === 'checkpoint_copy') {
-        const copy = projectSchema.parse({
-          ...session!.checkpoint,
-          id: `browser-project-${++serial}`,
-          title: body.title,
-          revision: 1,
-        });
-        documents.set(copy.id, copy);
-        await route.fulfill({ json: { projectId: copy.id, title: copy.title } });
+      const reply = checkpointReply(name, body, saved);
+      if (reply) {
+        await route.fulfill(reply);
         return;
       }
       if (name === 'session_end' && session?.view?.active) {
@@ -105,23 +159,14 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
         await route.fulfill({ json: { session: session?.view ?? null } });
         return;
       }
-      if (name === 'checkpoint_restore') {
-        if (!session || body.expectedRevision !== saved.revision) {
-          await route.fulfill({ status: 409, json: { error: 'The memory-only project revision changed.' } });
-          return;
-        }
-        const restored = projectSchema.parse({ ...session.checkpoint, revision: saved.revision + 1 });
-        documents.set(restored.id, restored);
-        await route.fulfill({
-          json: {
-            revision: restored.revision,
-            duration: { frames: calculateLayout(restored).duration, seconds: 0, timecode: '00:00:00' },
-          },
-        });
-        return;
-      }
       const view = session?.view?.projectId === body.projectId ? session.view : null;
-      await route.fulfill({ json: { session: view, revision: saved.revision, checkpoints: [] } });
+      await route.fulfill({
+        json: {
+          session: view,
+          revision: saved.revision,
+          checkpoints: body.checkpoints === false ? [] : checkpoints.map((entry) => entry.summary),
+        },
+      });
     },
   );
   await page.route(/\/api\/projects(?:\?.*)?$/, async (route) => {
@@ -230,6 +275,7 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
     set readiness(next) {
       readiness = next;
     },
+    checkpoints,
     get saves() {
       return saves;
     },

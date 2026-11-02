@@ -898,6 +898,14 @@ started (the assistant's version is kept as a checkpoint too); **Open as new pro
 that earlier state as a separate project instead. Clips the
 assistant adds stay inside the ranges you kept in Source preview.
 
+**Checkpoints** (header) keeps a copy of the project as it is saved, without an assistant: give it an
+optional name and choose **Checkpoint**. Each saved checkpoint offers **Restore**, which replaces
+the project in one step after checkpointing its current state (so you can come back to it), and
+**Open as new project**, which opens it as a separate project and leaves this one unchanged.
+PasCap keeps the most recent checkpoints of a project (five unless the service sets another count),
+including those it takes before an assistant session and before a restore. Restore is unavailable
+while an assistant is editing: take the project back first.
+
 ## Workspace and keyboard
 
 Use **Clip** for the selected clip's **Speed**, **Detail**, **Range** and **Placement**;

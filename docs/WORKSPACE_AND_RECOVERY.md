@@ -757,6 +757,16 @@ before session** (replaces the project in one revision after checkpointing it), 
 unavailable with the reason while changes are unsaved, and × to dismiss. See
 [the assistant design](design/ASSISTANT_MCP.md#hand-off-in-the-editor).
 
+**Checkpoints** (header, before **Hand off**) opens a dialog to keep and return to copies of the
+project without an assistant: an optional **Name** and **Checkpoint**, then the project's
+checkpoints newest first (name or reason, time and revision), each with **Open as new project**
+(titled "… (name or checkpoint time)") and **Restore**. Taking one and restoring first save pending
+changes, and a save error stops them. Restore replaces the project in one new revision with a fresh
+history, after checkpointing the current state; during an assistant session it stays
+`aria-disabled` with the reason and the service refuses it (423) before checkpointing anything. The
+list and its limit (`PASCAP_ASSISTANT_CHECKPOINTS`) are those of the assistant, so
+checkpoints from sessions and restores appear in it.
+
 ## Projects, service connection and errors
 
 Projects are searchable by title/ID with compatibility filtering and recent ordering.
