@@ -172,7 +172,7 @@ still need the intended-GPU validation tracked in v0.2.
 
 ## Native toolchain
 
-Native processing is qualified on **FFmpeg/ffprobe 8.0.1** with `libx264`, FFV1,
+Native processing is qualified on **FFmpeg/ffprobe 9.0.2** with `libx264`, FFV1,
 AAC, `lut3d`/`xfade`, `setparams`, raw/lossless pixel formats and the `setts`
 bitstream filter; [FEASIBILITY_REPORT.md](FEASIBILITY_REPORT.md) holds the historical
 evidence. Distribution packages are usually older or configured differently, and a
@@ -186,9 +186,9 @@ To build the qualified version locally, run the
 missing), then point the service at it with the two lines it prints:
 
 ```sh
-npm run setup:ffmpeg -- "$HOME/.local/opt/ffmpeg-8.0.1"
-export PASCAP_FFMPEG="$HOME/.local/opt/ffmpeg-8.0.1/bin/ffmpeg"
-export PASCAP_FFPROBE="$HOME/.local/opt/ffmpeg-8.0.1/bin/ffprobe"
+npm run setup:ffmpeg -- "$HOME/.local/opt/ffmpeg-9.0.2"
+export PASCAP_FFMPEG="$HOME/.local/opt/ffmpeg-9.0.2/bin/ffmpeg"
+export PASCAP_FFPROBE="$HOME/.local/opt/ffmpeg-9.0.2/bin/ffprobe"
 npm start
 ```
 

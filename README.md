@@ -80,7 +80,7 @@ targets.
 ## Requirements
 
 - **Linux**, Node.js **22.12+ or 24 LTS** and npm.
-- Native **FFmpeg and ffprobe**. The tested development toolchain is **FFmpeg 8.0.1** with `libx264`, FFV1, AAC and the required color/transition filters. Older distribution packages have not been certified: `npm run setup:ffmpeg -- <folder>` builds the tested version ([local deployment](docs/DEPLOYMENT.md#native-toolchain)), and the editor tells you at startup when the configured FFmpeg differs or lacks a component.
+- Native **FFmpeg and ffprobe**. The tested development toolchain is **FFmpeg 9.0.2** with `libx264`, FFV1, AAC and the required color/transition filters. Older distribution packages have not been certified: `npm run setup:ffmpeg -- <folder>` builds the tested version ([local deployment](docs/DEPLOYMENT.md#native-toolchain)), and the editor tells you at startup when the configured FFmpeg differs or lacks a component.
 - A current desktop browser with **WebCodecs** (H.264 `VideoDecoder`), **WebGL2** and AudioWorklet. Automated browser tests use Google Chrome.
 - Optional: Google Chrome or Chromium and a hardware GPU speed up heavy exports; an NVIDIA GPU with CUDA speeds up proxy preparation.
 - Enough disk space for generated proxies and export scratch. Long lossless 4K intermediate files can be large; there is no fixed-GB scratch guarantee.
@@ -184,7 +184,7 @@ needed. Tests never need the user's footage; sample preparation and measurement
 scripts are opt-in and must not be run against someone else's media without consent.
 
 [GitHub Actions](https://github.com/Plonk42/PasCap/actions) runs the checks on Node 22
-(and 24 on `main`), the native-media suite on a checksum-pinned FFmpeg 8.0.1 build,
+(and 24 on `main`), the native-media suite on a checksum-pinned FFmpeg 9.0.2 build,
 four Chrome browser shards and scoped Firefox music/playback regressions. CI is
 correctness evidence, **not target-GPU or long-render certification**. Routine changes
 go straight to `main`; risky ones use a short pull request

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /** The FFmpeg release native processing is qualified on; scripts/setup-ffmpeg.sh builds the same one. */
-export const QUALIFIED_FFMPEG = '8.0.1';
+export const QUALIFIED_FFMPEG = '9.0.2';
 
 /** What native processing and the native tests need from FFmpeg; scripts/setup-ffmpeg.sh verifies the same lists. */
 export const REQUIRED_FFMPEG = {

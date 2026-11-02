@@ -101,9 +101,9 @@ configuration. Do not describe the current libx264-enabled toolchain as an
 LGPL-only or MIT native distribution.
 
 The [setup script](../scripts/setup-ffmpeg.sh) (`npm run setup:ffmpeg`, also used by
-CI) builds FFmpeg/ffprobe **8.0.1**
+CI) builds FFmpeg/ffprobe **9.0.2**
 from the official archive, SHA-256
-**05ee0b03119b45c0bdb4df654b96802e909e0a752f72e4fe3794f487229e5a41**, with
+**8c3850283eb25fa026482078a04051e0be17347b09ef81a0849bec15a96e002e**, with
 `--disable-autodetect --enable-gpl --enable-libx264 --enable-pthreads
 --disable-ffplay`, plus disabled documentation/debug output. Its optional `--nvdec`
 adds `--enable-ffnvcodec --enable-nvdec --enable-cuvid` (the MIT-licensed
