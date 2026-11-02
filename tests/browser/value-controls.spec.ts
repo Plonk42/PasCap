@@ -47,7 +47,13 @@ test.beforeEach(async ({ page, request }) => {
   music = prepared;
 
   const reads: Record<string, unknown> = {
-    '/api/health': { name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 },
+    '/api/health': {
+      name: 'PasCap',
+      milestone: 'editing-and-export',
+      frameRate: '30000/1001',
+      workerConcurrency: 1,
+      toolchain: null,
+    },
     '/api/media': { assets, missing: [] },
     '/api/audio': { assets: [music], missing: [] },
     '/api/jobs': { jobs: [] },

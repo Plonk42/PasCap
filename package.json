@@ -29,7 +29,8 @@
     "format:check": "prettier --check .",
     "check": "npm run format:check && npm test && npm run build",
     "prepare:samples": "tsx scripts/prepare-samples.ts",
-    "measure": "tsx scripts/measure-preview.ts"
+    "measure": "tsx scripts/measure-preview.ts",
+    "setup:ffmpeg": "bash scripts/setup-ffmpeg.sh"
   },
   "dependencies": {
     "@fastify/static": "10.1.5",

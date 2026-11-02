@@ -10,6 +10,7 @@ import {
 import type { ExportProfile } from '../../src/shared/export.js';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { QUALIFIED_FFMPEG, type Toolchain } from '../../src/shared/toolchain.js';
 import {
   adjustmentFrom0,
   adjustmentKeyframes,
@@ -33,6 +34,7 @@ let checks: ExportProfile[];
 let submissions: ExportProfile[];
 let submittedNames: (string | undefined)[];
 let jobs: MediaJob[];
+let toolchain: Toolchain | null;
 
 function spaceFor(document: ProjectDocument, profile: ExportProfile): ExportPreflight {
   const estimate = estimateExportSpace(document, profile);
@@ -54,6 +56,7 @@ test.beforeEach(async ({ page, request }) => {
   submissions = [];
   submittedNames = [];
   jobs = [];
+  toolchain = null;
   storageError = '';
   freeBytes = 64 * 1024 ** 3;
   const library = (await (await request.get('/api/media')).json()) as { assets: MediaAsset[] };
@@ -72,7 +75,13 @@ test.beforeEach(async ({ page, request }) => {
     const pathname = new URL(route.request().url()).pathname;
     const method = route.request().method();
     const reads: Record<string, unknown> = {
-      '/api/health': { name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 },
+      '/api/health': {
+        name: 'PasCap',
+        milestone: 'editing-and-export',
+        frameRate: '30000/1001',
+        workerConcurrency: 1,
+        toolchain,
+      },
       '/api/media': { assets, missing: [] },
       '/api/audio': { assets: audio, missing: [] },
       '/api/jobs': { jobs },
@@ -180,6 +189,37 @@ test('panel and help controls are direct, keyboard accessible, and do not edit t
   await expect(help).toBeFocused();
   expect(await current(page)).toEqual(before);
   expect(memory.saves).toBe(0);
+});
+
+test('the startup FFmpeg check is a dismissible notice that never blocks editing', async ({ page }) => {
+  const banner = page.locator('.toolchain-banner');
+  await expect(banner).toHaveCount(0);
+  const older = { version: '6.1.1-3ubuntu5', error: null };
+  toolchain = { ffmpeg: { command: 'ffmpeg', ...older }, ffprobe: { command: 'ffprobe', ...older }, missing: [] };
+  await page.reload();
+  await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+  await expect(banner).toContainText(
+    `FFmpeg 6.1.1-3ubuntu5 and ffprobe 6.1.1-3ubuntu5 are not the tested ${QUALIFIED_FFMPEG}`,
+  );
+  await expect(banner).not.toHaveAttribute('role', 'alert');
+  await expect(banner.getByRole('link', { name: 'Learn more' })).toHaveAttribute(
+    'href',
+    /docs\/DEPLOYMENT\.md#native-toolchain$/,
+  );
+  await expect(page.getByRole('button', { name: 'Export video' })).toBeEnabled();
+  await banner.getByRole('button', { name: 'Dismiss FFmpeg notice' }).click();
+  await expect(banner).toHaveCount(0);
+
+  toolchain = {
+    ffmpeg: { command: '/opt/ffmpeg/bin/ffmpeg', version: null, error: 'was not found' },
+    ffprobe: { command: 'ffprobe', ...older },
+    missing: [],
+  };
+  await page.reload();
+  await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
+  await expect(banner).toHaveAttribute('role', 'alert');
+  await expect(banner).toContainText('FFmpeg cannot run: /opt/ffmpeg/bin/ffmpeg was not found.');
+  await expect(page.getByRole('button', { name: 'Export video' })).toBeEnabled();
 });
 
 test('partial media selection is mixed and active search/filter states can be cleared in place', async ({ page }) => {

@@ -44,7 +44,8 @@ paths, storage, network and the native toolchain: [DEPLOYMENT.md](DEPLOYMENT.md)
 - **FFmpeg/ffprobe 8.0.1**, the tested baseline; FFmpeg 6 is unqualified.
   Other builds need parity tests. Require `libx264`, FFV1, AAC, `lut3d`/`xfade`, raw
   RGB/lossless RGBA16 and the existing timing/color filters and bitstream tools.
-  [Build it locally](DEPLOYMENT.md#native-toolchain) with the CI setup script.
+  [Build it locally](DEPLOYMENT.md#native-toolchain) with `npm run setup:ffmpeg -- <folder>`;
+  the service checks the configured toolchain at startup and the editor names what differs.
 - Browser **WebCodecs** `VideoDecoder` with H.264, module workers, **WebGL2** and
   **AudioWorklet**/`getOutputTimestamp` for music; tests use installed **Google Chrome**
   (`channel: 'chrome'`), not bundled Chromium: [configuration](../playwright.config.ts).
@@ -79,7 +80,7 @@ This is not static hosting or LAN/SaaS deployment.
 | `PASCAP_DATA_DIR`                   | Generated-data directory; defaults to the ignored `.pascap/`                                                                                                                                                                                                              |
 | `PASCAP_MEDIA_ROOTS`                | JSON array of up to 32 unique absolute roots shared by footage/music browsing; defaults to the service user's Videos folder; `[]` disables both browsers, not deliberate manual path imports                                                                              |
 | `PASCAP_PORT`                       | Unprivileged loopback service port, default 4318                                                                                                                                                                                                                          |
-| `PASCAP_FFMPEG` / `PASCAP_FFPROBE`  | Native executable paths, otherwise resolved from PATH                                                                                                                                                                                                                     |
+| `PASCAP_FFMPEG` / `PASCAP_FFPROBE`  | Native executable paths, otherwise resolved from PATH; checked once at startup ([native toolchain](DEPLOYMENT.md#native-toolchain))                                                                                                                                       |
 | `PASCAP_MEASURE_URL`                | Editor URL/project used by the optional measurement helper                                                                                                                                                                                                                |
 | `PASCAP_CHROME`                     | Browser for the export GPU compositor, otherwise `google-chrome` or `chromium` from PATH                                                                                                                                                                                  |
 | `PASCAP_GPU_COMPOSITING`            | `auto` (default) composites detail/HDR export groups on a hardware GPU when one starts; `off` always uses the CPU compositor                                                                                                                                              |
@@ -372,9 +373,11 @@ and manual dispatch ([job overview](GITHUB_WORKFLOW.md#ci-and-branch-protection)
 - Synthetic fixtures only: no private media/sample helper/native reference work
   or hardware/performance acceptance claim.
 
-The [FFmpeg setup script](../scripts/ci/setup-ffmpeg.sh) verifies the official 8.0.1
-source archive SHA-256, enables GPL/libx264 explicitly and checks the required
-filters/encoders/bitstream tool. Its installation directory is cached by script
+The [FFmpeg setup script](../scripts/setup-ffmpeg.sh) (`npm run setup:ffmpeg` locally)
+verifies the official 8.0.1 source archive SHA-256, enables GPL/libx264 explicitly and
+checks the required filters/encoders/bitstream tool. Its version and component lists
+match `QUALIFIED_FFMPEG`/`REQUIRED_FFMPEG` in [the toolchain module](../src/shared/toolchain.ts),
+which the service's startup check uses; a unit test keeps them in step. Its installation directory is cached by script
 content, runner architecture and Ubuntu release; Node dependencies use the lockfile.
 Native/browser jobs retain failure diagnostics for seven days, never original media
 or the whole generated cache. Action references are commit-pinned and the workflow

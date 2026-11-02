@@ -47,6 +47,7 @@ import { activeSelectIndex, appliedSelections, applySelectRange } from '../share
 import { forEachSerial } from '../shared/serial.js';
 import { validateSourceRanges } from '../shared/source-range.js';
 import { calculateLayout, layerClips } from '../shared/timeline.js';
+import type { Toolchain } from '../shared/toolchain.js';
 import type { AnalysisFrame } from '../shared/white-balance.js';
 import { api, proxyUrl, type RequestOptions } from './api.js';
 import { Autosave, type SaveState } from './autosave.js';
@@ -89,6 +90,7 @@ import type { SourcePlayback } from './SourceReview.js';
 import { planTimelineDrop } from './timeline-placement.js';
 import { adjacentBookmark, rangeBookmarkCommands } from './timeline-bookmarks.js';
 import { Timeline, type DraftPreview } from './Timeline.js';
+import { ToolchainBanner } from './ToolchainBanner.js';
 import { useReviewTarget } from './use-review-target.js';
 import {
   DEFAULT_LAYOUT,
@@ -293,6 +295,7 @@ export function App() {
     message: 'Connecting to the local service…',
   });
   const [connectionAttempt, setConnectionAttempt] = useState(0);
+  const [toolchain, setToolchain] = useState<Toolchain | null>(null);
   const [actionError, setActionError] = useState('');
   const [activityError, setActivityError] = useState('');
   const [importKind, setImportKind] = useState<ImportKind | null>(null);
@@ -1061,13 +1064,14 @@ export function App() {
     const controller = new AbortController();
     setConnection({ state: 'connecting', message: 'Connecting to the local service…' });
     const initialize = async (): Promise<void> => {
-      await waitForService(controller.signal, (attempt, max) => {
+      const health = await waitForService(controller.signal, (attempt, max) => {
         if (!controller.signal.aborted)
           setConnection({
             state: 'connecting',
             message: `Connecting to the local service · attempt ${attempt} of ${max}`,
           });
       });
+      setToolchain(health.toolchain);
       await refresh({ signal: controller.signal });
       const list = (await api.projects({ signal: controller.signal })).projects;
       if (controller.signal.aborted) return;
@@ -2028,6 +2032,7 @@ export function App() {
             )}
           </output>
         )}
+        <ToolchainBanner toolchain={toolchain} />
         {error && (
           <div className="error-banner" role="alert">
             <span>{error}</span>

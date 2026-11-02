@@ -7,6 +7,7 @@ const health: ServiceHealth = {
   milestone: 'editing-and-export',
   frameRate: '30000/1001',
   workerConcurrency: 1,
+  toolchain: null,
 };
 let fetchMock = vi.fn<typeof fetch>();
 function healthResponse(): Response {

@@ -77,7 +77,13 @@ test.beforeEach(async ({ page, request }) => {
   // Project routes are installed afterwards and take precedence over this deny-by-default guard.
   // Only reads for these existing synthetic proxies/thumbnails (and explicitly selected fixture music) reach the server.
   const reads: Record<string, unknown> = {
-    '/api/health': { name: 'PasCap', milestone: 'editing-and-export', frameRate: '30000/1001', workerConcurrency: 1 },
+    '/api/health': {
+      name: 'PasCap',
+      milestone: 'editing-and-export',
+      frameRate: '30000/1001',
+      workerConcurrency: 1,
+      toolchain: null,
+    },
     '/api/media': { assets, missing: [] },
     '/api/jobs': { jobs: [] },
   };

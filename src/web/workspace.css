@@ -756,6 +756,34 @@ body {
   border-color: #4d6856;
 }
 
+.toolchain-banner {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 10px 6px 16px;
+  border-bottom: 1px solid #755947;
+  background: #30271f;
+  color: #f0d5b3;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+.toolchain-banner > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.toolchain-banner a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.toolchain-banner.error {
+  border-color: #7a4a3c;
+  background: #412820;
+  color: #ffcebf;
+}
+
 .save-recovery-banner > div {
   display: flex;
   flex-direction: column;
