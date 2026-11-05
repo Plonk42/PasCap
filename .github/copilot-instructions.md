@@ -6,7 +6,10 @@ Reply in English. Keep summaries short and name remaining limitations.
 
 PasCap is a solo, pre-release project: optimize for fast iteration, but the owner now
 edits real projects with it, so saved data must keep working. Details are in
-[the GitHub workflow](../docs/GITHUB_WORKFLOW.md).
+`docs/GITHUB_WORKFLOW.md`.
+
+Guides are named as plain paths, not links, so they are not attached to every
+request: read one only when the task touches its area.
 
 - Start from current `main` (`git pull --ff-only`). Never stash, reset, discard or
   commit unrelated edits that are already in the checkout; leave them unstaged.
@@ -48,7 +51,7 @@ edits real projects with it, so saved data must keep working. Details are in
   projects: rendered screenshots before changes and after the final edit, relevant
   states at 1440 × 900 and the 1280 × 720 minimum supported viewport. Smaller
   windows are best effort and need no checks. Tests or DOM snapshots alone are not
-  visual validation. Steps: [development](../docs/DEVELOPMENT.md). Report what was
+  visual validation. Steps: `docs/DEVELOPMENT.md` (Live UI inspection). Report what was
   inspected; if browser access is unavailable, name the blocker and missing check.
 - Before pushing: `npm run format`, then `npm run check` (formatting, unit/service
   tests, types, build, licenses) plus the affected Playwright specs for UI changes.
@@ -57,6 +60,10 @@ edits real projects with it, so saved data must keep working. Details are in
   `git pull`; run each match, not only specs you edited (on a long-lived dev
   branch, CI runs them instead; see Workflow).
   Docs-only changes need only `npm run format`.
+- Run Playwright specs and other long commands in sync mode with no timeout
+  (`timeout: 0`) and wait for the result. If a command does go to the background,
+  end the turn and wait for its completion notification: never poll it with
+  terminal-output reads, `tail` or `sleep`.
 - Full Chrome, Firefox and native suites run in CI. Run them locally only for
   playback, decoding, native export or test-infrastructure changes.
 - Never weaken assertions, add retries or skip regressions to get green. Don't
@@ -78,7 +85,7 @@ edits real projects with it, so saved data must keep working. Details are in
 - American English everywhere (#292): UI, help, code, file names, docs and saved fields use
   American spelling: **Color**, analyze, canceled, center, gray, neighbor, behavior.
 - User-facing animation text uses **Keyframe**, **enabled setting** and **Easing**,
-  following [the editor control catalog](../docs/design/EDITOR_CONTROLS.md).
+  following the editor control catalog, `docs/design/EDITOR_CONTROLS.md`.
   Keep contextual accessible names and technical/internal math terms such as
   anchor, participant and `interpolation` where needed; do not rename saved fields
   or internal identifiers merely to match visible labels.
@@ -104,7 +111,7 @@ edits real projects with it, so saved data must keep working. Details are in
 - Preview and source review decode proxies only with WebCodecs `VideoDecoder` in
   worker lanes delivering exact source frames under credit bounds; no `<video>`
   elements, media-element time or seek heuristics. See
-  [WebCodecs preview](../docs/design/WEBCODECS_PREVIEW.md).
+  WebCodecs preview, `docs/design/WEBCODECS_PREVIEW.md`.
 - Speed is clip-only: strict constant `rate` or a 1–256-keyframe curve on original
   source frames (presets such as Ramp up replace its keyframes). A clip's duration
   depends only on its own speed and source range, never its track, start or Ripple
@@ -115,7 +122,7 @@ edits real projects with it, so saved data must keep working. Details are in
   displayed (left handle/Q trim source OUT; split/cut pieces stay reversed). Preview
   reverses GOP by GOP (≤ 6 held + 6 outstanding frames per lane); export decodes
   serial seeked chunks through FFmpeg `reverse` within `reverseChunkBytes` (256 MiB).
-  See [speed/audio](../docs/SPEED_AND_AUDIO.md).
+  See `docs/SPEED_AND_AUDIO.md`.
 - Sliding timeline keyframe markers (clip grade, Transform and any new type) must use
   `useKeyframeSlide`/`KeyframeMarkers` in `src/web/keyframe-slide.tsx`; a type
   only supplies its `KeyframeSlideKind`, never its own drag/keyboard handling.
@@ -137,16 +144,16 @@ edits real projects with it, so saved data must keep working. Details are in
   real displayed project/source frame. Timeline speed markers still omit off-trim
   keyframes; exclusive OUT has a boundary marker seeking the last available image.
   Navigation never edits,
-  saves or creates history. See [speed/audio](../docs/SPEED_AND_AUDIO.md) and
-  [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
+  saves or creates history. See `docs/SPEED_AND_AUDIO.md` and
+  `docs/design/SPATIAL_TRANSFORMS.md`.
 - Projects require `selects`: per recording in `media.videoIds`, 1–100 ascending kept source ranges separated by at
   least one frame (no entry = whole recording, `[]` invalid), set by `select-set`/`select-narrow` and Source preview's
   applied range (the active range). They never retime, render or export and clips may use other frames. See
-  [timeline](../docs/TIMELINE_EDITING.md#kept-ranges).
+  `docs/TIMELINE_EDITING.md` (Kept ranges).
 - #143: projects require `bookmarks`: 0–1,000 unique ascending project
   frames, `[]` on new projects. They are extra `snapPoints()` for every snapping gesture,
   slide through `useKeyframeSlide` (a dragged bookmark never snaps to itself) and never
-  retime, render or export. See [timeline](../docs/TIMELINE_EDITING.md).
+  retime, render or export. See `docs/TIMELINE_EDITING.md`.
 - Color lives in **clip grades and adjustments** (#273/#286, owner-approved, below): each has a
   complete `color` with twelve graded scalar fields (including `vibrance`, −1…2, a chroma scale
   after Saturation weighted towards muted colors; #184 `whites`, −1…1, a white-point tone stage
@@ -157,7 +164,7 @@ edits real projects with it, so saved data must keep working. Details are in
   invalid. Neutral creators deep-clone nested structures; never repair missing saved fields.
   Advanced resets never overwrite scalar bases/keys; Reset on an animated section never erases
   advanced settings. Keep existing LUT/buffer/decoder/native budgets and strict gates. See
-  [the advanced color contract](../docs/design/HSL_AND_CURVES.md).
+  the advanced color contract, `docs/design/HSL_AND_CURVES.md`.
 - Approved #68: required `temperature` and `tint` color fields use normalized
   −2…2 and −1…1, neutral 0; positive Temperature warms, positive Tint adds magenta.
   For Temperature $T$, Tint $I$, raw gains are
@@ -180,11 +187,11 @@ edits real projects with it, so saved data must keep working. Details are in
   the grades' values, leaving animated settings and keyframes unchanged; Keyframe (Playhead source only)
   captures all eleven at the source frame like their diamonds (initial, with Playhead, once any is
   animated). Constants in `src/shared/auto-adjust.ts`, no schema/render change
-  ([Auto adjust](../docs/design/AUTO_ADJUST.md)).
+  (`docs/design/AUTO_ADJUST.md`).
   Main/stored slider/exact-field/reset/diamond/navigation retain
   explicit capture and one-step gestures.
   Compare bypasses all Color, including Temperature/Tint, and clip Detail, never coverage or geometry.
-  See [Temperature and Tint](../docs/design/TEMPERATURE_AND_TINT.md).
+  See `docs/design/TEMPERATURE_AND_TINT.md`.
 - v1.3, owner-approved #273/#286: every clip requires
   `grade: { color, keyframes }` (0–64 keys at original-source frames, fourteen nullable
   channels), evaluated at the continuous source position (one frame lower when reversed) and kept
@@ -204,8 +211,8 @@ edits real projects with it, so saved data must keep working. Details are in
   adjustments. Color and `layer-key-*` commands take `clipId` (`color`: `clipIds`) or
   `adjustmentId`. No migration (owner, 2026-10-28): projects and receipt snapshots saved with track
   Color are rejected with the reason and left unchanged. Items are on a pinned timeline lane (#287)
-  and edited through MCP with the `adjustment-*` commands (#288); see [clip grades and adjustments](../docs/design/CLIP_GRADES_AND_ADJUSTMENTS.md) and
-  [row appearance](../docs/design/ROW_APPEARANCE.md).
+  and edited through MCP with the `adjustment-*` commands (#288); see `docs/design/CLIP_GRADES_AND_ADJUSTMENTS.md` and
+  `docs/design/ROW_APPEARANCE.md`.
 - Owner-approved #131: Transform is **track-owned, exactly like Color**.
   Every video track requires strict `transform: { base, keyframes }`; clips have no
   `spatial` field. Nine complete pose values (#286: the eight geometry settings and
@@ -229,7 +236,7 @@ edits real projects with it, so saved data must keep working. Details are in
   **Add default Transform keyframe**, stored-key navigation/exact fields and live
   slider preview; blue ▼ markers sit at the top of the track row. Any spatial
   edit/key requires layered export; native 22 bytes/pixel, two LUTs and process
-  bounds remain unchanged. See [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md).
+  bounds remain unchanged. See `docs/design/SPATIAL_TRANSFORMS.md`.
 - Owner-approved #123: every clip requires strict static `detail: { sharpen 0–2,
 clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channel; split/
   cut/duplicate copy it. Filters run on bilinear source taps around the inverse-mapped
@@ -242,7 +249,7 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   CPU fallback; the CPU kernel stays the parity reference.
   Compare bypasses Color and Detail. Clip → Detail is the third section, collapsed
   by default, with live slider preview and one Undo per release. See
-  [detail filters](../docs/design/DETAIL_FILTERS.md).
+  `docs/design/DETAIL_FILTERS.md`.
 - Grade **Shadows**, **Highlights** (−1…1), **HDR** (`color.hdr` 0–1, keyframe channel `hdr`,
   an SDR local tone-mapping look) and **Local contrast** (`color.localContrast` −1…1, channel
   `localContrast`, the local-detail boost split out of HDR, which keeps only its tone
@@ -252,7 +259,7 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   Clarity → Sharpen) from one guided edge-aware base,
   excluded from the per-pixel grade and LUT identity; any nonzero or keyed value needs
   composited export. Shadows/Highlights are linear-light gains in stops chosen by the base
-  after Exposure. See [detail filters](../docs/design/DETAIL_FILTERS.md).
+  after Exposure. See `docs/design/DETAIL_FILTERS.md`.
 - **Opacity** (#67, moved into Transform by #286) is track coverage, not a clip setting or a
   grade: `transform.base.opacity` 0–1 (new tracks 1) and the nullable `opacity` setting of
   Transform keyframes, with its own Easing, edited in **Track → Transform** (UI 0–100%, storage
@@ -275,7 +282,7 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   never reaches back, so a setting whose first keyframe it is keeps its unkeyed value before
   it. Toggle **Add default keyframe** in the Color keyframe line; amber filled marker.
   Transform keyframes carry the same `reset` flag (own toggle in the Transform line). See
-  [layers/keyframes](../docs/LAYERS_AND_KEYFRAMES.md).
+  `docs/LAYERS_AND_KEYFRAMES.md`.
 - Music is a required 0–8 array of independently identified music tracks, never null
   or singular. #203: like a video track, each owns gain, opening/closing fades, Ripple and
   1–8 clips joined by Cut / Crossfade (two linear fades over the overlap) / Fade through
@@ -287,13 +294,8 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
 - Heavy native work stays serial with bounded children/buffers, exact frame counts
   and source identity guards.
 - Read and update the relevant contract guide when behavior changes:
-  [timeline](../docs/TIMELINE_EDITING.md),
-  [layers/keyframes/resources](../docs/LAYERS_AND_KEYFRAMES.md),
-  [speed/audio](../docs/SPEED_AND_AUDIO.md),
-  [Temperature and Tint](../docs/design/TEMPERATURE_AND_TINT.md),
-  [spatial transforms](../docs/design/SPATIAL_TRANSFORMS.md),
-  [detail filters](../docs/design/DETAIL_FILTERS.md),
-  [WebCodecs preview](../docs/design/WEBCODECS_PREVIEW.md),
-  [workspace/recovery](../docs/WORKSPACE_AND_RECOVERY.md) and
-  [development](../docs/DEVELOPMENT.md). Guides describe current behavior only;
+  `docs/TIMELINE_EDITING.md`, `docs/LAYERS_AND_KEYFRAMES.md` (with resources),
+  `docs/SPEED_AND_AUDIO.md`, `docs/WORKSPACE_AND_RECOVERY.md`,
+  `docs/DEVELOPMENT.md` and the guides in `docs/design/` (Temperature and Tint,
+  spatial transforms, detail filters, WebCodecs preview, etc.). Guides describe current behavior only;
   history belongs in Git and issues.
