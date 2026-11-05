@@ -54,11 +54,14 @@ request: read one only when the task touches its area.
   visual validation. Steps: `docs/DEVELOPMENT.md` (Live UI inspection). Report what was
   inspected; if browser access is unavailable, name the blocker and missing check.
 - Before pushing: `npm run format`, then `npm run check` (formatting, unit/service
-  tests, types, build, licenses) plus the affected Playwright specs for UI changes.
-  Find affected specs by searching `tests/browser` for every accessible name,
-  selector and visible/help text the change renamed, removed or newly hides, after
-  `git pull`; run each match, not only specs you edited (on a long-lived dev
-  branch, CI runs them instead; see Workflow).
+  tests, types, build, licenses) plus the affected Playwright tests for UI changes.
+  Find them by searching `tests/browser` for every accessible name, selector and
+  visible/help text the change renamed, removed or newly hides, after `git pull`,
+  and run each test containing a match (`npx playwright test <spec>:<line>`), plus
+  tests you added or edited. Run whole spec files instead when the change moves
+  layout many tests share (panel sizes, toolbars, scrolling) or a targeted test
+  fails. CI on `main` runs the rest (on a long-lived dev branch, CI runs them all;
+  see Workflow).
   Docs-only changes need only `npm run format`.
 - Run Playwright specs and other long commands in sync mode with no timeout
   (`timeout: 0`) and wait for the result. If a command does go to the background,

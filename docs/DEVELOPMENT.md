@@ -267,10 +267,18 @@ need the [live inspection](#live-ui-inspection) below.
 
   Install Chrome once with `npx playwright install --with-deps chrome`.
 
-- Choose affected specs by search, not memory: after `git pull`, search
+- Choose affected tests by search, not memory: after `git pull`, search
   `tests/browser` for every accessible name, selector and visible/help text the
-  change renames, removes or newly hides (for example behind a toggle), and run
-  every matching spec, not only the ones you edited.
+  change renames, removes or newly hides (for example behind a toggle). Run each
+  test containing a match, plus the tests you added or edited, by line:
+
+  ```sh
+  npx playwright test tests/browser/<spec>.spec.ts:<line> tests/browser/<other>.spec.ts:<line>
+  ```
+
+  Run whole spec files instead when the change moves layout many tests share
+  (panel sizes, toolbars, scrolling) or a targeted test fails. CI on `main` runs
+  the full suites.
 
 - Reuse fixtures across focused runs while tests leave their baseline intact;
   reseed after state-changing runs. Never build or reset fixtures while a browser
