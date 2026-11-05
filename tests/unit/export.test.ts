@@ -201,6 +201,14 @@ describe('strict production export request and immutable validation', () => {
     );
     expect(() => validateExport(document, fakeLibrary(videoAsset({ durationSeconds: 20 })))).toThrow('project-rate');
   });
+  it('checks kept ranges of recordings that no clip uses against their registered frames', () => {
+    const document = documentWithClips();
+    document.media.videoIds = ['video', 'unused'];
+    document.selects = { unused: [{ sourceIn: 0, sourceOut: 50 }] };
+    expect(validateExport(document, fakeLibrary()).selects).toEqual(document.selects);
+    document.selects = { unused: [{ sourceIn: 0, sourceOut: 61 }] };
+    expect(() => validateExport(document, fakeLibrary())).toThrow('Kept ranges exceed');
+  });
   it('parses and deeply freezes an independent snapshot instead of retaining the editor document', () => {
     const document = documentWithClips();
     const captured = {
