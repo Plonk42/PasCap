@@ -52,7 +52,7 @@ same kernel; see [local contrast](design/DETAIL_FILTERS.md#local-contrast).
   **Expand Media panel** / **Expand Properties panel** button. Focus moves between
   the two buttons.
 - Left: independently scrolling Media list/grid with search, import and compact
-  status. **Media options** holds filter/sort/view controls. A plain click reviews;
+  status. Filter, sort and List/Grid view controls sit directly under the heading. A plain click reviews;
   checkboxes/Ctrl/Shift select. With one or more recordings selected, the
   **Select all** bar shows their count with **Use best** (each keeps only its best steady
   range) and, from two, Prepare/Clear; dragging

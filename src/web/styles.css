@@ -327,25 +327,6 @@ svg {
   font-size: 11px;
 }
 
-.library-tools {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 0 12px 8px;
-}
-
-.library-tools select {
-  min-width: 0;
-  max-width: 114px;
-  padding: 5px 3px;
-  font-size: 9px;
-}
-
-.library-tools .icon-button {
-  width: 24px;
-  height: 24px;
-}
-
 .library-summary {
   display: flex;
   align-items: center;
@@ -1516,15 +1497,6 @@ progress {
 
   .timecode small {
     display: none;
-  }
-
-  .library-tools {
-    gap: 3px;
-    padding-inline: 9px;
-  }
-
-  .library-tools select {
-    max-width: 102px;
   }
 }
 

@@ -25,7 +25,6 @@ import './media-review.css';
 import './media-import.css';
 import { MediaMusicList, musicMatchesFilter } from './MediaMusicList.js';
 import './rush-source.css';
-import { Popover } from './Popover.js';
 import { PanelCollapseButton, type SidePanel } from './PanelToggle.js';
 import { readPreference, writePreference } from './preferences.js';
 import { RemoveMediaDialog } from './RemoveMediaDialog.js';
@@ -92,13 +91,6 @@ const STATUS_ICON = {
   preparing: 'activity',
   error: 'warning',
 } as const;
-const FILTER_LABEL: Record<string, string> = {
-  all: '',
-  ready: 'Ready',
-  unprepared: 'Not prepared',
-  used: 'In timeline',
-  unused: 'Not in timeline',
-};
 
 function externalFiles(transfer: DataTransfer): boolean {
   return Array.from(transfer.types).includes('Files') && !Array.from(transfer.types).includes(MEDIA_DRAG_TYPE);
@@ -539,74 +531,73 @@ export function MediaLibrary({
             <Icon name="plus" size={15} />
             <span className="library-import-label">Import</span>
           </button>
-          <Popover label="Media options" className="media-options">
-            <div className="library-tools">
-              <label>
-                <span>Filter</span>
-                <select aria-label="Filter media" value={filter} onChange={(event) => setFilter(event.target.value)}>
-                  <option value="all">All recordings</option>
-                  <option value="ready">Ready</option>
-                  <option value="unprepared">Not prepared</option>
-                  <option value="used">In timeline</option>
-                  <option value="unused">Not in timeline</option>
-                </select>
-              </label>
-              <label>
-                <span>Sort</span>
-                <select aria-label="Sort media" value={sort} onChange={(event) => setSort(event.target.value)}>
-                  <option value="name">Name</option>
-                  <option value="duration">Duration</option>
-                  <option value="recent">Newest</option>
-                </select>
-              </label>
-              <fieldset className="library-view-field">
-                <legend>View</legend>
-                <div className="library-view-controls">
-                  <button
-                    className={`secondary-button small ${view === 'list' ? 'active' : ''}`}
-                    aria-label="List view"
-                    title="Compact recording list"
-                    aria-pressed={view === 'list'}
-                    onClick={() => setLibraryView('list')}
-                  >
-                    <Icon name="list" size={15} />
-                    List
-                  </button>
-                  <button
-                    className={`secondary-button small ${view === 'grid' ? 'active' : ''}`}
-                    aria-label="Grid view"
-                    title="Thumbnail grid"
-                    aria-pressed={view === 'grid'}
-                    onClick={() => setLibraryView('grid')}
-                  >
-                    <Icon name="grid" size={15} />
-                    Grid
-                  </button>
-                </div>
-              </fieldset>
-            </div>
-          </Popover>
           <PanelCollapseButton panel="media" disabled={collapseDisabled} onToggle={onCollapse} />
         </div>
       </div>
-      <div className="library-search">
-        <Icon name="search" size={15} />
-        <input
-          aria-label="Search media"
-          placeholder="Search recordings"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-        {search && (
+      <div className="library-search-row">
+        <div className="library-search">
+          <Icon name="search" size={15} />
+          <input
+            aria-label="Search media"
+            placeholder="Search recordings"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          {search && (
+            <button
+              className="icon-button library-clear-search"
+              aria-label="Clear media search"
+              title="Clear search"
+              onClick={() => setSearch('')}
+            >
+              <Icon name="x" size={14} />
+            </button>
+          )}
+        </div>
+        <div className="library-view-controls">
           <button
-            className="icon-button library-clear-search"
-            aria-label="Clear media search"
-            title="Clear search"
-            onClick={() => setSearch('')}
+            className={`icon-button ${view === 'list' ? 'active' : ''}`}
+            aria-label="List view"
+            title="List view: compact recording list"
+            aria-pressed={view === 'list'}
+            onClick={() => setLibraryView('list')}
           >
-            <Icon name="x" size={14} />
+            <Icon name="list" size={15} />
           </button>
-        )}
+          <button
+            className={`icon-button ${view === 'grid' ? 'active' : ''}`}
+            aria-label="Grid view"
+            title="Grid view: thumbnail grid"
+            aria-pressed={view === 'grid'}
+            onClick={() => setLibraryView('grid')}
+          >
+            <Icon name="grid" size={15} />
+          </button>
+        </div>
+      </div>
+      <div className="library-filters">
+        <select
+          aria-label="Filter media"
+          title="Show only some recordings"
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+        >
+          <option value="all">All recordings</option>
+          <option value="ready">Ready</option>
+          <option value="unprepared">Not prepared</option>
+          <option value="used">In timeline</option>
+          <option value="unused">Not in timeline</option>
+        </select>
+        <select
+          aria-label="Sort media"
+          title="Order of the recordings"
+          value={sort}
+          onChange={(event) => setSort(event.target.value)}
+        >
+          <option value="name">By name</option>
+          <option value="duration">By duration</option>
+          <option value="recent">Newest first</option>
+        </select>
       </div>
       <div className="library-summary" data-selected={selectedAssets.length}>
         <label>
@@ -634,17 +625,6 @@ export function MediaLibrary({
           <span className="library-visible-count" title="Matching recordings">
             {visible.length} / {assets.length}
           </span>
-        )}
-        {filter !== 'all' && (
-          <button
-            className="library-filter-chip"
-            aria-label="Clear media filter"
-            title="Show all recordings"
-            onClick={() => setFilter('all')}
-          >
-            {FILTER_LABEL[filter]}
-            <Icon name="x" size={12} />
-          </button>
         )}
         {selectedAssets.length > 0 && (
           <span className="library-selection-actions">

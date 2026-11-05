@@ -814,8 +814,8 @@ the alternative grid uses two columns. Each thumbnail maps the whole original
 (frame 0 left, exclusive OUT right) and hatches the head/tail omitted by the
 recording's applied source-review range, without a text badge; the exact frames
 are the review button's accessible description. Unapplied numeric drafts and
-existing clips do not change it. Search is always visible; **Media options**
-holds sort (name/duration/newest), readiness/usage filters and List/Grid. A plain
+existing clips do not change it. Search, with **List view / Grid view** beside it, and
+the readiness/usage filter and sort (name/duration/newest) below it, are always visible. A plain
 click reviews a recording without selecting it; checkboxes, Ctrl-click and
 Shift-click select. With one or more selected, the **Select all** bar shows the count with
 **Use best** ([below](#keeping-the-best-steady-range-of-several-recordings)) and, from two,

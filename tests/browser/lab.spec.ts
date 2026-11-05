@@ -83,7 +83,6 @@ test('compact library handles 12 recordings and the editor fits the desktop view
   await expect(music).toHaveCount(0);
   await expectDecoders(page, 2);
   await page.getByRole('textbox', { name: 'Search media' }).fill('');
-  await openOptions(page, 'Media options');
   await page.getByRole('combobox', { name: 'Filter media' }).selectOption('ready');
   await expect(recordings).toHaveCount(3);
   await expect(music).toHaveCount(readyMusic);
@@ -95,7 +94,6 @@ test('compact library handles 12 recordings and the editor fits the desktop view
   await page.getByRole('button', { name: 'Grid view', exact: true }).click();
   await expect(page.locator('.media-items')).toHaveClass('media-items grid');
   await page.getByRole('button', { name: 'List view', exact: true }).click();
-  await closeOptions(page);
   expect(await page.locator('.media-items').evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(
     true,
   );

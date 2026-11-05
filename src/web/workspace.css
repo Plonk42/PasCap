@@ -578,25 +578,8 @@ body {
 }
 
 .product-workspace .library-search input,
-.product-workspace .library-tools select,
 .product-workspace .library-summary {
   font-size: 12px;
-}
-
-.product-workspace .library-tools {
-  flex-wrap: wrap;
-  gap: 5px;
-  padding-inline: 12px;
-}
-
-.product-workspace .library-tools select {
-  max-width: none;
-  padding: 6px 4px;
-}
-
-.product-workspace .library-tools .icon-button {
-  width: 26px;
-  height: 30px;
 }
 
 .product-workspace .list .media-item {

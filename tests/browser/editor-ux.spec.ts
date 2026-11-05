@@ -234,19 +234,13 @@ test('partial media selection is mixed and active search/filter states can be cl
   await expect(page.getByRole('button', { name: 'Clear media search' })).toBeVisible();
   await page.getByRole('button', { name: 'Clear media search' }).click();
   await expect(page.getByRole('textbox', { name: 'Search media' })).toHaveValue('');
-  await openOptions(page, 'Media options');
-  await page.getByRole('combobox', { name: 'Filter media' }).selectOption('used');
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Clear media filter' })).toBeVisible();
+  const filter = page.getByRole('combobox', { name: 'Filter media' });
+  await filter.selectOption('used');
   await expect(page.getByRole('button', { name: 'Review pattern-b.mp4', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Clear media filter' }).click();
-  await openOptions(page, 'Media options');
-  await page.getByRole('combobox', { name: 'Filter media' }).selectOption('unused');
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Clear media filter' })).toHaveText('Not in timeline');
+  await filter.selectOption('unused');
   await expect(page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Review pattern-b.mp4', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Clear media filter' }).click();
+  await filter.selectOption('all');
   await expect(page.getByRole('button', { name: 'Review pattern-b.mp4', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Add pattern-b.mp4 to timeline', exact: true })).toHaveCSS(
     'opacity',

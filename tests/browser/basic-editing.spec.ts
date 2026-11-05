@@ -108,12 +108,8 @@ test('default editor keeps rare options, speed/layer details, track settings and
   await expect(page.getByRole('slider', { name: 'Track opacity', exact: true })).toHaveCount(0);
   await expect(page.getByRole('spinbutton', { name: 'Opening fade', exact: true })).toBeHidden();
   await expect(page.getByRole('combobox', { name: 'Music track', exact: true })).toBeHidden();
-  await expect(page.getByRole('combobox', { name: 'Filter media' })).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Prepare selected' })).toHaveCount(0);
-  await openOptions(page, 'Media options');
   await expect(page.getByRole('combobox', { name: 'Filter media' })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.locator('summary[aria-label="Media options"]')).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Prepare selected' })).toHaveCount(0);
   await inspectorTab(page, 'Clip grade');
   await expect(page.getByRole('slider', { name: 'Exposure', exact: true })).toBeVisible();
   // Opacity is the track's, with Transform, whose section starts collapsed.

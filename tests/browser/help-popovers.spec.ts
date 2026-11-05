@@ -415,7 +415,7 @@ test('changing Inspector context without clicking dismisses help whose owner bec
 });
 
 test('options retain click-only disclosure behavior rather than opening on hover', async ({ page }) => {
-  const options = page.locator('summary[aria-label="Media options"]');
+  const options = page.locator('summary[aria-label="Workspace options"]');
   await options.hover();
   await expect(options).toHaveAttribute('aria-expanded', 'false');
   await options.click();

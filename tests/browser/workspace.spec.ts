@@ -347,10 +347,8 @@ test('denied browser preference storage does not prevent opening/editing a proje
   });
   await page.reload();
   await page.waitForFunction(() => window.pascapLab?.engine.diagnostics().status === 'paused');
-  await openOptions(page, 'Media options');
   await page.getByRole('button', { name: 'Grid view' }).click();
   await expect(page.locator('.media-items')).toHaveClass('media-items grid');
-  await closeOptions(page);
   await inspectorTab(page, 'Clip grade');
   await page.getByRole('slider', { name: 'Exposure', exact: true }).fill('0.3');
   expect(await page.evaluate(() => window.pascapLab!.project()!.clips[0]!.grade.color.exposure)).toBe(0.3);

@@ -2556,9 +2556,7 @@ test('Media thumbnails dim the omitted head/tail of the applied source range, no
   await expect(review).not.toHaveAccessibleDescription(/Selected range/);
 
   await sourceRange(page, 20, 100);
-  await openOptions(page, 'Media options');
   await page.getByRole('button', { name: 'Grid view', exact: true }).click();
-  await closeOptions(page);
   await expect(page.locator('.media-items')).toHaveClass('media-items grid');
   await expectZones(20, 100);
   await expectOnlyRangesSaved(page);
