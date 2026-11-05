@@ -154,7 +154,13 @@ function captureInputs(
     ? planLayeredExport(request.document)
     : planExport(request.document);
   try {
-    validateSourceRanges(request.document, new Map(assets.map((asset) => [asset.id, asset.metadata.frameCount])));
+    // Kept ranges may name recordings that no clip uses.
+    const frameCounts = new Map(assets.map((asset) => [asset.id, asset.metadata.frameCount]));
+    for (const mediaId of Object.keys(request.document.selects)) {
+      if (!frameCounts.has(mediaId))
+        frameCounts.set(mediaId, mediaAssetSchema.parse(library.get(mediaId)).metadata.frameCount);
+    }
+    validateSourceRanges(request.document, frameCounts);
   } catch (error) {
     throw new ServiceError(error instanceof Error ? error.message : 'Invalid source range.', 422);
   }
