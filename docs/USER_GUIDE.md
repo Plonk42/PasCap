@@ -964,7 +964,9 @@ mixed select-all and always-visible media Add simplify the library. The Media he
 the number of recordings (video icon) and, joined to it, their total duration (clock icon;
 minutes keep counting past
 an hour); it covers every recording in the project's bin, whatever the search or filter,
-and is absent while the bin is empty.
+and is absent while the bin is empty. Once any recording has kept ranges, the duration they keep
+comes first, in accent color: `kept/total`, where a recording without kept ranges counts in full.
+A narrow Media panel drops the tenths of that pair; its tooltip keeps them.
 
 Inline help is a small **? button**, not an expandable text section. Find it
 beside the relevant title—**Speed**, **Range**, **Placement**,

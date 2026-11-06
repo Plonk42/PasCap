@@ -2645,6 +2645,56 @@ test('removing recordings from the project bin confirms used footage and Undo re
   expect(await edited()).toEqual(before);
 });
 
+test('the Media heading shows the kept duration before the recorded total, following edits, Undo and removal', async ({
+  page,
+}) => {
+  const total = page.locator('.library-total');
+  const recorded = (items: MediaAsset[]) => items.reduce((sum, item) => sum + item.metadata.durationSeconds, 0);
+  // Every recording counts in full except pattern-a, which keeps `frames`.
+  const kept = (items: MediaAsset[], frames: number) =>
+    `${durationLabel(recorded(items) - assets[0]!.metadata.durationSeconds + (frames * 1001) / 30000)}/${durationLabel(recorded(items))}`;
+  const undo = page.getByRole('button', { name: 'Undo', exact: true });
+  const redo = page.getByRole('button', { name: 'Redo', exact: true });
+
+  // Nothing kept: the recorded total alone.
+  await expect(total).toHaveText(durationLabel(recorded(assets)));
+  await expect(total.locator('.library-kept')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await sourceRange(page, 10, 40);
+  await expect(total).toHaveText(kept(assets, 30));
+  await expect(total).toHaveAttribute(
+    'title',
+    `Kept ranges ${kept(assets, 30).replace('/', ' of the ')} recorded; a recording without kept ranges counts in full`,
+  );
+  await sourceFrame(page, 60);
+  await page.locator('summary[aria-label="Kept ranges"]').click();
+  await page.getByRole('button', { name: 'New range', exact: true }).click();
+  await expect(total).toHaveText(kept(assets, 90));
+  await page.keyboard.press('Escape');
+  await undo.click();
+  await expect(total).toHaveText(kept(assets, 30));
+  await redo.click();
+  await expect(total).toHaveText(kept(assets, 90));
+
+  // The pair fits beside the heading actions with Media at its minimum width.
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const resizer = page.getByRole('slider', { name: 'Resize Media panel' });
+  await resizer.focus();
+  while (Number(await resizer.getAttribute('aria-valuenow')) > 240) await resizer.press('ArrowLeft');
+  const pill = (await total.boundingBox())!;
+  expect(pill.x + pill.width).toBeLessThanOrEqual((await page.locator('.library-heading-actions').boundingBox())!.x);
+  expect(pill.height).toBeLessThan(20);
+  // Removing a recording updates both values; Undo back to no kept range shows the total alone.
+  await page.getByRole('button', { name: 'Remove pattern-b.mp4 from project', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Remove from project', exact: true }).click();
+  const remaining = assets.filter((asset) => asset.id !== assets[1]!.id);
+  await expect(total).toHaveText(kept(remaining, 90));
+  await undo.click();
+  await undo.click();
+  await undo.click();
+  await expect(total).toHaveText(durationLabel(recorded(assets)));
+});
+
 test('removing a music recording removes its tracks after confirmation and keeps other media', async ({
   page,
   request,

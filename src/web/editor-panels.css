@@ -304,6 +304,15 @@
   border-radius: 0 4px 4px 0;
 }
 
+.editor-media .library-kept {
+  color: var(--accent);
+}
+
+.editor-media .library-kept-separator {
+  margin-inline: -1px;
+  color: var(--muted);
+}
+
 .editor-media .library-stat svg {
   flex: none;
   opacity: 0.75;
@@ -328,6 +337,14 @@
   }
 
   .editor-media .library-stat svg {
+    display: none;
+  }
+
+  .editor-media .library-stat {
+    padding-inline: 3px;
+  }
+
+  .editor-media .library-tenths {
     display: none;
   }
 

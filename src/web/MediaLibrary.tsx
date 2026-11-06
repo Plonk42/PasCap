@@ -9,6 +9,7 @@ import {
 import { damageLabel, type MediaAsset } from '../shared/media.js';
 import { MAX_VIDEO_LAYERS, type ProjectDocument } from '../shared/model.js';
 import { mediaRemovalUsage } from '../shared/projects.js';
+import { framesToSeconds } from '../shared/timing.js';
 import {
   bestRangesHint,
   bestRangesReport,
@@ -75,6 +76,60 @@ interface HoverMarker {
   projectId: string | null;
   mediaId: string;
   ratio: number;
+}
+
+/**
+ * The bin's recorded duration, preceded by the duration it keeps once any recording has kept ranges:
+ * a recording without kept ranges counts in full.
+ */
+function LibraryDuration({
+  assets,
+  selects,
+}: Readonly<{ assets: readonly MediaAsset[]; selects: ProjectDocument['selects'] | undefined }>) {
+  const total = durationLabel(assets.reduce((sum, asset) => sum + asset.metadata.durationSeconds, 0));
+  const kept =
+    selects && assets.some((asset) => selects[asset.id])
+      ? durationLabel(
+          assets.reduce((sum, asset) => {
+            const ranges = selects[asset.id];
+            if (!ranges) return sum + asset.metadata.durationSeconds;
+            return (
+              sum + framesToSeconds(ranges.reduce((frames, range) => frames + range.sourceOut - range.sourceIn, 0))
+            );
+          }, 0),
+        )
+      : null;
+  return (
+    <span
+      className="count library-stat library-total"
+      title={
+        kept === null
+          ? "Total duration of the project's video recordings"
+          : `Kept ranges ${kept} of the ${total} recorded; a recording without kept ranges counts in full`
+      }
+    >
+      <Icon name="clock" size={11} />
+      {kept !== null && (
+        <>
+          <Duration className="library-kept" label={kept} />
+          <span className="library-kept-separator">/</span>
+          <Duration label={total} />
+        </>
+      )}
+      {kept === null && total}
+    </span>
+  );
+}
+
+/** Narrow panels hide the tenths of a kept / total pair; the tooltip keeps them. */
+function Duration({ label, className }: Readonly<{ label: string; className?: string }>) {
+  const point = label.lastIndexOf('.');
+  return (
+    <span className={className}>
+      {label.slice(0, point)}
+      <span className="library-tenths">{label.slice(point)}</span>
+    </span>
+  );
 }
 
 const STATUS_LABEL: Record<MediaAsset['status'], string> = {
@@ -513,12 +568,7 @@ export function MediaLibrary({
               {assets.length}
             </span>
           </h2>
-          {assets.length > 0 && (
-            <span className="count library-stat library-total" title="Total duration of the project's video recordings">
-              <Icon name="clock" size={11} />
-              {durationLabel(assets.reduce((total, asset) => total + asset.metadata.durationSeconds, 0))}
-            </span>
-          )}
+          {assets.length > 0 && <LibraryDuration assets={assets} selects={project?.selects} />}
         </div>
         <div className="library-heading-actions">
           <button
