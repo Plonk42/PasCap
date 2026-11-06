@@ -7,7 +7,10 @@ type SavedProject = Record<string, unknown>;
 type Migration = (document: SavedProject) => SavedProject;
 
 /** `MIGRATIONS[v]` upgrades a document saved with schema `v` to schema `v + 1`; it never mutates its input. */
-const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = {};
+const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = {
+  // Schema 29 adds the recordings whose range selection is marked done: none yet.
+  28: (document) => ({ ...document, selectsDone: [] }),
+};
 
 /**
  * Schema 27 replaced track Color, Opacity and keyframes with clip grades, adjustments and Transform

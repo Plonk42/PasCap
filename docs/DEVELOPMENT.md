@@ -15,9 +15,9 @@ boolean `reset` (default keyframe), in control order:
 `hue`, `saturation`, `vibrance`, `highlights`, `shadows`, `whites`, `blacks`, `hdr`, `localContrast`. Video
 tracks have no Color, Opacity or keyframes: Opacity is a setting of their `transform`. HSL/curves remain static; speed is
 clip-only (constant or 1–256 source-frame keyframes), and every clip requires a boolean `reverse`.
-`OLDEST_PROJECT_SCHEMA_VERSION` is the current schema: projects and receipt snapshots saved
+`OLDEST_PROJECT_SCHEMA_VERSION` is the oldest schema this build opens: projects and receipt snapshots saved
 before it, with track Color or British spelling, are rejected with the reason and left unchanged, with no
-load defaults or automatic deletion. A later incompatible change adds its upgrade step to
+load defaults or automatic deletion. Later schemas open through their upgrade steps in
 [project migrations](../src/shared/project-migrations.ts). CPU/reference/native/GPU
 must use the same [Temperature/Tint gain math](design/TEMPERATURE_AND_TINT.md)
 before Exposure, including intentionally colored grays and pre-clipping
@@ -647,7 +647,8 @@ independent numeric IN/OUT pair (Enter/blur applies, Escape restores) is unchang
   saved project IDs, real media/cache or reports. Preserve fingerprints, symlink
   rejection, cache exclusion and HTTP guards.
 - Keep **the strict current schema**: required project `bookmarks` (at most 1,000 unique ascending
-  frames, editing aids only), `selects` (kept source ranges per recording) and `adjustments`
+  frames, editing aids only), `selects` (kept source ranges per recording), `selectsDone` (recordings
+  whose range selection is marked done) and `adjustments`
   (0–1,024 ordered, non-overlapping graded ranges), and a complete required `grade` on every clip,
   including Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves;
   reject saved `clip.color` and `clip.correction`. Grade each source with its clip grade, then

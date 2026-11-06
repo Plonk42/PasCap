@@ -120,6 +120,49 @@ describe('project selects', () => {
   });
 });
 
+describe('range selection done marks', () => {
+  it('start empty and require unique recordings of the bin, without defaults', () => {
+    const document = project();
+    expect(document.selectsDone).toEqual([]);
+    const parse = (selectsDone: unknown) => projectSchema.safeParse({ ...document, selectsDone }).success;
+    expect(parse(['recording', 'other'])).toBe(true);
+    for (const selectsDone of [['recording', 'recording'], ['missing'], [''], null, {}])
+      expect(parse(selectsDone)).toBe(false);
+    const missing: Record<string, unknown> = { ...document };
+    delete missing['selectsDone'];
+    expect(projectSchema.safeParse(missing).success).toBe(false);
+  });
+
+  it('toggle in one Undo step each without touching kept ranges, clips or timing', () => {
+    const history = new EditHistory(
+      applyCommand(project(), { type: 'select-set', mediaId: 'recording', ranges: [range(0, 30)] }),
+    );
+    const before = history.current;
+    history.commit({ type: 'select-done', mediaId: 'other', done: true });
+    history.commit({ type: 'select-done', mediaId: 'recording', done: true });
+    expect(history.current.selectsDone).toEqual(['other', 'recording']);
+    expect(applyCommand(history.current, { type: 'select-done', mediaId: 'other', done: true }).selectsDone).toEqual([
+      'other',
+      'recording',
+    ]);
+    history.commit({ type: 'select-done', mediaId: 'other', done: false });
+    expect(history.current.selectsDone).toEqual(['recording']);
+    expect({ ...history.current, selectsDone: [] }).toEqual(before);
+    history.undo();
+    history.undo();
+    expect(history.current.selectsDone).toEqual(['other']);
+    expect(() => applyCommand(before, { type: 'select-done', mediaId: 'missing', done: true })).toThrow(
+      'Only a recording of this project',
+    );
+  });
+
+  it('leave with the recording when it is removed from the project', () => {
+    const document = applyCommand(project(), { type: 'select-done', mediaId: 'other', done: true });
+    const both = applyCommand(document, { type: 'select-done', mediaId: 'recording', done: true });
+    expect(removeProjectMedia(both, { videoIds: ['other'], audioIds: [] }).selectsDone).toEqual(['recording']);
+  });
+});
+
 describe('Source preview selects', () => {
   const kept = [range(10, 30), range(60, 80)];
 

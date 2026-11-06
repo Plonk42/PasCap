@@ -900,6 +900,19 @@ cancellation or lost capture abandon the drawing. Each change is one Undo step, 
 Source preview. The active range is editor-only state; ranges kept before this field
 existed in the browser (`localStorage`) are not read.
 
+#### Range selection done
+
+A project's required `selectsDone` field lists the recordings of its bin whose range selection the user
+marked done (unique IDs; projects saved before it open with none marked). It is the user's own
+review mark: it never changes kept ranges, clips, rendering or export, and does not stop later range
+edits. Each Media entry has a small round check on its thumbnail's corner, **Range selection of
+<name> done** (pressed when done): a filled accent check stays visible on recordings marked done, while
+recordings still to review show only an outline on hover or focus. Each click is one Undo step
+(command `select-done`, editor-only: the assistant reads the mark in `describe_project` as
+`selectionDone` but cannot set it). The Media filter adds **Selection done** and **Selection not done**
+(music recordings are hidden by both), and the summary row shows **N/M done** for the whole bin
+while no recording is selected. **Remove from project** drops the recording's mark.
+
 ### Camera motion and the best steady range
 
 Source preview suggests the best steady stretch of a drone recording, where the camera

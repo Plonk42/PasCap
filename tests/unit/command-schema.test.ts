@@ -138,7 +138,8 @@ type FormerEditCommand =
   | { type: 'bookmark-move'; frame: number; nextFrame: number }
   | { type: 'bookmark-remove'; frame: number }
   | { type: 'select-set'; mediaId: string; ranges: SelectRange[] }
-  | { type: 'select-narrow'; mediaId: string; ranges: SelectRange[] };
+  | { type: 'select-narrow'; mediaId: string; ranges: SelectRange[] }
+  | { type: 'select-done'; mediaId: string; done: boolean };
 
 const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> } = {
   insert: { type: 'insert', clip: newClip('clip-2', 'rec-1', 0, 30), index: 1 },
@@ -221,6 +222,7 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
   'bookmark-remove': { type: 'bookmark-remove', frame: 45 },
   'select-set': { type: 'select-set', mediaId: 'rec-1', ranges: [] },
   'select-narrow': { type: 'select-narrow', mediaId: 'rec-1', ranges: [{ sourceIn: 3, sourceOut: 9 }] },
+  'select-done': { type: 'select-done', mediaId: 'rec-1', done: true },
 };
 
 function descriptionOf(schema: z.ZodType): string | undefined {
@@ -304,7 +306,9 @@ describe('editCommandSchema', () => {
   });
 
   it('validates commands other tools refer to exactly like edit, publishing only their type', () => {
-    const assistant = Object.values(samples).filter((sample) => !['layer-add', 'layer-update'].includes(sample.type));
+    const assistant = Object.values(samples).filter(
+      (sample) => !['layer-add', 'layer-update', 'select-done'].includes(sample.type),
+    );
     for (const sample of assistant)
       expect(referencedEditCommandSchema.parse(sample)).toEqual(editCommandSchema.parse(sample));
     expect(referencedEditCommandSchema.safeParse({ ...samples.delete, clip: 'clip-1' }).success).toBe(false);
@@ -315,11 +319,12 @@ describe('editCommandSchema', () => {
     expect(published.length).toBeLessThan(1_500);
   });
 
-  it('offers the assistant every command but the two carrying a whole track', () => {
+  it('offers the assistant every command but the two carrying a whole track and the user’s done marks', () => {
     const types = assistantEditCommandSchema.options.map((option) => option.shape.type.value);
-    expect(types).toHaveLength(editCommandSchema.options.length - 2);
+    expect(types).toHaveLength(editCommandSchema.options.length - 3);
     expect(types).not.toContain('layer-add');
     expect(types).not.toContain('layer-update');
+    expect(types).not.toContain('select-done');
     expect(types).toContain('adjustment-split');
     expect(assistantEditCommandSchema.safeParse(samples['layer-update']).success).toBe(false);
     expect(referencedEditCommandSchema.safeParse(samples['layer-add']).success).toBe(false);

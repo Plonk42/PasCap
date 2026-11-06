@@ -48,6 +48,8 @@ interface Props {
   onRemoveMusic: (ids: string[]) => boolean;
   /** Keeps each recording's best steady range as its only kept range, in one Undo step. */
   onKeepBestRanges: (changes: readonly BestRangeChange[]) => boolean;
+  /** Marks a recording's range selection done, or still to review, in one Undo step. */
+  onSelectionDone: (mediaId: string, done: boolean) => void;
   onImport: () => void;
   /** Changes after a successful import, so new media is not hidden by a search or filter. */
   importRevision: number;
@@ -320,6 +322,7 @@ export function MediaLibrary({
   onRemove,
   onRemoveMusic,
   onKeepBestRanges,
+  onSelectionDone,
   onImport,
   importRevision,
   review,
@@ -431,6 +434,7 @@ export function MediaLibrary({
   };
   const reviewedAsset = assets.find((asset) => asset.id === review?.mediaId && mediaReady(asset));
 
+  const done = useMemo(() => new Set(project?.selectsDone), [project]);
   const usage = useMemo(() => {
     const counts = new Map<string, number>();
     project?.clips.forEach((clip) => counts.set(clip.mediaId, (counts.get(clip.mediaId) ?? 0) + 1));
@@ -445,6 +449,8 @@ export function MediaLibrary({
           if (filter === 'unprepared') return !mediaReady(asset);
           if (filter === 'used') return usage.has(asset.id);
           if (filter === 'unused') return !usage.has(asset.id);
+          if (filter === 'done') return done.has(asset.id);
+          if (filter === 'todo') return !done.has(asset.id);
           return true;
         })
         .sort((left, right) => {
@@ -456,7 +462,7 @@ export function MediaLibrary({
           if (sort === 'recent') return right.fingerprint.mtimeMs - left.fingerprint.mtimeMs;
           return left.name.localeCompare(right.name, undefined, { numeric: true });
         }),
-    [assets, filter, search, sort, usage],
+    [assets, done, filter, search, sort, usage],
   );
   const selectedAssets = useMemo(() => assets.filter((asset) => selected.has(asset.id)), [assets, selected]);
   const selectionKey = [...selected].join('|');
@@ -637,6 +643,8 @@ export function MediaLibrary({
           <option value="unprepared">Not prepared</option>
           <option value="used">In timeline</option>
           <option value="unused">Not in timeline</option>
+          <option value="done">Selection done</option>
+          <option value="todo">Selection not done</option>
         </select>
         <select
           aria-label="Sort media"
@@ -674,6 +682,12 @@ export function MediaLibrary({
         {visible.length !== assets.length && (
           <span className="library-visible-count" title="Matching recordings">
             {visible.length} / {assets.length}
+          </span>
+        )}
+        {assets.length > 0 && !selectedAssets.length && (
+          <span className="library-done-count" title="Recordings whose range selection is marked done">
+            <Icon name="check" size={11} />
+            {assets.filter((asset) => done.has(asset.id)).length}/{assets.length} done
           </span>
         )}
         {selectedAssets.length > 0 && (
@@ -909,6 +923,21 @@ export function MediaLibrary({
                 {hover?.projectId === projectId && hover.mediaId === asset.id && (
                   <span className="media-hover-marker" style={{ left: `${hover.ratio * 100}%` }} aria-hidden="true" />
                 )}
+              </button>
+              <button
+                className="media-done"
+                type="button"
+                aria-label={`Range selection of ${asset.name} done`}
+                aria-pressed={done.has(asset.id)}
+                title={
+                  done.has(asset.id)
+                    ? 'Range selection done. Click to mark it still to review'
+                    : 'Mark range selection done'
+                }
+                disabled={!project || busy}
+                onClick={() => onSelectionDone(asset.id, !done.has(asset.id))}
+              >
+                <Icon name="check" size={11} />
               </button>
               <span
                 className={`media-state ${status.state}`}

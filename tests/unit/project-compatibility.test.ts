@@ -56,11 +56,21 @@ describe('project compatibility', () => {
   it('keeps the adjustments, clip grades and Transform Opacity of a schema-28 project through the load', async () => {
     const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-28.json'), 'utf8')) as ProjectDocument;
     const loaded = projectSchema.parse(upgradeProject(saved));
-    expect(loaded).toEqual(saved);
+    expect(loaded).toEqual({ ...saved, schemaVersion: PROJECT_SCHEMA_VERSION, selectsDone: [] });
     expect(loaded.adjustments.length).toBeGreaterThan(1);
     expect(loaded.adjustments[0]!.keyframes.length).toBeGreaterThan(0);
     expect(loaded.layers[0]!.transform.base.opacity).toBeLessThan(1);
     expect(loaded.clips.some((clip) => clip.grade.keyframes.length > 0)).toBe(true);
+  });
+
+  it('opens schema-28 projects with every recording still to review, and keeps schema-29 done marks', async () => {
+    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-28.json'), 'utf8')) as Record<string, unknown>;
+    const before = structuredClone(saved);
+    expect(projectSchema.parse(upgradeProject(saved)).selectsDone).toEqual([]);
+    expect(saved).toEqual(before);
+    const marked = JSON.parse(await readFile(path.join(FIXTURES, 'schema-29.json'), 'utf8')) as ProjectDocument;
+    expect(marked.selectsDone.length).toBeGreaterThan(0);
+    expect(projectSchema.parse(upgradeProject(marked))).toEqual(marked);
   });
 
   it('rejects projects saved with track Color or British field names, with the reason, and leaves their files unchanged', async () => {

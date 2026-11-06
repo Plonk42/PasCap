@@ -93,6 +93,7 @@ export const runDescribeProject: OperationRunner<typeof describeProject> = async
         frameCount: asset?.metadata.frameCount ?? null,
         ready: asset?.status === 'ready',
         kept: project.selects[id] ?? null,
+        selectionDone: project.selectsDone.includes(id),
       };
     });
   return {

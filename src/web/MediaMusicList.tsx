@@ -29,6 +29,8 @@ export function musicMatchesFilter(
   const used = musicClips(project?.music ?? []).some((clip) => clip.mediaId === asset.id);
   if (filter === 'used') return used;
   if (filter === 'unused') return !used;
+  // Range selection marks are for video recordings.
+  if (filter === 'done' || filter === 'todo') return false;
   return true;
 }
 

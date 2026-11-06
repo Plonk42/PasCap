@@ -157,6 +157,10 @@ kept range.
 reset icon returns to the whole recording, removing every kept range; the trash after it deletes only the
 selected kept range.
 Ranges cannot overlap or touch. Clips can still use any frame of the recording.
+When you have finished choosing a recording's ranges, click the small round check on its Media
+thumbnail: it stays filled to mark the recording done (click again to undo the mark). The Media
+filter's **Selection not done** then lists the recordings still to review, and the row under the
+filters counts **N/M done**. The mark is saved with the project and changes nothing else.
 Details: [kept ranges](TIMELINE_EDITING.md#kept-ranges).
 
 The source range strip under the image shows snapshots across the whole recording, like

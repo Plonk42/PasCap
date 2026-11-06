@@ -292,7 +292,7 @@ Read; for editor and assistant. List the saved projects, most recently saved fir
 
 #### `describe_project`
 
-Read; for editor and assistant. Summarize a saved project: its revision, duration, video tracks with their clips in timeline order (project frames and timecodes, source ranges, speed, direction, grade), transitions, adjustments, music tracks, the recordings with the ranges the user kept, and bookmarks. Frames are integers at 30000/1001 fps. Read it before editing and after each edit batch.
+Read; for editor and assistant. Summarize a saved project: its revision, duration, video tracks with their clips in timeline order (project frames and timecodes, source ranges, speed, direction, grade), transitions, adjustments, music tracks, the recordings with the ranges the user kept and whether their selection is done, and bookmarks. Frames are integers at 30000/1001 fps. Read it before editing and after each edit batch.
 
 | Input       | Type                                                                                    | Description                                                                                                                                                                                                                                                       |
 | ----------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

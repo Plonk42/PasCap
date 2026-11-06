@@ -49,6 +49,7 @@ const PHRASES: Record<EditCommand['type'], Phrase> = {
   'bookmark-remove': ['bookmark', 'removed'],
   'select-set': ['kept range', 'changed'],
   'select-narrow': ['kept range', 'narrowed'],
+  'select-done': ['range selection', 'marked'],
 };
 
 /**
