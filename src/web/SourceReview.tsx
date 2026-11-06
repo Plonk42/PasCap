@@ -76,6 +76,9 @@ interface Props {
   onInsert: (ranges?: readonly MediaSelection[]) => string | null;
   onRevealClip: (id: string) => void;
   targetLayer: string;
+  /** The user's own mark that this recording's range selection is done, toggled in one Undo step. */
+  selectionDone: boolean;
+  onSelectionDone: (done: boolean) => void;
   ref?: Ref<SourcePlayback>;
 }
 
@@ -148,6 +151,10 @@ function addedFeedback(count: number): string {
   return count > 1 ? `${count} clips added · one per range` : 'Clip added · mark another range';
 }
 
+function selectionDoneTitle(done: boolean): string {
+  return done ? 'Range selection done. Click to mark it still to review' : 'Mark range selection done';
+}
+
 /** One video-only proxy decoder, independent of the project preview and transport. */
 export function SourceReview({
   asset,
@@ -165,6 +172,8 @@ export function SourceReview({
   onInsert,
   onRevealClip,
   targetLayer,
+  selectionDone,
+  onSelectionDone,
   ref,
 }: Readonly<Props>) {
   const host = useRef<HTMLDivElement>(null);
@@ -376,6 +385,19 @@ export function SourceReview({
             {asset.metadata.width} × {asset.metadata.height} · original source frames
           </span>
         </div>
+        <button
+          className="secondary-button small source-selection-done"
+          type="button"
+          aria-label="Range selection done"
+          aria-pressed={selectionDone}
+          title={selectionDoneTitle(selectionDone)}
+          disabled={disabled}
+          onKeyDown={keyboard}
+          onClick={() => onSelectionDone(!selectionDone)}
+        >
+          <Icon name="check" size={13} />
+          <span>Selection done</span>
+        </button>
         <button
           className="primary-button small"
           type="button"

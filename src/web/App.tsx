@@ -2213,7 +2213,7 @@ export function App() {
               onRemove={(videoIds) => removeMedia({ videoIds, audioIds: [] })}
               onRemoveMusic={(audioIds) => removeMedia({ videoIds: [], audioIds })}
               onKeepBestRanges={keepBestRanges}
-              onSelectionDone={(mediaId, done) => edit({ type: 'select-done', mediaId, done })}
+              onSelectionDone={(mediaId, done) => edit({ type: 'select-done', mediaId, done }, true)}
               onImport={() => requestImport()}
               importRevision={importRevision}
               review={review}
@@ -2361,6 +2361,8 @@ export function App() {
                     }}
                     onRevealClip={revealClip}
                     targetLayer={targetLayer}
+                    selectionDone={project?.selectsDone.includes(reviewAsset.id) ?? false}
+                    onSelectionDone={(done) => edit({ type: 'select-done', mediaId: reviewAsset.id, done }, true)}
                   />
                 )}
               </Suspense>

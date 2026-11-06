@@ -907,7 +907,9 @@ marked done (unique IDs; projects saved before it open with none marked). It is 
 review mark: it never changes kept ranges, clips, rendering or export, and does not stop later range
 edits. Each Media entry has a small round check on its thumbnail's corner, **Range selection of
 <name> done** (pressed when done): a filled accent check stays visible on recordings marked done, while
-recordings still to review show only an outline on hover or focus. Each click is one Undo step
+recordings still to review show only an outline on hover or focus. Source preview's heading has the
+same toggle for the reviewed recording, **Selection done** (**Range selection done**, pressed when
+done; the label gives way to its check icon in a narrow panel). Each click is one Undo step
 (command `select-done`, editor-only: the assistant reads the mark in `describe_project` as
 `selectionDone` but cannot set it). The Media filter adds **Selection done** and **Selection not done**
 (music recordings are hidden by both), and the summary row shows **N/M done** for the whole bin

@@ -2780,6 +2780,19 @@ test('the range selection done mark toggles in one Undo step, shows on the thumb
   await expect.poll(() => opacity(b)).toBe('0');
   await onThumbnail(a);
 
+  // Source preview toggles the reviewed recording's mark too, in one Undo step, and stays open.
+  const sourceMark = page
+    .getByRole('region', { name: 'Source review' })
+    .getByRole('button', { name: 'Range selection done', exact: true });
+  await expect(sourceMark).toHaveAttribute('aria-pressed', 'true');
+  await sourceMark.click();
+  await expect(mark(a)).toHaveAttribute('aria-pressed', 'false');
+  await expect(sourceMark).toBeVisible();
+  expect(await now()).toEqual(before);
+  await undo.click();
+  await expect(mark(a)).toHaveAttribute('aria-pressed', 'true');
+  expect(await now()).toEqual({ ...before, selectsDone: [a.id] });
+
   // The filter shows the recordings marked done, or those still to review.
   const filter = page.getByRole('combobox', { name: 'Filter media', exact: true });
   await filter.selectOption('done');
