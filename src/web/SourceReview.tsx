@@ -35,6 +35,7 @@ import { DamageMarks } from './DamageMarks.js';
 import { mediaReady, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
 import { Popover } from './Popover.js';
+import { readPreference, writePreference } from './preferences.js';
 import {
   CameraMotionPanel,
   MotionLanes,
@@ -147,6 +148,8 @@ function addedFeedback(count: number): string {
   return count > 1 ? `${count} clips added · one per range` : 'Clip added · mark another range';
 }
 
+const PLAY_SCOPE_PREFERENCE = 'pascap-source-play-scope';
+
 /** One video-only proxy decoder, independent of the project preview and transport. */
 export function SourceReview({
   asset,
@@ -176,6 +179,7 @@ export function SourceReview({
   const [retry, setRetry] = useState(0);
   const [lastAdded, setLastAdded] = useState<{ id: string; count: number } | null>(null);
   const [rangeDraft, setRangeDraft] = useState(false);
+  const [wholeRecording, setWholeRecording] = useState(() => readPreference(PLAY_SCOPE_PREFERENCE) === 'recording');
   const smooth = useSmoothRange(asset);
   const motionView = useCameraMotionView();
   const requestedFrame = Math.max(0, Math.min(asset.metadata.frameCount - 1, Math.round(frame)));
@@ -297,7 +301,11 @@ export function SourceReview({
   const playDisabled = rangeDraft || !visible || disabled || (!playing && (buffering || !!error));
   const togglePlayback = (): void => {
     if (playing) pause();
-    else if (!playDisabled) transport.current?.play();
+    else if (!playDisabled) transport.current?.play(wholeRecording);
+  };
+  const togglePlayScope = (): void => {
+    setWholeRecording(!wholeRecording);
+    writePreference(PLAY_SCOPE_PREFERENCE, wholeRecording ? 'range' : 'recording');
   };
   useImperativeHandle(ref, () => ({
     toggle: togglePlayback,
@@ -454,16 +462,37 @@ export function SourceReview({
         onDraft={setRangeDraft}
         onKeyDown={keyboard}
         transport={
-          <button
-            className="play-button source-play-button"
-            aria-label={playing ? 'Pause source preview' : 'Play source preview'}
-            title="Play the applied IN–OUT range without audio; stop at OUT − 1"
-            disabled={playDisabled}
-            onKeyDown={keyboard}
-            onClick={togglePlayback}
-          >
-            <Icon name={playing ? 'pause' : 'play'} size={19} />
-          </button>
+          <div className="source-transport">
+            <button
+              className="play-button source-play-button"
+              aria-label={playing ? 'Pause source preview' : 'Play source preview'}
+              title={
+                wholeRecording
+                  ? 'Play the whole recording from the displayed frame without audio; stop on its last frame'
+                  : 'Play the applied IN–OUT range without audio; stop at OUT − 1'
+              }
+              disabled={playDisabled}
+              onKeyDown={keyboard}
+              onClick={togglePlayback}
+            >
+              <Icon name={playing ? 'pause' : 'play'} size={19} />
+            </button>
+            <button
+              className="source-play-scope"
+              type="button"
+              aria-label="Play whole recording"
+              aria-pressed={wholeRecording}
+              title={
+                wholeRecording
+                  ? 'Play and Space play the whole recording, past the kept ranges. Click to play only the applied range'
+                  : 'Play and Space play only the applied range. Click to play the whole recording'
+              }
+              onKeyDown={keyboard}
+              onClick={togglePlayScope}
+            >
+              {wholeRecording ? 'Whole' : 'Range'}
+            </button>
+          </div>
         }
         readout={
           <div className="source-review-readout">

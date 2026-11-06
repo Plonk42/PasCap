@@ -222,9 +222,35 @@
   gap: 10px;
 }
 
-.source-track .source-play-button {
+.source-transport {
+  display: flex;
+  flex-direction: column;
   flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
   margin-top: 4px;
+}
+
+.source-play-scope {
+  min-width: 40px;
+  height: 20px;
+  padding: 0 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.source-play-scope:hover {
+  color: #dce5df;
+}
+
+.source-play-scope[aria-pressed='true'] {
+  border-color: #4f7a58;
+  background: var(--accent-dim);
+  color: var(--accent);
 }
 
 /* The strip and the camera motion lanes under it share one column and one playhead. */

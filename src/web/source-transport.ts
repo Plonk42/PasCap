@@ -175,13 +175,17 @@ export class SourceTransport {
     this.#range = { ...range };
   }
 
-  /** Play the applied range from the displayed frame (else IN) and stop on OUT − 1, never looping. */
-  play(): void {
+  /**
+   * Play the applied range from the displayed frame (else IN) and stop on OUT − 1, or with `whole` the
+   * recording from the displayed frame (else 0) to its last frame; never looping.
+   */
+  play(whole = false): void {
     const url = this.#url;
     if (this.#disposed || url === null || this.state.status !== 'paused' || this.state.frame === null) return;
-    const last = this.#range.sourceOut - 1;
+    const first = whole ? 0 : this.#range.sourceIn;
+    const last = whole ? this.frameCount - 1 : this.#range.sourceOut - 1;
     const shown = this.state.frame;
-    const start = shown >= this.#range.sourceIn && shown < last ? shown : this.#range.sourceIn;
+    const start = shown >= first && shown < last ? shown : first;
     if (start === last) {
       if (shown !== last) this.seek(last);
       return;
@@ -190,11 +194,11 @@ export class SourceTransport {
     this.#last = last;
     // The shown image stays on the canvas until the start frame replaces it.
     this.#publish({ status: 'starting', requestedFrame: start, frame: shown, error: '' });
-    const first = start === shown ? start + 1 : start;
-    const frames = Array.from({ length: last - first + 1 }, (_value, index) => first + index);
+    const next = start === shown ? start + 1 : start;
+    const frames = Array.from({ length: last - next + 1 }, (_value, index) => next + index);
     this.frames.start(0, url, frames, true, false);
     void this.frames
-      .ready(0, first, Math.min(PREFILL_FRAMES, frames.length), signal)
+      .ready(0, next, Math.min(PREFILL_FRAMES, frames.length), signal)
       .then(() => {
         if (signal.aborted) return;
         this.#clockFrame = start;

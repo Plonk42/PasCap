@@ -1760,6 +1760,55 @@ test('source proxy Play/Pause advances decoded frames and stops at exclusive OUT
   await expectOnlyRangesSaved(page);
 });
 
+test('the Whole play scope plays past the kept ranges to the last frame, remembered, without edits', async ({
+  page,
+}) => {
+  const before = await current(page);
+  const last = String(assets[0]!.metadata.frameCount - 1);
+  const preview = page.locator('.source-preview');
+  const frameNow = async (): Promise<number> => Number(await preview.getAttribute('data-source-frame'));
+  const scope = page.getByRole('button', { name: 'Play whole recording', exact: true });
+  const play = page.getByRole('button', { name: 'Play source preview', exact: true });
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await sourceRange(page, 12, 40);
+  const kept = (await current(page)).selects;
+  await expect(scope).toHaveAttribute('aria-pressed', 'false');
+  await expect(scope).toHaveText('Range');
+  await scope.click();
+  await expect(scope).toHaveAttribute('aria-pressed', 'true');
+  await expect(scope).toHaveText('Whole');
+
+  // From inside the kept range, playback crosses its OUT and stops on the recording's last frame.
+  await sourceFrame(page, 30);
+  await play.click();
+  await expect(preview).toHaveAttribute('data-source-status', 'playing');
+  await expect.poll(frameNow).toBeGreaterThan(45);
+  await expect(preview).toHaveAttribute('data-source-status', 'paused', { timeout: 8_000 });
+  await expect(preview).toHaveAttribute('data-source-frame', last);
+  // Playing again from the last frame restarts at the recording's first frame, not IN.
+  await page.keyboard.press('Space');
+  await expect(preview).toHaveAttribute('data-source-status', 'playing');
+  await expect.poll(frameNow).toBeLessThan(12);
+  await page.keyboard.press('Space');
+  await expect(preview).toHaveAttribute('data-source-status', 'paused');
+
+  // The scope is an editor preference: it survives a reload; Range plays only the applied range again.
+  await flush(page);
+  await page.reload();
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await expect(scope).toHaveAttribute('aria-pressed', 'true');
+  await scope.click();
+  await expect(scope).toHaveAttribute('aria-pressed', 'false');
+  await sourceFrame(page, 30);
+  await play.click();
+  await expect(preview).toHaveAttribute('data-source-status', 'playing');
+  await expect(preview).toHaveAttribute('data-source-status', 'paused');
+  await expect(preview).toHaveAttribute('data-source-frame', '39');
+  expect((await current(page)).selects).toEqual(kept);
+  expect(timelineOf(await current(page))).toEqual(timelineOf(before));
+  await expectOnlyRangesSaved(page);
+});
+
 test('Space plays and pauses the displayed preview: the source preview on its tab, the timeline otherwise', async ({
   page,
 }) => {
@@ -2163,8 +2212,8 @@ test('the motion timeline shows jolts, their maximum and the best steady range; 
   await expect(use).toBeEnabled();
   await expect(strip).toHaveAttribute('data-source-in', String(steady.sourceIn));
 
-  // Clicking the timeline away from the dashed line scrubs the source like the strip does.
-  await timeline.click({ position: { x: timelineBox!.width * 0.75, y: timelineBox!.height * 0.85 } });
+  // Clicking the timeline away from the dashed line scrubs the source like the strip does (frame 90's center).
+  await timeline.click({ position: { x: (timelineBox!.width * 90.5) / 120, y: timelineBox!.height * 0.85 } });
   await expect
     .poll(async () => Number(await page.locator('.source-preview').getAttribute('data-source-frame')))
     .toBeGreaterThanOrEqual(88);

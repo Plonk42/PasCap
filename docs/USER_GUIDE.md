@@ -167,6 +167,9 @@ loss/cancellation/window blur restores the prior choice. The round **Play / Paus
 button left of the strip reviews the applied range, without audio, from the current frame or IN.
 It stops at the last included frame (OUT − 1), without looping; a one-frame range
 just displays that frame. Unapplied numeric drafts are not played or inserted.
+To review the footage outside the kept ranges, switch the small **Range** toggle under Play to
+**Whole**: Play and Space then play the whole recording from the current frame to its last
+frame; the choice is remembered.
 Scrubbing or changing the range pauses first. Closing, switching sources/projects
 or leaving the Source tab cancels playback. Source playback does not move the
 timeline or music and does not create Undo steps or saves. Failures expose Retry.

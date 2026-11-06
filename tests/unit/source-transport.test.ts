@@ -292,6 +292,38 @@ describe('owned source proxy transport', () => {
     f.transport.dispose();
   });
 
+  it.each([
+    [20, 20, [21, 22]],
+    [5, 5, [6, 7]],
+    [75, 75, [76, 77]],
+    [119, 0, [0, 1]],
+  ])('whole-recording playback from frame %s starts at %s and runs to the last frame', async (frame, start, first) => {
+    const f = await loaded(frame);
+    f.transport.play(true);
+    expect(f.transport.state).toMatchObject({ status: 'starting', requestedFrame: start, frame });
+    expect(f.frames.starts.at(-1)!.frames.slice(0, 2)).toEqual(first);
+    expect(f.frames.starts.at(-1)!.frames.at(-1)).toBe(119);
+    await settle();
+    expect(f.transport.state.status).toBe('playing');
+    f.transport.dispose();
+  });
+
+  it('whole-recording playback crosses OUT and stops on the recording’s last frame', async () => {
+    const f = await loaded(38);
+    f.transport.play(true);
+    await settle();
+    const anchor = now;
+    for (let frame = 39; frame < 119; frame++) {
+      tick(anchor, frame - 38);
+      expect(f.transport.state).toMatchObject({ status: 'playing', frame });
+    }
+    tick(anchor, 85);
+    expect(f.transport.state).toMatchObject({ status: 'paused', frame: 119, requestedFrame: 119 });
+    expect(f.drawn).toEqual(Array.from({ length: 82 }, (_value, index) => 38 + index));
+    expect(raf.size).toBe(0);
+    f.transport.dispose();
+  });
+
   it('presents every source frame on the wall clock and stops exactly on OUT − 1', async () => {
     const f = await loaded(30);
     const anchor = await started(f);
