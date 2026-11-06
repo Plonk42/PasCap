@@ -121,6 +121,25 @@ export function resetSpatial(settings: SpatialSettings, frame: number): SpatialS
   return replaceSpatialKey(settings, frame, { values });
 }
 
+/**
+ * The Transform with one setting neutral at every frame, its keyframes of that setting disabled (dropping keyframes
+ * left without settings), for a hold-to-compare preview; null when it is neutral already.
+ */
+export function withoutSpatialChannel(settings: SpatialSettings, channel: SpatialChannel): SpatialSettings | null {
+  if (!hasSpatialChannelKeys(settings, channel) && settings.base[channel] === NEUTRAL_SPATIAL_POSE[channel])
+    return null;
+  return validatedSpatial({
+    base: { ...settings.base, [channel]: NEUTRAL_SPATIAL_POSE[channel] },
+    keyframes: settings.keyframes
+      .map((key) => ({
+        ...key,
+        values: { ...key.values, [channel]: null },
+        easing: { ...key.easing, [channel]: null },
+      }))
+      .filter((key) => SPATIAL_CHANNELS.some((setting) => key.values[setting] !== null)),
+  });
+}
+
 /** Sets one enabled setting's Easing at a key, or every enabled setting's when `channel` is null. */
 export function setSpatialEasing(
   settings: SpatialSettings,

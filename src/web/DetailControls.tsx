@@ -64,6 +64,11 @@ export function DetailSection({ project, clip, disabled, onEdit }: Readonly<Prop
                   name={control.label}
                   blocked={resetBlocked(value === NEUTRAL_DETAIL[control.key], disabled)}
                   onReset={() => commit(withValue(control.key, NEUTRAL_DETAIL[control.key]))}
+                  compare={
+                    value === NEUTRAL_DETAIL[control.key]
+                      ? null
+                      : command(withValue(control.key, NEUTRAL_DETAIL[control.key]))
+                  }
                 >
                   {control.label}
                 </ResetLabel>

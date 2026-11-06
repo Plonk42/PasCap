@@ -552,6 +552,11 @@ color settings across enabled video tracks, including clip grades, adjustments
 and both dissolve sources, and every clip's Sharpen, Clarity and Denoise. Exact observed source frames, retiming, track Opacity,
 spatial geometry/coverage (Transform), visibility, black fades, stacking and music remain unchanged.
 
+To judge one setting, hold the small **eye** after its Reset icon (Color, HSL, Detail and Transform settings, and
+beside **Reset <channel>** for the shown curve): while you hold the pointer on it, the preview shows the image
+without only that setting, animated or not, with a **Without <setting>** badge. Releasing restores it; nothing
+is saved or added to Undo.
+
 This is editor-only: holding never seeks, saves, enters Undo history, changes
 exports, schema, proxies or originals, or adds decoders. Same-project seeks,
 appearance edits and timing reloads keep the engine's mode while it is held; changing project or reloading

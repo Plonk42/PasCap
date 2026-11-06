@@ -31,6 +31,7 @@ import {
   SPATIAL_CONTROLS,
   toggleDefaultSpatialKey,
   toggleSpatialChannel,
+  withoutSpatialChannel,
 } from './spatial-editor.js';
 import {
   inspectSpatialKeyframe,
@@ -125,6 +126,7 @@ function PoseFields({
   onCommit,
   onDraft,
   onReset,
+  compare,
 }: Readonly<{
   values: Readonly<Record<SpatialChannel, number>>;
   label: (setting: string) => string;
@@ -141,6 +143,8 @@ function PoseFields({
   onCommit: (key: SpatialChannel, value: number) => void;
   onDraft: (key: SpatialChannel, value: number | null) => void;
   onReset?: (key: SpatialChannel) => void;
+  /** The preview without a setting, for its hold-to-compare eye; absent for no eye. */
+  compare?: (key: SpatialChannel) => EditCommand | null;
 }>) {
   const id = useId();
   return (
@@ -169,6 +173,7 @@ function PoseFields({
                   readOnly?.(control.key) ?? false,
                 )}
                 onReset={() => onReset?.(control.key)}
+                compare={compare?.(control.key)}
               >
                 {control.label}
                 {unit}
@@ -399,6 +404,10 @@ export function SpatialControls({
         onCommit={(key, value) => change(poseAt(key, value))}
         onDraft={(key, value) => draft(poseAt(key, value ?? 0), value)}
         onReset={(key) => change(poseAt(key, NEUTRAL_SPATIAL_POSE[key]))}
+        compare={(key) => {
+          const without = withoutSpatialChannel(settings, key);
+          return without && command(without);
+        }}
       />
       <StoredKeyframeList
         kind={kind}

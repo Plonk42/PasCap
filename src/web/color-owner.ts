@@ -1,4 +1,5 @@
-import { COLOR_CONTROLS, type ColorSettings } from '../shared/color.js';
+import { COLOR_CONTROLS, NEUTRAL_COLOR, type ColorSettings, type ScalarColorSetting } from '../shared/color.js';
+import type { EditCommand } from '../shared/commands.js';
 import { gradeColorAt, gradeKeyAsLayerKey, type Adjustment } from '../shared/grade.js';
 import { activeLayerSetting, type LayerKeyframe } from '../shared/keyframes.js';
 import type { ProjectDocument, VideoClip } from '../shared/model.js';
@@ -75,6 +76,24 @@ export function ownerNoun(owner: ColorOwner): 'clip' | 'adjustment' {
 export function gradeSeekFrame(placed: PlacedClip, sourceFrame: number): number {
   const { sourceIn, sourceOut } = placed.clip;
   return placed.start + nearestOutput(placed, Math.min(Math.max(sourceFrame, sourceIn), sourceOut - 1));
+}
+
+/**
+ * Commands showing the owner with one setting neutral at every frame (its base neutral, its keyframes of that setting
+ * disabled), for a hold-to-compare preview; null when it is neutral already.
+ */
+export function withoutColorSetting(owner: ColorOwner, setting: ScalarColorSetting): EditCommand[] | null {
+  const keyed = owner.keyframes.filter((key) => key.values[setting] !== null);
+  if (!keyed.length && owner.color[setting] === NEUTRAL_COLOR[setting]) return null;
+  return [
+    { type: 'color', ...colorTarget(owner), color: { ...owner.color, [setting]: NEUTRAL_COLOR[setting] } },
+    ...keyed.map((key): EditCommand => ({
+      type: 'layer-key-set',
+      ...ownerTarget(owner),
+      frame: key.frame,
+      values: { [setting]: null },
+    })),
+  ];
 }
 
 /** Where the image evaluates a clip grade at a project frame: between source frames in slow motion. */

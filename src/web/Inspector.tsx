@@ -38,6 +38,7 @@ import {
   isClipOwner,
   ownerNoun,
   ownerTarget,
+  withoutColorSetting,
   type ColorOwner,
 } from './color-owner.js';
 import { KeyframeNavigationContext, useKeyframeNavigation, type KeyframeNavigation } from './keyframe-navigation.js';
@@ -264,6 +265,7 @@ function ColorControl({
         disabled={disabled || !state.editable}
         onCommit={commit}
         onDraft={(value) => livePreview(value === null ? null : command(value))}
+        compare={withoutColorSetting(layer, control.key)}
         hint={hint}
         scope={<SettingScope scope={scope} />}
         locked={state.keyed && !state.active && <LockedCue />}

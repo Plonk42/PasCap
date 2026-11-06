@@ -3,6 +3,7 @@ import { COLOR_CONTROLS, NEUTRAL_COLOR } from '../shared/color.js';
 import { KEYFRAME_SETTINGS, type KeyframeSetting } from '../shared/keyframes.js';
 import { Icon } from './icons.js';
 import type { NumberFieldProps } from './NumberField.js';
+import { BypassButton, type BypassPreview } from './setting-bypass.js';
 import { ValueControl, type SliderTone, type ValueControlProps } from './ValueControl.js';
 
 const isToned = (setting: KeyframeSetting): setting is SliderTone =>
@@ -27,6 +28,8 @@ interface RangeSettingProps {
   validate?: NumberFieldProps['validate'];
   onDraft?: ValueControlProps['onDraft'];
   exact?: Pick<NumberFieldProps, 'resetKey' | 'validate'>;
+  /** The preview without this setting, for its hold-to-compare eye; null when neutral, absent for no eye. */
+  compare?: BypassPreview | null;
 }
 
 /** Compact reset beside a setting's name; `blocked` is the reason it cannot apply, else it resets that setting alone. */
@@ -53,8 +56,8 @@ export function ResetButton({
 }
 
 /**
- * A setting's visible name with its reset button; double-clicking the name resets it too. The name is
- * not a focusing label: moving focus could scroll the control between the two clicks.
+ * A setting's visible name with its reset button and, given `compare`, its hold-to-compare eye; double-clicking
+ * the name resets it too. The name is not a focusing label: moving focus could scroll the control between the two clicks.
  */
 export function ResetLabel({
   htmlFor,
@@ -62,6 +65,7 @@ export function ResetLabel({
   name,
   blocked,
   onReset,
+  compare,
   children,
 }: Readonly<{
   htmlFor: string;
@@ -69,6 +73,7 @@ export function ResetLabel({
   name: string;
   blocked: string | null;
   onReset: () => void;
+  compare?: BypassPreview | null | undefined;
   children: ReactNode;
 }>) {
   return (
@@ -84,6 +89,7 @@ export function ResetLabel({
         {children}
       </span>
       <ResetButton name={name} blocked={blocked} onReset={onReset} />
+      {compare !== undefined && <BypassButton name={name} preview={compare} />}
     </span>
   );
 }
@@ -121,6 +127,7 @@ export function RangeSettingControl({
   validate,
   onDraft,
   exact,
+  compare,
 }: Readonly<RangeSettingProps>) {
   const definition = KEYFRAME_SETTINGS.find((item) => item.key === setting)!;
   const color = COLOR_CONTROLS.find((item) => item.key === setting);
@@ -139,6 +146,7 @@ export function RangeSettingControl({
           name={name}
           blocked={resetBlocked(value === neutral, disabled, Boolean(locked))}
           onReset={() => onCommit(neutral)}
+          compare={compare}
         >
           {definition.label}
           {scope}

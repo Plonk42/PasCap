@@ -712,6 +712,81 @@ test('bypasses clip grades and adjustments across dissolves, retaining coverage,
   });
 });
 
+test('holding a setting eye previews the image without that setting only, animated or not, without editing', async ({
+  page,
+  comparison,
+}) => {
+  // Exposure is animated in the clip grade; Opacity is a static Transform setting.
+  const animated = structuredClone(comparison.single);
+  animated.clips[0]!.grade.keyframes = [
+    gradePoint(20, { exposure: 1.2 }, 'smooth'),
+    gradePoint(80, { exposure: -0.5, saturation: 1.3 }),
+  ];
+  animated.layers[0]!.transform.base.opacity = 0.6;
+  const withoutExposure = structuredClone(animated);
+  withoutExposure.clips[0]!.grade.color.exposure = 0;
+  withoutExposure.clips[0]!.grade.keyframes = [gradePoint(80, { saturation: 1.3 })];
+  const withoutOpacity = structuredClone(animated);
+  withoutOpacity.layers[0]!.transform.base.opacity = 1;
+  const reference = async (document: ProjectDocument, name: string): Promise<PixelSummary> => {
+    comparison.memory.seed(projectSchema.parse(document));
+    await openFixture(page, document);
+    await seek(page, document, 30);
+    return capture(page, name);
+  };
+  const exposureReference = await reference(withoutExposure, 'without-exposure');
+  const opacityReference = await reference(withoutOpacity, 'without-opacity');
+  const full = await reference(animated, 'full');
+  expect(full).not.toEqual(exposureReference);
+  expect(full).not.toEqual(opacityReference);
+
+  const badge = page.locator('.canvas-stage .preview-comparison-overlay');
+  const hold = async (eye: Locator): Promise<void> => {
+    await eye.hover();
+    await page.mouse.down();
+    await expect(eye).toHaveAttribute('aria-pressed', 'true');
+  };
+  await inspectorTab(page, 'Clip grade');
+  const exposure = page.getByRole('button', { name: 'Hold to compare without Exposure', exact: true });
+  await hold(exposure);
+  await expect(badge).toHaveText('Without Exposure');
+  await expect.poll(() => capture(page, 'held-exposure')).toEqual(exposureReference);
+  await page.mouse.up();
+  await expect(exposure).toHaveAttribute('aria-pressed', 'false');
+  await expect(badge).toBeHidden();
+  await expect.poll(() => capture(page, 'released-exposure')).toEqual(full);
+
+  // Window blur ends the hold too.
+  await hold(exposure);
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await expect(exposure).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(() => capture(page, 'blurred-exposure')).toEqual(full);
+  await page.mouse.up();
+
+  // A neutral setting has nothing to compare.
+  await expect(page.getByRole('button', { name: 'Hold to compare without Hue', exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'false',
+  );
+  await expect(page.getByRole('button', { name: 'Hold to compare without Vibrance', exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+
+  await inspectorTab(page, 'Track');
+  const opacity = page.getByRole('button', { name: 'Hold to compare without Opacity', exact: true });
+  await hold(opacity);
+  await expect(badge).toHaveText('Without Opacity');
+  await expect.poll(() => capture(page, 'held-opacity')).toEqual(opacityReference);
+  await page.mouse.up();
+  await expect.poll(() => capture(page, 'released-opacity')).toEqual(full);
+
+  // The Original button shares the eye icon.
+  const icon = (button: Locator) => button.locator('svg').evaluate((svg) => svg.innerHTML);
+  expect(await icon(compareButton(page))).toBe(await icon(opacity));
+  await expectPristine(page, comparison, projectSchema.parse(animated));
+});
+
 test('a color edit while original saves once, returns the new grade and has a separate Undo', async ({
   page,
   comparison,

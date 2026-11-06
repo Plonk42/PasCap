@@ -21,6 +21,7 @@ import {
   SPATIAL_CONTROLS,
   toggleDefaultSpatialKey,
   toggleSpatialChannel,
+  withoutSpatialChannel,
 } from '../../src/web/spatial-editor.js';
 import { createValueControlState, syncValueControlState, transitionValueControl } from '../../src/web/ValueControl.js';
 
@@ -41,6 +42,22 @@ function key(frame: number, values: Partial<SpatialKeyValues>, curve: Interpolat
 }
 
 describe('per-setting track Transform editor', () => {
+  it('previews one setting neutral at every frame for its hold-to-compare eye, other settings unchanged', () => {
+    const settings = createSpatialSettings();
+    expect(withoutSpatialChannel(settings, 'scale')).toBeNull();
+    settings.base.scale = 1.5;
+    settings.base.rotation = 20;
+    settings.keyframes = [key(0, { scale: 2 }, 'linear'), key(10, { scale: 3, opacity: 0.5 }, 'smooth')];
+    const before = structuredClone(settings);
+    const without = withoutSpatialChannel(settings, 'scale')!;
+    expect(settings).toEqual(before);
+    expect(without.base).toEqual({ ...settings.base, scale: 1 });
+    expect(without.keyframes).toEqual([key(10, { opacity: 0.5 }, 'smooth')]);
+    for (const frame of [0, 5, 10, 20]) {
+      expect(evaluateSpatial(without, frame)).toEqual({ ...evaluateSpatial(settings, frame), scale: 1 });
+    }
+    expect(withoutSpatialChannel(settings, 'translateX')).toBeNull();
+  });
   it('exposes all nine exact value controls, Opacity included, and edits only the unanimated base', () => {
     expect(SPATIAL_CONTROLS.map((control) => control.key)).toEqual(Object.keys(NEUTRAL_SPATIAL_POSE));
     let settings = createSpatialSettings();

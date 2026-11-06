@@ -25,6 +25,7 @@ import { InspectorSection } from './InspectorSection.js';
 import { livePreview } from './live-preview.js';
 import { NumberField } from './NumberField.js';
 import { ResetLabel, resetBlocked } from './SettingValueControl.js';
+import { BypassButton } from './setting-bypass.js';
 import type { DraftPreview } from './Timeline.js';
 import { ValueControl } from './ValueControl.js';
 
@@ -539,6 +540,11 @@ export function HslRangesSection(props: Readonly<Props>) {
                 name={`HSL ${control.key}`}
                 blocked={resetBlocked(layer.color.hsl[band][control.key] === 0, disabled)}
                 onReset={() => commit(withValue(0))}
+                compare={
+                  layer.color.hsl[band][control.key] === 0
+                    ? null
+                    : { type: 'color', ...colorTarget(layer), color: withValue(0) }
+                }
               >
                 {control.label}
               </ResetLabel>
@@ -633,6 +639,21 @@ export function ColorCurvesSection(props: Readonly<Props>) {
             <Icon name="reset" size={13} />
             Reset {channel}
           </button>
+          <BypassButton
+            name={`the ${channel} curve`}
+            preview={
+              isIdentityCurve(layer.color.curves[channel])
+                ? null
+                : {
+                    type: 'color',
+                    ...colorTarget(layer),
+                    color: {
+                      ...layer.color,
+                      curves: { ...layer.color.curves, [channel]: createColorCurves()[channel] },
+                    },
+                  }
+            }
+          />
           <button
             type="button"
             className="text-button"

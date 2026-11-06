@@ -284,6 +284,41 @@
   cursor: default;
 }
 
+/* The hold-to-compare eye mirrors the reset icon beside it. */
+.setting-bypass {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  margin: -4px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.setting-bypass:hover {
+  opacity: 1;
+}
+
+.setting-bypass[aria-pressed='true'] {
+  background: var(--accent);
+  color: #18291d;
+  opacity: 1;
+}
+
+.setting-bypass[aria-disabled='true'] {
+  opacity: 0.25;
+  cursor: default;
+}
+
 /* Track → Color groups: a small heading with its group reset, separated by a hairline. */
 .color-group {
   display: flex;

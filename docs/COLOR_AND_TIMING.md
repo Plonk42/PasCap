@@ -166,6 +166,20 @@ change, or additional decoder. Same-project seeks, appearance updates and timing
 reloads preserve the mode while it is held; changing project or reloading with a fresh preview engine
 resets to normal graded preview. Export continues to use the saved grading contract.
 
+### Hold-to-compare one setting
+
+An **eye** button after a setting's Reset icon (accessible as **Hold to compare without <setting>**) shows the
+preview without that setting only while the pointer holds it: the twelve Color scalars and HDR/Local contrast of
+the clip grade or adjustment being edited, the HSL settings of the shown range, the shown curve channel (beside
+**Reset <channel>**), clip Detail and the track's main Transform settings, Opacity included. It previews the
+project with that setting at its neutral value at every frame (its base neutral and its keyframes of that setting
+disabled) through the same live preview path as slider drags, so the image matches the project with that setting
+reset, on the same CPU and shader math; other settings, grades, adjustments, clips and tracks render unchanged.
+Release, pointer cancellation, lost capture and window blur restore the full result; the eye turns accent and the
+preview shows a **Without <setting>** badge while held. It is pointer-only (not focusable, no keyboard hold) and
+works paused or playing. Nothing is saved or added to history and export is unchanged. A neutral setting's eye is
+unavailable. Speed and music settings have none. The **Original** button shows the same eye icon.
+
 ## Timing
 
 - Project placements, Transform keyframes, adjustments and output durations use integer **project frames**;

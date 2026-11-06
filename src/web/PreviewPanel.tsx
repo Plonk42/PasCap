@@ -4,6 +4,7 @@ import { formatTimecode } from '../shared/timing.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import './preview-comparison.css';
+import { useBypassedSetting } from './setting-bypass.js';
 import { TimecodeField } from './TimecodeField.js';
 import { useDelayedFlag } from './use-delayed-flag.js';
 
@@ -162,6 +163,7 @@ export function PreviewPanel({
     if (!event.repeat) hold(active && originalMode(event));
   };
   const original = diagnostics?.ungraded ? (diagnostics.original ?? 'all') : null;
+  const bypassed = useBypassedSetting();
   return (
     <section className="preview-panel" aria-label="Preview">
       <div className="preview-heading preview-comparison-heading">
@@ -185,7 +187,7 @@ export function PreviewPanel({
             onKeyUp={(event) => keyHold(event, false)}
             onBlur={() => hold(false)}
           >
-            <Icon name="color" size={14} />
+            <Icon name="eye" size={14} />
             Original
           </button>
         </div>
@@ -228,6 +230,7 @@ export function PreviewPanel({
           </div>
         )}
         {original && <span className="preview-comparison-overlay">{ORIGINAL_BADGES[original]}</span>}
+        {!original && bypassed && <span className="preview-comparison-overlay">Without {bypassed}</span>}
       </div>
       <div className="transport">
         <span className="transport-note">
