@@ -1,8 +1,16 @@
 import { z } from 'zod';
 import type { AudioAsset } from '../shared/audio.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
-import type { MusicClip, MusicLane, ProjectDocument } from '../shared/model.js';
-import { laneOfClip, moveMusicClip, musicClips, musicTracks, sequenceMusicLane } from '../shared/music-lanes.js';
+import { MAX_MUSIC_CLIPS, type MusicClip, type MusicLane, type ProjectDocument } from '../shared/model.js';
+import {
+  insertMusicClip,
+  laneOfClip,
+  moveMusicClip,
+  musicClipEnd,
+  musicClips,
+  musicTracks,
+  sequenceMusicLane,
+} from '../shared/music-lanes.js';
 import { calculateLayout } from '../shared/timeline.js';
 
 export type MusicEdit = Extract<EditCommand, { type: 'music' }>;
@@ -55,6 +63,47 @@ export function musicLaneEdit(
 ): MusicEdit {
   if (!project.music.some((lane) => lane.id === laneId)) throw new Error('The selected music track is unavailable.');
   return { type: 'music', music: project.music.map((lane) => (lane.id === laneId ? update(lane) : lane)) };
+}
+
+/** Where Source preview adds a music range: after the selected clip's track, else the first; a new track without one. */
+export interface MusicAddTarget {
+  laneId: string | null;
+  /** Names the track for the button's tooltip. */
+  name: string;
+  /** Why nothing can be added there, or ''. */
+  reason: string;
+}
+
+export function musicAddTarget(project: ProjectDocument, selectedMusicId: string | null): MusicAddTarget {
+  const lane = (selectedMusicId === null ? undefined : laneOfClip(project.music, selectedMusicId)) ?? project.music[0];
+  if (!lane) return { laneId: null, name: 'a new music track', reason: '' };
+  const index = project.music.indexOf(lane) + 1;
+  const reason =
+    lane.clips.length >= MAX_MUSIC_CLIPS
+      ? `Music track ${index} holds at most ${MAX_MUSIC_CLIPS} clips. Select a clip on another music track first.`
+      : '';
+  return { laneId: lane.id, name: `music track ${index}`, reason };
+}
+
+/** A new clip of `range` after the last clip of the target track, or alone on a new track at frame 0. */
+export function addMusicRangeEdit(
+  project: ProjectDocument,
+  laneId: string | null,
+  range: Pick<MusicClip, 'mediaId' | 'sourceIn' | 'sourceOut'>,
+  ids: { lane: string; clip: string },
+): MusicEdit {
+  const clip: MusicClip = { id: ids.clip, ...range, start: 0, duration: range.sourceOut - range.sourceIn, loop: false };
+  if (laneId === null)
+    return {
+      type: 'music',
+      music: [
+        ...project.music,
+        { id: ids.lane, gainDb: 0, ripple: false, openingFade: 0, closingFade: 0, clips: [clip], transitions: [] },
+      ],
+    };
+  return musicLaneEdit(project, laneId, (lane) =>
+    insertMusicClip(lane, { ...clip, start: musicClipEnd(lane.clips.at(-1)!) }),
+  );
 }
 
 /** Changes one clip; a Ripple track plays its clips one after another again, a start can reorder clips. */

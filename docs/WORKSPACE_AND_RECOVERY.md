@@ -192,7 +192,8 @@ are mapped explicitly. Space plays or pauses after a pointer press on a control
 (button, tab, checkbox, slider, select or divider), so focus left by a click never
 swallows it; a control reached by keyboard keeps native Space activation, and text
 or number fields always keep the typed space. Space drives the displayed preview: the
-source preview's IN–OUT playback while **Source preview** is shown, the timeline
+source preview's IN–OUT playback while **Source preview** is shown (a recording's, or the
+music file's shown there), the timeline
 otherwise. Editing
 shortcuts cannot mutate clips while using a modal, source control, input, options
 popover, activity drawer or pane divider. Skip links expose the major editor regions.
@@ -683,6 +684,33 @@ creates a new music entry and verifies the selected path, not a missing old one.
 The new entry prepares its own PCM cache; the old entry, its project references and
 caches remain unchanged. Add the new entry separately to place music. To keep the
 existing entry, its music tracks and cache, use **Relink** instead.
+
+### Music in Source preview
+
+Clicking a music file in Media → Music (**Listen to** _name_, pressed while shown) opens it in
+**Source preview** instead of a recording; choosing a recording replaces it, while hovering
+recording cards does not. Its range strip, as tall as a timeline music clip, draws the whole
+file with its waveform and, once analyzed, beats, hits and sections; below it, the play
+position timecode, the IN → OUT readout with **Reset music range** and the analysis line
+with **Music structure**. The round Play, the **Range / Whole** toggle (the same
+`pascap-source-play-scope` preference) and Space play from the play position (else IN) to OUT
+or the end, without looping. A click or drag on the strip (the **Music playhead** slider)
+moves the play position and pauses; the **Trim music start/end** handles (arrows one frame,
+Shift ten, Home/End restore) and I/O at the play position set IN/OUT. The range is
+editor-only, kept for the session per music file, never project data, history or a save;
+**Add music clip** _length_ adds it as one new clip after the last clip of the selected music
+clip's track (else the first track, else a new track at frame 0) in one Undo step, with
+**Music clip added to** _track_ feedback, and stays in Source preview. A full track is a
+reason on the disabled button.
+
+Playback reads the prepared PCM cache through its own music output (an AudioContext, worklet
+and reader worker created on first play, closed on close or project change) with the same
+bounded queue as the timeline; it plays one source, so its output clock is the play
+position. Music in Source preview and the timeline never play at once: playing the
+timeline pauses it, playing it pauses the timeline, and leaving the Source tab pauses it.
+A file not prepared, queued, preparing, failed or with a missing original shows the reason
+on the strip and disables Play and Add; nothing prepares or relinks implicitly. Escape or
+the × closes Source preview; removing the file from the project closes it.
 
 ### Independent music tracks
 

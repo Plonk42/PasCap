@@ -59,6 +59,9 @@ interface Props {
   /** `choose` remembers the recording to return to once hovering ends. */
   onReview: (review: ReviewTarget, choose: boolean) => void;
   onReviewHoverEnd: () => void;
+  /** The music recording shown in Source preview, and opening one there. */
+  musicReview: string | null;
+  onReviewMusic: (id: string) => void;
   targetLayer: string;
   onCollapse: (panel: SidePanel) => void;
   collapseDisabled: boolean;
@@ -329,6 +332,8 @@ export function MediaLibrary({
   currentReview,
   onReview,
   onReviewHoverEnd,
+  musicReview,
+  onReviewMusic,
   targetLayer,
   onCollapse,
   collapseDisabled,
@@ -1007,6 +1012,8 @@ export function MediaLibrary({
           project={project}
           busy={busy}
           missing={missing}
+          reviewing={musicReview}
+          onReview={onReviewMusic}
           onPrepare={onPrepareMusic}
           onRelink={onRelink}
           onRemove={onRemoveMusic}

@@ -1,51 +1,20 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type PointerEvent,
-  type RefObject,
-} from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
 import type { EditCommand } from '../shared/commands.js';
 import type { MusicTrack, ProjectDocument } from '../shared/model.js';
-import { musicBeatFrames, musicHitFrames, type MusicAnalysis } from '../shared/music-analysis.js';
 import { removeMusicClips } from '../shared/music-lanes.js';
 import { snapFrame, type BeatSnap } from '../shared/snap.js';
 import { formatTimecode } from '../shared/timing.js';
-import { waveformColumnCount, waveformColumns } from '../shared/waveform.js';
+import { MusicGraphics } from './music-graphics.js';
 import './music-ui.css';
 import { planMusicGesture, type MusicGestureKind } from './music-ui.js';
 import { useMusicAnalysis } from './MusicAnalysis.js';
-import { describeMusicMoment, MusicStructure } from './music-structure.js';
-import { useWaveform, waveformPath } from './music-waveform.js';
+import { describeMusicMoment } from './music-structure.js';
 import { placementSnapPoints, snapPlacement } from './timeline-placement.js';
 import type { DraftPreview } from './Timeline.js';
-import { beatTickPaths, hitTickPaths, type BeatTicks, type HitTicks } from './timeline-beats.js';
 
-/** Hit marks end just above the tone strip, light ones half as tall as strong ones. */
-const HIT_ROWS = { strong: 50, light: 56, bottom: 62 } as const;
 /** The hover readout names a hit within this many pixels. */
 const HIT_HOVER_PX = 4;
-
-/** SVG paths of a music clip's hits within its clip, at the clip's scale. */
-function hitTicks(music: MusicTrack, hits: MusicAnalysis['hits'] | null, scale: number): HitTicks | null {
-  if (!hits?.length) return null;
-  return hitTickPaths(musicHitFrames(music, hits), (frame) => (frame - music.start) * scale, HIT_ROWS, scale);
-}
-
-/** SVG paths of a music track's beats within its clip, at the clip's scale. */
-function beatTicks(music: MusicTrack, beats: MusicAnalysis['beats'] | null, scale: number): BeatTicks | null {
-  if (!beats?.length) return null;
-  return beatTickPaths(
-    musicBeatFrames(music, beats),
-    (frame) => (frame - music.start) * scale,
-    { downbeat: 26, beat: 36, bottom: 46 },
-    scale,
-  );
-}
 
 export interface MusicTimelineGesture {
   id: string;
@@ -151,19 +120,6 @@ export function MusicTimeline(props: Readonly<Props>) {
   const { phase } = useMusicAnalysis(asset);
   const clipScale = drag.current?.scale ?? scale;
   const analyzed = phase.kind === 'ready' ? phase.analysis : null;
-  const ticks = useMemo(() => beatTicks(music, analyzed?.beats ?? null, clipScale), [music, analyzed, clipScale]);
-  const hitMarks = useMemo(() => hitTicks(music, analyzed?.hits ?? null, clipScale), [music, analyzed, clipScale]);
-  const structure = useMemo(
-    () => analyzed && <MusicStructure music={music} analysis={analyzed} scale={clipScale} />,
-    [music, analyzed, clipScale],
-  );
-  const wave = useWaveform(asset);
-  const columns = wave ? waveformColumnCount(wave, music.duration, music.duration * clipScale) : 0;
-  const { sourceIn, sourceOut, duration, loop } = music;
-  const outline = useMemo(
-    () => (wave ? waveformPath(waveformColumns(wave, { sourceIn, sourceOut, duration, loop }, columns)) : null),
-    [wave, sourceIn, sourceOut, duration, loop, columns],
-  );
   const update = (): void => {
     const active = drag.current;
     const viewport = latest.current.viewport.current;
@@ -344,39 +300,7 @@ export function MusicTimeline(props: Readonly<Props>) {
         onPointerLeave={() => setHover(null)}
         {...handlers}
       >
-        {structure}
-        <svg
-          className="music-waveform"
-          viewBox={`0 0 ${Math.max(1, columns)} 45`}
-          preserveAspectRatio="none"
-          aria-label={`Waveform for ${name}`}
-          role="img"
-        >
-          {outline && <path d={outline} fill="#acb8ee" />}
-        </svg>
-        {ticks && (
-          <svg
-            className="music-beats"
-            aria-hidden="true"
-            data-beats={ticks.beatCount}
-            data-downbeats={ticks.downbeatCount}
-          >
-            <path className="beat" d={ticks.beats} />
-            <path className="downbeat" d={ticks.downbeats} />
-          </svg>
-        )}
-        {hitMarks && (
-          <svg
-            className="music-hits"
-            aria-hidden="true"
-            data-strong-hits={hitMarks.strongCount}
-            data-light-hits={hitMarks.lightCount}
-          >
-            {hitMarks.paths.map((path) => (
-              <path key={path.className} className={path.className} d={path.d} />
-            ))}
-          </svg>
-        )}
+        <MusicGraphics music={music} asset={asset} scale={clipScale} label={name} />
         <span>
           {asset?.name ?? 'Unavailable recording'}
           {music.loop ? ' · loop' : ''}

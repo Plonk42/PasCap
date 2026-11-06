@@ -14,3 +14,6 @@ export function writePreference(key: string, value: string): boolean {
     return false;
   }
 }
+
+/** Source preview plays the applied range, or with `recording` the whole recording, for video and music alike. */
+export const SOURCE_PLAY_SCOPE_PREFERENCE = 'pascap-source-play-scope';

@@ -820,6 +820,21 @@ onto the music lanes. Importing alone never places music. The trash on the file 
 clips) from this project. No soundtrack is
 supplied; use music you own or have permission to use and keep private paths private.
 
+**Listen before placing.** Click a music file in **Media → Music** to open it in **Source preview** (it replaces a
+recording shown there; hovering a recording does not interrupt it). The strip shows its whole
+waveform with, once analyzed, its beats, hits and sections, like a music clip on the
+timeline. **Play / Pause** (or Space) plays it from the play position; click or drag on the
+strip to move that position, which pauses. Like for recordings, **Range** plays from IN to OUT
+and **Whole** the whole file; playback stops at the end, without looping. Set **IN/OUT** with
+the handles or **I**/**O** at the play position (marking does not pause); the reset icon
+restores the whole file. This range is not saved: it only chooses what **Add music clip**
+adds, as a new clip after the last clip of the selected music clip's track (else the first
+track, else a new track at the start), one Undo step. Listening never edits, saves or
+creates history. Music in Source preview and the timeline never play at once: starting
+one pauses the other, and leaving the Source tab pauses the music. A file not prepared yet,
+still preparing, failed or with its original missing says why it cannot play. Escape or
+the × closes Source preview.
+
 If music was moved, **Relink** its **Original missing** file in Media → Music to keep
 its music clips and cache (see above). Importing the new location instead creates a
 separate entry that prepares its own cache and leaves the old entry and projects
@@ -1017,7 +1032,7 @@ storage/render breakdowns remain their existing expandable controls, not help bu
 Keyboard actions respect text and number fields, source controls, dialogs and a control
 reached with Tab. After a click on a button, tab, checkbox or slider, Space still
 plays or pauses. On the **Source preview** tab, Space plays or pauses the source preview
-instead of the timeline. Click the preview timecode for an exact frame or **MM:SS:FF** at 30 fps
+(the recording, or the music file shown there) instead of the timeline. Click the preview timecode for an exact frame or **MM:SS:FF** at 30 fps
 NDF; this display is not wall-clock duration at 30000/1001 fps. Undo/Redo is session
 history, not a persistent project revision browser.
 

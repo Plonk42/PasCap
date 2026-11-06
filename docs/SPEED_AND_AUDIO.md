@@ -419,6 +419,12 @@ Video uses integer project frames and exact decoded source frames
 for video: a late decoder holds the previous image while the audio clock continues,
 and skips frames the clock has passed. Only a failed music synchronization restarts
 music, after the required decoded frames are ready again.
+A music file shown in **Source preview** plays through its own instance of this same
+streaming output (its own AudioContext, worklet and reader worker, created on first play),
+as a single source of the played range at its own source frames with neutral gain and no
+fades; its position is that output's clock, and an underrun restarts it there. It never
+plays together with the timeline: starting either pauses the other. It changes nothing in
+the project, the mix or export ([music in Source preview](WORKSPACE_AND_RECOVERY.md#music-in-source-preview)).
 Placement, source IN/OUT, duration and loop boundaries use independently rounded
 integer 48 kHz sample positions, matching native audio placement. Selected-range
 wraps are filled into consecutive mixed blocks without a music restart; valid placement
