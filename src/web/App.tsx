@@ -145,6 +145,12 @@ const SAVE_LABEL: Record<SaveState['state'], string> = {
   error: 'Save error',
   unsaved: 'Unsaved',
 };
+const NO_PROJECT_LABEL = 'Local workspace';
+/** The save status reserves its longest label's width, so the controls before it never move. */
+const WIDEST_SAVE_LABEL = Object.values(SAVE_LABEL).reduce(
+  (widest, label) => (label.length > widest.length ? label : widest),
+  NO_PROJECT_LABEL,
+);
 function timingKey(project: ProjectDocument): string {
   return JSON.stringify({
     id: project.id,
@@ -1002,7 +1008,7 @@ export function App() {
     setDraggedMediaIds(null);
     reviews.close();
     setViewerMode('timeline');
-    setSaveState({ state: 'saved', message: 'Local workspace', revision: 0, recovery: null });
+    setSaveState({ state: 'saved', message: NO_PROJECT_LABEL, revision: 0, recovery: null });
     const url = new URL(location.href);
     url.searchParams.delete('project');
     window.history.replaceState(null, '', url);
@@ -1981,7 +1987,9 @@ export function App() {
             aria-atomic="true"
           >
             <span className="status-dot" />
-            {project ? SAVE_LABEL[saveState.state] : 'Local workspace'}
+            <span className="save-label" data-reserve={WIDEST_SAVE_LABEL}>
+              <span>{project ? SAVE_LABEL[saveState.state] : NO_PROJECT_LABEL}</span>
+            </span>
           </output>
           <button
             className="icon-button workspace-help"

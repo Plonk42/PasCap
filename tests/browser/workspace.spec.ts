@@ -9,6 +9,7 @@ let saved: ProjectDocument;
 let writes: number;
 let failure: number;
 let reads: number;
+let held: Promise<void> | null;
 
 test.beforeEach(async ({ page, request }) => {
   const library = (await (await request.get('/api/media')).json()) as { assets: MediaAsset[] };
@@ -23,6 +24,7 @@ test.beforeEach(async ({ page, request }) => {
   writes = 0;
   failure = 0;
   reads = 0;
+  held = null;
   await page.route('**/api/projects', async (route) => {
     if (route.request().method() !== 'GET') {
       await route.abort('blockedbyclient');
@@ -53,6 +55,7 @@ test.beforeEach(async ({ page, request }) => {
     }
     if (route.request().method() === 'PUT') {
       writes++;
+      await held;
       if (failure) {
         await route.fulfill({
           status: failure,
@@ -242,6 +245,46 @@ test('retryable autosave failures keep the draft and require an explicit retry w
   expect(writes).toBe(2);
   expect(saved.clips[0]?.grade.color).toMatchObject({ exposure: 0.6, saturation: 1.4 });
   expect(saved.revision).toBe(1);
+});
+
+test('save status changes never move the title, Undo or Redo at the default and minimum viewports', async ({
+  page,
+}) => {
+  // Its accessible name is the state's message, so find it by class.
+  const status = page.locator('output.save-status');
+  const title = page.getByRole('textbox', { name: 'Project title', exact: true });
+  const controls = [
+    title,
+    page.getByRole('button', { name: 'Undo', exact: true }),
+    page.getByRole('button', { name: 'Redo', exact: true }),
+  ];
+  const geometry = async (label: string): Promise<string> => {
+    await expect(status).toHaveText(label);
+    // The label sits on one line inside the status, never clipped.
+    expect(await status.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+    expect((await status.boundingBox())!.height).toBeLessThan(24);
+    return JSON.stringify(await Promise.all(controls.map((control) => control.boundingBox())));
+  };
+  for (const [index, size] of [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 720 },
+  ].entries()) {
+    await page.setViewportSize(size);
+    const stable = await geometry('Saved locally');
+    failure = 503;
+    await title.fill(`Renamed ${index}`);
+    await title.press('Enter');
+    expect(await geometry('Unsaved')).toBe(stable);
+    await page.evaluate(() => window.pascapLab!.flush());
+    expect(await geometry('Save error')).toBe(stable);
+    failure = 0;
+    let release = (): void => undefined;
+    held = new Promise((resolve) => (release = resolve));
+    await page.getByRole('button', { name: 'Retry save' }).click();
+    expect(await geometry('Saving…')).toBe(stable);
+    release();
+    expect(await geometry('Saved locally')).toBe(stable);
+  }
 });
 
 test('conflicts never overwrite or auto-rebase: download and confirmed reload preserve the saved project', async ({

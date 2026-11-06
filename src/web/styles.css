@@ -170,6 +170,20 @@ svg {
   white-space: nowrap;
 }
 
+.save-label {
+  display: inline-grid;
+}
+
+.save-label > span,
+.save-label::before {
+  grid-area: 1 / 1;
+}
+
+.save-label::before {
+  content: attr(data-reserve);
+  visibility: hidden;
+}
+
 .status-dot {
   width: 5px;
   height: 5px;
