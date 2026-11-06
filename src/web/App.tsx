@@ -2168,6 +2168,7 @@ export function App() {
               onRemove={(videoIds) => removeMedia({ videoIds, audioIds: [] })}
               onRemoveMusic={(audioIds) => removeMedia({ videoIds: [], audioIds })}
               onKeepBestRanges={keepBestRanges}
+              onSelectionDone={(mediaId, done) => edit({ type: 'select-done', mediaId, done })}
               onImport={() => requestImport()}
               importRevision={importRevision}
               review={review}

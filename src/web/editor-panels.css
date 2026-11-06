@@ -437,6 +437,66 @@
   column-gap: 2px;
 }
 
+/* The range selection mark sits on the thumbnail's corner, over the review button. */
+.editor-media .list .media-item-main {
+  grid-row: 1;
+  grid-column: 2;
+}
+
+.editor-media .media-done {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  grid-row: 1;
+  grid-column: 2;
+  justify-self: start;
+  align-self: center;
+  width: 16px;
+  height: 16px;
+  margin: 16px 0 0 41px;
+  padding: 0;
+  border: 1px solid #a9c7b1;
+  border-radius: 50%;
+  background: #101814d9;
+  color: #a9c7b1;
+  opacity: 0;
+}
+
+.editor-media .grid .media-done {
+  grid-column: 1 / -1;
+  justify-self: end;
+  align-self: start;
+  margin: 4px;
+}
+
+.editor-media .media-item:is(:hover, :focus-within) .media-done,
+.editor-media .media-done[aria-pressed='true'] {
+  opacity: 1;
+}
+
+.editor-media .media-done[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #18291d;
+}
+
+.editor-media .media-done:disabled {
+  cursor: default;
+}
+
+@container media-library (width < 280px) {
+  .editor-media .list .media-done {
+    margin-left: 30px;
+  }
+}
+
+@media (min-width: 1700px) {
+  .editor-media .list .media-done {
+    margin: 22px 0 0 55px;
+  }
+}
+
 .editor-media .grid .media-item :is(.icon-button, .media-action-space) {
   width: 22px;
   height: 22px;
@@ -587,6 +647,7 @@
   .editor-media .media-item .add-media,
   .editor-media .media-item .add-media-new-track,
   .editor-media .media-item .media-remove,
+  .editor-media .media-item .media-done,
   .editor-media .media-music-item .media-remove,
   .editor-inspector .color-control-actions .icon-button {
     opacity: 1;

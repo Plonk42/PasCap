@@ -2744,6 +2744,80 @@ test('the Media heading shows the kept duration before the recorded total, follo
   await expect(total).toHaveText(durationLabel(recorded(assets)));
 });
 
+test('the range selection done mark toggles in one Undo step, shows on the thumbnail, filters, counts and is saved', async ({
+  page,
+}) => {
+  const [a, b] = assets as [MediaAsset, MediaAsset];
+  const mark = (asset: MediaAsset) =>
+    page.getByRole('button', { name: `Range selection of ${asset.name} done`, exact: true });
+  const card = (asset: MediaAsset) => page.locator(`.media-item[data-media-id="${asset.id}"]`);
+  const count = page.locator('.library-done-count');
+  const undo = page.getByRole('button', { name: 'Undo', exact: true });
+  const opacity = (asset: MediaAsset) => mark(asset).evaluate((element) => getComputedStyle(element).opacity);
+  /** The mark sits inside the thumbnail's corner. */
+  const onThumbnail = async (asset: MediaAsset) => {
+    const badge = (await mark(asset).boundingBox())!;
+    const thumb = (await card(asset).locator('.media-thumb').boundingBox())!;
+    expect(badge.x).toBeGreaterThanOrEqual(thumb.x);
+    expect(badge.y).toBeGreaterThanOrEqual(thumb.y);
+    expect(badge.x + badge.width).toBeLessThanOrEqual(thumb.x + thumb.width);
+    expect(badge.y + badge.height).toBeLessThanOrEqual(thumb.y + thumb.height);
+  };
+  await page.getByRole('button', { name: 'Review pattern-a.mp4', exact: true }).click();
+  await sourceRange(page, 10, 40);
+  const before = { ...(await current(page)), revision: 0 };
+  const now = async () => ({ ...(await current(page)), revision: 0 });
+  await expect(count).toHaveText('0/2 done');
+  await expect(mark(a)).toHaveAttribute('aria-pressed', 'false');
+
+  await mark(a).click();
+  await expect(mark(a)).toHaveAttribute('aria-pressed', 'true');
+  await expect(count).toHaveText('1/2 done');
+  expect(await now()).toEqual({ ...before, selectsDone: [a.id] });
+  // Done shows without hovering; a recording still to review shows nothing.
+  await page.mouse.move(0, 0);
+  await expect.poll(() => opacity(a)).toBe('1');
+  await expect.poll(() => opacity(b)).toBe('0');
+  await onThumbnail(a);
+
+  // The filter shows the recordings marked done, or those still to review.
+  const filter = page.getByRole('combobox', { name: 'Filter media', exact: true });
+  await filter.selectOption('done');
+  await expect(card(a)).toBeVisible();
+  await expect(card(b)).toHaveCount(0);
+  await filter.selectOption('todo');
+  await expect(card(a)).toHaveCount(0);
+  await expect(card(b)).toBeVisible();
+  await filter.selectOption('all');
+
+  await undo.click();
+  await expect(mark(a)).toHaveAttribute('aria-pressed', 'false');
+  expect(await now()).toEqual(before);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(mark(a)).toHaveAttribute('aria-pressed', 'true');
+
+  // The mark is project data: it survives a reload and stays on the thumbnail in grid view and at 240 px.
+  await flush(page);
+  expect(memory.snapshot().selectsDone).toEqual([a.id]);
+  await page.reload();
+  await expect(mark(a)).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Grid view', exact: true }).click();
+  await onThumbnail(a);
+  await page.getByRole('button', { name: 'List view', exact: true }).click();
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const resizer = page.getByRole('slider', { name: 'Resize Media panel' });
+  await resizer.focus();
+  while (Number(await resizer.getAttribute('aria-valuenow')) > 240) await resizer.press('ArrowLeft');
+  await onThumbnail(a);
+  await expect(count).toBeInViewport();
+
+  // Removing the recording removes its mark.
+  await page.getByRole('button', { name: `Remove ${a.name} from project`, exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Remove from project', exact: true }).click();
+  await expect(count).toHaveText('0/1 done');
+  expect((await current(page)).selectsDone).toEqual([]);
+});
+
 test('removing a music recording removes its tracks after confirmation and keeps other media', async ({
   page,
   request,

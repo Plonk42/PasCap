@@ -209,6 +209,7 @@ describe('operation routes', () => {
         },
       ],
       selects: { 'rec-1': [{ sourceIn: 0, sourceOut: 120 }] },
+      selectsDone: ['rec-1'],
     });
     const context = {
       projects: { load: async () => project, save: async () => project },
@@ -235,7 +236,14 @@ describe('operation routes', () => {
       },
     ]);
     expect(description.recordings).toEqual([
-      { id: 'rec-1', name: 'DJI_0001.MP4', frameCount: 300, ready: true, kept: [{ sourceIn: 0, sourceOut: 120 }] },
+      {
+        id: 'rec-1',
+        name: 'DJI_0001.MP4',
+        frameCount: 300,
+        ready: true,
+        kept: [{ sourceIn: 0, sourceOut: 120 }],
+        selectionDone: true,
+      },
     ]);
 
     // A comparison renders the saved (or original) frame beside the candidate in one picture.

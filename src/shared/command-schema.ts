@@ -385,12 +385,16 @@ export const editCommandSchema = z.discriminatedUnion('type', [
     "Replace a recording's kept ranges with ranges inside the existing ones; it never keeps more frames.",
     { mediaId, ranges: described(selectRanges.min(1), 'At least one range inside the kept ones.') },
   ),
+  command('select-done', "Mark a recording's range selection done, or not done; it never changes its kept ranges.", {
+    mediaId,
+    done: described(z.boolean(), 'True marks it done; false marks it as still to review.'),
+  }),
 ]);
 
 export type EditCommand = z.infer<typeof editCommandSchema>;
 
-/** Editor commands carrying a whole track: half of edit's schema, and the assistant has a command per setting. */
-const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set(['layer-add', 'layer-update']);
+/** Editor commands carrying a whole track (half of edit's schema, and the assistant has a command per setting) or the user's own review marks. */
+const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set(['layer-add', 'layer-update', 'select-done']);
 
 /** The commands of the edit operation. */
 export const assistantEditCommandSchema = z.discriminatedUnion(

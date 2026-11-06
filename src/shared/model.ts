@@ -247,8 +247,17 @@ export const selectsSchema = z.record(
     .refine(orderedSelectRanges, { message: 'Selects must be ascending and separated by at least one frame.' }),
 );
 
+/**
+ * Recordings of the bin whose range selection the user marked done, an editing aid that never
+ * changes kept ranges, clips or rendering. Unmarked recordings still need a look.
+ */
+export const selectsDoneSchema = z
+  .array(idSchema)
+  .max(10_000)
+  .refine((ids) => new Set(ids).size === ids.length, { message: 'Recordings marked done must be unique.' });
+
 /** The only accepted project schema; bump it for every incompatible change. */
-export const PROJECT_SCHEMA_VERSION = 28;
+export const PROJECT_SCHEMA_VERSION = 29;
 
 const baseProjectSchema = z
   .object({
@@ -275,6 +284,7 @@ const baseProjectSchema = z
     music: musicTracksSchema,
     bookmarks: bookmarksSchema,
     selects: selectsSchema,
+    selectsDone: selectsDoneSchema,
     revision: frameSchema,
   })
   .strict();
@@ -295,6 +305,13 @@ export const projectSchema = baseProjectSchema.superRefine((project, context) =>
       context.addIssue({
         code: 'custom',
         message: `Selects refer to ${mediaId}, which is not in the project's recordings.`,
+      });
+  }
+  for (const mediaId of project.selectsDone) {
+    if (!bin.has(mediaId))
+      context.addIssue({
+        code: 'custom',
+        message: `Range selection is marked done for ${mediaId}, which is not in the project's recordings.`,
       });
   }
   try {
@@ -331,6 +348,7 @@ export function createProject(id: string, title: string): ProjectDocument {
     music: [],
     bookmarks: [],
     selects: {},
+    selectsDone: [],
     revision: 0,
   });
 }

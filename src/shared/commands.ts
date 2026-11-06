@@ -674,6 +674,15 @@ function editSelects(next: ProjectDocument, command: SelectCommand): void {
   next.selects = ranges.length ? { ...others, [mediaId]: ranges } : others;
 }
 
+/** The user's own review mark: it never changes kept ranges, clips or rendering. */
+function markSelectsDone(next: ProjectDocument, command: Extract<EditCommand, { type: 'select-done' }>): void {
+  const mediaId = idSchema.parse(command.mediaId);
+  if (!next.media.videoIds.includes(mediaId)) throw new Error('Only a recording of this project can be marked done.');
+  const others = next.selectsDone.filter((id) => id !== mediaId);
+  if (!command.done) next.selectsDone = others;
+  else if (others.length === next.selectsDone.length) next.selectsDone = [...others, mediaId];
+}
+
 /** Frames the two clips of a transition overlap. */
 function overlapOf(transition: Transition): number {
   return Math.max(0, -transitionOffset(transition));
@@ -948,6 +957,9 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'select-set':
     case 'select-narrow':
       editSelects(next, command);
+      return projectSchema.parse(next);
+    case 'select-done':
+      markSelectsDone(next, command);
       return projectSchema.parse(next);
     default:
       throw new Error('Unknown edit command.');
