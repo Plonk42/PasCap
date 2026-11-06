@@ -19,8 +19,10 @@ import {
 } from '../../src/shared/music-lanes.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import {
+  addMusicRangeEdit,
   createMusicClip,
   createMusicLane,
+  musicAddTarget,
   musicClipEdit,
   musicEditError,
   nextMusicSelection,
@@ -275,6 +277,37 @@ describe('music editing helpers', () => {
     expect(conflict.error).toContain('Fades and transitions overlap or exceed clip 2 of music track 1');
     expect(conflict.document).toEqual(project(fading));
     expect(conflict.command).toBeNull();
+  });
+
+  it("adds a reviewed range after the selected clip's track, else the first track, else on a new track", () => {
+    const range = { mediaId: 'song', sourceIn: 30, sourceOut: 90 };
+    const created = { lane: 'new-lane', clip: 'new-clip' };
+    const empty = project();
+    expect(musicAddTarget(empty, null)).toEqual({ laneId: null, name: 'a new music track', reason: '' });
+    expect(addMusicRangeEdit(empty, null, range, created)).toEqual({
+      type: 'music',
+      music: [
+        {
+          id: 'new-lane',
+          gainDb: 0,
+          ripple: false,
+          openingFade: 0,
+          closingFade: 0,
+          clips: [{ id: 'new-clip', ...range, start: 0, duration: 60, loop: false }],
+          transitions: [],
+        },
+      ],
+    });
+    const second = { ...lane([clip('x', 0), clip('y', 300)]), id: 'second' };
+    const document = project(lane([clip('a', 0)]), second);
+    expect(musicAddTarget(document, null)).toMatchObject({ laneId: 'lane', name: 'music track 1', reason: '' });
+    const target = musicAddTarget(document, 'x');
+    expect(target).toMatchObject({ laneId: 'second', name: 'music track 2', reason: '' });
+    const edit = addMusicRangeEdit(document, target.laneId, range, created);
+    expect(edit.music[0]).toBe(document.music[0]);
+    expect(edit.music[1]!.clips.at(-1)).toEqual({ id: 'new-clip', ...range, start: 400, duration: 60, loop: false });
+    const full = lane(Array.from({ length: 8 }, (_, index) => clip(`clip-${index}`, index * 100)));
+    expect(musicAddTarget(project(full), null).reason).toContain('at most 8 clips');
   });
 
   it('reports the first schema reason of a refused edit, not the whole report', () => {

@@ -35,7 +35,7 @@ import { DamageMarks } from './DamageMarks.js';
 import { mediaReady, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
 import { Popover } from './Popover.js';
-import { readPreference, writePreference } from './preferences.js';
+import { readPreference, SOURCE_PLAY_SCOPE_PREFERENCE, writePreference } from './preferences.js';
 import {
   CameraMotionPanel,
   MotionLanes,
@@ -148,8 +148,6 @@ function addedFeedback(count: number): string {
   return count > 1 ? `${count} clips added · one per range` : 'Clip added · mark another range';
 }
 
-const PLAY_SCOPE_PREFERENCE = 'pascap-source-play-scope';
-
 /** One video-only proxy decoder, independent of the project preview and transport. */
 export function SourceReview({
   asset,
@@ -179,7 +177,9 @@ export function SourceReview({
   const [retry, setRetry] = useState(0);
   const [lastAdded, setLastAdded] = useState<{ id: string; count: number } | null>(null);
   const [rangeDraft, setRangeDraft] = useState(false);
-  const [wholeRecording, setWholeRecording] = useState(() => readPreference(PLAY_SCOPE_PREFERENCE) === 'recording');
+  const [wholeRecording, setWholeRecording] = useState(
+    () => readPreference(SOURCE_PLAY_SCOPE_PREFERENCE) === 'recording',
+  );
   const smooth = useSmoothRange(asset);
   const motionView = useCameraMotionView();
   const requestedFrame = Math.max(0, Math.min(asset.metadata.frameCount - 1, Math.round(frame)));
@@ -305,7 +305,7 @@ export function SourceReview({
   };
   const togglePlayScope = (): void => {
     setWholeRecording(!wholeRecording);
-    writePreference(PLAY_SCOPE_PREFERENCE, wholeRecording ? 'range' : 'recording');
+    writePreference(SOURCE_PLAY_SCOPE_PREFERENCE, wholeRecording ? 'range' : 'recording');
   };
   useImperativeHandle(ref, () => ({
     toggle: togglePlayback,

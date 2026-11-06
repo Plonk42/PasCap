@@ -80,12 +80,13 @@ import { MediaLibrary, type ReviewTarget } from './MediaLibrary.js';
 import { nextLayerName } from './move-to-track.js';
 import type { ImportActions, ImportKind, ImportResult, RelinkTarget } from './ImportDialog.js';
 import { MusicControls, type MusicBoundaryRequest } from './MusicControls.js';
-import { nextMusicSelection } from './music-ui.js';
+import { addMusicRangeEdit, musicAddTarget, nextMusicSelection } from './music-ui.js';
 import { Popover } from './Popover.js';
 import { readPreference, writePreference } from './preferences.js';
 import { PreviewPanel } from './PreviewPanel.js';
 import { ProjectTitle } from './ProjectTitle.js';
 import { editorShortcut, typesSpace } from './shortcuts.js';
+import type { MusicReviewPlayback } from './MusicReview.js';
 import type { SourcePlayback } from './SourceReview.js';
 import { planTimelineDrop } from './timeline-placement.js';
 import { adjacentBookmark, rangeBookmarkCommands } from './timeline-bookmarks.js';
@@ -121,6 +122,7 @@ const ExportDialog = lazy(() => import('./ExportDialog.js').then((module) => ({ 
 const SaveRecovery = lazy(() => import('./SaveRecovery.js').then((module) => ({ default: module.SaveRecovery })));
 const ShortcutHelp = lazy(() => import('./ShortcutHelp.js').then((module) => ({ default: module.ShortcutHelp })));
 const SourceReview = lazy(() => import('./SourceReview.js').then((module) => ({ default: module.SourceReview })));
+const MusicReview = lazy(() => import('./MusicReview.js').then((module) => ({ default: module.MusicReview })));
 const ImportDialog = lazy(() => import('./ImportDialog.js').then((module) => ({ default: module.ImportDialog })));
 const HandOffDialog = lazy(() => import('./HandOff.js').then((module) => ({ default: module.HandOffDialog })));
 const CheckpointsDialog = lazy(() =>
@@ -330,6 +332,12 @@ export function App() {
   viewer.current = viewerMode;
   const sourcePlayback = useRef<SourcePlayback | null>(null);
   const [review, reviews] = useReviewTarget(sourcePlayback);
+  // A music recording shown in Source preview instead of a video one, and its session-only ranges.
+  const [musicReview, setMusicReview] = useState<string | null>(null);
+  const musicReviewOpen = useRef(false);
+  musicReviewOpen.current = musicReview !== null;
+  const musicPlayback = useRef<MusicReviewPlayback | null>(null);
+  const [musicRanges, setMusicRanges] = useState<MediaSelections>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const clipGroup = useClipGroup();
   const [selectedMusicId, setSelectedMusicId] = useState<string | null>(null);
@@ -700,6 +708,7 @@ export function App() {
   );
   const togglePlayback = useCallback(() => {
     if (drafting.current) return;
+    musicPlayback.current?.pause();
     sourceInspected.current = false;
     setSourceInspectionEpoch((epoch) => epoch + 1);
     setViewerMode('timeline');
@@ -938,6 +947,8 @@ export function App() {
       setSelectedLayerId(selectedLayer.current);
       setActiveSelects({});
       reviews.close();
+      setMusicReview(null);
+      setMusicRanges({});
       setViewerMode('timeline');
       const first = calculateLayout(loaded).clips[0];
       if (first) select(first.clip.id);
@@ -1007,6 +1018,8 @@ export function App() {
     setActiveSelects({});
     setDraggedMediaIds(null);
     reviews.close();
+    setMusicReview(null);
+    setMusicRanges({});
     setViewerMode('timeline');
     setSaveState({ state: 'saved', message: NO_PROJECT_LABEL, revision: 0, recovery: null });
     const url = new URL(location.href);
@@ -1224,7 +1237,7 @@ export function App() {
           undoRedo('redo');
           break;
         case 'play':
-          if (viewer.current === 'source') sourcePlayback.current?.toggle();
+          if (viewer.current === 'source') (musicPlayback.current ?? sourcePlayback.current)?.toggle();
           else togglePlayback();
           break;
         case 'split':
@@ -1454,6 +1467,10 @@ export function App() {
     INSPECTOR_REST_MS,
   );
   const pausePreview = useCallback(() => engine.current?.pause(), []);
+  const pauseTimelinePlayback = useCallback(() => {
+    playAfterSeek.current = false;
+    if (engine.current?.diagnostics().playing) engine.current.pause();
+  }, []);
   const openProject = async (id: string): Promise<boolean> =>
     (
       await act(async () => {
@@ -1729,11 +1746,20 @@ export function App() {
       .catch((cause: unknown) => setError(message(cause, 'Preview could not be retried.')));
   };
   const reviewSource = (next: ReviewTarget, choose: boolean): void => {
+    // Hovering a video recording never interrupts the music shown in Source preview.
+    if (!choose && musicReviewOpen.current) return;
+    setMusicReview(null);
     reviews.source(next, choose);
     if (viewer.current !== 'source') setViewerMode('source');
   };
+  const reviewMusic = (id: string): void => {
+    reviews.close();
+    setMusicReview(id);
+    setViewerMode('source');
+  };
   const closeReview = (): void => {
     reviews.close();
+    setMusicReview(null);
     setViewerMode('timeline');
     timelineTab.current?.focus({ preventScroll: true });
   };
@@ -1749,6 +1775,10 @@ export function App() {
     setTimeRange(null);
     // Release the removed recording's review decoder without moving keyboard focus.
     if (reviews.remove(removal.videoIds)) setViewerMode('timeline');
+    if (musicReview !== null && removal.audioIds.includes(musicReview)) {
+      setMusicReview(null);
+      setViewerMode('timeline');
+    }
     return true;
   };
   const refreshActivity = async (): Promise<boolean> => (await act(() => refresh(), 'activity')).ok;
@@ -1858,7 +1888,7 @@ export function App() {
       layerName: visible.layers.find((layer) => layer.id === clip.layerId)!.name,
     }));
   const navigateViewerTabs = (event: ReactKeyboardEvent<HTMLButtonElement>): void => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || !reviewAsset) return;
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || (!reviewAsset && !musicReview)) return;
     event.preventDefault();
     event.stopPropagation();
     const mode = event.key === 'Home' || (event.key !== 'End' && viewerMode === 'source') ? 'timeline' : 'source';
@@ -1872,6 +1902,21 @@ export function App() {
     const ids = project ? projectAudioIds(project) : new Set<string>();
     return audioAssets.filter((asset) => ids.has(asset.id));
   }, [audioAssets, project]);
+  const musicAsset = projectAudio.find((asset) => asset.id === musicReview);
+  const addMusicRange = (range: MediaSelection): boolean => {
+    const document = current.current;
+    if (!document || drafting.current) return false;
+    const target = musicAddTarget(document, musicSelection.current);
+    if (target.reason) {
+      setError(target.reason);
+      return false;
+    }
+    edit(
+      addMusicRangeEdit(document, target.laneId, range, { lane: crypto.randomUUID(), clip: crypto.randomUUID() }),
+      true,
+    );
+    return current.current !== document;
+  };
   const musicBusy = busy || !project || connection.state !== 'ready';
   const musicDrafting = draft !== null || !project;
   const musicControls = useMemo(
@@ -2175,6 +2220,8 @@ export function App() {
               currentReview={reviews.current}
               onReview={reviewSource}
               onReviewHoverEnd={reviews.endHover}
+              musicReview={musicReview}
+              onReviewMusic={reviewMusic}
               targetLayer={targetLayer}
               onCollapse={togglePanel}
               collapseDisabled={draft !== null}
@@ -2215,7 +2262,7 @@ export function App() {
                 tabIndex={viewerMode === 'source' ? 0 : -1}
                 aria-selected={viewerMode === 'source'}
                 aria-controls="source-view"
-                disabled={!reviewAsset}
+                disabled={!reviewAsset && !musicAsset}
                 onKeyDown={navigateViewerTabs}
                 onClick={() => setViewerMode('source')}
               >
@@ -2270,7 +2317,27 @@ export function App() {
                   </output>
                 }
               >
-                {reviewAsset && review && (
+                {musicAsset && (
+                  <MusicReview
+                    key={musicAsset.id}
+                    ref={musicPlayback}
+                    asset={musicAsset}
+                    missing={missingOriginals.has(musicAsset.id)}
+                    range={resolveMediaSelection(musicAsset.id, musicAsset.metadata.frameCount, musicRanges)}
+                    visible={viewerMode === 'source'}
+                    disabled={!project || busy || draft !== null}
+                    target={
+                      project
+                        ? musicAddTarget(project, selectedMusicId)
+                        : { laneId: null, name: 'a new music track', reason: 'Open a project first.' }
+                    }
+                    onRange={(range) => setMusicRanges((ranges) => ({ ...ranges, [range.mediaId]: range }))}
+                    onAdd={addMusicRange}
+                    onPlay={pauseTimelinePlayback}
+                    onClose={closeReview}
+                  />
+                )}
+                {!musicAsset && reviewAsset && review && (
                   <SourceReview
                     ref={sourcePlayback}
                     asset={reviewAsset}

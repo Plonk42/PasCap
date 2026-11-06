@@ -40,6 +40,8 @@ export function MediaMusicList({
   project,
   busy,
   missing,
+  reviewing,
+  onReview,
   onPrepare,
   onRelink,
   onRemove,
@@ -48,6 +50,9 @@ export function MediaMusicList({
   project: ProjectDocument | null;
   busy: boolean;
   missing: ReadonlySet<string>;
+  /** The recording shown in Source preview. */
+  reviewing: string | null;
+  onReview: (id: string) => void;
   onPrepare: (id: string) => Promise<void>;
   onRelink: (target: RelinkTarget | null) => void;
   onRemove: (ids: string[]) => boolean;
@@ -84,7 +89,7 @@ export function MediaMusicList({
         return (
           <article
             key={asset.id}
-            className="media-music-item"
+            className={`media-music-item ${reviewing === asset.id ? 'reviewing' : ''}`}
             data-music-media-id={asset.id}
             data-status={asset.status}
             draggable={asset.status === 'ready' && project !== null && !busy}
@@ -96,21 +101,34 @@ export function MediaMusicList({
               event.dataTransfer.effectAllowed = 'copy';
             }}
           >
-            <span className="media-music-icon" aria-hidden="true">
-              <Icon name="music" size={16} />
-            </span>
-            <span className="media-item-info" title={asset.sourcePath}>
-              <strong>{asset.name}</strong>
-              <span className="media-recording-meta">
-                <span className="media-recording-duration">{durationLabel(asset.metadata.durationSeconds)}</span>
-                {used > 0 && (
-                  <span className="media-usage-badge">
-                    {used} {used === 1 ? 'music clip' : 'music clips'}
-                  </span>
-                )}
-                {(asset.status !== 'ready' || lost) && <span className="media-status-text">{status}</span>}
+            <button
+              type="button"
+              className="media-music-main"
+              aria-label={`Listen to ${asset.name}`}
+              aria-pressed={reviewing === asset.id}
+              title={
+                asset.status === 'ready'
+                  ? `Listen in Source preview; drag onto the timeline’s music to place it · ${asset.sourcePath}`
+                  : `Show in Source preview · ${asset.sourcePath}`
+              }
+              onClick={() => onReview(asset.id)}
+            >
+              <span className="media-music-icon" aria-hidden="true">
+                <Icon name="music" size={16} />
               </span>
-            </span>
+              <span className="media-item-info">
+                <strong>{asset.name}</strong>
+                <span className="media-recording-meta">
+                  <span className="media-recording-duration">{durationLabel(asset.metadata.durationSeconds)}</span>
+                  {used > 0 && (
+                    <span className="media-usage-badge">
+                      {used} {used === 1 ? 'music clip' : 'music clips'}
+                    </span>
+                  )}
+                  {(asset.status !== 'ready' || lost) && <span className="media-status-text">{status}</span>}
+                </span>
+              </span>
+            </button>
             {lost && (
               <button
                 className="icon-button relink-media"

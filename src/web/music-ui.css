@@ -19,14 +19,14 @@
   margin-bottom: 6px;
 }
 
-.music-controls .music-analysis {
+:is(.music-controls, .music-review) .music-analysis {
   display: grid;
   justify-items: start;
   gap: 4px;
   margin-bottom: 10px;
 }
 
-.music-controls .music-analysis-status {
+:is(.music-controls, .music-review) .music-analysis-status {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -49,7 +49,7 @@
 }
 
 /* The analysis' sections, swells and silences, listed with their timeline positions. */
-.music-controls .music-structure {
+:is(.music-controls, .music-review) .music-structure {
   width: 100%;
   font-size: 12px;
 }
@@ -116,7 +116,8 @@
   stroke: rgb(243 217 164 / 95%);
 }
 
-.music-instance-lane .music-body svg.music-waveform {
+.music-instance-lane .music-body svg.music-waveform,
+.music-review .music-body svg.music-waveform {
   top: 20px;
   height: calc(100% - 30px);
 }
@@ -497,4 +498,56 @@
 
 .music-controls .music-transition .range-fields + .range-fields {
   margin-top: 6px;
+}
+
+/* Source preview of a music recording: the whole recording on a strip as tall as a timeline music clip. */
+.music-review .source-range-strip.music-review-strip {
+  height: 74px;
+  background: #31364f;
+}
+
+.music-review .music-review-body {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  cursor: auto;
+  pointer-events: none;
+}
+
+.music-review .music-review-unavailable {
+  padding: 0 12px;
+  text-align: center;
+}
+
+.music-review .music-review-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.music-review .music-review-error {
+  color: var(--error);
+  font-size: 11px;
+}
+
+.media-music-item.reviewing {
+  background: #243029;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.media-music-item > .media-music-main {
+  display: grid;
+  grid-column: 1 / 3;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
 }
