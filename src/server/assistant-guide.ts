@@ -77,8 +77,10 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   clip grades, for a shared look, such as one per music section: adjustment-add with its
   settings, then an adjustmentId on the color commands; adjustment-range moves or trims it,
   adjustment-split cuts it in two. Adjustments never overlap and stay at their project frames
-  when clips move. describe_project lists them with what they change; describe_track gives what
-  each clip's grade changes and the adjustments over it. Read them before changing a grade:
+  when clips move. describe_project lists them with what they change, and each clip's Detail;
+  describe_track gives what each clip's grade changes, its Detail and the adjustments over it
+  (with complete, every value of each clip grade, to copy a whole grade with the color command).
+  Read them before changing a grade:
   settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve).
   Prefer static grades; animate only when the brief asks or the light changes within a shot
   (clip keyframes are source frames, adjustment keyframes count from its start). describe_track

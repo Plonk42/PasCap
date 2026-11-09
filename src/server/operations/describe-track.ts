@@ -36,7 +36,7 @@ function only<T extends object>(values: T, settings: ReadonlySet<string> | null)
 
 export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
   { projects },
-  { projectId, layerId, frames = [], include, settings },
+  { projectId, layerId, frames = [], include, settings, complete },
 ) => {
   const project = await projects.load(projectId);
   const track = project.layers.find((layer) => layer.id === layerId);
@@ -71,7 +71,8 @@ export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
     ...(parts.has('grades') && {
       grades: placed.map((item) => ({
         clipId: item.clip.id,
-        grade: gradeSummary(item.clip.grade),
+        grade: gradeSummary(item.clip.grade, complete),
+        detail: item.clip.detail,
         adjustmentIds: over(item).map((adjustment) => adjustment.id),
       })),
     }),

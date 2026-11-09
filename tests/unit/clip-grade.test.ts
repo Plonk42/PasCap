@@ -6,6 +6,7 @@ import {
   generateCube,
   gradePixel,
   NEUTRAL_COLOR,
+  scalarColorValues,
   type ColorSettings,
   type RGB,
 } from '../../src/shared/color.js';
@@ -320,6 +321,11 @@ describe('clip grades for the assistant', () => {
       curves: { master: color.curves.master },
       keyframes: 2,
     });
+    // Complete: every value, neutral ones included.
+    const complete = gradeSummary({ color, keyframes: [] }, true);
+    expect(complete.settings).toEqual(scalarColorValues(color));
+    expect(complete.hsl).toEqual(color.hsl);
+    expect(complete.curves).toEqual(color.curves);
   });
   it('reads each clip grade on its track, the grade shown at a frame and the adjustment there', async () => {
     let document = applyCommand(project(), { type: 'color-setting', clipId: 'a', setting: 'saturation', value: 1.3 });
@@ -343,11 +349,17 @@ describe('clip grades for the assistant', () => {
       frames: [10, 70],
       include: ['grades', 'keyframes', 'at'],
       settings: ['tint', 'saturation'],
+      complete: false,
     });
-    // Each clip compactly, with the adjustments over it; the keyframes on request.
+    // Each clip compactly with its Detail and the adjustments over it; the keyframes on request.
     expect(described.grades).toEqual([
-      { clipId: 'a', grade: { settings: { saturation: 1.3 }, keyframes: 1 }, adjustmentIds: [] },
-      { clipId: 'b', grade: { settings: {}, keyframes: 0 }, adjustmentIds: ['look'] },
+      {
+        clipId: 'a',
+        grade: { settings: { saturation: 1.3 }, keyframes: 1 },
+        detail: NEUTRAL_DETAIL,
+        adjustmentIds: [],
+      },
+      { clipId: 'b', grade: { settings: {}, keyframes: 0 }, detail: NEUTRAL_DETAIL, adjustmentIds: ['look'] },
     ]);
     expect(described.keyframes).toEqual({
       transform: [],
@@ -383,6 +395,19 @@ describe('clip grades for the assistant', () => {
         transform: {},
       },
     ]);
+    // Complete: every value of each clip grade, enough to rebuild a color command.
+    const complete = await runners.describe_track(context, {
+      projectId: document.id,
+      layerId: 'video-1',
+      include: ['grades'],
+      complete: true,
+    });
+    expect(complete.grades![0]!.grade).toEqual({
+      settings: scalarColorValues(document.clips[0]!.grade.color),
+      hsl: document.clips[0]!.grade.color.hsl,
+      curves: document.clips[0]!.grade.color.curves,
+      keyframes: 1,
+    });
   });
 });
 

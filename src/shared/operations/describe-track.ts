@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { described } from '../described.js';
+import { detailSchema } from '../detail.js';
 import { interpolationSchema } from '../keyframes.js';
 import { gradeSettingSchema } from '../grade.js';
 import { frameSchema, idSchema, layerSchema } from '../model.js';
@@ -63,6 +64,7 @@ export const trackDescriptionSchema = z
             .object({
               clipId: idSchema,
               grade: described(gradeSummarySchema, "The clip's own grade, applied before any adjustment."),
+              detail: described(detailSchema, "The clip's static Detail filters, applied before its grade."),
               adjustmentIds: described(
                 z.array(idSchema),
                 'The adjustments overlapping the clip, applied after its grade (describe_project lists them).',
@@ -71,7 +73,7 @@ export const trackDescriptionSchema = z
             .strict(),
         )
         .optional(),
-      'Every clip of the track in timeline order: what its grade changes and the adjustments over it.',
+      'Every clip of the track in timeline order: what its grade changes, its Detail and the adjustments over it.',
     ),
     keyed: described(
       z
@@ -132,7 +134,7 @@ export type TrackDescription = z.infer<typeof trackDescriptionSchema>;
 export const describeTrack = defineOperation({
   name: 'describe_track',
   description:
-    'Read every appearance value of one video track: its Transform (with Opacity) and keyframes, which settings follow keyframes, what each clip grade changes (scalar settings, HSL ranges, curves and a keyframe count) with the adjustments over each clip, the keyframes on request, and the values that apply at the requested project frames, including the adjustment grading every track there. Settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve), so read the grades before changing them; afterwards, include keyframes or at with the settings you changed reads far less.',
+    "Read every appearance value of one video track: its Transform (with Opacity) and keyframes, which settings follow keyframes, what each clip grade changes (scalar settings, HSL ranges, curves and a keyframe count, or every value with complete), each clip's Detail (Sharpen, Clarity, Denoise) and the adjustments over it, the keyframes on request, and the values that apply at the requested project frames, including the adjustment grading every track there. Settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve), so read the grades before changing them; afterwards, include keyframes or at with the settings you changed reads far less.",
   input: z
     .object({
       projectId: described(idSchema, 'ID of the saved project.'),
@@ -143,7 +145,11 @@ export const describeTrack = defineOperation({
       ),
       include: described(
         z.array(z.enum(trackParts)).min(1).default(['track', 'grades', 'at']),
-        'Parts to return besides revision and keyed: track (the whole saved track, the largest part), keyframes (each Transform, clip grade and adjustment keyframe with only its keyed settings), grades (what each clip grade changes, with the adjustments over the clip) and at (the values at frames).',
+        'Parts to return besides revision and keyed: track (the whole saved track, the largest part), keyframes (each Transform, clip grade and adjustment keyframe with only its keyed settings), grades (what each clip grade changes and its Detail, with the adjustments over the clip) and at (the values at frames).',
+      ),
+      complete: described(
+        z.boolean().default(false),
+        'In grades, report every Color value of each clip grade, neutral ones included (all scalar settings, HSL ranges and curves), for example to copy a whole grade with the color command.',
       ),
       settings: described(
         z

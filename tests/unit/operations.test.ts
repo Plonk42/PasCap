@@ -204,7 +204,7 @@ describe('operation routes', () => {
           sourceOut: 90,
           speed: { mode: 'constant', rate: 2 },
           reverse: true,
-          detail: { sharpen: 0, clarity: 0, denoise: 0 },
+          detail: { sharpen: 0.4, clarity: -0.2, denoise: 0 },
           grade: createClipGrade(),
         },
       ],
@@ -233,6 +233,7 @@ describe('operation routes', () => {
         speed: '2×',
         reverse: true,
         grade: 'none',
+        detail: { sharpen: 0.4, clarity: -0.2, denoise: 0 },
       },
     ]);
     expect(description.recordings).toEqual([

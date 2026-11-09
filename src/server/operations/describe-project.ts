@@ -64,6 +64,7 @@ export const runDescribeProject: OperationRunner<typeof describeProject> = async
                 : `curve, ${clip.speed.keyframes.length} keyframes`,
             reverse: clip.reverse,
             grade: gradeLabel(clip.grade),
+            detail: clip.detail,
           })),
         transitions: layer.transitions,
       }));

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { described } from '../described.js';
+import { detailSchema } from '../detail.js';
 import { frameSchema, idSchema, musicTransitionSchema, selectRangeSchema, transitionSchema } from '../model.js';
 import { defineOperation } from './spec.js';
 import { gradeSummarySchema } from './grade-summary.js';
@@ -51,6 +52,7 @@ export const projectDescriptionSchema = z
                       z.string(),
                       'Its own grade, applied before any adjustment: "none", "static" or "N keyframes" (describe_track reads it).',
                     ),
+                    detail: described(detailSchema, 'Its static Detail filters, applied before its grade.'),
                   })
                   .strict(),
               ),
@@ -133,7 +135,7 @@ export type ProjectDescription = z.infer<typeof projectDescriptionSchema>;
 export const describeProject = defineOperation({
   name: 'describe_project',
   description:
-    'Summarize a saved project: its revision, duration, video tracks with their clips in timeline order (project frames and timecodes, source ranges, speed, direction, grade), transitions, adjustments, music tracks, the recordings with the ranges the user kept and whether their selection is done, and bookmarks. Frames are integers at 30000/1001 fps. Read it before editing and after each edit batch.',
+    'Summarize a saved project: its revision, duration, video tracks with their clips in timeline order (project frames and timecodes, source ranges, speed, direction, grade, Detail), transitions, adjustments, music tracks, the recordings with the ranges the user kept and whether their selection is done, and bookmarks. Frames are integers at 30000/1001 fps. Read it before editing and after each edit batch.',
   input: z
     .object({
       projectId: described(idSchema, 'ID of the saved project.'),
