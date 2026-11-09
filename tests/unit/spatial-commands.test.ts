@@ -179,12 +179,13 @@ describe('strict current-schema track Transform persistence', () => {
   it.each(malformed)('rejects $name without mutating the document or losing redo', ({ change }) => {
     const document = fixture();
     const history = new EditHistory(document);
-    const accepted = history.commit({ type: 'transform', layerId: 'video-1', transform: createSpatialSettings() });
+    const accepted = history.commit({ type: 'layer-key-set', layerId: 'video-1', frame: 0, values: { scale: 2 } });
     history.undo();
     const transform = settings();
     change(transform);
     expect(projectSchema.safeParse(withTransform(document, transform)).success).toBe(false);
-    expect(() => history.commit({ type: 'transform', layerId: 'video-1', transform })).toThrow();
+    const layer = { ...document.layers[0]!, transform } as ProjectDocument['layers'][number];
+    expect(() => history.commit({ type: 'layer-update', layer })).toThrow();
     expect(history.current).toEqual(document);
     expect(document).toEqual(fixture());
     expect(history.canUndo).toBe(false);
@@ -202,30 +203,27 @@ describe('strict current-schema track Transform persistence', () => {
   });
 });
 
-describe('atomic track Transform replacement', () => {
-  it('replaces only the track Transform in one Undo and owns all caller-supplied values', () => {
+describe('track Transform edits', () => {
+  it('change only the track Transform in one Undo each, never clip geometry', () => {
     const document = fixture();
-    const replacement = settings();
-    replacement.base.scale = 1.23456789;
-    replacement.keyframes[0]!.values.rotation = 15;
     const history = new EditHistory(document);
-    const next = history.commit({ type: 'transform', layerId: 'video-1', transform: replacement });
-    expect(next).toEqual(withTransform(document, replacement));
+    history.commit({ type: 'layer-key-set', layerId: 'video-1', frame: 100, values: { scale: 1.23456789 } });
+    const next = history.commit({ type: 'layer-key-set', layerId: 'video-1', frame: 0, values: { rotation: 15 } });
+    const expected = settings();
+    expected.keyframes[1]!.values.scale = 1.23456789;
+    expected.keyframes[0]!.values.rotation = 15;
+    expect(next).toEqual(withTransform(document, expected));
     const geometry = (value: ProjectDocument) =>
       calculateLayout(value).clips.map(({ start, end, duration }) => ({ start, end, duration }));
     expect(geometry(next)).toEqual(geometry(document));
-    replacement.base.scale = 8;
-    replacement.keyframes[0]!.values.rotation = 180;
-    expect(history.current.layers[0]!.transform.base.scale).toBe(1.23456789);
-    expect(history.current.layers[0]!.transform.keyframes[0]!.values.rotation).toBe(15);
+    history.undo();
     expect(history.undo()).toEqual(document);
     expect(history.canUndo).toBe(false);
-    expect(history.redo()).toEqual(next);
-    expect(() => applyCommand(document, { type: 'transform', layerId: 'missing', transform: settings() })).toThrow(
-      'Track no longer exists',
-    );
+    expect(() =>
+      applyCommand(document, { type: 'transform-patch', layerId: 'missing', settings: { scale: 2 } }),
+    ).toThrow('Track no longer exists');
     const unchanged = new EditHistory(document);
-    unchanged.commit({ type: 'transform', layerId: 'video-1', transform: settings() });
+    unchanged.commit({ type: 'layer-key-set', layerId: 'video-1', frame: 0, values: { rotation: -90 } });
     expect(unchanged.canUndo).toBe(false);
   });
 
@@ -234,13 +232,14 @@ describe('atomic track Transform replacement', () => {
     document.clips = [createClip('a', 'original', 0, 10), { ...createClip('b', 'original', 10, 20), start: 99 }];
     document.layers[0]!.transitions = [{ leftId: 'a', rightId: 'b', type: 'cut', duration: 0 }];
     document.layers.push(createLayer('empty', 'Empty'));
-    const transform = settings();
-    const next = applyCommand(document, { type: 'transform', layerId: 'video-1', transform });
-    expect(next.clips).toEqual(document.clips);
-    expect(next.layers[0]!.transform).toEqual(transform);
-    expect(applyCommand(document, { type: 'transform', layerId: 'empty', transform }).layers[1]!.transform).toEqual(
-      transform,
-    );
+    for (const layerId of ['video-1', 'empty']) {
+      const keyed = applyCommand(document, { type: 'layer-key-set', layerId, frame: 40, values: { scale: 2 } });
+      const patched = applyCommand(document, { type: 'transform-patch', layerId, settings: { rotation: 10 } });
+      for (const next of [keyed, patched]) expect(next.clips).toEqual(document.clips);
+      const index = layerId === 'empty' ? 1 : 0;
+      expect(keyed.layers[index]!.transform.keyframes.map((point) => point.frame)).toEqual([40]);
+      expect(patched.layers[index]!.transform.base.rotation).toBe(10);
+    }
   });
 
   it.each(['trim', 'trim-place', 'split', 'remove-source-range', 'duplicate'] as const)(

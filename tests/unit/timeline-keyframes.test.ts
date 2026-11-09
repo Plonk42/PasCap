@@ -62,7 +62,11 @@ describe('Transform keyframe drag planning', () => {
     const { project, point, other } = fixture();
     const bytes = JSON.stringify(project);
     const plan = planTransformKeyframeMove(project, 'video-1', 20, 90);
-    expect(plan).toMatchObject({ frame: 90, error: '', command: { type: 'transform', layerId: 'video-1' } });
+    expect(plan).toMatchObject({
+      frame: 90,
+      error: '',
+      command: { type: 'layer-key-move', layerId: 'video-1', frame: 20, nextFrame: 90 },
+    });
     expect(plan.document.layers[0]!.transform).toEqual({
       base: project.layers[0]!.transform.base,
       keyframes: [other, { ...point, frame: 90 }],

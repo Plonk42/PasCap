@@ -15,7 +15,7 @@ import {
   selectRangeSchema,
   transitionSchema,
 } from './model.js';
-import { SPATIAL_CHANNELS, spatialPoseSchema, spatialSettingsSchema, type SpatialChannel } from './spatial.js';
+import { SPATIAL_CHANNELS, spatialPoseSchema, type SpatialChannel } from './spatial.js';
 import { speedSchema } from './speed.js';
 
 /** A grade setting, or a Transform setting of a track. */
@@ -181,13 +181,6 @@ export const editCommandSchema = z.discriminatedUnion('type', [
   command('reverse', 'Play a clip backwards or forwards; its duration and placement do not change.', {
     clipId,
     reverse: described(z.boolean(), 'True plays the clip from its last frame back to its first.'),
-  }),
-  command('transform', "Replace a video track's Transform; it applies to every clip on the track at project time.", {
-    layerId,
-    transform: described(
-      spatialSettingsSchema,
-      'Base pose (crop, scale, translation, rotation, opacity) and keyframes at project frames.',
-    ),
   }),
   command('detail', "Set a clip's static detail filters, applied before its grade.", {
     clipId,
@@ -405,7 +398,6 @@ const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   'layer-update',
   'color',
   'detail',
-  'transform',
   'layer-key-toggle',
   'layer-key-value',
   'select-done',

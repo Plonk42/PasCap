@@ -17,7 +17,6 @@ const PHRASES: Record<EditCommand['type'], Phrase> = {
   'transform-patch': ['track Transform', 'changed', 'track Transforms'],
   speed: ['clip speed', 'changed', 'clip speeds'],
   reverse: ['clip direction', 'changed', 'clip directions'],
-  transform: ['track Transform', 'changed', 'track Transforms'],
   detail: ['clip detail', 'changed', 'clip details'],
   'detail-patch': ['clip detail', 'changed', 'clip details'],
   music: ['music', 'changed', null],

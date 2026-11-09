@@ -3,7 +3,7 @@ import { applyCommand } from '../../src/shared/commands.js';
 import type { MediaAsset, MediaJob } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
-import { closeOptions, inspectorTab, openOptions, transformPoint } from './editor-helpers.js';
+import { closeOptions, inspectorTab, openOptions } from './editor-helpers.js';
 
 let saved: ProjectDocument;
 let assets: MediaAsset[];
@@ -266,13 +266,13 @@ test('duplicate preserves static settings without copying row points, and overla
     color: { ...document.clips[1]!.grade.color, contrast: 1.3, saturation: 0.7 },
   });
   document = applyCommand(document, { type: 'transform-patch', layerId: 'upper', settings: { opacity: 0.6 } });
+  document = applyCommand(document, { type: 'layer-key-set', layerId: 'upper', frame: 10, values: { rotation: -5 } });
   document = applyCommand(document, {
-    type: 'transform',
+    type: 'layer-key-set',
     layerId: 'upper',
-    transform: {
-      ...document.layers[1]!.transform,
-      keyframes: [transformPoint(10, { rotation: -5 }), transformPoint(70, { rotation: 5 }, 'smooth')],
-    },
+    frame: 70,
+    values: { rotation: 5 },
+    easing: 'smooth',
   });
   await page.evaluate((next) => window.pascapLab!.setDocument(next), document);
   await page.getByRole('region', { name: 'Video timeline' }).focus();

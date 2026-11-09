@@ -1,10 +1,10 @@
-import { applyCommand, type EditCommand } from '../shared/commands.js';
+import { applyCommand } from '../shared/commands.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { calculateLayout } from '../shared/timeline.js';
 import { previewFrameFor } from './keyframe-navigation.js';
 import type { KeyframeMove, KeyframeSlideKind, KeyframeSlideTarget } from './keyframe-slide.js';
 import type { InspectorSectionTarget } from './InspectorSection.js';
-import { removeSpatialKey, replaceSpatialKey } from './spatial-editor.js';
+import { moveSpatialKey } from './spatial-editor.js';
 
 /** Track Transform keyframes and bookmarks live at timeline frames 0–2,147,483,647. */
 export function trackKeyframeFrame(origin: number, travel: number): number {
@@ -22,11 +22,7 @@ export function planTransformKeyframeMove(
   const layer = project.layers.find((item) => item.id === layerId);
   if (!layer) return fail('Track no longer exists.');
   try {
-    const command: EditCommand = {
-      type: 'transform',
-      layerId,
-      transform: replaceSpatialKey(layer.transform, frame, { frame: nextFrame }),
-    };
+    const command = moveSpatialKey(layer, frame, nextFrame);
     return {
       frame: nextFrame,
       document: applyCommand(project, command),
@@ -58,10 +54,6 @@ export function transformKeyframeKind(options: {
       if (open) options.onOpenSection('transform');
     },
     selector: ({ scope }, frame) => `[data-transform-layer="${CSS.escape(scope)}"][data-transform-keyframe="${frame}"]`,
-    remove: (project, { scope, origin }) => ({
-      type: 'transform',
-      layerId: scope,
-      transform: removeSpatialKey(project.layers.find((layer) => layer.id === scope)!.transform, origin),
-    }),
+    remove: (_project, { scope, origin }) => ({ type: 'layer-key-remove', layerId: scope, frame: origin }),
   };
 }

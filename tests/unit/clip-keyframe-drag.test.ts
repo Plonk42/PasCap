@@ -25,13 +25,13 @@ describe('track Transform keyframe sliding', () => {
     const project = fixture([30, 60]);
     const plan = planTransformKeyframeMove(project, 'video-1', 60, 90);
     expect(plan.error).toBe('');
-    expect(plan.command?.type).toBe('transform');
-    const transform = plan.command?.type === 'transform' ? plan.command.transform : null;
-    expect(transform?.keyframes.map((key) => [key.frame, key.easing.scale, key.values.scale, key.reset])).toEqual([
+    expect(plan.command).toEqual({ type: 'layer-key-move', layerId: 'video-1', frame: 60, nextFrame: 90 });
+    const { transform } = plan.document.layers[0]!;
+    expect(transform.keyframes.map((key) => [key.frame, key.easing.scale, key.values.scale, key.reset])).toEqual([
       [30, 'linear', 1, false],
       [90, 'ease-in', 2, true],
     ]);
-    expect(plan.document.layers[0]!.transform).toEqual(transform);
+    expect(transform.base).toEqual(project.layers[0]!.transform.base);
     expect(plan.document.clips).toEqual(project.clips);
     expect(project.layers[0]!.transform.keyframes[1]!.frame).toBe(60);
   });

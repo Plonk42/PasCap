@@ -271,8 +271,10 @@ keyframes at project frames, at most 256), and are the assistant's only keyframe
 editor's diamond and stored-value gestures (`layer-key-toggle`, `layer-key-value`) are not offered,
 and the editor sets Easing and default keyframes with `layer-key-set` too.
 `estimate` returns patches and keyframes as `layer-key-set` too, listing the settings it fits
-except those the grade animates. The editor keeps sending whole `color`, `detail` and `transform`
-commands; the assistant is offered none of them.
+except those the grade animates. The editor keeps sending whole `color` and `detail` commands; the
+assistant is offered neither. Transform has no whole-value command: the editor's Transform
+controls use the same patch and keyframe commands
+([#312](https://github.com/Plonk42/PasCap/issues/312)).
 
 The editor's `layer-add` and `layer-update` carry a complete track (every Transform
 setting and keyframe): half of the command schema. `edit` offers the assistant

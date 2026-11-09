@@ -202,6 +202,10 @@ running from a checkerboard to solid; its field's accessible name is **Transform
   setting's name resets only that setting.
 - **Add default Transform keyframe** adds a default keyframe at the playhead, or removes
   the one there, in one Undo step; it is unavailable where an ordinary keyframe exists.
+- Every edit here and on the track's ▼ markers is one of the commands the assistant uses
+  ([#312](https://github.com/Plonk42/PasCap/issues/312)): `transform-patch` for base settings,
+  `layer-key-set`, `layer-key-move` and `layer-key-remove` with the track's `layerId` for
+  keyframes. No command replaces a whole Transform.
 - Below the nine settings, when the track has Transform keyframes, a small **Keyframes**
   heading introduces the list (fieldset **Transform keyframes** plus the track name, list
   **Edit Transform keyframes**), built from the same shared stored keyframe list as Color's.

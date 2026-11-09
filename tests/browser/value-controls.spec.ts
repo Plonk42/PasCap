@@ -558,19 +558,12 @@ test('main and stored Opacity percentages reject invalid entries, cancel drafts 
     await expect(exact).toHaveValue(initial);
     await unchanged(page, before);
     const edit: ValueEdit = stored
-      ? (document, percent) => {
-          const transform = document.layers[0]!.transform;
-          return {
-            type: 'transform',
-            layerId: 'video-1',
-            transform: {
-              ...transform,
-              keyframes: transform.keyframes.map((point) =>
-                point.frame === 0 ? { ...point, values: { ...point.values, opacity: percent / 100 } } : point,
-              ),
-            },
-          };
-        }
+      ? (_document, percent) => ({
+          type: 'layer-key-set',
+          layerId: 'video-1',
+          frame: 0,
+          values: { opacity: percent / 100 },
+        })
       : opacityEdit;
     await preciseEdit(page, name, 12.3456789, edit, scope);
     const beforeReset = await checkpoint(page);

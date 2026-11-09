@@ -678,9 +678,10 @@ describe('independent adjustment interpolation and unchanged CPU composition', (
       settings: { opacity: 0.9 },
     });
     project = applyCommand(project, {
-      type: 'transform',
+      type: 'layer-key-set',
       layerId: BASE_LAYER_ID,
-      transform: { ...project.layers[0]!.transform, keyframes: [opacityKey(0, 0.4)] },
+      frame: 0,
+      values: { opacity: 0.4 },
     });
     project = applyCommand(project, {
       type: 'transition',

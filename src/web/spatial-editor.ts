@@ -1,15 +1,12 @@
-import { joiningEasing, uniformKeyframe, withEasing, type Interpolation } from '../shared/keyframes.js';
+import type { EditCommand } from '../shared/commands.js';
+import type { Interpolation } from '../shared/keyframes.js';
+import type { VideoLayer } from '../shared/model.js';
 import {
-  defaultSpatialKeyframe,
   evaluateSpatial,
   hasSpatialChannelKeys,
   NEUTRAL_SPATIAL_POSE,
   SPATIAL_CHANNELS,
-  spatialSettingsSchema,
   type SpatialChannel,
-  type SpatialKeyframe,
-  type SpatialKeyValues,
-  type SpatialSettings,
 } from '../shared/spatial.js';
 
 export const SPATIAL_CONTROLS: readonly {
@@ -32,160 +29,115 @@ export const SPATIAL_CONTROLS: readonly {
   { key: 'opacity', label: 'Opacity', min: 0, max: 1, step: 0.01, display: { scale: 100, unit: '%' } },
 ];
 
-/** Keep inline errors readable without losing strict validation. */
-function validatedSpatial(value: unknown): SpatialSettings {
-  const result = spatialSettingsSchema.safeParse(value);
-  if (!result.success) throw new Error(result.error.issues[0]!.message);
-  return result.data;
-}
+/** The Transform keyframe edits of the Track → Transform controls and markers, as the shared keyframe commands. */
+const keyCommand = (layer: VideoLayer, frame: number) => ({ type: 'layer-key-set' as const, layerId: layer.id, frame });
 
-const NO_VALUES: Readonly<SpatialKeyValues> = Object.freeze({
-  cropLeft: null,
-  cropRight: null,
-  cropTop: null,
-  cropBottom: null,
-  scale: null,
-  translateX: null,
-  translateY: null,
-  rotation: null,
-  opacity: null,
-});
+function existingKey(layer: VideoLayer, frame: number) {
+  const key = layer.transform.keyframes.find((item) => item.frame === frame);
+  if (!key) throw new Error('This Transform keyframe no longer exists.');
+  return key;
+}
 
 /**
  * One channel joins or leaves the key at a timeline frame, capturing its evaluated
  * value there. Other channels at that key and the saved base stay unchanged.
  */
-export function toggleSpatialChannel(
-  settings: SpatialSettings,
-  channel: SpatialChannel,
-  frame: number,
-): SpatialSettings {
-  const key = settings.keyframes.find((item) => item.frame === frame);
-  if (key && key.values[channel] !== null) {
-    const values = { ...key.values, [channel]: null };
-    const empty = Object.values(values).every((value) => value === null);
-    return validatedSpatial({
-      base: settings.base,
-      keyframes: empty
-        ? settings.keyframes.filter((item) => item !== key)
-        : settings.keyframes.map((item) =>
-            item === key ? { ...item, values, easing: { ...item.easing, [channel]: null } } : item,
-          ),
-    });
-  }
-  const value = evaluateSpatial(settings, frame)[channel];
-  const keyframes = key
-    ? settings.keyframes.map((item) =>
-        item === key
-          ? {
-              ...item,
-              values: { ...item.values, [channel]: value },
-              easing: { ...item.easing, [channel]: joiningEasing(settings.keyframes, item, SPATIAL_CHANNELS) },
-            }
-          : item,
-      )
-    : [
-        ...settings.keyframes,
-        { ...uniformKeyframe(frame, { ...NO_VALUES, [channel]: value }, 'linear'), reset: false },
-      ].sort((a, b) => a.frame - b.frame);
-  return validatedSpatial({ base: settings.base, keyframes });
+export function toggleSpatialChannel(layer: VideoLayer, channel: SpatialChannel, frame: number): EditCommand {
+  const key = layer.transform.keyframes.find((item) => item.frame === frame);
+  const value = key?.values[channel] != null ? null : evaluateSpatial(layer.transform, frame)[channel];
+  return { ...keyCommand(layer, frame), values: { [channel]: value } };
 }
 
 /** Adds a default keyframe, or removes the one already at this frame; never replaces another keyframe. */
-export function toggleDefaultSpatialKey(settings: SpatialSettings, frame: number): SpatialSettings {
-  const key = settings.keyframes.find((item) => item.frame === frame);
+export function toggleDefaultSpatialKey(layer: VideoLayer, frame: number): EditCommand {
+  const key = layer.transform.keyframes.find((item) => item.frame === frame);
   if (key && !key.reset)
     throw new Error('A Transform keyframe already exists at this frame. Choose another frame for a default keyframe.');
-  return validatedSpatial({
-    base: settings.base,
-    keyframes: key
-      ? settings.keyframes.filter((item) => item !== key)
-      : [...settings.keyframes, defaultSpatialKeyframe(frame)].sort((a, b) => a.frame - b.frame),
-  });
+  return key ? removeSpatialKey(layer, frame) : { ...keyCommand(layer, frame), reset: true };
 }
 
 /**
  * Like Color Reset: once animated, only the settings enabled at this frame's keyframe
  * return to neutral; otherwise the whole base does. Null when nothing would change.
  */
-export function resetSpatial(settings: SpatialSettings, frame: number): SpatialSettings | null {
-  if (!settings.keyframes.length) {
-    if (SPATIAL_CHANNELS.every((channel) => settings.base[channel] === NEUTRAL_SPATIAL_POSE[channel])) return null;
-    return validatedSpatial({ base: { ...NEUTRAL_SPATIAL_POSE }, keyframes: [] });
+export function resetSpatial(layer: VideoLayer, frame: number): EditCommand | null {
+  const { base, keyframes } = layer.transform;
+  if (!keyframes.length) {
+    const changed = SPATIAL_CHANNELS.filter((channel) => base[channel] !== NEUTRAL_SPATIAL_POSE[channel]);
+    if (!changed.length) return null;
+    return { type: 'transform-patch', layerId: layer.id, settings: Object.fromEntries(changed.map((c) => [c, null])) };
   }
-  const key = settings.keyframes.find((item) => item.frame === frame);
-  if (!key) return null;
-  const values = { ...key.values };
-  for (const channel of SPATIAL_CHANNELS) if (values[channel] !== null) values[channel] = NEUTRAL_SPATIAL_POSE[channel];
-  if (SPATIAL_CHANNELS.every((channel) => values[channel] === key.values[channel])) return null;
-  return replaceSpatialKey(settings, frame, { values });
+  const key = keyframes.find((item) => item.frame === frame);
+  const changed = SPATIAL_CHANNELS.filter(
+    (channel) => key?.values[channel] != null && key.values[channel] !== NEUTRAL_SPATIAL_POSE[channel],
+  );
+  if (!changed.length) return null;
+  return {
+    ...keyCommand(layer, frame),
+    values: Object.fromEntries(changed.map((channel) => [channel, NEUTRAL_SPATIAL_POSE[channel]])),
+  };
 }
 
 /**
- * The Transform with one setting neutral at every frame, its keyframes of that setting disabled (dropping keyframes
+ * The commands showing one setting neutral at every frame, its keyframes of that setting disabled (dropping keyframes
  * left without settings), for a hold-to-compare preview; null when it is neutral already.
  */
-export function withoutSpatialChannel(settings: SpatialSettings, channel: SpatialChannel): SpatialSettings | null {
-  if (!hasSpatialChannelKeys(settings, channel) && settings.base[channel] === NEUTRAL_SPATIAL_POSE[channel])
-    return null;
-  return validatedSpatial({
-    base: { ...settings.base, [channel]: NEUTRAL_SPATIAL_POSE[channel] },
-    keyframes: settings.keyframes
-      .map((key) => ({
-        ...key,
-        values: { ...key.values, [channel]: null },
-        easing: { ...key.easing, [channel]: null },
-      }))
-      .filter((key) => SPATIAL_CHANNELS.some((setting) => key.values[setting] !== null)),
-  });
+export function withoutSpatialChannel(layer: VideoLayer, channel: SpatialChannel): EditCommand[] | null {
+  const { base, keyframes } = layer.transform;
+  if (!hasSpatialChannelKeys(layer.transform, channel) && base[channel] === NEUTRAL_SPATIAL_POSE[channel]) return null;
+  return [
+    ...keyframes
+      .filter((key) => key.values[channel] !== null)
+      .map((key): EditCommand => ({ ...keyCommand(layer, key.frame), values: { [channel]: null } })),
+    ...(base[channel] === NEUTRAL_SPATIAL_POSE[channel]
+      ? []
+      : [{ type: 'transform-patch' as const, layerId: layer.id, settings: { [channel]: null } }]),
+  ];
 }
 
 /** Sets one enabled setting's Easing at a key, or every enabled setting's when `channel` is null. */
 export function setSpatialEasing(
-  settings: SpatialSettings,
+  layer: VideoLayer,
   frame: number,
   channel: SpatialChannel | null,
   curve: Interpolation,
-): SpatialSettings {
-  const key = settings.keyframes.find((item) => item.frame === frame);
-  if (!key) throw new Error('This Transform keyframe no longer exists.');
-  return replaceSpatialKey(settings, frame, { easing: withEasing(key, channel, curve) });
+): EditCommand {
+  existingKey(layer, frame);
+  return { ...keyCommand(layer, frame), easing: channel === null ? curve : { [channel]: curve } };
 }
 
-export function replaceSpatialKey(
-  settings: SpatialSettings,
+/** Changes one enabled setting's value at a stored keyframe. */
+export function setSpatialKeyValue(
+  layer: VideoLayer,
   frame: number,
-  changes: Partial<SpatialKeyframe>,
-): SpatialSettings {
-  if (!settings.keyframes.some((key) => key.frame === frame))
-    throw new Error('This Transform keyframe no longer exists.');
-  if (
-    changes.frame !== undefined &&
-    settings.keyframes.some((key) => key.frame !== frame && key.frame === changes.frame)
-  )
-    throw new Error('A Transform keyframe already exists at this timeline frame. Choose another frame.');
-  return validatedSpatial({
-    base: settings.base,
-    keyframes: settings.keyframes
-      .map((key) => (key.frame === frame ? { ...key, ...changes } : key))
-      .sort((a, b) => a.frame - b.frame),
-  });
+  channel: SpatialChannel,
+  value: number,
+): EditCommand {
+  existingKey(layer, frame);
+  return { ...keyCommand(layer, frame), values: { [channel]: value } };
 }
 
-export function removeSpatialKey(settings: SpatialSettings, frame: number): SpatialSettings {
-  return validatedSpatial({ base: settings.base, keyframes: settings.keyframes.filter((key) => key.frame !== frame) });
+export function moveSpatialKey(layer: VideoLayer, frame: number, nextFrame: number): EditCommand {
+  existingKey(layer, frame);
+  if (layer.transform.keyframes.some((key) => key.frame !== frame && key.frame === nextFrame))
+    throw new Error('A Transform keyframe already exists at this timeline frame. Choose another frame.');
+  return { type: 'layer-key-move', layerId: layer.id, frame, nextFrame };
+}
+
+export function removeSpatialKey(layer: VideoLayer, frame: number): EditCommand {
+  return { type: 'layer-key-remove', layerId: layer.id, frame };
 }
 
 /** Edits the base for an unkeyed channel; a keyed channel needs its own key at this frame. */
 export function editSpatialPose(
-  settings: SpatialSettings,
+  layer: VideoLayer,
   frame: number | null,
   channel: SpatialChannel,
   value: number,
-): SpatialSettings {
-  if (!hasSpatialChannelKeys(settings, channel))
-    return validatedSpatial({ ...settings, base: { ...settings.base, [channel]: value } });
-  const point = settings.keyframes.find((item) => item.frame === frame && item.values[channel] !== null);
+): EditCommand {
+  if (!hasSpatialChannelKeys(layer.transform, channel))
+    return { type: 'transform-patch', layerId: layer.id, settings: { [channel]: value } };
+  const point = layer.transform.keyframes.find((item) => item.frame === frame && item.values[channel] !== null);
   if (!point) throw new Error('Animated · add a keyframe for this setting at the playhead to edit.');
-  return replaceSpatialKey(settings, point.frame, { values: { ...point.values, [channel]: value } });
+  return { ...keyCommand(layer, point.frame), values: { [channel]: value } };
 }

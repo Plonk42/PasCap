@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { applyCommand } from '../../src/shared/commands.js';
+import { applyCommand, type EditCommand } from '../../src/shared/commands.js';
 import { uniformKeyframe, type Interpolation } from '../../src/shared/keyframes.js';
-import { createClip, createProject } from '../../src/shared/model.js';
+import { createClip, createProject, projectSchema, type VideoLayer } from '../../src/shared/model.js';
 import {
   createSpatialSettings,
   defaultSpatialKeyframe,
@@ -9,15 +9,17 @@ import {
   NEUTRAL_SPATIAL_POSE,
   type SpatialKeyframe,
   type SpatialKeyValues,
+  type SpatialSettings,
 } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { validateNumberDraft } from '../../src/web/NumberField.js';
 import {
   editSpatialPose,
+  moveSpatialKey,
   removeSpatialKey,
-  replaceSpatialKey,
   resetSpatial,
   setSpatialEasing,
+  setSpatialKeyValue,
   SPATIAL_CONTROLS,
   toggleDefaultSpatialKey,
   toggleSpatialChannel,
@@ -41,31 +43,50 @@ function key(frame: number, values: Partial<SpatialKeyValues>, curve: Interpolat
   return { ...uniformKeyframe(frame, { ...NO_VALUES, ...values }, curve), reset: false };
 }
 
+const project = createProject('spatial-editor', 'Transform editor');
+
+/** The track with this Transform. */
+function track(transform: SpatialSettings = createSpatialSettings()): VideoLayer {
+  return { ...structuredClone(project.layers[0]!), transform };
+}
+
+/** The track after the editor's commands, applied like edits. */
+function edited(layer: VideoLayer, ...commands: EditCommand[]): VideoLayer {
+  return commands.reduce(
+    (current, command) => applyCommand(projectSchema.parse({ ...project, layers: [current] }), command).layers[0]!,
+    layer,
+  );
+}
+
+/** Applies each command a helper builds from the track as it is then. */
+function edit(layer: VideoLayer, ...builds: ((current: VideoLayer) => EditCommand)[]): VideoLayer {
+  return builds.reduce((current, build) => edited(current, build(current)), layer);
+}
+
 describe('per-setting track Transform editor', () => {
   it('previews one setting neutral at every frame for its hold-to-compare eye, other settings unchanged', () => {
     const settings = createSpatialSettings();
-    expect(withoutSpatialChannel(settings, 'scale')).toBeNull();
+    expect(withoutSpatialChannel(track(settings), 'scale')).toBeNull();
     settings.base.scale = 1.5;
     settings.base.rotation = 20;
     settings.keyframes = [key(0, { scale: 2 }, 'linear'), key(10, { scale: 3, opacity: 0.5 }, 'smooth')];
-    const before = structuredClone(settings);
-    const without = withoutSpatialChannel(settings, 'scale')!;
-    expect(settings).toEqual(before);
+    const without = edited(track(settings), ...withoutSpatialChannel(track(settings), 'scale')!).transform;
     expect(without.base).toEqual({ ...settings.base, scale: 1 });
     expect(without.keyframes).toEqual([key(10, { opacity: 0.5 }, 'smooth')]);
     for (const frame of [0, 5, 10, 20]) {
       expect(evaluateSpatial(without, frame)).toEqual({ ...evaluateSpatial(settings, frame), scale: 1 });
     }
-    expect(withoutSpatialChannel(settings, 'translateX')).toBeNull();
+    expect(withoutSpatialChannel(track(settings), 'translateX')).toBeNull();
   });
   it('exposes all nine exact value controls, Opacity included, and edits only the unanimated base', () => {
     expect(SPATIAL_CONTROLS.map((control) => control.key)).toEqual(Object.keys(NEUTRAL_SPATIAL_POSE));
-    let settings = createSpatialSettings();
+    let layer = track();
     const values = [0.1234567, 0.2, 0.3, 0.4, 1.234567, -0.1234567, 0.1234567, 17.1234567, 0.4567891];
     for (const [index, control] of SPATIAL_CONTROLS.entries()) {
-      settings = editSpatialPose(settings, null, control.key, values[index]!);
-      expect(settings.base[control.key]).toBe(values[index]);
-      expect(settings.keyframes).toEqual([]);
+      expect(editSpatialPose(layer, null, control.key, values[index]!).type).toBe('transform-patch');
+      layer = edit(layer, (current) => editSpatialPose(current, null, control.key, values[index]!));
+      expect(layer.transform.base[control.key]).toBe(values[index]);
+      expect(layer.transform.keyframes).toEqual([]);
     }
   });
 
@@ -74,98 +95,116 @@ describe('per-setting track Transform editor', () => {
     settings.base.scale = 1.5;
     settings.base.rotation = 20;
     settings.keyframes = [key(0, { scale: 1 }, 'linear'), key(10, { scale: 3 }, 'smooth')];
-    const before = structuredClone(settings);
-    const scaled = toggleSpatialChannel(settings, 'scale', 4);
-    expect(scaled.keyframes[1]).toEqual(key(4, { scale: evaluateSpatial(settings, 4).scale }, 'linear'));
+    const layer = track(settings);
+    const scaled = edit(layer, (current) => toggleSpatialChannel(current, 'scale', 4));
+    expect(scaled.transform.keyframes[1]).toEqual(key(4, { scale: evaluateSpatial(settings, 4).scale }, 'linear'));
     // Rotation is unkeyed, so its capture holds the base value and adds no other channel.
-    const rotated = toggleSpatialChannel(settings, 'rotation', 4);
-    expect(rotated.keyframes[1]).toEqual(key(4, { rotation: 20 }, 'linear'));
-    expect(rotated.base).toEqual(settings.base);
-    expect(settings).toEqual(before);
+    const rotated = edit(layer, (current) => toggleSpatialChannel(current, 'rotation', 4));
+    expect(rotated.transform.keyframes[1]).toEqual(key(4, { rotation: 20 }, 'linear'));
+    expect(rotated.transform.base).toEqual(settings.base);
     // A second channel at the same frame joins the same key and adopts its agreed easing.
-    const eased = setSpatialEasing(rotated, 4, null, 'ease-in');
-    const joined = toggleSpatialChannel(eased, 'translateX', 4);
-    expect(joined.keyframes[1]).toEqual(key(4, { rotation: 20, translateX: 0 }, 'ease-in'));
+    const joined = edit(
+      rotated,
+      (current) => setSpatialEasing(current, 4, null, 'ease-in'),
+      (current) => toggleSpatialChannel(current, 'translateX', 4),
+    );
+    expect(joined.transform.keyframes[1]).toEqual(key(4, { rotation: 20, translateX: 0 }, 'ease-in'));
   });
 
   it('removes only the toggled setting and the key itself once no setting remains', () => {
-    let settings = toggleSpatialChannel(createSpatialSettings(), 'scale', 12);
-    settings = toggleSpatialChannel(settings, 'rotation', 12);
-    settings = toggleSpatialChannel(settings, 'scale', 12);
-    expect(settings.keyframes).toEqual([key(12, { rotation: 0 }, 'linear')]);
-    settings = toggleSpatialChannel(settings, 'rotation', 12);
-    expect(settings).toEqual(createSpatialSettings());
+    let layer = edit(
+      track(),
+      (current) => toggleSpatialChannel(current, 'scale', 12),
+      (current) => toggleSpatialChannel(current, 'rotation', 12),
+      (current) => toggleSpatialChannel(current, 'scale', 12),
+    );
+    expect(layer.transform.keyframes).toEqual([key(12, { rotation: 0 }, 'linear')]);
+    layer = edit(layer, (current) => toggleSpatialChannel(current, 'rotation', 12));
+    expect(layer.transform).toEqual(createSpatialSettings());
   });
 
   it('never creates implicit keys and keeps each setting independent of the others', () => {
-    const base = editSpatialPose(createSpatialSettings(), null, 'scale', 1.456789);
-    const keyed = toggleSpatialChannel(base, 'scale', 12);
+    const base = edit(track(), (current) => editSpatialPose(current, null, 'scale', 1.456789));
+    const keyed = edit(base, (current) => toggleSpatialChannel(current, 'scale', 12));
     expect(() => editSpatialPose(keyed, 13, 'scale', 2)).toThrow('add a keyframe');
     // Unkeyed settings still edit their base even while another setting is animated.
-    const moved = editSpatialPose(keyed, 13, 'translateX', 0.25);
-    expect(moved.base.translateX).toBe(0.25);
-    expect(moved.keyframes).toEqual(keyed.keyframes);
-    const edited = editSpatialPose(keyed, 12, 'scale', 2);
-    expect(edited.base).toEqual(keyed.base);
-    expect(edited.keyframes[0]!.values.scale).toBe(2);
-    expect(removeSpatialKey(edited, 12)).toEqual(base);
+    const moved = edit(keyed, (current) => editSpatialPose(current, 13, 'translateX', 0.25));
+    expect(moved.transform.base.translateX).toBe(0.25);
+    expect(moved.transform.keyframes).toEqual(keyed.transform.keyframes);
+    const changed = edit(keyed, (current) => editSpatialPose(current, 12, 'scale', 2));
+    expect(changed.transform.base).toEqual(keyed.transform.base);
+    expect(changed.transform.keyframes[0]!.values.scale).toBe(2);
+    expect(edit(changed, (current) => removeSpatialKey(current, 12))).toEqual(base);
   });
 
   it('interpolates each setting between its own keys, skipping keys that leave it out', () => {
-    let settings = toggleSpatialChannel(createSpatialSettings(), 'scale', 0);
-    settings = toggleSpatialChannel(settings, 'rotation', 10);
-    settings = toggleSpatialChannel(settings, 'scale', 20);
-    settings = editSpatialPose(settings, 20, 'scale', 3);
-    settings = editSpatialPose(settings, 10, 'rotation', 90);
-    expect(evaluateSpatial(settings, 10).scale).toBe(2);
-    expect(evaluateSpatial(settings, 10).rotation).toBe(90);
-    expect(evaluateSpatial(settings, 15).scale).toBe(2.5);
+    const { transform } = edit(
+      track(),
+      (current) => toggleSpatialChannel(current, 'scale', 0),
+      (current) => toggleSpatialChannel(current, 'rotation', 10),
+      (current) => toggleSpatialChannel(current, 'scale', 20),
+      (current) => editSpatialPose(current, 20, 'scale', 3),
+      (current) => editSpatialPose(current, 10, 'rotation', 90),
+    );
+    expect(evaluateSpatial(transform, 10).scale).toBe(2);
+    expect(evaluateSpatial(transform, 10).rotation).toBe(90);
+    expect(evaluateSpatial(transform, 15).scale).toBe(2.5);
     // Single-key settings hold everywhere; the base only returns for unkeyed settings.
-    expect(evaluateSpatial(settings, 99).rotation).toBe(90);
-    expect(evaluateSpatial(settings, 5).translateX).toBe(0);
+    expect(evaluateSpatial(transform, 99).rotation).toBe(90);
+    expect(evaluateSpatial(transform, 5).translateX).toBe(0);
   });
 
   it('moves a key and its easing atomically, rejects collisions, and keeps keys after the duration', () => {
-    let settings = toggleSpatialChannel(createSpatialSettings(), 'translateX', 0);
-    settings = toggleSpatialChannel(settings, 'translateX', 120);
-    settings = replaceSpatialKey(settings, 0, key(0, { translateX: 0.5 }, 'ease-in'));
-    const moved = replaceSpatialKey(settings, 0, { frame: 90 });
-    expect(moved.keyframes[0]).toEqual({ ...settings.keyframes[0], frame: 90 });
-    expect(moved.base).toEqual(settings.base);
-    expect(() => replaceSpatialKey(settings, 0, { frame: 120 })).toThrow('already exists');
-    const project = createProject('spatial-editor', 'Transform editor');
-    project.clips = [createClip('one', 'source', 30, 60)];
-    const next = applyCommand(project, { type: 'transform', layerId: 'video-1', transform: settings });
-    expect(next.layers[0]!.transform.keyframes.map((point) => point.frame)).toEqual([0, 120]);
-    expect(calculateLayout(next).duration).toBe(calculateLayout(project).duration);
-    expect(next.clips).toEqual(project.clips);
+    const layer = edit(
+      track(),
+      (current) => toggleSpatialChannel(current, 'translateX', 0),
+      (current) => toggleSpatialChannel(current, 'translateX', 120),
+      (current) => setSpatialKeyValue(current, 0, 'translateX', 0.5),
+      (current) => setSpatialEasing(current, 0, null, 'ease-in'),
+    );
+    expect(layer.transform.keyframes[0]).toEqual(key(0, { translateX: 0.5 }, 'ease-in'));
+    const moved = edit(layer, (current) => moveSpatialKey(current, 0, 90));
+    expect(moved.transform.keyframes[0]).toEqual({ ...layer.transform.keyframes[0], frame: 90 });
+    expect(moved.transform.base).toEqual(layer.transform.base);
+    expect(() => moveSpatialKey(layer, 0, 120)).toThrow('already exists');
+    expect(() => setSpatialKeyValue(layer, 5, 'translateX', 1)).toThrow('no longer exists');
+    const document = projectSchema.parse({ ...project, clips: [createClip('one', 'source', 30, 60)], layers: [layer] });
+    expect(document.layers[0]!.transform.keyframes.map((point) => point.frame)).toEqual([0, 120]);
+    expect(calculateLayout(document).duration).toBe(30);
   });
 
   it('toggles a default keyframe without ever replacing an ordinary one', () => {
-    const settings = toggleSpatialChannel(createSpatialSettings(), 'scale', 10);
-    const added = toggleDefaultSpatialKey(settings, 30);
-    expect(added.keyframes).toEqual([settings.keyframes[0], defaultSpatialKeyframe(30)]);
-    expect(toggleDefaultSpatialKey(added, 30)).toEqual(settings);
-    expect(() => toggleDefaultSpatialKey(settings, 10)).toThrow('already exists');
+    const layer = edit(track(), (current) => toggleSpatialChannel(current, 'scale', 10));
+    const added = edit(layer, (current) => toggleDefaultSpatialKey(current, 30));
+    expect(added.transform.keyframes).toEqual([layer.transform.keyframes[0], defaultSpatialKeyframe(30)]);
+    expect(edit(added, (current) => toggleDefaultSpatialKey(current, 30))).toEqual(layer);
+    expect(() => toggleDefaultSpatialKey(layer, 10)).toThrow('already exists');
     // A default keyframe stays one while its values are edited.
-    const edited = editSpatialPose(added, 30, 'scale', 2);
-    expect(edited.keyframes[1]).toMatchObject({ frame: 30, reset: true, values: { scale: 2 } });
+    const changed = edit(added, (current) => editSpatialPose(current, 30, 'scale', 2));
+    expect(changed.transform.keyframes[1]).toMatchObject({ frame: 30, reset: true, values: { scale: 2 } });
   });
 
   it('resets like Color: the whole base when unanimated, else only the keyframe at the playhead', () => {
-    const base = editSpatialPose(editSpatialPose(createSpatialSettings(), null, 'scale', 2), null, 'rotation', 30);
-    expect(resetSpatial(base, 0)).toEqual(createSpatialSettings());
-    expect(resetSpatial(createSpatialSettings(), 0)).toBeNull();
-    let animated = toggleSpatialChannel(base, 'scale', 10);
-    animated = editSpatialPose(animated, 10, 'scale', 3);
-    animated = toggleSpatialChannel(animated, 'translateX', 20);
-    animated = editSpatialPose(animated, 20, 'translateX', 0.5);
-    const reset = resetSpatial(animated, 10)!;
-    expect(reset.keyframes[0]!.values).toEqual({ ...NO_VALUES, scale: 1 });
+    const base = edit(
+      track(),
+      (current) => editSpatialPose(current, null, 'scale', 2),
+      (current) => editSpatialPose(current, null, 'rotation', 30),
+    );
+    expect(edit(base, (current) => resetSpatial(current, 0)!).transform).toEqual(createSpatialSettings());
+    expect(resetSpatial(track(), 0)).toBeNull();
+    const animated = edit(
+      base,
+      (current) => toggleSpatialChannel(current, 'scale', 10),
+      (current) => editSpatialPose(current, 10, 'scale', 3),
+      (current) => toggleSpatialChannel(current, 'translateX', 20),
+      (current) => editSpatialPose(current, 20, 'translateX', 0.5),
+    );
+    const reset = edit(animated, (current) => resetSpatial(current, 10)!);
+    expect(reset.transform.keyframes[0]!.values).toEqual({ ...NO_VALUES, scale: 1 });
     // Other keyframes, the easing and the saved base under keyed and unkeyed settings stay unchanged.
-    expect(reset.keyframes[1]).toEqual(animated.keyframes[1]);
-    expect(reset.keyframes[0]!.easing).toEqual(animated.keyframes[0]!.easing);
-    expect(reset.base).toEqual(animated.base);
+    expect(reset.transform.keyframes[1]).toEqual(animated.transform.keyframes[1]);
+    expect(reset.transform.keyframes[0]!.easing).toEqual(animated.transform.keyframes[0]!.easing);
+    expect(reset.transform.base).toEqual(animated.transform.base);
     expect(resetSpatial(animated, 15)).toBeNull();
     expect(resetSpatial(reset, 10)).toBeNull();
   });
@@ -182,23 +221,24 @@ describe('per-setting track Transform editor', () => {
     const settings = createSpatialSettings();
     settings.base.cropLeft = 0.2;
     settings.base.cropTop = 0.2;
-    const before = structuredClone(settings);
-    expect(() => editSpatialPose(settings, null, setting, value)).toThrow();
-    expect(settings).toEqual(before);
+    const layer = track(settings);
+    const before = structuredClone(layer);
+    expect(() => edit(layer, (current) => editSpatialPose(current, null, setting, value))).toThrow();
+    expect(layer).toEqual(before);
   });
 
   it('accepts opposite crops that cover nothing instead of repairing them', () => {
     const settings = createSpatialSettings();
     settings.base.cropRight = 0.6;
-    const edited = editSpatialPose(settings, null, 'cropLeft', 0.7);
-    expect(edited.base).toMatchObject({ cropLeft: 0.7, cropRight: 0.6 });
+    const layer = edit(track(settings), (current) => editSpatialPose(current, null, 'cropLeft', 0.7));
+    expect(layer.transform.base).toMatchObject({ cropLeft: 0.7, cropRight: 0.6 });
   });
 
   it('validates number drafts and pointer releases for an animated setting without publishing them', () => {
-    const settings = toggleSpatialChannel(createSpatialSettings(), 'scale', 10);
+    const layer = edit(track(), (current) => toggleSpatialChannel(current, 'scale', 10));
     const validate = (value: number): string | null => {
       try {
-        editSpatialPose(settings, 5, 'scale', value);
+        editSpatialPose(layer, 5, 'scale', value);
         return null;
       } catch (cause) {
         return cause instanceof Error ? cause.message : 'invalid';
@@ -220,10 +260,13 @@ describe('per-setting track Transform editor', () => {
   it('bounds explicit capture at 256 keys', () => {
     const settings = createSpatialSettings();
     settings.keyframes = Array.from({ length: 256 }, (_, frame) => key(frame, { scale: 1 }, 'linear'));
-    expect(() => toggleSpatialChannel(settings, 'rotation', 256)).toThrow();
-    expect(() => toggleDefaultSpatialKey(settings, 256)).toThrow();
+    const layer = track(settings);
+    expect(() => edit(layer, (current) => toggleSpatialChannel(current, 'rotation', 256))).toThrow();
+    expect(() => edit(layer, (current) => toggleDefaultSpatialKey(current, 256))).toThrow();
     // Joining an existing key adds no key, so it stays within the limit.
-    expect(toggleSpatialChannel(settings, 'rotation', 7).keyframes).toHaveLength(256);
-    expect(removeSpatialKey(settings, 0).keyframes).toHaveLength(255);
+    expect(edit(layer, (current) => toggleSpatialChannel(current, 'rotation', 7)).transform.keyframes).toHaveLength(
+      256,
+    );
+    expect(edit(layer, (current) => removeSpatialKey(current, 0)).transform.keyframes).toHaveLength(255);
   });
 });

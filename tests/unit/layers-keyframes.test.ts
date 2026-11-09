@@ -307,13 +307,13 @@ describe('project-frame adjustment and Transform settings', () => {
       adjustmentId: 'look',
       color: { ...NEUTRAL_COLOR, brightness: 0.1 },
     });
+    project = applyCommand(project, { type: 'layer-key-set', layerId: 'video-1', frame: 10, values: { opacity: 0 } });
     project = applyCommand(project, {
-      type: 'transform',
+      type: 'layer-key-set',
       layerId: 'video-1',
-      transform: {
-        ...project.layers[0]!.transform,
-        keyframes: [transformKey(10, { opacity: 0 }), transformKey(80, { opacity: 1 }, 'smooth')],
-      },
+      frame: 80,
+      values: { opacity: 1 },
+      easing: 'smooth',
     });
     project = applyCommand(project, {
       type: 'layer-key-toggle',

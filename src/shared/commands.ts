@@ -53,7 +53,6 @@ import {
   SPATIAL_CHANNELS,
   defaultSpatialKeyframe,
   spatialPoseSchema,
-  spatialSettingsSchema,
   type SpatialChannel,
   type SpatialKeyframe,
 } from './spatial.js';
@@ -1043,10 +1042,6 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
       // Direction never changes duration or placement.
       next.clips[index] = { ...next.clips[index]!, reverse: command.reverse };
       return projectSchema.parse(next);
-    case 'transform':
-      requiredLayer(next, command.layerId).transform = spatialSettingsSchema.parse(command.transform);
-      // Appearance-only replacement must not normalize or rewrite stored timing.
-      return projectSchema.parse(next);
     case 'detail':
       next.clips[index] = { ...next.clips[index]!, detail: detailSchema.parse(command.detail) };
       return projectSchema.parse(next);
@@ -1071,7 +1066,7 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'layer-key-value':
     case 'layer-key-move':
     case 'layer-key-remove':
-      // Like transform, a Transform keyframe edit never rewrites stored timing.
+      // Like transform-patch, a Transform keyframe edit never rewrites stored timing.
       if (editKeyframes(next, command) === 'transform') return projectSchema.parse(next);
       break;
     case 'layer-add':

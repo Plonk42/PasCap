@@ -16,7 +16,7 @@ import {
   type VideoClip,
   type VideoLayer,
 } from '../../src/shared/model.js';
-import { createSpatialSettings, type SpatialChannel, type SpatialSettings } from '../../src/shared/spatial.js';
+import { type SpatialChannel } from '../../src/shared/spatial.js';
 import type { SpeedSettings } from '../../src/shared/speed.js';
 
 /**
@@ -49,7 +49,6 @@ type FormerEditCommand =
     }
   | { type: 'speed'; clipId: string; speed: SpeedSettings }
   | { type: 'reverse'; clipId: string; reverse: boolean }
-  | { type: 'transform'; layerId: string; transform: SpatialSettings }
   | { type: 'detail'; clipId: string; detail: DetailSettings }
   | { type: 'detail-patch'; clipIds: string[]; settings: { [K in keyof DetailSettings]?: number | null } }
   | { type: 'music'; music: MusicLane[] }
@@ -132,7 +131,6 @@ const EDITOR_ONLY: readonly EditCommand['type'][] = [
   'layer-update',
   'color',
   'detail',
-  'transform',
   'layer-key-toggle',
   'layer-key-value',
   'select-done',
@@ -164,7 +162,6 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
   'transform-patch': { type: 'transform-patch', layerId: 'video-1', settings: { opacity: 0.5, scale: null } },
   speed: { type: 'speed', clipId: 'clip-1', speed: { mode: 'constant', rate: 2 } },
   reverse: { type: 'reverse', clipId: 'clip-1', reverse: true },
-  transform: { type: 'transform', layerId: 'video-1', transform: createSpatialSettings() },
   detail: { type: 'detail', clipId: 'clip-1', detail: createDetailSettings() },
   'detail-patch': { type: 'detail-patch', clipIds: ['clip-1', 'clip-2'], settings: { sharpen: 0.3, denoise: null } },
   music: { type: 'music', music: [] },

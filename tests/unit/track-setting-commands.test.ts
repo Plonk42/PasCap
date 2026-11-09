@@ -34,21 +34,7 @@ function graded(): ProjectDocument {
   for (const command of [
     { type: 'layer-key-toggle', clipId: 'shot', frame: 10, setting: 'exposure', value: 0.5 },
     { type: 'layer-key-toggle', adjustmentId: 'look', frame: 10, setting: 'exposure', value: 0.5 },
-    {
-      type: 'transform',
-      layerId: layer.id,
-      transform: {
-        ...layer.transform,
-        keyframes: [
-          {
-            frame: 0,
-            values: { ...nulls(), scale: 1.5 },
-            easing: { ...nulls(), scale: 'linear' },
-            reset: false,
-          },
-        ],
-      },
-    },
+    { type: 'layer-key-set', layerId: layer.id, frame: 0, values: { scale: 1.5 } },
   ] as EditCommand[])
     next = applyCommand(next, command);
   return next;

@@ -1,12 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { EditHistory } from '../../src/shared/commands.js';
+import { applyCommand, EditHistory } from '../../src/shared/commands.js';
 import { uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { previewClipSource } from '../../src/web/clip-speed-geometry.js';
 import type { KeyframeInspection } from '../../src/web/keyframe-navigation.js';
-import { removeSpatialKey, replaceSpatialKey } from '../../src/web/spatial-editor.js';
 import {
   clipSpeedKeyframes,
   inspectSpatialKeyframe,
@@ -48,13 +47,12 @@ function reconcile(inspection: SpatialInspection | null, project: ProjectDocumen
   return reconcileSpatialInspection(inspection, context(project), stored(project), observedFrame, false);
 }
 
-function withTransform(
-  project: ProjectDocument,
-  produce: (transform: ProjectDocument['layers'][0]['transform']) => ProjectDocument['layers'][0]['transform'],
-): ProjectDocument {
-  const next = structuredClone(project);
-  next.layers[0]!.transform = produce(next.layers[0]!.transform);
-  return next;
+function moved(project: ProjectDocument, ...moves: [frame: number, nextFrame: number][]): ProjectDocument {
+  return moves.reduce(
+    (document, [frame, nextFrame]) =>
+      applyCommand(document, { type: 'layer-key-move', layerId: 'video-1', frame, nextFrame }),
+    project,
+  );
 }
 
 describe('track-local Transform stored-keyframe cursor', () => {
@@ -138,8 +136,7 @@ describe('track-local Transform stored-keyframe cursor', () => {
     const project = fixture([0, 20, 60, 120]);
     const history = new EditHistory(project);
     let cursor = inspect(project, 20);
-    const transform = replaceSpatialKey(project.layers[0]!.transform, 20, { frame: 65 });
-    history.commit({ type: 'transform', layerId: 'video-1', transform });
+    history.commit({ type: 'layer-key-move', layerId: 'video-1', frame: 20, nextFrame: 65 });
     cursor = reconcile(cursor, history.current)!;
     expect(cursor.frame).toBe(65);
     expect(cursor.frames).toEqual([0, 60, 65, 120]);
@@ -156,30 +153,22 @@ describe('track-local Transform stored-keyframe cursor', () => {
   it('updates the previous key list after unrelated changes before identifying a later selected-key move', () => {
     const project = fixture();
     const initial = inspect(project, 20);
-    const unrelated = withTransform(project, (transform) => replaceSpatialKey(transform, 60, { frame: 65 }));
+    const unrelated = moved(project, [60, 65]);
     const retained = reconcile(initial, unrelated)!;
     expect(retained.frame).toBe(20);
     expect(retained.frames).toContain(65);
-    const moved = withTransform(unrelated, (transform) => replaceSpatialKey(transform, 20, { frame: 22 }));
-    expect(reconcile(retained, moved)?.frame).toBe(22);
+    expect(reconcile(retained, moved(unrelated, [20, 22]))?.frame).toBe(22);
   });
 
   it('clears a deleted selected key permanently, including after Undo', () => {
     const project = fixture();
     const history = new EditHistory(project);
     const cursor = inspect(project, 20);
-    history.commit({
-      type: 'transform',
-      layerId: 'video-1',
-      transform: removeSpatialKey(project.layers[0]!.transform, 20),
-    });
+    history.commit({ type: 'layer-key-remove', layerId: 'video-1', frame: 20 });
     const cleared = reconcile(cursor, history.current);
     expect(cleared).toBeNull();
     expect(reconcile(cleared, history.undo())).toBeNull();
-    const replaced = withTransform(project, (transform) =>
-      replaceSpatialKey(replaceSpatialKey(transform, 20, { frame: 22 }), 60, { frame: 65 }),
-    );
-    expect(reconcile(cursor, replaced)).toBeNull();
+    expect(reconcile(cursor, moved(project, [20, 22], [60, 65]))).toBeNull();
   });
 
   it('navigates retained clip speed keys, including off-trim and original OUT', () => {

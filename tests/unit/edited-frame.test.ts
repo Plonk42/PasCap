@@ -3,9 +3,7 @@ import { createColorSettings } from '../../src/shared/color.js';
 import { applyCommand, type EditCommand } from '../../src/shared/commands.js';
 import { editedFrame } from '../../src/shared/edited-frame.js';
 import { createAdjustment } from '../../src/shared/grade.js';
-import { uniformKeyframe } from '../../src/shared/keyframes.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { SPATIAL_CHANNELS, type SpatialChannel } from '../../src/shared/spatial.js';
 
 const base: ProjectDocument = projectSchema.parse({
   ...createProject('edited', 'Edited'),
@@ -26,10 +24,6 @@ const base: ProjectDocument = projectSchema.parse({
   adjustments: [createAdjustment('look', 40, 100)],
 });
 const layerId = base.layers[0]!.id;
-const NO_TRANSFORM = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<
-  SpatialChannel,
-  null
->;
 
 function after(...commands: EditCommand[]): number | null {
   return editedFrame(
@@ -55,16 +49,7 @@ describe('edited frame', () => {
     expect(after({ type: 'layer-key-toggle', adjustmentId: 'look', frame: 50, setting: 'exposure', value: 0.5 })).toBe(
       90,
     );
-    expect(
-      after({
-        type: 'transform',
-        layerId,
-        transform: {
-          ...base.layers[0]!.transform,
-          keyframes: [{ ...uniformKeyframe(75, { ...NO_TRANSFORM, opacity: 0.5 }, 'linear'), reset: false }],
-        },
-      }),
-    ).toBe(75);
+    expect(after({ type: 'layer-key-set', layerId, frame: 75, values: { opacity: 0.5 } })).toBe(75);
     expect(after({ type: 'adjustment-add', adjustmentId: 'later', start: 150, duration: 20 })).toBe(150);
     expect(after({ type: 'adjustment-remove', adjustmentId: 'look' })).toBe(40);
     expect(after({ type: 'bookmark-add', frame: 200 })).toBe(200);

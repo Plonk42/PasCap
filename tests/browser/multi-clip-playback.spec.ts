@@ -5,7 +5,6 @@ import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { memoryProjects } from './memory-projects.js';
-import { transformPoint } from './editor-helpers.js';
 import { installMusicEvidence, observeRealtimeHeadroom } from './music-evidence.js';
 import { singleClipLane } from '../music-lanes.js';
 
@@ -136,14 +135,14 @@ function buildProject(
     });
   }
   for (const layer of document.layers) {
-    const keyframes = (scenario.opacity ?? [])
-      .filter(([track]) => (track ? `multi-track-${track}` : document.layers[0]!.id) === layer.id)
-      .map(([, frame, value]) => transformPoint(frame, { opacity: value }));
-    if (keyframes.length)
+    for (const [, frame, value] of (scenario.opacity ?? []).filter(
+      ([track]) => (track ? `multi-track-${track}` : document.layers[0]!.id) === layer.id,
+    ))
       document = applyCommand(document, {
-        type: 'transform',
+        type: 'layer-key-set',
         layerId: layer.id,
-        transform: { ...layer.transform, keyframes },
+        frame,
+        values: { opacity: value },
       });
   }
   if (music) {

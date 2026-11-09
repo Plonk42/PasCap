@@ -375,11 +375,7 @@ describe('shared exact values and contextual validation', () => {
     const moved = change(captured.state, 0.137123456789);
     expect(moved.commit).toBeNull();
     const released = finish(moved.state);
-    const next = applyCommand(project, {
-      type: 'transform',
-      layerId: layer.id,
-      transform: editSpatialPose(layer.transform, 10, 'opacity', released.commit!),
-    });
+    const next = applyCommand(project, editSpatialPose(layer, 10, 'opacity', released.commit!));
     expect(next.layers[0]!.transform.base.opacity).toBe(0.75);
     expect(next.layers[0]!.transform.keyframes).toEqual([
       { ...layer.transform.keyframes[0], values: { ...layer.transform.keyframes[0]!.values, opacity: 0.137123456789 } },

@@ -11,7 +11,6 @@ import {
   spatialKeyChannels,
   type SpatialChannel,
   type SpatialKeyframe,
-  type SpatialSettings,
 } from '../shared/spatial.js';
 import { ChannelSteps, KeyframeSteps, keyframeCount } from './AnimationControls.js';
 import { HelpPopover } from './HelpPopover.js';
@@ -24,15 +23,18 @@ import { livePreview } from './live-preview.js';
 import './spatial-editor.css';
 import {
   editSpatialPose,
+  moveSpatialKey,
   removeSpatialKey,
-  replaceSpatialKey,
   resetSpatial,
   setSpatialEasing,
+  setSpatialKeyValue,
   SPATIAL_CONTROLS,
   toggleDefaultSpatialKey,
   toggleSpatialChannel,
   withoutSpatialChannel,
 } from './spatial-editor.js';
+import { musicEditError } from './music-ui.js';
+import type { BypassPreview } from './setting-bypass.js';
 import {
   inspectSpatialKeyframe,
   reconcileSpatialInspection,
@@ -144,7 +146,7 @@ function PoseFields({
   onDraft: (key: SpatialChannel, value: number | null) => void;
   onReset?: (key: SpatialChannel) => void;
   /** The preview without a setting, for its hold-to-compare eye; absent for no eye. */
-  compare?: (key: SpatialChannel) => EditCommand | null;
+  compare?: (key: SpatialChannel) => BypassPreview | null;
 }>) {
   const id = useId();
   return (
@@ -252,33 +254,33 @@ export function SpatialControls({
   const readOnly = (channel: SpatialChannel): boolean =>
     hasSpatialChannelKeys(settings, channel) && !channelActive(channel);
   const [error, setError] = useState('');
-  const command = (transform: SpatialSettings): EditCommand => ({ type: 'transform', layerId: layer.id, transform });
-  const validate = (produce: () => SpatialSettings): string | null => {
+  const refused = (cause: unknown) => musicEditError(cause, 'This Transform is invalid.');
+  const validate = (produce: () => EditCommand): string | null => {
     try {
-      applyCommand(project, command(produce()));
+      applyCommand(project, produce());
       return null;
     } catch (cause) {
-      return cause instanceof Error ? cause.message : 'This Transform is invalid.';
+      return refused(cause);
     }
   };
-  const change = (produce: () => SpatialSettings): void => {
+  const change = (produce: () => EditCommand): void => {
     if (unavailable) return;
     try {
-      const next = command(produce());
+      const next = produce();
       applyCommand(project, next);
       onEdit(next);
       setError('');
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'This Transform is invalid.');
+      setError(refused(cause));
     }
   };
-  const draft = (produce: () => SpatialSettings, value: number | null): void => {
+  const draft = (produce: () => EditCommand, value: number | null): void => {
     if (value === null) {
       livePreview(null);
       return;
     }
     try {
-      livePreview(command(produce()));
+      livePreview(produce());
     } catch {
       livePreview(null);
     }
@@ -297,22 +299,21 @@ export function SpatialControls({
       next: keyed.find((key) => key.frame > cursor),
       captureDisabled: unavailable || !valid || (!atFrame && settings.keyframes.length >= 256),
       onToggle: () => {
-        if (valid) change(() => toggleSpatialChannel(settings, channel, frame));
+        if (valid) change(() => toggleSpatialChannel(layer, channel, frame));
       },
       onSeek: seek,
     };
   };
-  const reset = valid ? resetSpatial(settings, frame) : null;
+  const reset = valid ? resetSpatial(layer, frame) : null;
   const occupied = atFrame !== undefined && !atFrame.reset;
   let defaultTitle =
     'Add a default Transform keyframe here: every Transform setting returns to its default and holds until its next keyframe. Earlier frames keep their values.';
   if (atFrame?.reset) defaultTitle = 'Remove the default Transform keyframe at the playhead';
   else if (atFrame)
     defaultTitle = 'A Transform keyframe already exists at the playhead; move to another frame for a default keyframe';
-  const poseAt = (key: SpatialChannel, value: number) => () =>
-    editSpatialPose(settings, valid ? frame : null, key, value);
+  const poseAt = (key: SpatialChannel, value: number) => () => editSpatialPose(layer, valid ? frame : null, key, value);
   const storedAt = (stored: SpatialKeyframe, key: SpatialChannel, value: number) => () =>
-    replaceSpatialKey(settings, stored.frame, { values: { ...stored.values, [key]: value } });
+    setSpatialKeyValue(layer, stored.frame, key, value);
   const kind: StoredKeyframeKind<SpatialChannel, SpatialKeyframe> = {
     noun: 'Transform',
     title: 'Transform keyframes',
@@ -331,11 +332,11 @@ export function SpatialControls({
     seek: (target) => {
       if (!unavailable) onSelectStored?.(target);
     },
-    validateFrame: (key, value) => validate(() => replaceSpatialKey(settings, key.frame, { frame: value })),
-    moveFrame: (key, value) => change(() => replaceSpatialKey(settings, key.frame, { frame: value })),
+    validateFrame: (key, value) => validate(() => moveSpatialKey(layer, key.frame, value)),
+    moveFrame: (key, value) => change(() => moveSpatialKey(layer, key.frame, value)),
     setEasing: (key, channel, interpolation) =>
-      change(() => setSpatialEasing(settings, key.frame, channel, interpolation)),
-    remove: (key) => change(() => removeSpatialKey(settings, key.frame)),
+      change(() => setSpatialEasing(layer, key.frame, channel, interpolation)),
+    remove: (key) => change(() => removeSpatialKey(layer, key.frame)),
     removeTitle: 'Remove this whole Transform keyframe and all its settings',
     renderValues: (key, row) => (
       <PoseFields
@@ -385,7 +386,7 @@ export function SpatialControls({
           aria-label={atFrame?.reset ? 'Remove default Transform keyframe' : 'Add default Transform keyframe'}
           title={defaultTitle}
           onClick={() => {
-            if (!occupied) change(() => toggleDefaultSpatialKey(settings, frame));
+            if (!occupied) change(() => toggleDefaultSpatialKey(layer, frame));
           }}
         >
           <Icon name="default-key" size={16} />
@@ -404,10 +405,7 @@ export function SpatialControls({
         onCommit={(key, value) => change(poseAt(key, value))}
         onDraft={(key, value) => draft(poseAt(key, value ?? 0), value)}
         onReset={(key) => change(poseAt(key, NEUTRAL_SPATIAL_POSE[key]))}
-        compare={(key) => {
-          const without = withoutSpatialChannel(settings, key);
-          return without && command(without);
-        }}
+        compare={(key) => withoutSpatialChannel(layer, key)}
       />
       <StoredKeyframeList
         kind={kind}
