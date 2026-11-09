@@ -67,7 +67,7 @@ type FormerEditCommand =
       adjustmentId?: string | undefined;
       layerId?: string | undefined;
       frame: number;
-      values: { [K in ScalarColorSetting | SpatialChannel]?: number | null };
+      values?: { [K in ScalarColorSetting | SpatialChannel]?: number | null } | undefined;
       easing?: Interpolation | { [K in ScalarColorSetting | SpatialChannel]?: Interpolation } | undefined;
       reset?: boolean | undefined;
     }
@@ -135,6 +135,19 @@ type FormerEditCommand =
   | { type: 'select-set'; mediaId: string; ranges: SelectRange[] }
   | { type: 'select-narrow'; mediaId: string; ranges: SelectRange[] }
   | { type: 'select-done'; mediaId: string; done: boolean };
+
+const EDITOR_ONLY: readonly EditCommand['type'][] = [
+  'layer-add',
+  'layer-update',
+  'color',
+  'detail',
+  'transform',
+  'layer-key-toggle',
+  'layer-key-value',
+  'layer-key-easing',
+  'layer-key-default',
+  'select-done',
+];
 
 const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> } = {
   insert: { type: 'insert', clip: newClip('clip-2', 'rec-1', 0, 30), index: 1 },
@@ -292,9 +305,7 @@ describe('editCommandSchema', () => {
   });
 
   it('validates commands other tools refer to exactly like edit, publishing only their type', () => {
-    const assistant = Object.values(samples).filter(
-      (sample) => !['layer-add', 'layer-update', 'color', 'detail', 'transform', 'select-done'].includes(sample.type),
-    );
+    const assistant = Object.values(samples).filter((sample) => !EDITOR_ONLY.includes(sample.type));
     for (const sample of assistant)
       expect(referencedEditCommandSchema.parse(sample)).toEqual(editCommandSchema.parse(sample));
     expect(referencedEditCommandSchema.safeParse({ ...samples.delete, clip: 'clip-1' }).success).toBe(false);
@@ -305,11 +316,10 @@ describe('editCommandSchema', () => {
     expect(published.length).toBeLessThan(1_500);
   });
 
-  it('offers the assistant every command but those replacing a whole track, Color, Detail or Transform and the user’s done marks', () => {
+  it('offers the assistant every command but whole-value replacements, keyframe gestures and the user’s done marks', () => {
     const types = assistantEditCommandSchema.options.map((option) => option.shape.type.value);
-    expect(types).toHaveLength(editCommandSchema.options.length - 6);
-    for (const type of ['layer-add', 'layer-update', 'color', 'detail', 'transform', 'select-done'])
-      expect(types).not.toContain(type);
+    expect(types).toHaveLength(editCommandSchema.options.length - EDITOR_ONLY.length);
+    for (const type of EDITOR_ONLY) expect(types).not.toContain(type);
     expect(types).toContain('adjustment-split');
     expect(assistantEditCommandSchema.safeParse(samples['layer-update']).success).toBe(false);
     expect(referencedEditCommandSchema.safeParse(samples['layer-add']).success).toBe(false);

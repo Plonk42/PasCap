@@ -243,6 +243,22 @@ describe('partial appearance commands', () => {
     );
   });
 
+  it('changes only the Easing or default flag of an existing keyframe when values are left out', () => {
+    const key = (document: ProjectDocument) => document.layers[0]!.transform.keyframes[0]!;
+    const eased = applyCommand(project, { type: 'layer-key-set', layerId, frame: 0, easing: 'smooth' });
+    expect(key(eased)).toEqual({ ...key(project), easing: { ...key(project).easing, scale: 'smooth' } });
+    const reset = applyCommand(project, { type: 'layer-key-set', layerId, frame: 0, reset: true });
+    expect(key(reset)).toEqual({ ...key(project), reset: true });
+    const graded = applyCommand(project, { type: 'layer-key-set', clipId: 'shot', frame: 10, easing: 'hold' });
+    expect(graded.clips[0]!.grade.keyframes[0]!.easing.exposure).toBe('hold');
+    expect(() => applyCommand(project, { type: 'layer-key-set', layerId, frame: 5, easing: 'hold' })).toThrow(
+      'No keyframe at frame 5: list values to create one.',
+    );
+    expect(() => applyCommand(project, { type: 'layer-key-set', layerId, frame: 0 })).toThrow(
+      'List values, an Easing or reset to change.',
+    );
+  });
+
   it('creates a neutral track and changes its options without sending the whole track', () => {
     const project = graded();
     const created = applyCommand(project, { type: 'layer-create', layerId: 'overlay', name: ' Overlay ' });

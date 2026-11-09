@@ -230,7 +230,7 @@ async function estimateWhiteBalance(
   if (input.applyAs === 'keyframe')
     return {
       fields,
-      commands: whiteBalanceCommands(grade.values, grade.keyFrame!, balance, grade.owner),
+      commands: whiteBalanceCommands(grade.keyFrame!, balance, grade.owner),
       unchanged: [],
     };
   const unchanged = (['temperature', 'tint'] as const).filter((setting) => hasLayerKeys(grade.values, setting));
@@ -246,7 +246,7 @@ async function estimateAutoAdjust(context: ServiceContext, { reads, grade }: Tar
   if (input.applyAs === 'keyframe')
     return {
       fields,
-      commands: captureCommands(grade.values, grade.keyFrame!, fields.correction, grade.owner),
+      commands: captureCommands(grade.keyFrame!, fields.correction, grade.owner),
       unchanged: [],
     };
   const command = autoAdjustCommand(grade.values, fitted, intensity, grade.owner);

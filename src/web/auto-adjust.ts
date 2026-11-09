@@ -181,7 +181,7 @@ export function autoAdjustCommands(
     if (apply === 'keyframe') {
       const frame = sourceFrameAt(part.clip, context.playhead);
       if (frame === null) return [];
-      return captureCommands(owner, frame, scaleCorrection(correction, intensity), clipOwner(clipId));
+      return captureCommands(frame, scaleCorrection(correction, intensity), clipOwner(clipId));
     }
     const edit = autoAdjustCommand(owner, correction, intensity, clipOwner(clipId));
     return edit ? [edit] : [];

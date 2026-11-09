@@ -85,8 +85,8 @@ describe('Auto white balance capture', () => {
   it('creates one keyframe of the clip grade at the source frame, in one Undo step', () => {
     const document = project();
     const before = structuredClone(document);
-    const commands = whiteBalanceCommands(gradeOwnerOf(document, 'a')!, 220, balance, CLIP_A);
-    expect(commands.map((command) => command.type)).toEqual(['layer-key-toggle', 'layer-key-toggle']);
+    const commands = whiteBalanceCommands(220, balance, CLIP_A);
+    expect(commands.map((command) => command.type)).toEqual(['layer-key-set']);
     const next = commands.reduce(applyCommand, document);
     expect(grade(next, 'a').keyframes).toEqual([key(220, { temperature: 0.214, tint: -0.031 }, 'linear')]);
     expect(next.layers).toEqual(before.layers);
@@ -105,7 +105,7 @@ describe('Auto white balance capture', () => {
       key(300, { exposure: -0.5, temperature: 1.2 }, 'hold'),
     ];
     const owner = gradeOwnerOf(document, 'a')!;
-    const joined = whiteBalanceCommands(owner, 220, balance, CLIP_A).reduce(applyCommand, document);
+    const joined = whiteBalanceCommands(220, balance, CLIP_A).reduce(applyCommand, document);
     const point = gradeKeyAsLayerKey(grade(joined, 'a').keyframes[0]!);
     const order = KEYFRAME_SETTINGS.map((setting) => setting.key);
     const easing = joiningEasing(owner.keyframes, owner.keyframes[0]!, order);
@@ -114,8 +114,8 @@ describe('Auto white balance capture', () => {
     expect(grade(joined, 'a').keyframes[1]).toEqual(grade(document, 'a').keyframes[1]);
     expect(grade(joined, 'a').color).toEqual(grade(document, 'a').color);
 
-    const rerun = whiteBalanceCommands(gradeOwnerOf(joined, 'a')!, 220, { temperature: -0.1, tint: 0.05 }, CLIP_A);
-    expect(rerun.map((command) => command.type)).toEqual(['layer-key-value', 'layer-key-value']);
+    const rerun = whiteBalanceCommands(220, { temperature: -0.1, tint: 0.05 }, CLIP_A);
+    expect(rerun.map((command) => command.type)).toEqual(['layer-key-set']);
     const updated = rerun.reduce(applyCommand, joined);
     expect(gradeKeyAsLayerKey(grade(updated, 'a').keyframes[0]!)).toEqual({
       ...point,
@@ -126,7 +126,7 @@ describe('Auto white balance capture', () => {
   it('interpolates between two runs in preview and export sampling', () => {
     let document = project();
     const run = (frame: number, temperature: number, tint: number): void => {
-      const commands = whiteBalanceCommands(gradeOwnerOf(document, 'a')!, frame, { temperature, tint }, CLIP_A);
+      const commands = whiteBalanceCommands(frame, { temperature, tint }, CLIP_A);
       document = commands.reduce(applyCommand, document);
     };
     run(200, 0.4, -0.1);

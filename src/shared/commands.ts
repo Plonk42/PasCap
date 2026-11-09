@@ -428,25 +428,44 @@ function patchKeySettings<K extends string>(
 ): { values: Record<K, number | null>; easing: Record<K, Interpolation | null> } {
   const values: Record<K, number | null> = { ...base.values };
   const curves: Record<K, Interpolation | null> = { ...base.easing };
-  for (const [setting, value] of Object.entries(patch) as [K, number | null | undefined][]) {
-    if (value === undefined) continue;
+  const listed = (Object.entries(patch) as [K, number | null | undefined][]).filter(
+    (entry): entry is [K, number | null] => entry[1] !== undefined,
+  );
+  for (const [setting, value] of listed) {
     const keyed = values[setting] !== null;
     values[setting] = value;
     if (value === null) curves[setting] = null;
     else if (typeof easing === 'string') curves[setting] = easing;
     else if (!keyed) curves[setting] = joining;
   }
-  if (typeof easing !== 'object') return { values, easing: curves };
+  if (typeof easing === 'string' && !listed.length)
+    for (const setting of Object.keys(values) as K[]) if (values[setting] !== null) curves[setting] = easing;
+  if (typeof easing === 'object') easePerSetting(values, curves, easing);
+  return { values, easing: curves };
+}
+
+function easePerSetting<K extends string>(
+  values: Readonly<Record<K, number | null>>,
+  curves: Record<K, Interpolation | null>,
+  easing: Partial<Record<K, Interpolation>>,
+): void {
   for (const [setting, curve] of Object.entries(easing) as [K, Interpolation][]) {
     if (values[setting] === null) throw new Error(`${setting} is not keyed at this keyframe, so it has no Easing.`);
     curves[setting] = curve;
   }
-  return { values, easing: curves };
 }
 
 function keyframeLimit(owner: ColorOwner): Error {
   const what = owner.kind === 'clip' ? 'This clip' : 'This adjustment';
   return new Error(`${what} already has ${maxKeyframes(owner)} keyframes. Change one of them, or remove one.`);
+}
+
+/** Without values, layer-key-set changes only an existing keyframe's Easing or default flag. */
+function requireKeyChange(command: LayerKeySet, exists: boolean): void {
+  if (command.values !== undefined) return;
+  if (command.easing === undefined && command.reset === undefined)
+    throw new Error('List values, an Easing or reset to change.');
+  if (!exists) throw new Error(`No keyframe at frame ${command.frame}: list values to create one.`);
 }
 
 /** A grade frame: a source frame of a clip, or a frame counted from an adjustment's start, which may be negative. */
@@ -468,16 +487,17 @@ function gradeEasingPatch(
 /** Keys, changes or disables several settings of one keyframe at once, like their toggles together. */
 function setLayerKey(layer: ColorOwner, command: LayerKeySet): void {
   requireGradeFrame(command.frame);
-  const foreign = Object.keys(command.values).find(
+  const foreign = Object.keys(command.values ?? {}).find(
     (setting) => !GRADE_SETTINGS.includes(setting as ScalarColorSetting),
   );
   if (foreign !== undefined)
     throw new Error(`${foreign} is not a Color setting: Transform keyframes belong to a track (layerId).`);
-  const patch = gradeKeyValuesPatchSchema.parse(command.values);
+  const patch = command.values === undefined ? {} : gradeKeyValuesPatchSchema.parse(command.values);
   const easing = command.easing === undefined ? undefined : gradeEasingPatch(command.easing);
   if (command.reset !== undefined && typeof command.reset !== 'boolean')
     throw new Error('Reset must be true or false.');
   const point = layer.keyframes.find((key) => key.frame === command.frame);
+  requireKeyChange(command, point !== undefined);
   if (!point && layer.keyframes.length >= maxKeyframes(layer)) throw keyframeLimit(layer);
   const order = KEYFRAME_SETTINGS.map((setting) => setting.key);
   const base = point ?? layerKeyframe(command.frame, EMPTY_KEY_VALUES, 'linear');
@@ -601,8 +621,9 @@ const isTransformSetting = (setting: string): setting is SpatialChannel =>
 
 /** The Transform settings a command keys, each within its bounds, or null to disable it. */
 function transformKeyPatch(
-  values: Partial<Record<KeySetting, number | null>>,
+  values: Partial<Record<KeySetting, number | null>> | undefined,
 ): Partial<Record<SpatialChannel, number | null>> {
+  if (values === undefined) return {};
   const entries = Object.entries(values);
   if (!entries.length) throw new Error('List at least one setting.');
   for (const [setting, value] of entries) {
@@ -634,6 +655,7 @@ function setTransformKey(
   const easing = command.easing === undefined ? undefined : transformEasingPatch(command.easing);
   if (command.reset !== undefined && typeof command.reset !== 'boolean')
     throw new Error('Reset must be true or false.');
+  requireKeyChange(command, point !== undefined);
   if (!point && keys.length >= MAX_TRANSFORM_KEYFRAMES)
     throw new Error(
       `This track already has ${MAX_TRANSFORM_KEYFRAMES} Transform keyframes. Change one of them, or remove one.`,

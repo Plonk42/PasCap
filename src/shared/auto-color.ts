@@ -9,7 +9,7 @@ import {
 import type { EditCommand } from './commands.js';
 import type { ColorSettings } from './color.js';
 import { MAX_GRADE_KEYFRAMES } from './grade.js';
-import { activeLayerSetting, hasLayerKeys, type KeyframeSetting, type LayerKeyframe } from './keyframes.js';
+import { hasLayerKeys, type KeyframeSetting, type LayerKeyframe } from './keyframes.js';
 import type { PlacedClip } from './timeline.js';
 import type { WhiteBalance } from './white-balance.js';
 
@@ -34,31 +34,18 @@ export function keyframeLimitReason(grade: GradeValues, frame: number, owner: Au
   return `${what} already has ${MAX_GRADE_KEYFRAMES} keyframes. Move the playhead to one of them, or remove one.`;
 }
 
-/** Captures each value at `frame` exactly like its diamond (joining or overwriting), in one transaction. */
+/** Keys each value at `frame` in one keyframe edit, joining or overwriting it exactly like the diamonds. */
 export function captureCommands(
-  grade: GradeValues,
   frame: number,
   values: Readonly<Partial<Record<KeyframeSetting, number>>>,
   owner: AutoOwner,
 ): EditCommand[] {
-  return (Object.entries(values) as [Exclude<KeyframeSetting, 'opacity'>, number][]).map(
-    ([setting, value]): EditCommand => {
-      const capture = { ...keyTarget(owner), frame, setting, value };
-      return activeLayerSetting(grade, setting, frame)
-        ? { type: 'layer-key-value', ...capture }
-        : { type: 'layer-key-toggle', ...capture };
-    },
-  );
+  return [{ type: 'layer-key-set', ...keyTarget(owner), frame, values: { ...values } }];
 }
 
-/** Captures both settings at the playhead exactly like their diamonds, in one transaction. */
-export function whiteBalanceCommands(
-  grade: GradeValues,
-  frame: number,
-  balance: WhiteBalance,
-  owner: AutoOwner,
-): EditCommand[] {
-  return captureCommands(grade, frame, { temperature: balance.temperature, tint: balance.tint }, owner);
+/** Keys both settings at the playhead exactly like their diamonds, in one keyframe edit. */
+export function whiteBalanceCommands(frame: number, balance: WhiteBalance, owner: AutoOwner): EditCommand[] {
+  return captureCommands(frame, { temperature: balance.temperature, tint: balance.tint }, owner);
 }
 
 /** The settings Auto sets that this grade animates: Auto leaves them unchanged. */

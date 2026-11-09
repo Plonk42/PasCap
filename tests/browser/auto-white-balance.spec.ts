@@ -18,7 +18,6 @@ import {
   type WhiteBalance,
 } from '../../src/shared/white-balance.js';
 import { whiteBalanceCommands } from '../../src/shared/auto-color.js';
-import { gradeOwnerOf } from '../../src/web/color-owner.js';
 import { adjustmentFrom0, expandedInspectorPreferences, inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
@@ -200,7 +199,7 @@ function autoButton(page: Page) {
 
 /** The cast clip's grade keyed at source frame `frame` (the cast clip starts at frame 0 at 1×). */
 function balanced(document: ProjectDocument, frame: number, balance: WhiteBalance): ProjectDocument {
-  const commands = whiteBalanceCommands(gradeOwnerOf(document, 'cast')!, frame, balance, {
+  const commands = whiteBalanceCommands(frame, balance, {
     kind: 'clip',
     clipId: 'cast',
   });

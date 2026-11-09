@@ -307,8 +307,8 @@ describe('operation routes', () => {
         { type: 'transform-patch', layerId: 'video-1', settings: { scale: 1.5 } },
         { type: 'layer-key-set', layerId: 'video-1', frame: 30, values: { opacity: 1 } },
         { type: 'layer-key-set', layerId: 'video-1', frame: 90, values: { opacity: 0.5 } },
-        { type: 'layer-key-toggle', adjustmentId: 'look', frame: 30, setting: 'exposure', value: 1 },
-        { type: 'layer-key-toggle', adjustmentId: 'look', frame: 90, setting: 'exposure', value: 0 },
+        { type: 'layer-key-set', adjustmentId: 'look', frame: 30, values: { exposure: 1 } },
+        { type: 'layer-key-set', adjustmentId: 'look', frame: 90, values: { exposure: 0 } },
       ],
     });
     expect(edited.statusCode).toBe(200);

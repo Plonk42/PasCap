@@ -88,7 +88,7 @@ export function AutoWhiteBalance({ project, clipId, layout, assets, playhead, di
       if (!balance) throw new Error('These frames are too dark, too bright or too uniform to estimate their light.');
       const owner = gradeOwnerOf(latest.current.project, clipId);
       if (latest.current.disabled || !owner) throw new Error('Color cannot be edited right now. Try again.');
-      onEdit(whiteBalanceCommands(owner, target.frame, balance, { kind: 'clip', clipId }));
+      onEdit(whiteBalanceCommands(target.frame, balance, { kind: 'clip', clipId }));
       setAnnouncement(
         `White balance keyframed at source frame ${target.frame}: Temperature ${signed(balance.temperature)}, Tint ${signed(balance.tint)}.`,
       );

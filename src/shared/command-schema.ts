@@ -222,21 +222,21 @@ export const editCommandSchema = z.discriminatedUnion('type', [
   ),
   command(
     'layer-key-set',
-    'Create or change the keyframe at frame of a clip grade, an adjustment or a track Transform in one command: each listed setting is keyed at its value (or disabled with null), others keep theirs, and a keyframe left without settings is removed. Rejected as a whole on an out-of-bounds value, a setting the target does not have, an Easing for a setting not keyed there, or a keyframe beyond the limit (64 per grade, 256 per Transform).',
+    'Create or change the keyframe at frame of a clip grade, an adjustment or a track Transform in one command: each listed setting is keyed at its value (or disabled with null), others keep theirs, and a keyframe left without settings is removed. Without values it changes only the Easing or default flag of an existing keyframe. Rejected as a whole on an out-of-bounds value, a setting the target does not have, an Easing for a setting not keyed there, or a keyframe beyond the limit (64 per grade, 256 per Transform).',
     {
       ...keyOwner,
       frame: described(gradeFrame, `Frame of the keyframe: ${keyFrameTerms}.`),
       values: described(
-        z.partialRecord(keySetting, z.number().nullable()),
-        `Settings to key at their value, or null to disable them here; at least one. Color settings of a grade: ${colorBounds} Transform settings of a track: ${transformBounds}.`,
+        z.partialRecord(keySetting, z.number().nullable()).optional(),
+        `Settings to key at their value, or null to disable them here; at least one when given. Color settings of a grade: ${colorBounds} Transform settings of a track: ${transformBounds}.`,
       ),
       easing: described(
         interpolationSchema.or(z.partialRecord(keySetting, interpolationSchema)).optional(),
-        'One Easing (hold, linear, ease-in, ease-out or smooth) for every setting keyed by this command, or an Easing per setting keyed here. Omitted: a newly keyed setting adopts the Easing the keyframe already agrees on, else linear; others keep theirs.',
+        'One Easing (hold, linear, ease-in, ease-out or smooth) for every setting keyed by this command (every setting keyed there when values is omitted), or an Easing per setting keyed here. Omitted: a newly keyed setting adopts the Easing the keyframe already agrees on, else linear; others keep theirs.',
       ),
       reset: described(
         z.boolean().optional(),
-        "True makes it a default keyframe, whose values never reach back to earlier frames; omitted keeps the keyframe's current flag (false for a new one).",
+        "True makes it a default keyframe, whose values never reach back to earlier frames; omitted keeps the keyframe's current flag (false for a new one). The editor's default keyframe keys every setting at neutral with hold.",
       ),
     },
   ),
@@ -411,8 +411,8 @@ export const editCommandSchema = z.discriminatedUnion('type', [
 export type EditCommand = z.infer<typeof editCommandSchema>;
 
 /**
- * Editor commands replacing a whole value (the assistant changes settings with the patch commands and keyframes
- * with layer-key-set) or the user's own review marks.
+ * Editor commands replacing a whole value or mirroring one keyframe gesture (the assistant changes settings with
+ * the patch commands and keyframes with layer-key-set, -move and -remove) or the user's own review marks.
  */
 const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   'layer-add',
@@ -420,6 +420,10 @@ const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   'color',
   'detail',
   'transform',
+  'layer-key-toggle',
+  'layer-key-value',
+  'layer-key-easing',
+  'layer-key-default',
   'select-done',
 ]);
 
