@@ -11,7 +11,6 @@ import {
   layerKeyframeSchema,
   uniformKeyframe,
   upsertKey,
-  withEasing,
   type Interpolation,
   type KeyframeSetting,
   type LayerKeyframe,
@@ -52,6 +51,7 @@ import {
   MAX_TRANSFORM_KEYFRAMES,
   NEUTRAL_SPATIAL_POSE,
   SPATIAL_CHANNELS,
+  defaultSpatialKeyframe,
   spatialPoseSchema,
   spatialSettingsSchema,
   type SpatialChannel,
@@ -375,15 +375,7 @@ function duplicateClip(next: ProjectDocument, index: number, newClipId: string):
 
 type LayerKeyCommand = Extract<
   EditCommand,
-  {
-    type:
-      | 'layer-key-toggle'
-      | 'layer-key-value'
-      | 'layer-key-move'
-      | 'layer-key-remove'
-      | 'layer-key-easing'
-      | 'layer-key-default';
-  }
+  { type: 'layer-key-toggle' | 'layer-key-value' | 'layer-key-move' | 'layer-key-remove' }
 >;
 type LayerValueCommand = Extract<LayerKeyCommand, { type: 'layer-key-toggle' | 'layer-key-value' }>;
 function editLayerValue(layer: ColorOwner, point: LayerKeyframe | undefined, command: LayerValueCommand): void {
@@ -461,11 +453,19 @@ function keyframeLimit(owner: ColorOwner): Error {
 }
 
 /** Without values, layer-key-set changes only an existing keyframe's Easing or default flag. */
-function requireKeyChange(command: LayerKeySet, exists: boolean): void {
-  if (command.values !== undefined) return;
+/**
+ * Without values, layer-key-set changes an existing keyframe's Easing or default flag, or with reset true alone
+ * adds a default keyframe (every setting neutral, held).
+ */
+function keyChange(command: LayerKeySet, exists: boolean): 'patch' | 'default' {
+  if (command.values !== undefined) return 'patch';
   if (command.easing === undefined && command.reset === undefined)
     throw new Error('List values, an Easing or reset to change.');
-  if (!exists) throw new Error(`No keyframe at frame ${command.frame}: list values to create one.`);
+  if (exists) return 'patch';
+  if (command.reset === true && command.easing === undefined) return 'default';
+  throw new Error(
+    `No keyframe at frame ${command.frame}: list values to create one, or give reset true alone for a default keyframe.`,
+  );
 }
 
 /** A grade frame: a source frame of a clip, or a frame counted from an adjustment's start, which may be negative. */
@@ -497,8 +497,12 @@ function setLayerKey(layer: ColorOwner, command: LayerKeySet): void {
   if (command.reset !== undefined && typeof command.reset !== 'boolean')
     throw new Error('Reset must be true or false.');
   const point = layer.keyframes.find((key) => key.frame === command.frame);
-  requireKeyChange(command, point !== undefined);
+  const change = keyChange(command, point !== undefined);
   if (!point && layer.keyframes.length >= maxKeyframes(layer)) throw keyframeLimit(layer);
+  if (change === 'default') {
+    addDefaultKey(layer, command.frame);
+    return;
+  }
   const order = KEYFRAME_SETTINGS.map((setting) => setting.key);
   const base = point ?? layerKeyframe(command.frame, EMPTY_KEY_VALUES, 'linear');
   const joining = point ? joiningEasing(layer.keyframes, point, order) : 'linear';
@@ -512,15 +516,8 @@ function setLayerKey(layer: ColorOwner, command: LayerKeySet): void {
     : layer.keyframes.filter((key) => key.frame !== command.frame);
 }
 
-/** Adds a default keyframe at `frame`, or removes the one there; a grade's has no Opacity. */
-function toggleDefaultKey(layer: ColorOwner, point: LayerKeyframe | undefined, frame: number): void {
-  if (point && !point.reset)
-    throw new Error('A keyframe already exists at this frame. Choose another frame for a default keyframe.');
-  if (point) {
-    layer.keyframes = layer.keyframes.filter((key) => key !== point);
-    return;
-  }
-  if (layer.keyframes.length >= maxKeyframes(layer)) throw keyframeLimit(layer);
+/** A grade's default keyframe: every Color setting neutral and held; a grade has no Opacity. */
+function addDefaultKey(layer: ColorOwner, frame: number): void {
   const added = { ...defaultKeyframe(frame) };
   added.values = { ...added.values, opacity: null };
   added.easing = { ...added.easing, opacity: null };
@@ -546,24 +543,9 @@ function editLayerKey(layer: ColorOwner, command: LayerKeyCommand): void {
     editLayerValue(layer, point, command);
     return;
   }
-  if (command.type === 'layer-key-default') {
-    toggleDefaultKey(layer, point, command.frame);
-    return;
-  }
   if (!point) throw new Error(`${layer.kind === 'clip' ? 'Clip grade' : 'Adjustment'} keyframe no longer exists.`);
-  switch (command.type) {
-    case 'layer-key-move':
-      moveLayerKey(layer, point, command.nextFrame);
-      break;
-    case 'layer-key-remove':
-      layer.keyframes = layer.keyframes.filter((key) => key !== point);
-      break;
-    case 'layer-key-easing':
-      if (command.setting !== null && !GRADE_SETTINGS.includes(command.setting))
-        throw new Error('Unknown keyframe setting.');
-      point.easing = withEasing<KeyframeSetting>(point, command.setting, command.interpolation);
-      break;
-  }
+  if (command.type === 'layer-key-move') moveLayerKey(layer, point, command.nextFrame);
+  else layer.keyframes = layer.keyframes.filter((key) => key !== point);
 }
 
 type KeyframeCommand = LayerKeyCommand | LayerKeySet;
@@ -655,11 +637,12 @@ function setTransformKey(
   const easing = command.easing === undefined ? undefined : transformEasingPatch(command.easing);
   if (command.reset !== undefined && typeof command.reset !== 'boolean')
     throw new Error('Reset must be true or false.');
-  requireKeyChange(command, point !== undefined);
+  const change = keyChange(command, point !== undefined);
   if (!point && keys.length >= MAX_TRANSFORM_KEYFRAMES)
     throw new Error(
       `This track already has ${MAX_TRANSFORM_KEYFRAMES} Transform keyframes. Change one of them, or remove one.`,
     );
+  if (change === 'default') return upsertKey(keys, defaultSpatialKeyframe(command.frame));
   const base = point ?? { ...uniformKeyframe(command.frame, NO_TRANSFORM_KEY_VALUES, 'linear'), reset: false };
   const joining = point ? joiningEasing(keys, point, SPATIAL_CHANNELS) : 'linear';
   const changed = {
@@ -1088,8 +1071,6 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'layer-key-value':
     case 'layer-key-move':
     case 'layer-key-remove':
-    case 'layer-key-easing':
-    case 'layer-key-default':
       // Like transform, a Transform keyframe edit never rewrites stored timing.
       if (editKeyframes(next, command) === 'transform') return projectSchema.parse(next);
       break;

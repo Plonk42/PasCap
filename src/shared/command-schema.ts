@@ -222,7 +222,7 @@ export const editCommandSchema = z.discriminatedUnion('type', [
   ),
   command(
     'layer-key-set',
-    'Create or change the keyframe at frame of a clip grade, an adjustment or a track Transform in one command: each listed setting is keyed at its value (or disabled with null), others keep theirs, and a keyframe left without settings is removed. Without values it changes only the Easing or default flag of an existing keyframe. Rejected as a whole on an out-of-bounds value, a setting the target does not have, an Easing for a setting not keyed there, or a keyframe beyond the limit (64 per grade, 256 per Transform).',
+    'Create or change the keyframe at frame of a clip grade, an adjustment or a track Transform in one command: each listed setting is keyed at its value (or disabled with null), others keep theirs, and a keyframe left without settings is removed. Without values it changes only the Easing or default flag of an existing keyframe, or with reset true alone adds a default keyframe (every setting neutral, held), as the editor button does. Rejected as a whole on an out-of-bounds value, a setting the target does not have, an Easing for a setting not keyed there, or a keyframe beyond the limit (64 per grade, 256 per Transform).',
     {
       ...keyOwner,
       frame: described(gradeFrame, `Frame of the keyframe: ${keyFrameTerms}.`),
@@ -236,7 +236,7 @@ export const editCommandSchema = z.discriminatedUnion('type', [
       ),
       reset: described(
         z.boolean().optional(),
-        "True makes it a default keyframe, whose values never reach back to earlier frames; omitted keeps the keyframe's current flag (false for a new one). The editor's default keyframe keys every setting at neutral with hold.",
+        "True makes it a default keyframe, whose values never reach back to earlier frames; omitted keeps the keyframe's current flag (false for a new one).",
       ),
     },
   ),
@@ -254,20 +254,6 @@ export const editCommandSchema = z.discriminatedUnion('type', [
   command('layer-key-remove', 'Remove a whole keyframe.', {
     ...keyOwner,
     frame: described(gradeFrame, `Frame of the existing keyframe: ${keyFrameTerms}.`),
-  }),
-  command(
-    'layer-key-default',
-    'Add a default keyframe, returning every Color setting to neutral from its frame on, or remove the one there. Rejected where an ordinary keyframe exists.',
-    { ...colorOwner, frame: ownerFrame },
-  ),
-  command('layer-key-easing', "Set the Easing of a keyframe's settings toward their next keyframes.", {
-    ...colorOwner,
-    frame: keyFrame,
-    setting: described(
-      gradeSettingSchema.nullable(),
-      'Scalar Color setting whose Easing to change; null sets every enabled setting.',
-    ),
-    interpolation: described(interpolationSchema, 'Easing: hold, linear, ease-in, ease-out or smooth.'),
   }),
   command('layer-add', 'Add a video track on top of the others; a project has at most 8.', {
     layer: described(
@@ -422,8 +408,6 @@ const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   'transform',
   'layer-key-toggle',
   'layer-key-value',
-  'layer-key-easing',
-  'layer-key-default',
   'select-done',
 ]);
 

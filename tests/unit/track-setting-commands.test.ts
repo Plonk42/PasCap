@@ -3,6 +3,7 @@ import { NEUTRAL_COLOR } from '../../src/shared/color.js';
 import { applyCommand, type EditCommand } from '../../src/shared/commands.js';
 import { createAdjustment, type ClipGrade } from '../../src/shared/grade.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
+import { defaultSpatialKeyframe } from '../../src/shared/spatial.js';
 
 /**
  * A track with a clip and an adjustment whose grades have every kind of appearance away from neutral, with Exposure
@@ -252,8 +253,11 @@ describe('partial appearance commands', () => {
     const graded = applyCommand(project, { type: 'layer-key-set', clipId: 'shot', frame: 10, easing: 'hold' });
     expect(graded.clips[0]!.grade.keyframes[0]!.easing.exposure).toBe('hold');
     expect(() => applyCommand(project, { type: 'layer-key-set', layerId, frame: 5, easing: 'hold' })).toThrow(
-      'No keyframe at frame 5: list values to create one.',
+      /No keyframe at frame 5: list values to create one/,
     );
+    // reset true alone on a free frame adds a default keyframe: every setting neutral, held.
+    const added = applyCommand(project, { type: 'layer-key-set', layerId, frame: 40, reset: true });
+    expect(added.layers[0]!.transform.keyframes[1]).toEqual(defaultSpatialKeyframe(40));
     expect(() => applyCommand(project, { type: 'layer-key-set', layerId, frame: 0 })).toThrow(
       'List values, an Easing or reset to change.',
     );

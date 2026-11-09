@@ -246,14 +246,13 @@ describe('clip grade commands', () => {
     expect(() => applyCommand(next, opacityKey as unknown as EditCommand)).toThrow('Unknown keyframe setting');
     next = applyCommand(next, { type: 'layer-key-move', clipId: 'b', frame: 120, nextFrame: 130 });
     next = applyCommand(next, {
-      type: 'layer-key-easing',
+      type: 'layer-key-set',
       clipId: 'b',
       frame: 130,
-      setting: null,
-      interpolation: 'hold',
+      easing: 'hold',
     });
     expect(next.clips[1]!.grade.keyframes).toEqual([gradeKey(130, { exposure: 1 }, 'hold')]);
-    next = applyCommand(next, { type: 'layer-key-default', clipId: 'b', frame: 150 });
+    next = applyCommand(next, { type: 'layer-key-set', clipId: 'b', frame: 150, reset: true });
     expect(next.clips[1]!.grade.keyframes[1]).toMatchObject({ frame: 150, reset: true, values: { exposure: 0 } });
     next = applyCommand(next, { type: 'layer-key-remove', clipId: 'b', frame: 130 });
     expect(next.clips[1]!.grade.keyframes.map((key) => key.frame)).toEqual([150]);

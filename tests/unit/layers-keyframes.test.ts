@@ -330,11 +330,10 @@ describe('project-frame adjustment and Transform settings', () => {
       value: 0.5,
     });
     project = applyCommand(project, {
-      type: 'layer-key-easing',
+      type: 'layer-key-set',
       adjustmentId: 'look',
       frame: 80,
-      setting: null,
-      interpolation: 'smooth',
+      easing: 'smooth',
     });
     const original = project;
     const transform = structuredClone(project.layers[0]!.transform);
@@ -418,11 +417,10 @@ describe('project-frame adjustment and Transform settings', () => {
     history.commit({ type: 'layer-key-move', adjustmentId: 'look', frame: 10, nextFrame: 30 });
     expect(history.current.adjustments[0]!.keyframes).toEqual([keys[1], { ...keys[0]!, frame: 30 }]);
     history.commit({
-      type: 'layer-key-easing',
+      type: 'layer-key-set',
       adjustmentId: 'look',
       frame: 30,
-      setting: null,
-      interpolation: 'ease-out',
+      easing: 'ease-out',
     });
     history.commit({ type: 'layer-key-value', adjustmentId: 'look', frame: 30, setting: 'exposure', value: -1 });
     const edited = point(30, { exposure: -1, contrast: 1.4, saturation: 0.6 }, 'ease-out');

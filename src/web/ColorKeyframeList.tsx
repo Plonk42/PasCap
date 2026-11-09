@@ -98,7 +98,12 @@ export function ColorKeyframeList({ project, layer, frame, duration, disabled, o
     moveFrame: (key, nextFrame) =>
       onEdit({ type: 'layer-key-move', ...ownerTarget(layer), frame: key.frame, nextFrame }),
     setEasing: (key, setting, interpolation) =>
-      onEdit({ type: 'layer-key-easing', ...ownerTarget(layer), frame: key.frame, setting, interpolation }),
+      onEdit({
+        type: 'layer-key-set',
+        ...ownerTarget(layer),
+        frame: key.frame,
+        easing: setting === null ? interpolation : { [setting]: interpolation },
+      }),
     remove: (key) => onEdit({ type: 'layer-key-remove', ...ownerTarget(layer), frame: key.frame }),
     removeTitle: 'Remove this whole keyframe and all its animated settings',
     renderValues: (key, row) =>

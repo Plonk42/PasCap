@@ -94,15 +94,6 @@ type FormerEditCommand =
       layerId?: string | undefined;
       frame: number;
     }
-  | { type: 'layer-key-default'; clipId?: string | undefined; adjustmentId?: string | undefined; frame: number }
-  | {
-      type: 'layer-key-easing';
-      clipId?: string | undefined;
-      adjustmentId?: string | undefined;
-      frame: number;
-      setting: ScalarColorSetting | null;
-      interpolation: Interpolation;
-    }
   | { type: 'layer-add'; layer: VideoLayer }
   | { type: 'layer-update'; layer: VideoLayer }
   | { type: 'layer-create'; layerId: string; name: string }
@@ -144,8 +135,6 @@ const EDITOR_ONLY: readonly EditCommand['type'][] = [
   'transform',
   'layer-key-toggle',
   'layer-key-value',
-  'layer-key-easing',
-  'layer-key-default',
   'select-done',
 ];
 
@@ -191,14 +180,6 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
   'layer-key-value': { type: 'layer-key-value', clipId: 'clip-1', frame: 4, setting: 'tint', value: 0.2 },
   'layer-key-move': { type: 'layer-key-move', adjustmentId: 'look', frame: -4, nextFrame: 9 },
   'layer-key-remove': { type: 'layer-key-remove', clipId: 'clip-1', frame: 4 },
-  'layer-key-default': { type: 'layer-key-default', adjustmentId: 'look', frame: 4 },
-  'layer-key-easing': {
-    type: 'layer-key-easing',
-    clipId: 'clip-1',
-    frame: 4,
-    setting: null,
-    interpolation: 'smooth',
-  },
   'layer-add': { type: 'layer-add', layer: createLayer('video-2', 'Track 2') },
   'layer-update': { type: 'layer-update', layer: createLayer('video-1', 'Renamed', false) },
   'layer-create': { type: 'layer-create', layerId: 'video-3', name: 'Overlay' },

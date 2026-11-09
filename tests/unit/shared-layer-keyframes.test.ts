@@ -289,11 +289,10 @@ describe('strict current-schema keyframes and independently enabled settings', (
       value: 0,
     });
     project = applyCommand(project, {
-      type: 'layer-key-easing',
+      type: 'layer-key-set',
       adjustmentId: 'look',
       frame: 20,
-      setting: null,
-      interpolation: 'smooth',
+      easing: 'smooth',
     });
     project = applyCommand(project, {
       type: 'layer-key-toggle',
@@ -335,11 +334,10 @@ describe('strict current-schema keyframes and independently enabled settings', (
     };
     const ease = (frame: number, setting: ScalarColorSetting | null, interpolation: Interpolation): void => {
       project = applyCommand(project, {
-        type: 'layer-key-easing',
+        type: 'layer-key-set',
         adjustmentId: 'look',
         frame,
-        setting,
-        interpolation,
+        easing: setting === null ? interpolation : { [setting]: interpolation },
       });
     };
     toggle(0, 'exposure', 0);
@@ -371,7 +369,7 @@ describe('strict current-schema keyframes and independently enabled settings', (
     toggle(0, 'hue', 0);
     expect(project.adjustments[0]!.keyframes[0]!.easing.hue).toBeNull();
     const before = project;
-    expect(() => ease(0, 'hue', 'hold')).toThrow('not enabled');
+    expect(() => ease(0, 'hue', 'hold')).toThrow('hue is not keyed at this keyframe, so it has no Easing.');
     expect(project).toBe(before);
   });
 
@@ -398,11 +396,10 @@ describe('strict current-schema keyframes and independently enabled settings', (
         value,
       });
     toggled = applyCommand(toggled, {
-      type: 'layer-key-easing',
+      type: 'layer-key-set',
       adjustmentId: 'look',
       frame: 30,
-      setting: null,
-      interpolation: 'hold',
+      easing: 'hold',
     });
     const set = (project: ProjectDocument, command: Omit<Extract<EditCommand, { type: 'layer-key-set' }>, 'type'>) =>
       applyCommand(project, { type: 'layer-key-set', ...command });
@@ -456,10 +453,10 @@ describe('strict current-schema keyframes and independently enabled settings', (
       ...createProject('default', 'Default keyframe'),
       adjustments: [look([grade(10, { exposure: 1 })], { ...createColorSettings(), exposure: 0.5, contrast: 1.4 })],
     });
-    const toggle = (frame: number): void => {
-      project = applyCommand(project, { type: 'layer-key-default', adjustmentId: 'look', frame });
+    const addDefault = (frame: number): void => {
+      project = applyCommand(project, { type: 'layer-key-set', adjustmentId: 'look', frame, reset: true });
     };
-    toggle(50);
+    addDefault(50);
     const reset = project.adjustments[0]!.keyframes[1]!;
     expect(reset.reset).toBe(true);
     expect(keySettings(gradeKeyAsLayerKey(reset))).toEqual(COLOR_CONTROLS.map((setting) => setting.key));
@@ -484,10 +481,10 @@ describe('strict current-schema keyframes and independently enabled settings', (
       value: 0,
     });
     expect(project.adjustments[0]!.keyframes[1]).toMatchObject({ frame: 60, reset: true, values: { hue: null } });
-    const before = project;
-    expect(() => toggle(10)).toThrow('already exists');
-    expect(project).toBe(before);
-    toggle(60);
+    // On an existing keyframe, reset only flags it: its values stay.
+    const flagged = applyCommand(project, { type: 'layer-key-set', adjustmentId: 'look', frame: 10, reset: true });
+    expect(flagged.adjustments[0]!.keyframes[0]).toEqual({ ...project.adjustments[0]!.keyframes[0]!, reset: true });
+    project = applyCommand(project, { type: 'layer-key-remove', adjustmentId: 'look', frame: 60 });
     expect(project.adjustments[0]!.keyframes).toEqual([grade(10, { exposure: 1 })]);
     const { reset: _reset, ...withoutKind } = point(0, { exposure: 0 });
     expect(layerKeyframeSchema.safeParse(withoutKind).success).toBe(false);

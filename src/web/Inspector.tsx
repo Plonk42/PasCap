@@ -388,7 +388,8 @@ function ColorSection({
           aria-label={pointAtFrame?.reset ? 'Remove default keyframe' : 'Add default keyframe'}
           title={defaultTitle}
           onClick={() => {
-            if (!occupied) onEdit([{ type: 'layer-key-default', ...ownerTarget(layer), frame }]);
+            if (pointAtFrame?.reset) onEdit([{ type: 'layer-key-remove', ...ownerTarget(layer), frame }]);
+            else if (!occupied) onEdit([{ type: 'layer-key-set', ...ownerTarget(layer), frame, reset: true }]);
           }}
         >
           <Icon name="default-key" size={16} />

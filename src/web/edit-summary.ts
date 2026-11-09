@@ -30,8 +30,6 @@ const PHRASES: Record<EditCommand['type'], Phrase> = {
   'layer-key-value': ['keyframe value', 'changed'],
   'layer-key-move': ['keyframe', 'moved'],
   'layer-key-remove': ['keyframe', 'removed'],
-  'layer-key-default': ['default keyframe', 'toggled'],
-  'layer-key-easing': ['keyframe Easing', 'changed', 'keyframe Easings'],
   'layer-add': ['track', 'added'],
   'layer-create': ['track', 'added'],
   'layer-update': ['track', 'changed'],

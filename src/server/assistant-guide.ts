@@ -102,7 +102,8 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   (hold keeps a value until the next keyframe) or one per setting; settings left out keep what
   they have there, and null disables one. With clipId or adjustmentId it keys a grade; with
   layerId, the track's Transform at a project frame. Without values it changes only an existing
-  keyframe's Easing or default flag (reset). layer-key-move and layer-key-remove take the same
+  keyframe's Easing or default flag (reset); reset true alone on a free frame adds a default
+  keyframe (every setting neutral, held). layer-key-move and layer-key-remove take the same
   targets.
 - Compare with still or timeline_sheet: both accept commands to preview a change without saving.
   still with compare shows the candidate beside the saved frame (saved) or the ungraded one
