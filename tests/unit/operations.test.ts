@@ -117,7 +117,7 @@ describe('operation routes', () => {
     expect(after.revision).toBe(2);
     expect(after.bookmarks).toEqual([30, 90]);
     expect(after.videoTracks.map((track) => [track.id, track.opacity])).toEqual([
-      ['video-1', 1],
+      ['video-1', undefined],
       ['video-2', 0.5],
     ]);
   });
@@ -231,16 +231,16 @@ describe('operation routes', () => {
         sourceOut: 90,
         speed: '2×',
         reverse: true,
-        grade: 'none',
         detail: { sharpen: 0.4, clarity: -0.2 },
       },
     ]);
+    // Default values are left out: a shown Ripple track without Opacity, keyframes, fades or dissolves.
+    expect(Object.keys(description.videoTracks![0]!)).toEqual(['id', 'name', 'clips', 'transitions']);
     expect(description.recordings).toEqual([
       {
         id: 'rec-1',
         name: 'DJI_0001.MP4',
         frameCount: 300,
-        ready: true,
         kept: [{ sourceIn: 0, sourceOut: 120 }],
         selectionDone: true,
       },
@@ -365,7 +365,8 @@ describe('operation routes', () => {
     ).toEqual([
       [0, '00:00:00', 'look', 1, 0.3],
       [60, '00:02:00', 'look', 0.5, 0.3],
-      [120, '00:04:00', 'look', 0, 0.3],
+      // Neutral values are left out.
+      [120, '00:04:00', 'look', undefined, 0.3],
     ]);
     expect(description.at![1]!.transform.opacity).toBe(0.75);
     expect(description.at![1]!.transform.scale).toBe(1.5);

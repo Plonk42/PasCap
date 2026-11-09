@@ -1,9 +1,14 @@
-import { scalarColorValues } from '../../shared/color.js';
+import { NEUTRAL_COLOR, scalarColorValues } from '../../shared/color.js';
 import { adjustmentAt, adjustmentColorAt, gradeColorAt, isNeutralClipGrade } from '../../shared/grade.js';
 import type { Interpolation } from '../../shared/keyframes.js';
 import type { describeTrack } from '../../shared/operations/describe-track.js';
 import { detailSummary, gradeSummary } from '../../shared/operations/grade-summary.js';
-import { evaluateSpatial, hasSpatialChannelKeys, SPATIAL_CHANNELS } from '../../shared/spatial.js';
+import {
+  evaluateSpatial,
+  hasSpatialChannelKeys,
+  NEUTRAL_SPATIAL_POSE,
+  SPATIAL_CHANNELS,
+} from '../../shared/spatial.js';
 import { calculateLayout, gradePosition } from '../../shared/timeline.js';
 import { formatTimecode } from '../../shared/timing.js';
 import { ServiceError } from '../errors.js';
@@ -28,11 +33,16 @@ function compact<K extends string>(key: {
   };
 }
 
-function only<T extends object>(values: T, settings: ReadonlySet<string> | null): Partial<T> {
-  return settings
-    ? (Object.fromEntries(Object.entries(values).filter(([key]) => settings.has(key))) as Partial<T>)
-    : values;
+/** The chosen values (all when null) that differ from neutral. */
+function only<T extends object>(values: T, settings: ReadonlySet<string> | null, neutral: Readonly<T>): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(values).filter(
+      ([key, value]) => (!settings || settings.has(key)) && value !== neutral[key as keyof T],
+    ),
+  ) as Partial<T>;
 }
+
+const NEUTRAL_SCALARS = scalarColorValues(NEUTRAL_COLOR);
 
 export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
   { projects },
@@ -89,7 +99,7 @@ export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
           .map((item) => {
             const sourceFrame = item.retiming.sourceAt(frame - item.start);
             const values = scalarColorValues(gradeColorAt(item.clip.grade, gradePosition(item, frame - item.start)));
-            return { clipId: item.clip.id, sourceFrame, values: only(values, chosen) };
+            return { clipId: item.clip.id, sourceFrame, values: only(values, chosen, NEUTRAL_SCALARS) };
           });
         const item = adjustmentAt(project.adjustments, frame);
         return {
@@ -98,10 +108,10 @@ export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
           ...(item && {
             adjustment: {
               adjustmentId: item.id,
-              values: only(scalarColorValues(adjustmentColorAt(item, frame)), chosen),
+              values: only(scalarColorValues(adjustmentColorAt(item, frame)), chosen, NEUTRAL_SCALARS),
             },
           }),
-          transform: only(evaluateSpatial(track.transform, frame), chosen),
+          transform: only(evaluateSpatial(track.transform, frame), chosen, NEUTRAL_SPATIAL_POSE),
           ...(clipGrades.length > 0 && { clipGrades }),
         };
       }),

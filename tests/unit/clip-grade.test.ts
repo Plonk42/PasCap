@@ -382,7 +382,7 @@ describe('clip grades for the assistant', () => {
       {
         frame: 70,
         timecode: '00:02:10',
-        adjustment: { adjustmentId: 'look', values: { tint: 0, saturation: 1.2 } },
+        adjustment: { adjustmentId: 'look', values: { saturation: 1.2 } },
         transform: {},
       },
     ]);

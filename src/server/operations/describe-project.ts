@@ -2,7 +2,8 @@ import { isNeutralClipGrade, type ClipGrade } from '../../shared/grade.js';
 import { projectParts, type describeProject } from '../../shared/operations/describe-project.js';
 import { detailSummary, gradeSummary } from '../../shared/operations/grade-summary.js';
 import { durationOf } from '../../shared/operations/timecode.js';
-import { calculateLayout } from '../../shared/timeline.js';
+import { calculateLayout, type PlacedClip } from '../../shared/timeline.js';
+import type { MusicLane, ProjectDocument, VideoClip, VideoLayer } from '../../shared/model.js';
 import { formatTimecode } from '../../shared/timing.js';
 import { ServiceError } from '../errors.js';
 import type { OperationRunner, ServiceContext } from './context.js';
@@ -21,10 +22,86 @@ function span(start: number, end: number) {
   return { start, end, startTimecode: formatTimecode(start), endTimecode: formatTimecode(end), seconds };
 }
 
-/** "none", "static" or "N keyframes". */
-function gradeLabel(grade: Pick<ClipGrade, 'color' | 'keyframes'>): string {
+/** "static" or "N keyframes"; undefined when neutral. */
+function gradeLabel(grade: Pick<ClipGrade, 'color' | 'keyframes'>): string | undefined {
   if (grade.keyframes.length) return `${grade.keyframes.length} keyframe${grade.keyframes.length === 1 ? '' : 's'}`;
-  return isNeutralClipGrade(grade) ? 'none' : 'static';
+  return isNeutralClipGrade(grade) ? undefined : 'static';
+}
+
+/** "2×" or "curve, N keyframes"; undefined at normal speed. */
+function speedLabel({ speed }: VideoClip): string | undefined {
+  if (speed.mode === 'curve') return `curve, ${speed.keyframes.length} keyframes`;
+  return speed.rate === 1 ? undefined : `${speed.rate}×`;
+}
+
+/** The value under its key, unless it is the default. */
+function unlessDefault<K extends string, V>(key: K, value: V | undefined, fallback?: V): Partial<Record<K, V>> {
+  return value === undefined || value === fallback ? {} : ({ [key]: value } as Record<K, V>);
+}
+
+const notCut = <T extends { type: string }>(transitions: readonly T[]): T[] =>
+  transitions.filter((transition) => transition.type !== 'cut');
+
+type Name = (id: string) => string | null;
+
+function describeClip({ clip, start, end }: PlacedClip, videoName: Name) {
+  return {
+    id: clip.id,
+    recording: { id: clip.mediaId, name: videoName(clip.mediaId) },
+    ...span(start, end),
+    sourceIn: clip.sourceIn,
+    sourceOut: clip.sourceOut,
+    ...unlessDefault('speed', speedLabel(clip)),
+    ...(clip.reverse && { reverse: true as const }),
+    ...unlessDefault('grade', gradeLabel(clip.grade)),
+    ...unlessDefault('detail', detailSummary(clip.detail)),
+  };
+}
+
+function describeVideoTrack(layer: VideoLayer, clips: readonly PlacedClip[], videoName: Name) {
+  return {
+    id: layer.id,
+    name: layer.name,
+    ...(!layer.enabled && { enabled: false as const }),
+    ...(!layer.ripple && { ripple: false as const }),
+    ...unlessDefault('opacity', layer.transform.base.opacity, 1),
+    ...unlessDefault('transformKeyframes', layer.transform.keyframes.length, 0),
+    ...unlessDefault('openingFade', layer.openingFade, 0),
+    ...unlessDefault('closingFade', layer.closingFade, 0),
+    clips: clips.filter((placed) => placed.clip.layerId === layer.id).map((placed) => describeClip(placed, videoName)),
+    transitions: notCut(layer.transitions),
+  };
+}
+
+function describeMusicTrack(track: MusicLane, musicName: Name) {
+  return {
+    id: track.id,
+    ...unlessDefault('gainDb', track.gainDb, 0),
+    ...(track.ripple && { ripple: true as const }),
+    ...unlessDefault('openingFade', track.openingFade, 0),
+    ...unlessDefault('closingFade', track.closingFade, 0),
+    clips: track.clips.map((clip) => ({
+      id: clip.id,
+      recording: { id: clip.mediaId, name: musicName(clip.mediaId) },
+      ...span(clip.start, clip.start + clip.duration),
+      sourceIn: clip.sourceIn,
+      sourceOut: clip.sourceOut,
+      ...(clip.loop && { loop: true as const }),
+    })),
+    transitions: notCut(track.transitions),
+  };
+}
+
+function describeRecording(project: ProjectDocument, id: string, library: ServiceContext['library']) {
+  const asset = known(() => library.get(id));
+  return {
+    id,
+    name: asset?.name ?? null,
+    frameCount: asset?.metadata.frameCount ?? null,
+    ...(asset?.status !== 'ready' && { ready: false as const }),
+    ...unlessDefault('kept', project.selects[id]),
+    ...(project.selectsDone.includes(id) && { selectionDone: true as const }),
+  };
 }
 
 export const runDescribeProject: OperationRunner<typeof describeProject> = async (
@@ -41,65 +118,7 @@ export const runDescribeProject: OperationRunner<typeof describeProject> = async
   const videoTracks = () =>
     project.layers
       .filter((layer) => layerId === undefined || layer.id === layerId)
-      .map((layer) => ({
-        id: layer.id,
-        name: layer.name,
-        enabled: layer.enabled,
-        ripple: layer.ripple,
-        opacity: layer.transform.base.opacity,
-        transformKeyframes: layer.transform.keyframes.length,
-        openingFade: layer.openingFade,
-        closingFade: layer.closingFade,
-        clips: layout.clips
-          .filter((placed) => placed.clip.layerId === layer.id)
-          .map(({ clip, start, end }) => {
-            const detail = detailSummary(clip.detail);
-            return {
-              id: clip.id,
-              recording: { id: clip.mediaId, name: videoName(clip.mediaId) },
-              ...span(start, end),
-              sourceIn: clip.sourceIn,
-              sourceOut: clip.sourceOut,
-              speed:
-                clip.speed.mode === 'constant'
-                  ? `${clip.speed.rate}×`
-                  : `curve, ${clip.speed.keyframes.length} keyframes`,
-              reverse: clip.reverse,
-              grade: gradeLabel(clip.grade),
-              ...(detail && { detail }),
-            };
-          }),
-        transitions: layer.transitions,
-      }));
-  const musicTracks = () =>
-    project.music.map((track) => ({
-      id: track.id,
-      gainDb: track.gainDb,
-      ripple: track.ripple,
-      openingFade: track.openingFade,
-      closingFade: track.closingFade,
-      clips: track.clips.map((clip) => ({
-        id: clip.id,
-        recording: { id: clip.mediaId, name: musicName(clip.mediaId) },
-        ...span(clip.start, clip.start + clip.duration),
-        sourceIn: clip.sourceIn,
-        sourceOut: clip.sourceOut,
-        loop: clip.loop,
-      })),
-      transitions: track.transitions,
-    }));
-  const recordings = () =>
-    project.media.videoIds.map((id) => {
-      const asset = known(() => library.get(id));
-      return {
-        id,
-        name: asset?.name ?? null,
-        frameCount: asset?.metadata.frameCount ?? null,
-        ready: asset?.status === 'ready',
-        kept: project.selects[id] ?? null,
-        selectionDone: project.selectsDone.includes(id),
-      };
-    });
+      .map((layer) => describeVideoTrack(layer, layout.clips, videoName));
   return {
     id: project.id,
     title: project.title,
@@ -113,9 +132,11 @@ export const runDescribeProject: OperationRunner<typeof describeProject> = async
         grade: gradeSummary(item),
       })),
     }),
-    ...(parts.has('musicTracks') && { musicTracks: musicTracks() }),
+    ...(parts.has('musicTracks') && {
+      musicTracks: project.music.map((track) => describeMusicTrack(track, musicName)),
+    }),
     ...(parts.has('recordings') && {
-      recordings: recordings(),
+      recordings: project.media.videoIds.map((id) => describeRecording(project, id, library)),
       musicRecordings: project.media.audioIds.map((id) => ({ id, name: musicName(id) })),
     }),
     ...(parts.has('bookmarks') && { bookmarks: project.bookmarks }),

@@ -79,7 +79,8 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   adjustment-split cuts it in two. Adjustments never overlap and stay at their project frames
   when clips move. describe_project lists them with what they change, and each clip's Detail that
   is not neutral; describe_track gives what each clip's grade changes, its Detail and the
-  adjustments over it. Reads leave out neutral values. Read them before changing a grade:
+  adjustments over it. Reads leave out values at their default (neutral settings, normal speed,
+  forwards, cuts, no fades), and writes keep what they leave out. Read them before changing a grade:
   settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve).
   Prefer static grades; animate only when the brief asks or the light changes within a shot
   (clip keyframes are source frames, adjustment keyframes count from its start). describe_track

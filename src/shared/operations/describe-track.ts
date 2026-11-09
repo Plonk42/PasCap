@@ -100,11 +100,11 @@ export const trackDescriptionSchema = z
                   })
                   .strict()
                   .optional(),
-                'The adjustment grading every track at this frame, if any, and its scalar Color settings (or those asked for), applied after the clip grades.',
+                'The adjustment grading every track at this frame, if any, and its scalar Color settings that are not neutral (of those asked for), applied after the clip grades.',
               ),
               transform: described(
                 spatialPoseSchema.partial(),
-                'The Transform pose with Opacity (or the settings asked for) at this frame.',
+                'The Transform settings with Opacity that are not neutral at this frame (of those asked for).',
               ),
               clipGrades: described(
                 z
@@ -118,13 +118,13 @@ export const trackDescriptionSchema = z
                       .strict(),
                   )
                   .optional(),
-                'The grade of each clip shown at this frame that has one, at the source frame it shows; values apply before the adjustment.',
+                'The grade of each clip shown at this frame that has one, at the source frame it shows: its settings that are not neutral; values apply before the adjustment.',
               ),
             })
             .strict(),
         )
         .optional(),
-      'The values that apply at each requested frame, after keyframes; HSL ranges and curves are static.',
+      'The values that apply at each requested frame, after keyframes, leaving out neutral ones; HSL ranges and curves are static.',
     ),
   })
   .strict();
@@ -151,7 +151,7 @@ export const describeTrack = defineOperation({
           .array(z.union([gradeSettingSchema, spatialChannelSchema]))
           .min(1)
           .optional(),
-        'Report only these Color and Transform (Opacity included) settings in at; all when omitted.',
+        'Report only these Color and Transform (Opacity included) settings in at, when not neutral; all when omitted.',
       ),
     })
     .strict(),
