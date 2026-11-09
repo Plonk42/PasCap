@@ -93,13 +93,15 @@ export const spatialKeyframeSchema = z
 
 export type SpatialKeyframe = z.infer<typeof spatialKeyframeSchema>;
 
+export const MAX_TRANSFORM_KEYFRAMES = 256;
+
 export const spatialSettingsSchema = z
   .object({
     base: described(spatialPoseSchema, 'The pose of settings without keyframes.'),
     keyframes: described(
       z
         .array(spatialKeyframeSchema)
-        .max(256)
+        .max(MAX_TRANSFORM_KEYFRAMES)
         .refine(orderedKeys, { message: 'Transform keyframes must have unique ascending project frames.' }),
       'Transform keyframes at unique ascending project frames, at most 256.',
     ),

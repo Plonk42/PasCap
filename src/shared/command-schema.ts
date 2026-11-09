@@ -3,7 +3,7 @@ import { colorCurveSchema, CURVE_CHANNELS, HSL_BANDS, hslBandSchema } from './ad
 import { COLOR_CONTROLS, colorSchema, NEUTRAL_COLOR } from './color.js';
 import { described } from './described.js';
 import { detailSchema } from './detail.js';
-import { gradeKeyValuesPatchSchema, gradeSettingSchema } from './grade.js';
+import { GRADE_SETTINGS, gradeSettingSchema } from './grade.js';
 import { interpolationSchema } from './keyframes.js';
 import {
   frameSchema,
@@ -15,8 +15,11 @@ import {
   selectRangeSchema,
   transitionSchema,
 } from './model.js';
-import { spatialPoseSchema, spatialSettingsSchema } from './spatial.js';
+import { SPATIAL_CHANNELS, spatialPoseSchema, spatialSettingsSchema, type SpatialChannel } from './spatial.js';
 import { speedSchema } from './speed.js';
+
+/** A grade setting, or a Transform setting of a track. */
+export type KeySetting = (typeof GRADE_SETTINGS)[number] | SpatialChannel;
 
 function command<const T extends string, S extends z.ZodRawShape>(type: T, description: string, shape: S) {
   return described(z.object({ type: z.literal(type), ...shape }).strict(), description);
@@ -28,6 +31,12 @@ const adjustmentId = described(idSchema, 'ID of an existing adjustment.');
 const colorAdjustmentId = described(idSchema.optional(), 'Adjustment ID; or clipId.');
 const gradeClipId = described(idSchema.optional(), 'Clip ID, for its grade; or adjustmentId.');
 const colorOwner = { clipId: gradeClipId, adjustmentId: colorAdjustmentId };
+/** Grade keyframes of a clip or an adjustment, or a track's Transform keyframes. */
+const keyOwner = {
+  clipId: described(idSchema.optional(), 'Clip ID, for its grade keyframes; or adjustmentId or layerId.'),
+  adjustmentId: described(idSchema.optional(), 'Adjustment ID; or clipId or layerId.'),
+  layerId: described(idSchema.optional(), 'Video track ID, for its Transform keyframes; or clipId or adjustmentId.'),
+};
 const newClipId = (use: string) =>
   described(idSchema, `Unused clip ID (letters, digits, "_" and "-", at most 100) for ${use}.`);
 const sourceIn = described(frameSchema, 'First kept source frame of the recording (inclusive).');
@@ -35,6 +44,7 @@ const sourceOut = described(frameSchema, 'Source frame after the last kept one (
 /** Clip grade keys are at source frames; adjustment keys count from its start and may precede it (commands check). */
 const gradeFrame = z.number().int();
 const frameTerms = 'source frame (clip), or from its start (adjustment)';
+const keyFrameTerms = `${frameTerms}, or project frame (track)`;
 const keyFrame = described(gradeFrame, `Frame of the existing keyframe: ${frameTerms}.`);
 const ownerFrame = described(gradeFrame, `Frame of the keyframe: ${frameTerms}.`);
 const trackName = described(z.string().trim().min(1).max(100), 'Track name, 1–100 characters.');
@@ -48,7 +58,9 @@ const keyframeSetting = described(
   gradeSettingSchema,
   'Scalar Color setting; bounds and neutral values as in color-patch.',
 );
-const easingPatch = interpolationSchema.or(z.partialRecord(gradeSettingSchema, interpolationSchema));
+const keySetting = z.enum([...GRADE_SETTINGS, ...SPATIAL_CHANNELS] as [KeySetting, ...KeySetting[]]);
+const transformBounds =
+  'cropLeft, cropRight, cropTop and cropBottom 0–1 (fractions of the recording), scale 0.1–8, translateX and translateY −2–2 (fractions of the output), rotation −180–180° clockwise, opacity 0–1; neutral: scale 1, opacity 1, every other 0';
 const mediaId = described(idSchema, 'ID of a video recording of the project.');
 const selectRanges = described(
   z.array(selectRangeSchema).max(MAX_SELECTS),
@@ -151,7 +163,7 @@ export const editCommandSchema = z.discriminatedUnion('type', [
       layerId,
       settings: described(
         z.partialRecord(spatialPoseSchema.keyof(), z.number().nullable()),
-        'Transform settings: cropLeft, cropRight, cropTop and cropBottom 0–1 (fractions of the recording), scale 0.1–8, translateX and translateY −2–2 (fractions of the output), rotation −180–180° clockwise, opacity 0–1; or null for neutral: scale 1, opacity 1, every other 0.',
+        `Transform settings: a value, or null for neutral. ${transformBounds}.`,
       ),
     },
   ),
@@ -210,16 +222,16 @@ export const editCommandSchema = z.discriminatedUnion('type', [
   ),
   command(
     'layer-key-set',
-    'Create or change the keyframe at frame in one command: each listed setting is keyed at its value (or disabled with null), others keep theirs, and a keyframe left without settings is removed. Rejected as a whole on an out-of-bounds value, an Easing for a setting not keyed there, or a keyframe beyond 64.',
+    'Create or change the keyframe at frame of a clip grade, an adjustment or a track Transform in one command: each listed setting is keyed at its value (or disabled with null), others keep theirs, and a keyframe left without settings is removed. Rejected as a whole on an out-of-bounds value, a setting the target does not have, an Easing for a setting not keyed there, or a keyframe beyond the limit (64 per grade, 256 per Transform).',
     {
-      ...colorOwner,
-      frame: ownerFrame,
+      ...keyOwner,
+      frame: described(gradeFrame, `Frame of the keyframe: ${keyFrameTerms}.`),
       values: described(
-        gradeKeyValuesPatchSchema,
-        `Settings to key at their value, or null to disable them here; at least one. ${colorBounds}`,
+        z.partialRecord(keySetting, z.number().nullable()),
+        `Settings to key at their value, or null to disable them here; at least one. Color settings of a grade: ${colorBounds} Transform settings of a track: ${transformBounds}.`,
       ),
       easing: described(
-        easingPatch.optional(),
+        interpolationSchema.or(z.partialRecord(keySetting, interpolationSchema)).optional(),
         'One Easing (hold, linear, ease-in, ease-out or smooth) for every setting keyed by this command, or an Easing per setting keyed here. Omitted: a newly keyed setting adopts the Easing the keyframe already agrees on, else linear; others keep theirs.',
       ),
       reset: described(
@@ -235,13 +247,13 @@ export const editCommandSchema = z.discriminatedUnion('type', [
     value: described(z.number(), "New value, within the setting's bounds."),
   }),
   command('layer-key-move', 'Move a whole keyframe to another frame; an occupied frame rejects the edit.', {
-    ...colorOwner,
-    frame: keyFrame,
+    ...keyOwner,
+    frame: described(gradeFrame, `Frame of the existing keyframe: ${keyFrameTerms}.`),
     nextFrame: described(gradeFrame, 'Destination frame, in the same terms as frame.'),
   }),
   command('layer-key-remove', 'Remove a whole keyframe.', {
-    ...colorOwner,
-    frame: keyFrame,
+    ...keyOwner,
+    frame: described(gradeFrame, `Frame of the existing keyframe: ${keyFrameTerms}.`),
   }),
   command(
     'layer-key-default',
@@ -399,14 +411,15 @@ export const editCommandSchema = z.discriminatedUnion('type', [
 export type EditCommand = z.infer<typeof editCommandSchema>;
 
 /**
- * Editor commands replacing a whole value (the assistant changes settings with the patch commands; Transform
- * keyframes still need transform) or the user's own review marks.
+ * Editor commands replacing a whole value (the assistant changes settings with the patch commands and keyframes
+ * with layer-key-set) or the user's own review marks.
  */
 const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   'layer-add',
   'layer-update',
   'color',
   'detail',
+  'transform',
   'select-done',
 ]);
 

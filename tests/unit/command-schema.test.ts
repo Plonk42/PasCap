@@ -65,9 +65,10 @@ type FormerEditCommand =
       type: 'layer-key-set';
       clipId?: string | undefined;
       adjustmentId?: string | undefined;
+      layerId?: string | undefined;
       frame: number;
-      values: { [K in ScalarColorSetting]?: number | null | undefined };
-      easing?: Interpolation | { [K in ScalarColorSetting]?: Interpolation } | undefined;
+      values: { [K in ScalarColorSetting | SpatialChannel]?: number | null };
+      easing?: Interpolation | { [K in ScalarColorSetting | SpatialChannel]?: Interpolation } | undefined;
       reset?: boolean | undefined;
     }
   | {
@@ -82,10 +83,17 @@ type FormerEditCommand =
       type: 'layer-key-move';
       clipId?: string | undefined;
       adjustmentId?: string | undefined;
+      layerId?: string | undefined;
       frame: number;
       nextFrame: number;
     }
-  | { type: 'layer-key-remove'; clipId?: string | undefined; adjustmentId?: string | undefined; frame: number }
+  | {
+      type: 'layer-key-remove';
+      clipId?: string | undefined;
+      adjustmentId?: string | undefined;
+      layerId?: string | undefined;
+      frame: number;
+    }
   | { type: 'layer-key-default'; clipId?: string | undefined; adjustmentId?: string | undefined; frame: number }
   | {
       type: 'layer-key-easing';
@@ -285,7 +293,7 @@ describe('editCommandSchema', () => {
 
   it('validates commands other tools refer to exactly like edit, publishing only their type', () => {
     const assistant = Object.values(samples).filter(
-      (sample) => !['layer-add', 'layer-update', 'color', 'detail', 'select-done'].includes(sample.type),
+      (sample) => !['layer-add', 'layer-update', 'color', 'detail', 'transform', 'select-done'].includes(sample.type),
     );
     for (const sample of assistant)
       expect(referencedEditCommandSchema.parse(sample)).toEqual(editCommandSchema.parse(sample));
@@ -297,10 +305,10 @@ describe('editCommandSchema', () => {
     expect(published.length).toBeLessThan(1_500);
   });
 
-  it('offers the assistant every command but those replacing a whole track, Color or Detail and the user’s done marks', () => {
+  it('offers the assistant every command but those replacing a whole track, Color, Detail or Transform and the user’s done marks', () => {
     const types = assistantEditCommandSchema.options.map((option) => option.shape.type.value);
-    expect(types).toHaveLength(editCommandSchema.options.length - 5);
-    for (const type of ['layer-add', 'layer-update', 'color', 'detail', 'select-done'])
+    expect(types).toHaveLength(editCommandSchema.options.length - 6);
+    for (const type of ['layer-add', 'layer-update', 'color', 'detail', 'transform', 'select-done'])
       expect(types).not.toContain(type);
     expect(types).toContain('adjustment-split');
     expect(assistantEditCommandSchema.safeParse(samples['layer-update']).success).toBe(false);

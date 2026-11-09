@@ -13,9 +13,6 @@ import { createProject, projectSchema, type ProjectDocument } from '../../src/sh
 import type { TrackDescription } from '../../src/shared/operations/describe-track.js';
 import { operations } from '../../src/shared/operations/index.js';
 import { durationOf } from '../../src/shared/operations/timecode.js';
-import { NEUTRAL_SPATIAL_POSE, SPATIAL_CHANNELS } from '../../src/shared/spatial.js';
-
-const NO_TRANSFORM = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null]));
 
 const headers = { host: '127.0.0.1:4318', 'x-pascap-client': 'preview-lab' };
 const temporary: string[] = [];
@@ -299,28 +296,17 @@ describe('operation routes', () => {
     );
   });
 
-  it('reads a whole track, its keyed settings and the values that apply at frames, with the adjustment there', async () => {
+  it('reads a track, its keyed settings and the values that apply at frames, with the adjustment there', async () => {
     const { app, project } = await service();
-    const opacityKey = (frame: number, opacity: number) => ({
-      frame,
-      values: { ...NO_TRANSFORM, opacity },
-      easing: { ...NO_TRANSFORM, opacity: 'linear' },
-      reset: false,
-    });
     const edited = await call(app, 'edit', {
       projectId: project.id,
       expectedRevision: 1,
       commands: [
         { type: 'adjustment-add', adjustmentId: 'look', start: 0, duration: 200 },
         { type: 'color-patch', adjustmentId: 'look', settings: { shadows: 0.3, contrast: 1.2 } },
-        {
-          type: 'transform',
-          layerId: 'video-1',
-          transform: {
-            base: { ...NEUTRAL_SPATIAL_POSE, scale: 1.5 },
-            keyframes: [opacityKey(30, 1), opacityKey(90, 0.5)],
-          },
-        },
+        { type: 'transform-patch', layerId: 'video-1', settings: { scale: 1.5 } },
+        { type: 'layer-key-set', layerId: 'video-1', frame: 30, values: { opacity: 1 } },
+        { type: 'layer-key-set', layerId: 'video-1', frame: 90, values: { opacity: 0.5 } },
         { type: 'layer-key-toggle', adjustmentId: 'look', frame: 30, setting: 'exposure', value: 1 },
         { type: 'layer-key-toggle', adjustmentId: 'look', frame: 90, setting: 'exposure', value: 0 },
       ],
@@ -347,11 +333,8 @@ describe('operation routes', () => {
         grade: { settings: { contrast: 1.2, shadows: 0.3 }, keyframes: 2 },
       }),
     ]);
-    expect(description.track!.transform.base).toMatchObject({ scale: 1.5, opacity: 1 });
-    expect(description.track!.transform.keyframes.map((key) => [key.frame, key.values.opacity])).toEqual([
-      [30, 1],
-      [90, 0.5],
-    ]);
+    // Only the Transform base settings that are not neutral; keyframes on request.
+    expect(description.transform).toEqual({ scale: 1.5 });
     expect(description.keyed).toEqual({ transform: ['opacity'] });
     expect(description.keyframes).toBeUndefined();
     expect(

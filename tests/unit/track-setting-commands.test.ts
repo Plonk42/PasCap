@@ -202,6 +202,47 @@ describe('partial appearance commands', () => {
     expect(project).toEqual(graded());
   });
 
+  it('keys, moves and removes Transform keyframes like grade keyframes, by project frame', () => {
+    const key = (document: ProjectDocument, frame: number) =>
+      document.layers[0]!.transform.keyframes.find((item) => item.frame === frame);
+    const set = applyCommand(project, {
+      type: 'layer-key-set',
+      layerId,
+      frame: 50,
+      values: { rotation: 10, opacity: 0.5 },
+      easing: 'hold',
+    });
+    expect(key(set, 50)).toEqual({
+      frame: 50,
+      values: { ...nulls(), rotation: 10, opacity: 0.5 },
+      easing: { ...nulls(), rotation: 'hold', opacity: 'hold' },
+      reset: false,
+    });
+    // A joining setting adopts the keyframe's Easing; disabling the last setting removes the keyframe.
+    const joined = applyCommand(project, { type: 'layer-key-set', layerId, frame: 0, values: { translateX: 0.2 } });
+    expect(key(joined, 0)!.easing).toMatchObject({ scale: 'linear', translateX: 'linear' });
+    const unkeyed = applyCommand(project, { type: 'layer-key-set', layerId, frame: 0, values: { scale: null } });
+    expect(key(unkeyed, 0)).toBeUndefined();
+    const moved = applyCommand(set, { type: 'layer-key-move', layerId, frame: 50, nextFrame: 70 });
+    expect(moved.layers[0]!.transform.keyframes.map((item) => item.frame)).toEqual([0, 70]);
+    expect(applyCommand(moved, { type: 'layer-key-remove', layerId, frame: 70 }).layers).toEqual(project.layers);
+    expect(applyCommand(set, { type: 'layer-key-move', layerId, frame: 50, nextFrame: 51 }).clips).toEqual(set.clips);
+
+    const refused = (command: EditCommand, message: string | RegExp) =>
+      expect(() => applyCommand(project, command)).toThrow(message);
+    refused({ type: 'layer-key-set', layerId, frame: 5, values: { exposure: 1 } }, /exposure is not a Transform/);
+    refused({ type: 'layer-key-set', clipId: 'shot', frame: 5, values: { opacity: 1 } }, /opacity is not a Color/);
+    refused({ type: 'layer-key-set', layerId, clipId: 'shot', frame: 5, values: { scale: 2 } }, 'Give one of');
+    refused({ type: 'layer-key-set', layerId, frame: -1, values: { scale: 2 } }, /whole project frames/);
+    refused({ type: 'layer-key-set', layerId, frame: 5, values: { scale: 9 } }, /8/);
+    refused({ type: 'layer-key-set', layerId, frame: 5, values: {} }, 'List at least one setting.');
+    refused({ type: 'layer-key-remove', layerId, frame: 5 }, 'Transform keyframe no longer exists.');
+    refused({ type: 'layer-key-move', layerId: 'video-9', frame: 0, nextFrame: 5 }, 'Track no longer exists.');
+    expect(() => applyCommand(set, { type: 'layer-key-move', layerId, frame: 0, nextFrame: 50 })).toThrow(
+      'A Transform keyframe already exists at the destination frame.',
+    );
+  });
+
   it('creates a neutral track and changes its options without sending the whole track', () => {
     const project = graded();
     const created = applyCommand(project, { type: 'layer-create', layerId: 'overlay', name: ' Overlay ' });

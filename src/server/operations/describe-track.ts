@@ -60,7 +60,7 @@ export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
   const adjustments = project.adjustments.filter((item) => placed.some((clip) => over(clip).includes(item)));
   return {
     revision: project.revision,
-    ...(parts.has('track') && { track }),
+    ...(parts.has('transform') && { transform: only(track.transform.base, null, NEUTRAL_SPATIAL_POSE) }),
     ...(parts.has('keyframes') && {
       keyframes: {
         transform: track.transform.keyframes.map(compact),

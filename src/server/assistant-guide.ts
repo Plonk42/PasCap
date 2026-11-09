@@ -97,11 +97,12 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   transform-patch a track's Transform base; detail-patch the Detail of one or several clips;
   fades a track's opening or closing fade. To copy a look onto other clips, list its changed
   settings and null those the targets change that it leaves neutral. A keyed setting follows
-  its keyframes, so change those instead (layer-key-set); transform replaces a whole Transform
-  with its keyframes.
+  its keyframes, so change those instead (layer-key-set).
 - To animate, layer-key-set keys several settings at one frame in one command, with one Easing
-  (hold keeps a grade until the next keyframe) or one per setting; settings left out keep what
-  they have there, and null disables one.
+  (hold keeps a value until the next keyframe) or one per setting; settings left out keep what
+  they have there, and null disables one. With clipId or adjustmentId it keys a grade; with
+  layerId, the track's Transform at a project frame. layer-key-move and layer-key-remove take
+  the same targets.
 - Compare with still or timeline_sheet: both accept commands to preview a change without saving.
   still with compare shows the candidate beside the saved frame (saved) or the ungraded one
   (original) in one picture: judge a grade there, not in small sheet cells. Judge Detail on a

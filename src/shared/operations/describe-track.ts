@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { described } from '../described.js';
 import { interpolationSchema } from '../keyframes.js';
 import { gradeSettingSchema } from '../grade.js';
-import { frameSchema, idSchema, layerSchema } from '../model.js';
+import { frameSchema, idSchema } from '../model.js';
 import { SPATIAL_CHANNELS, spatialPoseSchema, type SpatialChannel } from '../spatial.js';
 import { gradeSummarySchema, detailSummarySchema } from './grade-summary.js';
 import { defineOperation } from './spec.js';
@@ -12,7 +12,7 @@ export const MAX_DESCRIBED_FRAMES = 32;
 
 const spatialChannelSchema = z.enum(SPATIAL_CHANNELS as [SpatialChannel, ...SpatialChannel[]]);
 
-export const trackParts = ['track', 'keyframes', 'grades', 'at'] as const;
+export const trackParts = ['transform', 'keyframes', 'grades', 'at'] as const;
 
 /** A keyframe with only its enabled settings. */
 function compactKeyframe<K extends string>(settings: z.ZodEnum<Record<K, K>>) {
@@ -33,9 +33,9 @@ function compactKeyframe<K extends string>(settings: z.ZodEnum<Record<K, K>>) {
 export const trackDescriptionSchema = z
   .object({
     revision: described(frameSchema, 'Saved revision of the project; pass it as expectedRevision to edit.'),
-    track: described(
-      layerSchema.optional(),
-      'The complete video track as saved: its Transform (with Opacity) and keyframes, Ripple, transitions and fades.',
+    transform: described(
+      spatialPoseSchema.partial().optional(),
+      'Transform base settings (Opacity included) that are not neutral; a keyed setting follows its keyframes instead (see keyed).',
     ),
     keyframes: described(
       z
@@ -143,8 +143,8 @@ export const describeTrack = defineOperation({
         `Up to ${MAX_DESCRIBED_FRAMES} project frames at which to report the values that apply; none when omitted.`,
       ),
       include: described(
-        z.array(z.enum(trackParts)).min(1).default(['track', 'grades', 'at']),
-        'Parts to return besides revision and keyed: track (the whole saved track, the largest part), keyframes (each Transform, clip grade and adjustment keyframe with only its keyed settings), grades (what each clip grade changes and its Detail, with the adjustments over the clip) and at (the values at frames).',
+        z.array(z.enum(trackParts)).min(1).default(['transform', 'grades', 'at']),
+        'Parts to return besides revision and keyed: transform (its Transform base settings that are not neutral), keyframes (each Transform, clip grade and adjustment keyframe with only its keyed settings), grades (what each clip grade changes and its Detail, with the adjustments over the clip) and at (the values at frames).',
       ),
       settings: described(
         z

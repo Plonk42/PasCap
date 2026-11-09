@@ -1,5 +1,5 @@
 import { arrangeClipGroup } from './clip-group.js';
-import type { EditCommand } from './command-schema.js';
+import type { EditCommand, KeySetting } from './command-schema.js';
 import {
   defaultKeyframe,
   EMPTY_KEY_VALUES,
@@ -9,6 +9,7 @@ import {
   keySettings,
   layerKeyframe,
   layerKeyframeSchema,
+  uniformKeyframe,
   upsertKey,
   withEasing,
   type Interpolation,
@@ -47,7 +48,15 @@ import {
 } from './grade.js';
 import type { ColorCurvePoint, CurveChannel, HslBand, HslSettings } from './advanced-color.js';
 import { colorSchema, NEUTRAL_COLOR, type ColorSettings, type ScalarColorSetting } from './color.js';
-import { NEUTRAL_SPATIAL_POSE, spatialPoseSchema, spatialSettingsSchema, type SpatialChannel } from './spatial.js';
+import {
+  MAX_TRANSFORM_KEYFRAMES,
+  NEUTRAL_SPATIAL_POSE,
+  SPATIAL_CHANNELS,
+  spatialPoseSchema,
+  spatialSettingsSchema,
+  type SpatialChannel,
+  type SpatialKeyframe,
+} from './spatial.js';
 import { clipDuration } from './speed.js';
 import { trimByOutputFrames } from './source-range.js';
 import { calculateLayout, layerClips, transitionOffset, type TimelineLayout } from './timeline.js';
@@ -411,15 +420,15 @@ function editLayerValue(layer: ColorOwner, point: LayerKeyframe | undefined, com
 type LayerKeySet = Extract<EditCommand, { type: 'layer-key-set' }>;
 
 /** Each listed setting's new value and Easing; the others keep theirs. */
-function patchKeySettings(
-  base: LayerKeyframe,
-  patch: { [K in KeyframeSetting]?: number | null | undefined },
-  easing: Interpolation | Partial<Record<KeyframeSetting, Interpolation>> | undefined,
+function patchKeySettings<K extends string>(
+  base: { values: Readonly<Record<K, number | null>>; easing: Readonly<Record<K, Interpolation | null>> },
+  patch: { [S in K]?: number | null | undefined },
+  easing: Interpolation | Partial<Record<K, Interpolation>> | undefined,
   joining: Interpolation,
-): Pick<LayerKeyframe, 'values' | 'easing'> {
-  const values = { ...base.values };
-  const curves: Record<KeyframeSetting, Interpolation | null> = { ...base.easing };
-  for (const [setting, value] of Object.entries(patch) as [KeyframeSetting, number | null | undefined][]) {
+): { values: Record<K, number | null>; easing: Record<K, Interpolation | null> } {
+  const values: Record<K, number | null> = { ...base.values };
+  const curves: Record<K, Interpolation | null> = { ...base.easing };
+  for (const [setting, value] of Object.entries(patch) as [K, number | null | undefined][]) {
     if (value === undefined) continue;
     const keyed = values[setting] !== null;
     values[setting] = value;
@@ -428,7 +437,7 @@ function patchKeySettings(
     else if (!keyed) curves[setting] = joining;
   }
   if (typeof easing !== 'object') return { values, easing: curves };
-  for (const [setting, curve] of Object.entries(easing) as [KeyframeSetting, Interpolation][]) {
+  for (const [setting, curve] of Object.entries(easing) as [K, Interpolation][]) {
     if (values[setting] === null) throw new Error(`${setting} is not keyed at this keyframe, so it has no Easing.`);
     curves[setting] = curve;
   }
@@ -459,6 +468,11 @@ function gradeEasingPatch(
 /** Keys, changes or disables several settings of one keyframe at once, like their toggles together. */
 function setLayerKey(layer: ColorOwner, command: LayerKeySet): void {
   requireGradeFrame(command.frame);
+  const foreign = Object.keys(command.values).find(
+    (setting) => !GRADE_SETTINGS.includes(setting as ScalarColorSetting),
+  );
+  if (foreign !== undefined)
+    throw new Error(`${foreign} is not a Color setting: Transform keyframes belong to a track (layerId).`);
   const patch = gradeKeyValuesPatchSchema.parse(command.values);
   const easing = command.easing === undefined ? undefined : gradeEasingPatch(command.easing);
   if (command.reset !== undefined && typeof command.reset !== 'boolean')
@@ -470,7 +484,7 @@ function setLayerKey(layer: ColorOwner, command: LayerKeySet): void {
   const joining = point ? joiningEasing(layer.keyframes, point, order) : 'linear';
   const changed = {
     frame: command.frame,
-    ...patchKeySettings(base, patch, easing, joining),
+    ...patchKeySettings<KeyframeSetting>(base, patch, easing, joining),
     reset: command.reset ?? base.reset,
   };
   layer.keyframes = keySettings(changed).length
@@ -530,6 +544,110 @@ function editLayerKey(layer: ColorOwner, command: LayerKeyCommand): void {
       point.easing = withEasing<KeyframeSetting>(point, command.setting, command.interpolation);
       break;
   }
+}
+
+type KeyframeCommand = LayerKeyCommand | LayerKeySet;
+type TransformKeyCommand = Extract<KeyframeCommand, { type: 'layer-key-set' | 'layer-key-move' | 'layer-key-remove' }>;
+
+/** Edits the keyframes of a clip grade or an adjustment, or of a track's Transform. */
+function editKeyframes(next: ProjectDocument, command: KeyframeCommand): 'grade' | 'transform' {
+  if ('layerId' in command && command.layerId !== undefined) {
+    if (command.clipId !== undefined || command.adjustmentId !== undefined)
+      throw new Error('Give one of clipId, adjustmentId or layerId.');
+    editTransformKey(requiredLayer(next, command.layerId), command);
+    return 'transform';
+  }
+  const { owner, save } = colorOwner(next, command);
+  if (command.type === 'layer-key-set') setLayerKey(owner, command);
+  else editLayerKey(owner, command);
+  save();
+  return 'grade';
+}
+
+function requireProjectFrame(frame: number): void {
+  if (!Number.isInteger(frame) || frame < 0 || frame > MAX_FRAME)
+    throw new Error('Transform keyframes are at whole project frames from 0.');
+}
+
+function editTransformKey(layer: VideoLayer, command: TransformKeyCommand): void {
+  requireProjectFrame(command.frame);
+  const keys = layer.transform.keyframes;
+  const point = keys.find((key) => key.frame === command.frame);
+  let keyframes: SpatialKeyframe[];
+  if (command.type === 'layer-key-set') keyframes = setTransformKey(keys, point, command);
+  else if (!point) throw new Error('Transform keyframe no longer exists.');
+  else if (command.type === 'layer-key-remove') keyframes = keys.filter((key) => key !== point);
+  else keyframes = moveTransformKey(keys, point, command.nextFrame);
+  layer.transform = { ...layer.transform, keyframes };
+}
+
+function moveTransformKey(keys: SpatialKeyframe[], point: SpatialKeyframe, nextFrame: number): SpatialKeyframe[] {
+  requireProjectFrame(nextFrame);
+  if (keys.some((key) => key !== point && key.frame === nextFrame))
+    throw new Error('A Transform keyframe already exists at the destination frame.');
+  return upsertKey(
+    keys.filter((key) => key !== point),
+    { ...point, frame: nextFrame },
+  );
+}
+
+const NO_TRANSFORM_KEY_VALUES = Object.fromEntries(SPATIAL_CHANNELS.map((channel) => [channel, null])) as Record<
+  SpatialChannel,
+  number | null
+>;
+
+const isTransformSetting = (setting: string): setting is SpatialChannel =>
+  (SPATIAL_CHANNELS as readonly string[]).includes(setting);
+
+/** The Transform settings a command keys, each within its bounds, or null to disable it. */
+function transformKeyPatch(
+  values: Partial<Record<KeySetting, number | null>>,
+): Partial<Record<SpatialChannel, number | null>> {
+  const entries = Object.entries(values);
+  if (!entries.length) throw new Error('List at least one setting.');
+  for (const [setting, value] of entries) {
+    if (!isTransformSetting(setting))
+      throw new Error(`${setting} is not a Transform setting: Color keyframes belong to a clip or an adjustment.`);
+    if (value !== null) spatialPoseSchema.shape[setting].parse(value);
+  }
+  return values as Partial<Record<SpatialChannel, number | null>>;
+}
+
+function transformEasingPatch(
+  easing: Interpolation | Partial<Record<string, Interpolation>>,
+): Interpolation | Partial<Record<SpatialChannel, Interpolation>> {
+  if (typeof easing === 'string') return interpolationSchema.parse(easing);
+  for (const [setting, curve] of Object.entries(easing)) {
+    if (!isTransformSetting(setting)) throw new Error(`Unknown setting ${setting}.`);
+    interpolationSchema.parse(curve);
+  }
+  return easing as Partial<Record<SpatialChannel, Interpolation>>;
+}
+
+/** Keys, changes or disables several Transform settings at one project frame, like layer-key-set on a grade. */
+function setTransformKey(
+  keys: SpatialKeyframe[],
+  point: SpatialKeyframe | undefined,
+  command: LayerKeySet,
+): SpatialKeyframe[] {
+  const patch = transformKeyPatch(command.values);
+  const easing = command.easing === undefined ? undefined : transformEasingPatch(command.easing);
+  if (command.reset !== undefined && typeof command.reset !== 'boolean')
+    throw new Error('Reset must be true or false.');
+  if (!point && keys.length >= MAX_TRANSFORM_KEYFRAMES)
+    throw new Error(
+      `This track already has ${MAX_TRANSFORM_KEYFRAMES} Transform keyframes. Change one of them, or remove one.`,
+    );
+  const base = point ?? { ...uniformKeyframe(command.frame, NO_TRANSFORM_KEY_VALUES, 'linear'), reset: false };
+  const joining = point ? joiningEasing(keys, point, SPATIAL_CHANNELS) : 'linear';
+  const changed = {
+    frame: command.frame,
+    ...patchKeySettings(base, patch, easing, joining),
+    reset: command.reset ?? base.reset,
+  };
+  return SPATIAL_CHANNELS.some((channel) => changed.values[channel] !== null)
+    ? upsertKey(keys, changed)
+    : keys.filter((key) => key.frame !== command.frame);
 }
 
 type LayerCommand = Extract<
@@ -943,23 +1061,16 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
       editAdjustment(next, command);
       // Adjustments never move clips or extend the project.
       return projectSchema.parse(next);
-    case 'layer-key-set': {
-      const { owner, save } = colorOwner(next, command);
-      setLayerKey(owner, command);
-      save();
-      break;
-    }
+    case 'layer-key-set':
     case 'layer-key-toggle':
     case 'layer-key-value':
     case 'layer-key-move':
     case 'layer-key-remove':
     case 'layer-key-easing':
-    case 'layer-key-default': {
-      const { owner, save } = colorOwner(next, command);
-      editLayerKey(owner, command);
-      save();
+    case 'layer-key-default':
+      // Like transform, a Transform keyframe edit never rewrites stored timing.
+      if (editKeyframes(next, command) === 'transform') return projectSchema.parse(next);
       break;
-    }
     case 'layer-add':
     case 'layer-create':
     case 'layer-update':
