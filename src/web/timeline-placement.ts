@@ -251,7 +251,12 @@ function planGroupDrop(
     );
     ({ delta, guide } = snapGroupDelta(free, delta, points, tolerance));
   }
-  const command: EditCommand = { type: 'move-clips', clipIds: [...payload.clipIds], delta, layerId };
+  const command: EditCommand = {
+    type: 'move-clips',
+    clipIds: [...payload.clipIds],
+    delta,
+    ...(layerId !== null && { layerId }),
+  };
   const adjustmentCommands = adjustmentMoveCommands(project, adjustmentIds, delta);
   const requestedGhosts = moved.map((placed) => ({
     clipId: placed.clip.id,

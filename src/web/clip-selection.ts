@@ -77,7 +77,7 @@ export function applyClipSelection(
 
 /** Alt+←/→ moves the whole group in time; Ripple tracks keep their sequence, so a move may change nothing. */
 export function groupNudge(project: ProjectDocument, group: readonly string[], delta: number): EditCommand | string {
-  const command: EditCommand = { type: 'move-clips', clipIds: [...group], delta, layerId: null };
+  const command: EditCommand = { type: 'move-clips', clipIds: [...group], delta };
   try {
     const next = applyCommand(project, command);
     if (JSON.stringify(next.clips) === JSON.stringify(project.clips))

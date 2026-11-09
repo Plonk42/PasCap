@@ -28,8 +28,8 @@ function project(): ProjectDocument {
   return projectSchema.parse(document);
 }
 
-function move(clipIds: string[], delta: number, layerId: string | null = null): EditCommand {
-  return { type: 'move-clips', clipIds, delta, layerId };
+function move(clipIds: string[], delta: number, layerId?: string): EditCommand {
+  return { type: 'move-clips', clipIds, delta, ...(layerId !== undefined && { layerId }) };
 }
 
 function placements(document: ProjectDocument): Record<string, [string, number]> {

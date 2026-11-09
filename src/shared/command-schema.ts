@@ -305,8 +305,8 @@ export const editCommandSchema = z.discriminatedUnion('type', [
       clipIds: described(z.array(idSchema).min(1), 'The clips to move, each once.'),
       delta: described(z.number().int(), 'Project frames to move by; negative moves earlier.'),
       layerId: described(
-        idSchema.nullable(),
-        'Destination track for clips that all come from one track; null keeps each clip on its own track.',
+        idSchema.optional(),
+        'Destination track for clips that all come from one track; omitted keeps each clip on its own track.',
       ),
     },
   ),

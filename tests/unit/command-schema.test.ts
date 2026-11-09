@@ -107,7 +107,7 @@ type FormerEditCommand =
   | { type: 'layer-remove'; layerId: string }
   | { type: 'layer-order'; layerIds: string[] }
   | { type: 'place'; clipId: string; layerId: string; start: number; index: number }
-  | { type: 'move-clips'; clipIds: string[]; delta: number; layerId: string | null }
+  | { type: 'move-clips'; clipIds: string[]; delta: number; layerId?: string | undefined }
   | { type: 'transition'; transition: Transition; keepCut?: boolean | undefined }
   | { type: 'fades'; layerId: string; opening?: number | null | undefined; closing?: number | null | undefined }
   | {
@@ -187,7 +187,7 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
   'layer-remove': { type: 'layer-remove', layerId: 'video-2' },
   'layer-order': { type: 'layer-order', layerIds: ['video-2', 'video-1'] },
   place: { type: 'place', clipId: 'clip-1', layerId: 'video-2', start: 30, index: 0 },
-  'move-clips': { type: 'move-clips', clipIds: ['clip-1', 'clip-2'], delta: -3, layerId: null },
+  'move-clips': { type: 'move-clips', clipIds: ['clip-1', 'clip-2'], delta: -3 },
   transition: {
     type: 'transition',
     transition: { leftId: 'clip-1', rightId: 'clip-2', type: 'cross-dissolve', duration: 10 },

@@ -6,8 +6,8 @@ import { transitionOffset, type PlacedClip, type TimelineLayout } from './timeli
 export interface ClipGroupMove {
   clipIds: readonly string[];
   delta: number;
-  /** The destination track of clips that all come from one track; null keeps every clip on its own track. */
-  layerId: string | null;
+  /** The destination track of clips that all come from one track; omitted keeps every clip on its own track. */
+  layerId?: string | undefined;
 }
 
 export interface ClipGroupArrangement {
@@ -34,7 +34,7 @@ function movedClips(before: TimelineLayout, move: ClipGroupMove): PlacedClip[] {
   if (!Number.isSafeInteger(move.delta)) throw new Error('Clips move by whole timeline frames.');
   const moved = before.clips.filter((placed) => ids.has(placed.clip.id));
   if (moved.length !== ids.size) throw new Error('Clip no longer exists.');
-  if (move.layerId !== null && new Set(moved.map((placed) => placed.clip.layerId)).size > 1)
+  if (move.layerId !== undefined && new Set(moved.map((placed) => placed.clip.layerId)).size > 1)
     throw new Error('Clips from several tracks move in time only, each on its own track.');
   return moved;
 }

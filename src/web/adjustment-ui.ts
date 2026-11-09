@@ -98,7 +98,7 @@ export function planGroupMove(
   if (project.adjustments.some((item) => adjustmentIds.includes(item.id) && item.start + delta < 0))
     return fail('An adjustment cannot start before the first frame.');
   const commands: EditCommand[] = [
-    ...(clipIds.length && delta ? [{ type: 'move-clips' as const, clipIds: [...clipIds], delta, layerId: null }] : []),
+    ...(clipIds.length && delta ? [{ type: 'move-clips' as const, clipIds: [...clipIds], delta }] : []),
     ...adjustmentMoveCommands(project, adjustmentIds, delta),
   ];
   try {
