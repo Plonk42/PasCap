@@ -247,7 +247,7 @@ describe('assistant sessions', () => {
 
     expect(
       await call('assistant', 'preview_edits', { projectId: 'flight', commands: [insert('inside', 100, 190)] }),
-    ).toMatchObject({ revision: 1, clipCount: 2 });
+    ).toMatchObject({ revision: 1, clipCount: 2, changes: { clips: [expect.objectContaining({ id: 'inside' })] } });
     expect(await readFile(file, 'utf8')).toBe(saved);
     // The user's own clip outside the kept ranges may stay.
     expect(

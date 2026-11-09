@@ -12,7 +12,7 @@ import { calculateLayout } from '../../shared/timeline.js';
 import type { AssistantSession } from '../../shared/assistant-session.js';
 import { assertProjectSources } from '../project-sources.js';
 import { writerOf, type OperationRunner, type ServiceContext } from './context.js';
-import { prepareBatch } from './edit.js';
+import { editChanges, prepareBatch } from './edit.js';
 
 function view(sessions: ServiceContext['sessions'], session: AssistantSession) {
   return { ...session, active: session.endedAt === null, expiresAt: sessions.expiresAt(session) };
@@ -78,5 +78,6 @@ export const runPreviewEdits: OperationRunner<typeof previewEdits> = async (cont
     revision: current.revision,
     duration: durationOf(calculateLayout(next).duration),
     clipCount: next.clips.length,
+    changes: editChanges(current, next, context),
   };
 };

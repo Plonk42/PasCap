@@ -56,16 +56,26 @@ export const runEdit: OperationRunner<typeof edit> = async (context, { projectId
   return {
     revision: saved.revision,
     duration: durationOf(calculateLayout(saved).duration),
-    changes: editChanges(describeDocument(current, context), describeDocument(saved, context)),
+    changes: editChanges(current, saved, context),
   };
 };
 
-/** The items added or changed (compared as described) and the IDs of those removed. */
-function byId<T extends { id: string }>(before: readonly T[], after: readonly T[]) {
-  const previous = new Map(before.map((item) => [item.id, JSON.stringify(item)]));
+type Saved = (id: string) => unknown;
+const nothing: Saved = () => null;
+
+/**
+ * The items added or changed and the IDs of those removed. An item is compared as described and,
+ * where the description only summarizes it (a grade, a Transform), as saved.
+ */
+function byId<T extends { id: string }>(
+  before: readonly T[],
+  after: readonly T[],
+  [savedBefore, savedAfter]: readonly [Saved, Saved] = [nothing, nothing],
+) {
+  const previous = new Map(before.map((item) => [item.id, JSON.stringify([item, savedBefore(item.id)])]));
   const kept = new Set(after.map((item) => item.id));
   return {
-    changed: after.filter((item) => previous.get(item.id) !== JSON.stringify(item)),
+    changed: after.filter((item) => previous.get(item.id) !== JSON.stringify([item, savedAfter(item.id)])),
     removed: before.filter((item) => !kept.has(item.id)).map((item) => item.id),
   };
 }
@@ -73,14 +83,50 @@ function byId<T extends { id: string }>(before: readonly T[], after: readonly T[
 const unlessEmpty = <K extends string, T>(key: K, list: readonly T[]) =>
   (list.length ? { [key]: list } : {}) as Partial<Record<K, T[]>>;
 
-export function editChanges(before: ProjectDescription, after: ProjectDescription): EditChanges {
+/** What turned current into next, in describe_project's shape. */
+export function editChanges(
+  current: ProjectDocument,
+  next: ProjectDocument,
+  media: Pick<ServiceContext, 'library' | 'audio'>,
+): EditChanges {
+  const before = describeDocument(current, media);
+  const after = describeDocument(next, media);
+  const saved = <T extends { id: string }>(
+    items: (document: ProjectDocument) => readonly T[],
+    value: (item: T) => unknown,
+  ) =>
+    [current, next].map((document) => {
+      const byItem = new Map(items(document).map((item) => [item.id, value(item)]));
+      return (id: string) => byItem.get(id);
+    }) as [Saved, Saved];
   const tracks = (description: ProjectDescription) =>
     (description.videoTracks ?? []).map(({ clips: _clips, ...track }) => track);
   const clips = (description: ProjectDescription) =>
     (description.videoTracks ?? []).flatMap((track) => track.clips.map((clip) => ({ ...clip, layerId: track.id })));
-  const videoTracks = byId(tracks(before), tracks(after));
-  const placed = byId(clips(before), clips(after));
-  const adjustments = byId(before.adjustments ?? [], after.adjustments ?? []);
+  const videoTracks = byId(
+    tracks(before),
+    tracks(after),
+    saved(
+      (document) => document.layers,
+      (layer) => layer.transform,
+    ),
+  );
+  const placed = byId(
+    clips(before),
+    clips(after),
+    saved(
+      (document) => document.clips,
+      (clip) => clip,
+    ),
+  );
+  const adjustments = byId(
+    before.adjustments ?? [],
+    after.adjustments ?? [],
+    saved(
+      (document) => document.adjustments,
+      (item) => item,
+    ),
+  );
   const musicTracks = byId(before.musicTracks ?? [], after.musicTracks ?? []);
   return {
     ...unlessEmpty('videoTracks', videoTracks.changed),

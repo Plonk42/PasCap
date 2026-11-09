@@ -6,7 +6,6 @@ import { z } from 'zod';
 import { CATALOG_DOCUMENT, withCatalog } from '../../scripts/operation-catalog.js';
 import { createApp } from '../../src/server/app.js';
 import { createConfig } from '../../src/server/config.js';
-import { describeDocument } from '../../src/server/operations/describe-project.js';
 import { editChanges } from '../../src/server/operations/edit.js';
 import { runners } from '../../src/server/operations/index.js';
 import { applyCommand } from '../../src/shared/commands.js';
@@ -225,8 +224,8 @@ describe('operation routes', () => {
     const media = {
       library: { get: () => ({ name: 'DJI_0001.MP4', metadata: { frameCount: 300 }, status: 'ready' }) },
       audio: { get: () => ({ name: 'song.wav' }) },
-    } as unknown as Parameters<typeof describeDocument>[1];
-    const changes = editChanges(describeDocument(before, media), describeDocument(after, media));
+    } as unknown as Parameters<typeof editChanges>[2];
+    const changes = editChanges(before, after, media);
     expect(Object.keys(changes)).toEqual(['clips', 'removedClips', 'bookmarks']);
     expect(changes.clips!.map(({ id, layerId, start, end, sourceIn }) => [id, layerId, start, end, sourceIn])).toEqual([
       ['b', 'video-1', 30, 50, 10],
@@ -234,7 +233,16 @@ describe('operation routes', () => {
     ]);
     expect(changes.removedClips).toEqual(['d']);
     expect(changes.bookmarks).toEqual([5]);
-    expect(editChanges(describeDocument(after, media), describeDocument(after, media))).toEqual({});
+    expect(editChanges(after, after, media)).toEqual({});
+
+    // Values the description only summarizes still count: a static grade and the Transform base.
+    const graded = applyCommand(after, { type: 'color-patch', clipIds: ['a'], settings: { exposure: 0.5 } });
+    const regraded = applyCommand(graded, { type: 'color-patch', clipIds: ['a'], settings: { exposure: 0.8 } });
+    const scaled = applyCommand(regraded, { type: 'transform-patch', layerId: 'video-1', settings: { scale: 1.5 } });
+    expect(editChanges(graded, regraded, media).clips!.map(({ id, grade }) => [id, grade])).toEqual([['a', 'static']]);
+    expect(editChanges(regraded, scaled, media)).toEqual({
+      videoTracks: [{ id: 'video-1', name: expect.any(String), transitions: [] }],
+    });
   });
 
   it('describes clips with their recording, timecodes and kept ranges', async () => {

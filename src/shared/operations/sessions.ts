@@ -3,7 +3,7 @@ import { briefSchema, checkpointSummarySchema, MAX_SESSION_NOTES, sessionSchema 
 import { referencedEditCommandSchema } from '../command-schema.js';
 import { described } from '../described.js';
 import { frameSchema, idSchema } from '../model.js';
-import { MAX_EDIT_COMMANDS } from './edit.js';
+import { editChangesSchema, MAX_EDIT_COMMANDS } from './edit.js';
 import { defineOperation } from './spec.js';
 import { durationSchema } from './timecode.js';
 
@@ -129,7 +129,7 @@ export const checkpointCopy = defineOperation({
 export const previewEdits = defineOperation({
   name: 'preview_edits',
   title: 'Preview edits',
-  description: `Try up to ${MAX_EDIT_COMMANDS} edit commands against the saved project without saving: the same checks as edit, including the session rules, and the resulting duration and clip count, or the first rejected command's reason.`,
+  description: `Try up to ${MAX_EDIT_COMMANDS} edit commands against the saved project without saving: the same checks as edit, including the session rules, and the resulting duration, clip count and what would change (as edit reports it), or the first rejected command's reason.`,
   input: z
     .object({
       projectId,
@@ -145,6 +145,7 @@ export const previewEdits = defineOperation({
       revision: described(frameSchema, 'The saved revision the commands were tried against.'),
       duration: durationSchema,
       clipCount: z.number().int().nonnegative(),
+      changes: editChangesSchema,
     })
     .strict(),
   access: 'read',

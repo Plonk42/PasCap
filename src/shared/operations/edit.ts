@@ -21,7 +21,7 @@ export const editChangesSchema = z
   .object({
     videoTracks: described(
       z.array(videoTrackDescriptionSchema.omit({ clips: true })).optional(),
-      'Video tracks added or whose settings or transitions changed, without their clips.',
+      'Video tracks added or whose settings, Transform or transitions changed, without their clips.',
     ),
     removedVideoTracks: removed('video tracks'),
     clips: described(
@@ -29,7 +29,10 @@ export const editChangesSchema = z
       'Clips added or changed in any way, with their track, in timeline order: those a Ripple track moved too.',
     ),
     removedClips: removed('clips'),
-    adjustments: described(z.array(adjustmentDescriptionSchema).optional(), 'Adjustments added or changed.'),
+    adjustments: described(
+      z.array(adjustmentDescriptionSchema).optional(),
+      'Adjustments added or changed, their grade values and keyframes included.',
+    ),
     removedAdjustments: removed('adjustments'),
     musicTracks: described(z.array(musicTrackDescriptionSchema).optional(), 'Music tracks added or changed.'),
     removedMusicTracks: removed('music tracks'),

@@ -420,7 +420,7 @@ Write; for editor and assistant. Apply up to 64 edit commands to a saved project
 
 #### `preview_edits`
 
-Read; for editor and assistant. Try up to 64 edit commands against the saved project without saving: the same checks as edit, including the session rules, and the resulting duration and clip count, or the first rejected command's reason.
+Read; for editor and assistant. Try up to 64 edit commands against the saved project without saving: the same checks as edit, including the session rules, and the resulting duration, clip count and what would change (as edit reports it), or the first rejected command's reason.
 
 | Input       | Type            | Description                |
 | ----------- | --------------- | -------------------------- |
@@ -589,7 +589,7 @@ registry; the assistant never sees them.
 | `session_end`        | both      | Take over (editor) or finish with notes (assistant); the notes appear in the editor's hand-off dialog                                                                                                                                                                                                                                                                                   |                                                                                        |
 | `checkpoint`         | both      | Named checkpoint of the current document; `checkpoint_restore` replaces the document in one revision after checkpointing the current state; `checkpoint_copy` (editor only) saves a checkpoint as a new project                                                                                                                                                                         | Last 5 per project                                                                     |
 | `edit`               | both      | Apply a batch of commands atomically; with a session it also enforces selects and bin membership; returns the new revision, the duration and what changed, or the first failing command's message                                                                                                                                                                                       | ≤ 64 commands                                                                          |
-| `preview_edits`      | both      | Dry run of a batch against the saved revision: resulting timeline summary and errors, no save                                                                                                                                                                                                                                                                                           |                                                                                        |
+| `preview_edits`      | both      | Dry run of a batch against the saved revision: resulting duration, clip count and what would change, or errors, no save                                                                                                                                                                                                                                                                 |                                                                                        |
 | `describe_project`   | both      | Compact timeline: tracks with their Transform Opacity and keyframe count, clips with timecodes and grade summaries, transitions, adjustments with what they change, music, recordings with their kept ranges, bookmarks                                                                                                                                                                 |                                                                                        |
 | `describe_track`     | both      | One video track's Transform (Opacity included) and keyframes, what each clip's grade changes with the adjustments over it, its keyed settings, the clip grade and adjustment keyframes on request and the values that apply at requested frames, with the adjustment there ([#252](https://github.com/Plonk42/PasCap/issues/252), [#288](https://github.com/Plonk42/PasCap/issues/288)) | ≤ 32 frames                                                                            |
 | `describe_recording` | both      | Shot descriptors (below) inside the selects, flight data, damage, the steady-range limits applied, an opt-in sheet (`sheet: true`) of each steady range's middle frame ([#239](https://github.com/Plonk42/PasCap/issues/239))                                                                                                                                                           | Computed on request, no cache                                                          |
@@ -888,10 +888,13 @@ Conventions, by the operations rather than the endpoint: frames are authoritativ
 outputs also carry `MM:SS:FF` timecode (30 fps NDF, as the editor shows); every write returns
 the new revision; validation failures are tool errors with the service's message (for
 example an overlap or an invalid fade), never exceptions. `edit` also returns what the batch
-changed in `describe_project`'s shape: tracks, adjustments and music tracks added or changed,
-every clip whose description changed (those a Ripple track moved included) with its track,
-the IDs of what it removed, recordings whose kept ranges changed and the bookmarks when they
-changed, so the model follows its batches without reading the project again.
+changed in `describe_project`'s shape, and `preview_edits` what it would change: tracks,
+adjustments and music tracks added or changed, every clip added or changed (those a Ripple
+track moved included) with its track, the IDs of what it removed, recordings whose kept ranges
+changed and the bookmarks when they changed, so the model follows its batches without reading
+the project again. Where the description only summarizes a value (a clip's or adjustment's
+grade, a track's Transform), the saved value decides whether the item changed; the model reads
+the values themselves with `describe_track`.
 
 Each tool carries its operation's `title` (shown by clients, for example in approval prompts)
 and annotations: reads are `readOnlyHint`; writes are `destructiveHint` unless the operation is
