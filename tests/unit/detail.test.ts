@@ -711,15 +711,16 @@ describe('clip detail editing and export routing', () => {
     expect(duplicated.clips[1]!.detail).toEqual(detail);
   });
 
-  it('sets the same detail on several clips in one command, or on none of them', () => {
-    const document = applyCommand(project(NEUTRAL_DETAIL), {
+  it('patches detail on several clips in one command, or on none of them', () => {
+    const document = applyCommand(project({ sharpen: 0.5, clarity: 0, denoise: 0.2 }), {
       type: 'duplicate',
       clipId: 'clip',
       newClipId: 'copy',
     });
-    const detail = { sharpen: 0, clarity: 0.15, denoise: 0 };
     const history = new EditHistory(document);
-    history.commit({ type: 'detail-clips', clipIds: ['copy', 'clip'], detail });
+    // A value sets a filter, null returns it to neutral and a filter left out keeps its value.
+    history.commit({ type: 'detail-patch', clipIds: ['copy', 'clip'], settings: { clarity: 0.15, denoise: null } });
+    const detail = { sharpen: 0.5, clarity: 0.15, denoise: 0 };
     expect(history.current.clips.map((clip) => clip.detail)).toEqual([detail, detail]);
     expect(history.current.clips[0]!.detail).not.toBe(history.current.clips[1]!.detail);
     history.undo();
@@ -728,10 +729,11 @@ describe('clip detail editing and export routing', () => {
       ['clip', 'gone'],
       ['clip', 'clip'],
     ])
-      expect(() => history.commit({ type: 'detail-clips', clipIds, detail })).toThrow();
-    expect(() =>
-      history.commit({ type: 'detail-clips', clipIds: ['clip'], detail: { ...detail, clarity: 2 } }),
-    ).toThrow();
+      expect(() => history.commit({ type: 'detail-patch', clipIds, settings: { clarity: 0.1 } })).toThrow();
+    expect(() => history.commit({ type: 'detail-patch', clipIds: ['clip'], settings: { clarity: 2 } })).toThrow();
+    expect(() => history.commit({ type: 'detail-patch', clipIds: ['clip'], settings: {} })).toThrow(
+      'List at least one setting to change.',
+    );
     expect(history.current).toEqual(document);
   });
 

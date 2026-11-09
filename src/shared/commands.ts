@@ -32,7 +32,7 @@ import {
   type VideoClip,
   type VideoLayer,
 } from './model.js';
-import { detailSchema } from './detail.js';
+import { detailSchema, NEUTRAL_DETAIL, type DetailSetting } from './detail.js';
 import {
   createAdjustment,
   createClipGrade,
@@ -47,7 +47,7 @@ import {
 } from './grade.js';
 import type { ColorCurvePoint, CurveChannel, HslBand, HslSettings } from './advanced-color.js';
 import { colorSchema, NEUTRAL_COLOR, type ColorSettings, type ScalarColorSetting } from './color.js';
-import { spatialPoseSchema, spatialSettingsSchema } from './spatial.js';
+import { NEUTRAL_SPATIAL_POSE, spatialPoseSchema, spatialSettingsSchema, type SpatialChannel } from './spatial.js';
 import { clipDuration } from './speed.js';
 import { trimByOutputFrames } from './source-range.js';
 import { calculateLayout, layerClips, transitionOffset, type TimelineLayout } from './timeline.js';
@@ -137,13 +137,41 @@ function followsKeyframes(name: string, setting: string, keys: number, list: str
     );
 }
 
-function editTransformSetting(layer: VideoLayer, command: Extract<EditCommand, { type: 'transform-setting' }>): void {
+/** Patch entries: a value sets a setting, null returns it to neutral. */
+function listed<K extends string>(settings: Partial<Record<K, number | null>> | undefined): [K, number | null][] {
+  return Object.entries(settings ?? {}) as [K, number | null][];
+}
+
+function patched<K extends string>(
+  values: Readonly<Record<K, number>>,
+  entries: readonly [K, number | null][],
+  neutral: Readonly<Record<K, number>>,
+): Record<K, number> {
+  return { ...values, ...Object.fromEntries(entries.map(([setting, value]) => [setting, value ?? neutral[setting]])) };
+}
+
+const NOTHING_LISTED = 'List at least one setting to change.';
+
+function patchTransform(layer: VideoLayer, command: Extract<EditCommand, { type: 'transform-patch' }>): void {
   const { transform } = layer;
-  followsKeyframes(layer.name, command.setting, keyCount(transform.keyframes, command.setting), 'Transform');
+  const entries = listed<SpatialChannel>(command.settings);
+  if (!entries.length) throw new Error(NOTHING_LISTED);
+  for (const [setting] of entries)
+    followsKeyframes(layer.name, setting, keyCount(transform.keyframes, setting), 'Transform');
   layer.transform = {
     ...transform,
-    base: { ...transform.base, [command.setting]: spatialPoseSchema.shape[command.setting].parse(command.value) },
+    base: spatialPoseSchema.parse(patched(transform.base, entries, NEUTRAL_SPATIAL_POSE)),
   };
+}
+
+/** Each listed clip, once and existing, or none of them. */
+function listedClips(next: ProjectDocument, ids: readonly string[]): VideoClip[] {
+  if (new Set(ids).size !== ids.length) throw new Error('List each clip once.');
+  return ids.map((id) => {
+    const clip = next.clips.find((item) => item.id === id);
+    if (!clip) throw new Error(`Clip ${id} no longer exists.`);
+    return clip;
+  });
 }
 
 /** The clip grades (clipIds) or the adjustment (adjustmentId) a command changes. */
@@ -157,13 +185,11 @@ function colorTargets(
     const grade = requiredAdjustment(next, command.adjustmentId);
     return [{ kind: 'adjustment', name: `adjustment ${command.adjustmentId}`, grade }];
   }
-  const ids = command.clipIds!;
-  if (new Set(ids).size !== ids.length) throw new Error('List each clip once.');
-  return ids.map((id) => {
-    const clip = next.clips.find((item) => item.id === id);
-    if (!clip) throw new Error(`Clip ${id} no longer exists.`);
-    return { kind: 'clip', name: `clip ${id}`, grade: clip.grade };
-  });
+  return listedClips(next, command.clipIds!).map((clip) => ({
+    kind: 'clip',
+    name: `clip ${clip.id}`,
+    grade: clip.grade,
+  }));
 }
 
 /** The same Color on each listed clip's grade, or on an adjustment, keeping their keyframes. */
@@ -174,16 +200,15 @@ function setColor(next: ProjectDocument, command: Extract<EditCommand, { type: '
 
 /** Listed settings take their value, or neutral for null, on every target; the others keep theirs. */
 function patchColor(next: ProjectDocument, command: Extract<EditCommand, { type: 'color-patch' }>): void {
-  const settings = Object.entries(command.settings ?? {}) as [ScalarColorSetting, number | null][];
+  const settings = listed<ScalarColorSetting>(command.settings);
   const bands = Object.entries(command.hsl ?? {}) as [HslBand, HslSettings[HslBand] | null][];
   const curves = Object.entries(command.curves ?? {}) as [CurveChannel, ColorCurvePoint[] | null][];
-  if (settings.length + bands.length + curves.length === 0) throw new Error('List at least one setting to change.');
+  if (settings.length + bands.length + curves.length === 0) throw new Error(NOTHING_LISTED);
   for (const { kind, name, grade } of colorTargets(next, command)) {
     for (const [setting] of settings) followsKeyframes(name, setting, keyCount(grade.keyframes, setting), kind);
     const { color } = grade;
-    const patched = {
-      ...color,
-      ...Object.fromEntries(settings.map(([setting, value]) => [setting, value ?? NEUTRAL_COLOR[setting]])),
+    const changed = {
+      ...patched(color, settings, NEUTRAL_COLOR),
       hsl: {
         ...color.hsl,
         ...Object.fromEntries(bands.map(([band, values]) => [band, values ?? NEUTRAL_COLOR.hsl[band]])),
@@ -193,7 +218,7 @@ function patchColor(next: ProjectDocument, command: Extract<EditCommand, { type:
         ...Object.fromEntries(curves.map(([channel, points]) => [channel, points ?? NEUTRAL_COLOR.curves[channel]])),
       },
     };
-    grade.color = structuredClone(colorSchema.parse(patched));
+    grade.color = structuredClone(colorSchema.parse(changed));
   }
 }
 
@@ -744,14 +769,18 @@ function keepCutTransition(document: ProjectDocument, value: Transition): Projec
   return result;
 }
 
-/** The same detail filters on every listed clip, or none of them. */
-function setClipsDetail(next: ProjectDocument, clipIds: readonly string[], value: VideoClip['detail']): void {
-  const detail = detailSchema.parse(value);
-  const ids = new Set(clipIds);
-  if (ids.size !== clipIds.length) throw new Error('List each clip once.');
-  const missing = clipIds.find((id) => !next.clips.some((clip) => clip.id === id));
-  if (missing !== undefined) throw new Error(`Clip ${missing} no longer exists.`);
-  next.clips = next.clips.map((clip) => (ids.has(clip.id) ? { ...clip, detail: { ...detail } } : clip));
+function patchFades(layer: VideoLayer, command: Extract<EditCommand, { type: 'fades' }>): void {
+  if (command.opening === undefined && command.closing === undefined) throw new Error('List a fade to change.');
+  if (command.opening !== undefined) layer.openingFade = command.opening ?? 0;
+  if (command.closing !== undefined) layer.closingFade = command.closing ?? 0;
+}
+
+/** The listed detail filters on every listed clip, or none of them. */
+function patchClipsDetail(next: ProjectDocument, command: Extract<EditCommand, { type: 'detail-patch' }>): void {
+  const entries = listed<DetailSetting>(command.settings);
+  if (!entries.length) throw new Error(NOTHING_LISTED);
+  for (const clip of listedClips(next, command.clipIds))
+    clip.detail = detailSchema.parse(patched(clip.detail, entries, NEUTRAL_DETAIL));
 }
 
 /** Integer project frames for an adjustment: never before 0, its OUT within the supported range. */
@@ -898,11 +927,11 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'detail':
       next.clips[index] = { ...next.clips[index]!, detail: detailSchema.parse(command.detail) };
       return projectSchema.parse(next);
-    case 'detail-clips':
-      setClipsDetail(next, command.clipIds, command.detail);
+    case 'detail-patch':
+      patchClipsDetail(next, command);
       return projectSchema.parse(next);
-    case 'transform-setting':
-      editTransformSetting(requiredLayer(next, command.layerId), command);
+    case 'transform-patch':
+      patchTransform(requiredLayer(next, command.layerId), command);
       return projectSchema.parse(next);
     case 'music':
       next.music = command.music;
@@ -952,12 +981,9 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'transition':
       setTransition(next, command.transition, before);
       break;
-    case 'fades': {
-      const layer = requiredLayer(next, command.layerId);
-      layer.openingFade = command.opening;
-      layer.closingFade = command.closing;
+    case 'fades':
+      patchFades(requiredLayer(next, command.layerId), command);
       break;
-    }
     case 'bookmark-add':
     case 'bookmark-move':
     case 'bookmark-remove':

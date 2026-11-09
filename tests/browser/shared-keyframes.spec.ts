@@ -557,7 +557,7 @@ test('adjustment and Transform curves continue across different clips and their 
     contrast: 1.3,
     saturation: 0.6,
   };
-  document = applyCommand(document, { type: 'transform-setting', layerId: 'video-1', setting: 'opacity', value: 0.35 });
+  document = applyCommand(document, { type: 'transform-patch', layerId: 'video-1', settings: { opacity: 0.35 } });
   document = applyCommand(document, { type: 'speed', clipId: 'first', speed: { mode: 'constant', rate: 2 } });
   document = applyCommand(document, {
     type: 'speed',

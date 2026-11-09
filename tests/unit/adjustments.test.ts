@@ -288,16 +288,15 @@ describe('Transform Opacity', () => {
     expect(upper.opacity).toBe(0.4);
   });
 
-  it('is edited with transform-setting and returns to 1 with a default Transform keyframe', () => {
+  it('is edited with transform-patch and returns to 1 with a default Transform keyframe', () => {
     const document = applyCommand(project(), {
-      type: 'transform-setting',
+      type: 'transform-patch',
       layerId: 'video-2',
-      setting: 'opacity',
-      value: 0.25,
+      settings: { opacity: 0.25 },
     });
     expect(document.layers[1]!.transform.base).toEqual({ ...NEUTRAL_SPATIAL_POSE, opacity: 0.25 });
     expect(() =>
-      applyCommand(document, { type: 'transform-setting', layerId: 'video-2', setting: 'opacity', value: 1.5 }),
+      applyCommand(document, { type: 'transform-patch', layerId: 'video-2', settings: { opacity: 1.5 } }),
     ).toThrow();
   });
 });

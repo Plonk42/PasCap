@@ -70,7 +70,7 @@ describe('layer layout, compositing and edit commands', () => {
     document.layers.push(createLayer('other', 'Other'));
     expect(document.layers.map((layer) => layer.transform.base.opacity)).toEqual([1, 1]);
     const history = new EditHistory(document);
-    history.commit({ type: 'transform-setting', layerId: 'video-1', setting: 'opacity', value: 0.23456789 });
+    history.commit({ type: 'transform-patch', layerId: 'video-1', settings: { opacity: 0.23456789 } });
     const { transform } = document.layers[0]!;
     expect(history.current.layers[0]).toEqual({
       ...document.layers[0]!,
@@ -89,7 +89,7 @@ describe('layer layout, compositing and edit commands', () => {
     const beforeLayout = calculateLayout(document);
     history.commit({ type: 'duplicate', clipId: 'top', newClipId: 'later' });
     const populated = history.current;
-    history.commit({ type: 'transform-setting', layerId: 'upper', setting: 'opacity', value: 0.3 });
+    history.commit({ type: 'transform-patch', layerId: 'upper', settings: { opacity: 0.3 } });
     expect(history.current.clips).toEqual(populated.clips);
     expect(history.current.layers[0]).toEqual(populated.layers[0]);
     expect(history.current.layers[1]!.transform.keyframes).toEqual([]);
@@ -107,17 +107,17 @@ describe('layer layout, compositing and edit commands', () => {
   it.each([-1, 1.1, NaN, Infinity])('rejects row opacity %s atomically without discarding redo', (opacity) => {
     const document = layered();
     const history = new EditHistory(document);
-    const changed = history.commit({ type: 'transform-setting', layerId: 'upper', setting: 'opacity', value: 0.3 });
+    const changed = history.commit({ type: 'transform-patch', layerId: 'upper', settings: { opacity: 0.3 } });
     history.undo();
     expect(() =>
-      history.commit({ type: 'transform-setting', layerId: 'upper', setting: 'opacity', value: opacity }),
+      history.commit({ type: 'transform-patch', layerId: 'upper', settings: { opacity: opacity } }),
     ).toThrow();
     expect(history.current).toEqual(document);
     expect(history.canUndo).toBe(false);
     expect(history.canRedo).toBe(true);
-    expect(() =>
-      history.commit({ type: 'transform-setting', layerId: 'missing', setting: 'opacity', value: 0.5 }),
-    ).toThrow('Track no longer exists');
+    expect(() => history.commit({ type: 'transform-patch', layerId: 'missing', settings: { opacity: 0.5 } })).toThrow(
+      'Track no longer exists',
+    );
     expect(history.current).toEqual(document);
     expect(history.redo()).toEqual(changed);
   });

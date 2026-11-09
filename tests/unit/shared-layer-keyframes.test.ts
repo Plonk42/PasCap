@@ -676,10 +676,9 @@ describe('independent adjustment interpolation and unchanged CPU composition', (
       color: { ...NEUTRAL_COLOR, brightness: 0.1, saturation: 1.4 },
     });
     project = applyCommand(project, {
-      type: 'transform-setting',
+      type: 'transform-patch',
       layerId: BASE_LAYER_ID,
-      setting: 'opacity',
-      value: 0.9,
+      settings: { opacity: 0.9 },
     });
     project = applyCommand(project, {
       type: 'transform',

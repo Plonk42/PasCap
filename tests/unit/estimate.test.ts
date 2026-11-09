@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeAutoAdjust, autoAdjustFrames, scaleCorrection } from '../../src/shared/auto-adjust.js';
-import { NEUTRAL_COLOR } from '../../src/shared/color.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import {
   DETAIL_ESTIMATE,
@@ -162,7 +161,7 @@ describe('estimate operation', () => {
     expect(result.analyzed).toEqual({ description: 'the whole clip a', frames: 16 });
     expect(result.revision).toBe(project.revision);
     expect(result.unchanged).toEqual([]);
-    expect(result.commands).toEqual([{ type: 'color', clipIds: ['a'], color: expect.any(Object) }]);
+    expect(result.commands).toEqual([{ type: 'color-patch', clipIds: ['a'], settings: expected }]);
     const edited = applyCommand(project, result.commands[0]!);
     expect(edited.clips[0]!.grade.color).toMatchObject(expected);
     expect(edited.clips[1]!.grade).toEqual(project.clips[1]!.grade);
@@ -212,7 +211,7 @@ describe('estimate operation', () => {
     const expected = poolWhiteBalance(sourceFrames.map((frame) => frameIlluminant(patches(frame / 30))))!;
     expect(result.whiteBalance).toEqual(expected);
     expect(result.commands).toEqual([
-      { type: 'color', clipIds: ['b'], color: { ...project.clips[1]!.grade.color, ...expected } },
+      { type: 'color-patch', clipIds: ['b'], settings: { temperature: expected.temperature, tint: expected.tint } },
     ]);
   });
 
@@ -240,7 +239,7 @@ describe('estimate operation', () => {
     expect(lumaReads).toEqual([detailFrames(100, 200)]);
     expect(result.detail!.noise).toBeCloseTo(0.01, 2);
     expect(result.detail!.suggested.denoise).toBeGreaterThan(0);
-    expect(result.commands).toEqual([{ type: 'detail', clipId: 'b', detail: result.detail!.suggested }]);
+    expect(result.commands).toEqual([{ type: 'detail-patch', clipIds: ['b'], settings: result.detail!.suggested }]);
   });
 
   it('writes each clip its own whole-clip correction into its clip grade, keeping its keyframes', async () => {
@@ -271,11 +270,14 @@ describe('estimate operation', () => {
     ]);
     expect(result.correction).toBeUndefined();
     expect(result.clips!.map((clip) => clip.clipId)).toEqual(['a', 'b', 'c']);
+    // Only the values each clip's grade does not animate: clip b keys Hue.
     expect(result.commands).toEqual(
       result.clips!.map((clip) => ({
-        type: 'color',
+        type: 'color-patch',
         clipIds: [clip.clipId],
-        color: { ...NEUTRAL_COLOR, ...clip.correction },
+        settings: Object.fromEntries(
+          Object.entries(clip.correction!).filter(([setting]) => clip.clipId !== 'b' || setting !== 'hue'),
+        ),
       })),
     );
     let graded = dissolved;
@@ -289,9 +291,7 @@ describe('estimate operation', () => {
 
     // One clip of a list, on its own: only its Temperature and Tint change.
     const one = await runners.estimate(shots, { ...input, kind: 'white-balance', clipIds: ['b'], applyAs: 'shots' });
-    expect(one.commands).toEqual([
-      { type: 'color', clipIds: ['b'], color: { ...NEUTRAL_COLOR, ...one.clips![0]!.whiteBalance } },
-    ]);
+    expect(one.commands).toEqual([{ type: 'color-patch', clipIds: ['b'], settings: one.clips![0]!.whiteBalance }]);
   });
 
   it('measures the detail of several clips, each on its own, in one call', async () => {
@@ -300,7 +300,11 @@ describe('estimate operation', () => {
     expect(lumaReads).toEqual([detailFrames(0, 300), detailFrames(100, 200)]);
     expect(listed.clips!.map((clip) => clip.clipId)).toEqual(['a', 'b']);
     expect(listed.commands).toEqual(
-      listed.clips!.map((clip) => ({ type: 'detail', clipId: clip.clipId, detail: clip.detail!.suggested })),
+      listed.clips!.map((clip) => ({
+        type: 'detail-patch',
+        clipIds: [clip.clipId],
+        settings: clip.detail!.suggested,
+      })),
     );
     const track = await runners.estimate(context, { ...input, kind: 'detail', layerId });
     expect(track.commands).toEqual(listed.commands);

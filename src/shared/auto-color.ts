@@ -80,11 +80,10 @@ export function autoAdjustCommand(
   const settings = AUTO_ADJUST_SETTINGS.filter((setting) => !animated.has(setting));
   if (!settings.length) return null;
   const scaled = scaleCorrection(correction, intensity);
-  const color = { ...grade.color };
-  for (const setting of settings) color[setting] = scaled[setting];
+  const values = Object.fromEntries(settings.map((setting) => [setting, scaled[setting]]));
   return owner.kind === 'clip'
-    ? { type: 'color', clipIds: [owner.clipId], color }
-    : { type: 'color', adjustmentId: owner.adjustmentId, color };
+    ? { type: 'color-patch', clipIds: [owner.clipId], settings: values }
+    : { type: 'color-patch', adjustmentId: owner.adjustmentId, settings: values };
 }
 
 /** Source frames shown at the project frames within 1 s of `frame` in `clip`, each once. */

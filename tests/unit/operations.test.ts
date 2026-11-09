@@ -7,7 +7,6 @@ import { CATALOG_DOCUMENT, withCatalog } from '../../scripts/operation-catalog.j
 import { createApp } from '../../src/server/app.js';
 import { createConfig } from '../../src/server/config.js';
 import { runners } from '../../src/server/operations/index.js';
-import { createColorSettings } from '../../src/shared/color.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { createClipGrade } from '../../src/shared/grade.js';
 import { createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
@@ -104,7 +103,7 @@ describe('operation routes', () => {
         { type: 'bookmark-add', frame: 90 },
         { type: 'bookmark-add', frame: 30 },
         { type: 'layer-create', layerId: 'video-2', name: 'Overlay' },
-        { type: 'transform-setting', layerId: 'video-2', setting: 'opacity', value: 0.5 },
+        { type: 'transform-patch', layerId: 'video-2', settings: { opacity: 0.5 } },
       ],
     });
     expect(edited.statusCode).toBe(200);
@@ -313,7 +312,7 @@ describe('operation routes', () => {
       expectedRevision: 1,
       commands: [
         { type: 'adjustment-add', adjustmentId: 'look', start: 0, duration: 200 },
-        { type: 'color', adjustmentId: 'look', color: { ...createColorSettings(), shadows: 0.3, contrast: 1.2 } },
+        { type: 'color-patch', adjustmentId: 'look', settings: { shadows: 0.3, contrast: 1.2 } },
         {
           type: 'transform',
           layerId: 'video-1',

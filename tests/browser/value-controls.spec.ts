@@ -288,10 +288,9 @@ async function preciseEdit(
 }
 
 const opacityEdit: ValueEdit = (_document, percent) => ({
-  type: 'transform-setting',
+  type: 'transform-patch',
   layerId: 'video-1',
-  setting: 'opacity',
-  value: percent / 100,
+  settings: { opacity: percent / 100 },
 });
 const exposureEdit: ValueEdit = (document, exposure) => ({
   type: 'color',

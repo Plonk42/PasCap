@@ -142,19 +142,31 @@ describe('partial appearance commands', () => {
     expect(patch(['other', 'other'])).toThrow('List each clip once.');
   });
 
-  it('change one Transform setting and keep every other saved value', () => {
-    expect(applyCommand(project, { type: 'transform-setting', layerId, setting: 'translateX', value: 0.25 })).toEqual(
+  it('change Transform settings and fades, return null ones to neutral and keep the others', () => {
+    expect(
+      applyCommand(project, { type: 'transform-patch', layerId, settings: { translateX: 0.25, rotation: null } }),
+    ).toEqual(
       expected(project, (copy) => {
         copy.layers[0]!.transform.base.translateX = 0.25;
+        copy.layers[0]!.transform.base.rotation = 0;
       }),
     );
+    expect(() => applyCommand(project, { type: 'transform-patch', layerId, settings: {} })).toThrow(
+      'List at least one setting to change.',
+    );
+    const faded = applyCommand(project, { type: 'fades', layerId, opening: 12, closing: 20 });
+    expect(applyCommand(faded, { type: 'fades', layerId, closing: null }).layers[0]).toMatchObject({
+      openingFade: 12,
+      closingFade: 0,
+    });
+    expect(() => applyCommand(faded, { type: 'fades', layerId })).toThrow('List a fade to change.');
   });
 
   it.each(OWNERS)('refuse a setting of $owner that follows keyframes, naming them', ({ target, keyed }) => {
     expect(() => applyCommand(project, { type: 'color-patch', ...target, settings: { exposure: 1 } })).toThrow(
       `${keyed}, so its base value is not used; change that keyframe instead.`,
     );
-    expect(() => applyCommand(project, { type: 'transform-setting', layerId, setting: 'scale', value: 2 })).toThrow(
+    expect(() => applyCommand(project, { type: 'transform-patch', layerId, settings: { scale: 2 } })).toThrow(
       /scale follows 1 Transform keyframe/,
     );
   });
@@ -185,7 +197,7 @@ describe('partial appearance commands', () => {
       'Clip gone no longer exists.',
     );
     expect(() =>
-      applyCommand(project, { type: 'transform-setting', layerId: 'video-9', setting: 'rotation', value: 0 }),
+      applyCommand(project, { type: 'transform-patch', layerId: 'video-9', settings: { rotation: 0 } }),
     ).toThrow('Track no longer exists.');
     expect(project).toEqual(graded());
   });

@@ -24,7 +24,7 @@ import type { SpeedSettings } from '../../src/shared/speed.js';
  * commands naming a clip grade or an adjustment (#286); the inferred type must stay identical.
  */
 type FormerEditCommand =
-  | { type: 'transform-setting'; layerId: string; setting: SpatialChannel; value: number }
+  | { type: 'transform-patch'; layerId: string; settings: { [K in SpatialChannel]?: number | null } }
   | { type: 'insert'; clip: Omit<VideoClip, 'grade'>; index: number }
   | { type: 'delete'; clipId: string }
   | { type: 'reorder'; clipIds: string[] }
@@ -51,7 +51,7 @@ type FormerEditCommand =
   | { type: 'reverse'; clipId: string; reverse: boolean }
   | { type: 'transform'; layerId: string; transform: SpatialSettings }
   | { type: 'detail'; clipId: string; detail: DetailSettings }
-  | { type: 'detail-clips'; clipIds: string[]; detail: DetailSettings }
+  | { type: 'detail-patch'; clipIds: string[]; settings: { [K in keyof DetailSettings]?: number | null } }
   | { type: 'music'; music: MusicLane[] }
   | {
       type: 'layer-key-toggle';
@@ -110,7 +110,7 @@ type FormerEditCommand =
   | { type: 'place'; clipId: string; layerId: string; start: number; index: number }
   | { type: 'move-clips'; clipIds: string[]; delta: number; layerId: string | null }
   | { type: 'transition'; transition: Transition; keepCut?: boolean | undefined }
-  | { type: 'fades'; layerId: string; opening: number; closing: number }
+  | { type: 'fades'; layerId: string; opening?: number | null | undefined; closing?: number | null | undefined }
   | {
       type: 'adjustment-add';
       adjustmentId: string;
@@ -151,12 +151,12 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
     hsl: { blue: null },
     curves: { master: null },
   },
-  'transform-setting': { type: 'transform-setting', layerId: 'video-1', setting: 'opacity', value: 0.5 },
+  'transform-patch': { type: 'transform-patch', layerId: 'video-1', settings: { opacity: 0.5, scale: null } },
   speed: { type: 'speed', clipId: 'clip-1', speed: { mode: 'constant', rate: 2 } },
   reverse: { type: 'reverse', clipId: 'clip-1', reverse: true },
   transform: { type: 'transform', layerId: 'video-1', transform: createSpatialSettings() },
   detail: { type: 'detail', clipId: 'clip-1', detail: createDetailSettings() },
-  'detail-clips': { type: 'detail-clips', clipIds: ['clip-1', 'clip-2'], detail: createDetailSettings() },
+  'detail-patch': { type: 'detail-patch', clipIds: ['clip-1', 'clip-2'], settings: { sharpen: 0.3, denoise: null } },
   music: { type: 'music', music: [] },
   'layer-key-toggle': { type: 'layer-key-toggle', clipId: 'clip-1', frame: 4, setting: 'exposure', value: 0.5 },
   'layer-key-set': {
@@ -190,7 +190,7 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
     type: 'transition',
     transition: { leftId: 'clip-1', rightId: 'clip-2', type: 'cross-dissolve', duration: 10 },
   },
-  fades: { type: 'fades', layerId: 'video-1', opening: 15, closing: 0 },
+  fades: { type: 'fades', layerId: 'video-1', opening: 15, closing: null },
   'adjustment-add': { type: 'adjustment-add', adjustmentId: 'look', start: 30, duration: 60 },
   'adjustment-remove': { type: 'adjustment-remove', adjustmentId: 'look' },
   'adjustment-range': { type: 'adjustment-range', adjustmentId: 'look', start: 0, duration: 90, keyframes: 'stay' },
@@ -285,7 +285,7 @@ describe('editCommandSchema', () => {
 
   it('validates commands other tools refer to exactly like edit, publishing only their type', () => {
     const assistant = Object.values(samples).filter(
-      (sample) => !['layer-add', 'layer-update', 'select-done'].includes(sample.type),
+      (sample) => !['layer-add', 'layer-update', 'color', 'detail', 'select-done'].includes(sample.type),
     );
     for (const sample of assistant)
       expect(referencedEditCommandSchema.parse(sample)).toEqual(editCommandSchema.parse(sample));
@@ -297,12 +297,11 @@ describe('editCommandSchema', () => {
     expect(published.length).toBeLessThan(1_500);
   });
 
-  it('offers the assistant every command but the two carrying a whole track and the user’s done marks', () => {
+  it('offers the assistant every command but those replacing a whole track, Color or Detail and the user’s done marks', () => {
     const types = assistantEditCommandSchema.options.map((option) => option.shape.type.value);
-    expect(types).toHaveLength(editCommandSchema.options.length - 3);
-    expect(types).not.toContain('layer-add');
-    expect(types).not.toContain('layer-update');
-    expect(types).not.toContain('select-done');
+    expect(types).toHaveLength(editCommandSchema.options.length - 5);
+    for (const type of ['layer-add', 'layer-update', 'color', 'detail', 'select-done'])
+      expect(types).not.toContain(type);
     expect(types).toContain('adjustment-split');
     expect(assistantEditCommandSchema.safeParse(samples['layer-update']).success).toBe(false);
     expect(referencedEditCommandSchema.safeParse(samples['layer-add']).success).toBe(false);

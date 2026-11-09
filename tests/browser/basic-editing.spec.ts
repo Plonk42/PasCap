@@ -265,7 +265,7 @@ test('duplicate preserves static settings without copying row points, and overla
     clipIds: ['moving'],
     color: { ...document.clips[1]!.grade.color, contrast: 1.3, saturation: 0.7 },
   });
-  document = applyCommand(document, { type: 'transform-setting', layerId: 'upper', setting: 'opacity', value: 0.6 });
+  document = applyCommand(document, { type: 'transform-patch', layerId: 'upper', settings: { opacity: 0.6 } });
   document = applyCommand(document, {
     type: 'transform',
     layerId: 'upper',

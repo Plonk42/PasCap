@@ -92,7 +92,7 @@ describe('edited frame', () => {
     expect(
       after({ type: 'color', adjustmentId: 'look', color: { ...createColorSettings(), exposure: 0.5 } }),
     ).toBeNull();
-    expect(after({ type: 'transform-setting', layerId, setting: 'opacity', value: 0.5 })).toBeNull();
+    expect(after({ type: 'transform-patch', layerId, settings: { opacity: 0.5 } })).toBeNull();
     expect(after({ type: 'select-set', mediaId: 'rec', ranges: [{ sourceIn: 0, sourceOut: 90 }] })).toBeNull();
     expect(editedFrame(base, base)).toBeNull();
   });

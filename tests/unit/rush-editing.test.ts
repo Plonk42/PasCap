@@ -837,10 +837,9 @@ describe('quick trims retain the displayed original frame', () => {
     const document = primaryProject();
     const history = new EditHistory(document);
     const changed = history.commit({
-      type: 'transform-setting',
+      type: 'transform-patch',
       layerId: BASE_LAYER_ID,
-      setting: 'opacity',
-      value: 0.8,
+      settings: { opacity: 0.8 },
     });
     history.undo();
     expect(history.commit(trimAtPlayhead(history.current, 'rush', placed(document, 'rush').start, 'in'))).toEqual(

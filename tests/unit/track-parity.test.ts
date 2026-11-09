@@ -246,10 +246,9 @@ describe('independent Ripple toggles and packed placements', () => {
       );
       expectOtherTracks(document, hidden, layerId);
       const translucent = oneStep(document, {
-        type: 'transform-setting',
+        type: 'transform-patch',
         layerId,
-        setting: 'opacity',
-        value: 0.23456789,
+        settings: { opacity: 0.23456789 },
       });
       const transform = { ...layer.transform, base: { ...layer.transform.base, opacity: 0.23456789 } };
       expect(translucent.layers.find((item) => item.id === layerId)).toEqual({ ...layer, transform });

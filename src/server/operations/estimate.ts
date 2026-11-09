@@ -194,9 +194,8 @@ async function colorFrames(stills: ServiceContext['stills'], reads: readonly Rea
 function whiteBalanceValues({ owner, values }: GradeTarget, balance: WhiteBalance): EditCommand[] {
   const settings = (['temperature', 'tint'] as const).filter((setting) => !hasLayerKeys(values, setting));
   if (!settings.length || owner.kind !== 'clip') return [];
-  const color = { ...values.color };
-  for (const setting of settings) color[setting] = balance[setting];
-  return [{ type: 'color', clipIds: [owner.clipId], color }];
+  const changed = Object.fromEntries(settings.map((setting) => [setting, balance[setting]]));
+  return [{ type: 'color-patch', clipIds: [owner.clipId], settings: changed }];
 }
 
 const tooUniform = (): ServiceError =>
@@ -213,7 +212,9 @@ async function estimateDetail({ stills }: ServiceContext, { reads, clip }: Targe
   const read = reads[0]!;
   const measure = measureDetail(await stills.lumaFrames(read.mediaId, read.sourceFrames));
   const suggested = suggestDetail(measure);
-  const commands: EditCommand[] = clip ? [{ type: 'detail', clipId: clip.clip.id, detail: suggested }] : [];
+  const commands: EditCommand[] = clip
+    ? [{ type: 'detail-patch', clipIds: [clip.clip.id], settings: { ...suggested } }]
+    : [];
   return { fields: { detail: { ...measure, suggested } }, commands, unchanged: [] };
 }
 
@@ -262,14 +263,19 @@ type ShotValues = Partial<Record<ScalarColorSetting, number>>;
 
 /**
  * Each shot's values written into its clip's grade, which applies before any adjustment and stays with the
- * clip; settings the grade animates follow their keyframes. A cross-dissolve then blends the two clips' grades.
+ * clip; settings the grade animates follow their keyframes and are left out. A cross-dissolve then blends the
+ * two clips' grades.
  */
 export function shotCommands(shots: readonly { clip: PlacedClip; values: ShotValues }[]): EditCommand[] {
-  return shots.map(({ clip, values }) => ({
-    type: 'color',
-    clipIds: [clip.clip.id],
-    color: { ...structuredClone(clip.clip.grade.color), ...values },
-  }));
+  return shots.flatMap(({ clip, values }) => {
+    const { keyframes } = clip.clip.grade;
+    const settings = Object.fromEntries(
+      Object.entries(values).filter(([setting]) =>
+        keyframes.every((key) => key.values[setting as ScalarColorSetting] === null),
+      ),
+    );
+    return Object.keys(settings).length ? [{ type: 'color-patch' as const, clipIds: [clip.clip.id], settings }] : [];
+  });
 }
 
 /** Each clip analyzed whole on its own: its result, and the detail edits or clip grades applying them. */

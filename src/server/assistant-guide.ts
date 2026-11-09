@@ -90,13 +90,14 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   correction per shot, estimate with applyAs shots (layerId or clipIds) writes each clip's own
   correction into its clip grade in one call; dissolves blend the two grades. Keep adjustments
   for the look shared by every shot of a stretch.
-- color-patch changes Color settings of clips (clipIds, one or several) or of an adjustment: a
-  listed setting, HSL range or curve takes its value, null returns it to neutral, and what it
-  leaves out keeps its value. To copy a look onto other clips, list its changed settings and
-  null those the targets change that it leaves neutral. The color and transform commands replace
-  everything; transform-setting changes one Transform setting. A keyed setting follows its
-  keyframes, so change those instead (layer-key-set).
-  detail-clips sets the same Detail on several clips in one command.
+- Every edit command follows one rule: a listed setting takes its value, null returns it to
+  neutral, and what it leaves out keeps its value. color-patch changes Color settings of clips
+  (clipIds, one or several) or of an adjustment (scalar settings, HSL ranges, curves);
+  transform-patch a track's Transform base; detail-patch the Detail of one or several clips;
+  fades a track's opening or closing fade. To copy a look onto other clips, list its changed
+  settings and null those the targets change that it leaves neutral. A keyed setting follows
+  its keyframes, so change those instead (layer-key-set); transform replaces a whole Transform
+  with its keyframes.
 - To animate, layer-key-set keys several settings at one frame in one command, with one Easing
   (hold keeps a grade until the next keyframe) or one per setting; settings left out keep what
   they have there, and null disables one.

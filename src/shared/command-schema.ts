@@ -54,8 +54,6 @@ const selectRanges = described(
   z.array(selectRangeSchema).max(MAX_SELECTS),
   `Kept source ranges (OUT exclusive), ascending and separated by at least one frame, at most ${MAX_SELECTS}.`,
 );
-const settingValue = described(z.number(), "New base value, within the setting's bounds.");
-
 /** Descriptions are written for an LLM; rules JSON Schema cannot express are stated in them. */
 export const editCommandSchema = z.discriminatedUnion('type', [
   command(
@@ -147,15 +145,14 @@ export const editCommandSchema = z.discriminatedUnion('type', [
     },
   ),
   command(
-    'transform-setting',
-    'Set one Transform base setting of a video track, keeping the others. Rejected while the setting has Transform keyframes, which it then follows.',
+    'transform-patch',
+    'Change Transform base settings of a video track: a listed setting takes its value, null returns it to neutral, and settings left out keep theirs. Rejected as a whole while a listed setting has Transform keyframes, which it then follows.',
     {
       layerId,
-      setting: described(
-        spatialPoseSchema.keyof(),
-        'Transform setting: cropLeft, cropRight, cropTop and cropBottom 0–1 (fractions of the recording), scale 0.1–8, translateX and translateY −2–2 (fractions of the output), rotation −180–180° clockwise, opacity 0–1. Neutral: scale 1, opacity 1, every other 0.',
+      settings: described(
+        z.partialRecord(spatialPoseSchema.keyof(), z.number().nullable()),
+        'Transform settings: cropLeft, cropRight, cropTop and cropBottom 0–1 (fractions of the recording), scale 0.1–8, translateX and translateY −2–2 (fractions of the output), rotation −180–180° clockwise, opacity 0–1; or null for neutral: scale 1, opacity 1, every other 0.',
       ),
-      value: settingValue,
     },
   ),
   command(
@@ -185,11 +182,14 @@ export const editCommandSchema = z.discriminatedUnion('type', [
     detail: described(detailSchema, 'Sharpen 0–2, Clarity −1–1 and Denoise 0–1; 0 is neutral.'),
   }),
   command(
-    'detail-clips',
-    'Set the same static detail filters on several clips at once, such as every clip of a track; an unknown clip rejects the whole command.',
+    'detail-patch',
+    'Change the static detail filters of one or several clips: a listed filter takes its value, null returns it to neutral 0, and filters left out keep theirs. An unknown clip rejects the whole command.',
     {
       clipIds: described(z.array(idSchema).min(1), 'The clips, each once.'),
-      detail: described(detailSchema, 'Sharpen 0–2, Clarity −1–1 and Denoise 0–1; 0 is neutral.'),
+      settings: described(
+        z.partialRecord(detailSchema.keyof(), z.number().nullable()),
+        'Sharpen 0–2, Clarity −1–1 and Denoise 0–1, or null for neutral 0.',
+      ),
     },
   ),
   command('music', 'Replace every music track of the project.', {
@@ -326,11 +326,18 @@ export const editCommandSchema = z.discriminatedUnion('type', [
       ),
     },
   ),
-  command('fades', "Set a video track's fade from black at its first clip and to black at its last clip.", {
-    layerId,
-    opening: described(frameSchema, 'Frames of fade from black at the start of the first clip.'),
-    closing: described(frameSchema, 'Frames of fade to black at the end of the last clip.'),
-  }),
+  command(
+    'fades',
+    "Change a video track's fade from black at its first clip or to black at its last clip: a listed fade takes its length, null removes it, and a fade left out keeps its length.",
+    {
+      layerId,
+      opening: described(
+        frameSchema.nullable().optional(),
+        'Frames of fade from black at the start of the first clip.',
+      ),
+      closing: described(frameSchema.nullable().optional(), 'Frames of fade to black at the end of the last clip.'),
+    },
+  ),
   command(
     'adjustment-add',
     'Add an adjustment: a grade of every video track over a range, after clip grades. No overlaps; at most 1024.',
@@ -391,8 +398,17 @@ export const editCommandSchema = z.discriminatedUnion('type', [
 
 export type EditCommand = z.infer<typeof editCommandSchema>;
 
-/** Editor commands carrying a whole track (half of edit's schema, and the assistant has a command per setting) or the user's own review marks. */
-const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set(['layer-add', 'layer-update', 'select-done']);
+/**
+ * Editor commands replacing a whole value (the assistant changes settings with the patch commands; Transform
+ * keyframes still need transform) or the user's own review marks.
+ */
+const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set([
+  'layer-add',
+  'layer-update',
+  'color',
+  'detail',
+  'select-done',
+]);
 
 /** The commands of the edit operation. */
 export const assistantEditCommandSchema = z.discriminatedUnion(

@@ -240,8 +240,8 @@ own, and the track-level compromise grade is removed with track Color.
 
 ## Assistant
 
-- **Clip grades (owner, implemented):** one clip-grade edit command per clip and a batch form like
-  `detail-clips` (the Color commands take `clipIds`). `estimate` with `applyAs: 'shots'` writes each clip's grade values; the
+- **Clip grades (owner, implemented):** the patch commands take several clips (`color-patch` and
+  `detail-patch` take `clipIds`). `estimate` with `applyAs: 'shots'` writes each clip's grade values; the
   track-keyframe shots mode is removed.
 - **Items (owner, #288, implemented),** balancing features, calls and tokens:
   - no new read: `describe_project` lists items compactly (id, range, non-neutral settings,
