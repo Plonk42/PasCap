@@ -1,5 +1,9 @@
 import { isNeutralClipGrade, type ClipGrade } from '../../shared/grade.js';
-import { projectParts, type describeProject } from '../../shared/operations/describe-project.js';
+import {
+  projectParts,
+  type describeProject,
+  type ProjectDescription,
+} from '../../shared/operations/describe-project.js';
 import { detailSummary, gradeSummary } from '../../shared/operations/grade-summary.js';
 import { durationOf } from '../../shared/operations/timecode.js';
 import { calculateLayout, type PlacedClip } from '../../shared/timeline.js';
@@ -105,12 +109,22 @@ function describeRecording(project: ProjectDocument, id: string, library: Servic
 }
 
 export const runDescribeProject: OperationRunner<typeof describeProject> = async (
-  { projects, library, audio }: ServiceContext,
+  context: ServiceContext,
   { projectId, include = projectParts, layerId },
 ) => {
-  const project = await projects.load(projectId);
+  const project = await context.projects.load(projectId);
   if (layerId !== undefined && !project.layers.some((layer) => layer.id === layerId))
     throw new ServiceError(`The project has no video track ${layerId}.`, 404);
+  return describeDocument(project, context, include, layerId);
+};
+
+/** The describe_project summary of a project document, for its parts (and one video track). */
+export function describeDocument(
+  project: ProjectDocument,
+  { library, audio }: Pick<ServiceContext, 'library' | 'audio'>,
+  include: readonly (typeof projectParts)[number][] = projectParts,
+  layerId?: string,
+): ProjectDescription {
   const layout = calculateLayout(project);
   const parts = new Set(include);
   const videoName = (id: string) => known(() => library.get(id).name);
@@ -141,4 +155,4 @@ export const runDescribeProject: OperationRunner<typeof describeProject> = async
     }),
     ...(parts.has('bookmarks') && { bookmarks: project.bookmarks }),
   };
-};
+}

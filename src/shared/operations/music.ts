@@ -36,6 +36,7 @@ const placedHit = z
 
 export const musicAnalysis = defineOperation({
   name: 'music_analysis',
+  title: 'Analyze music',
   description:
     "Read the music of the project's music clips at project frames (where each plays on the timeline, repeated across loops): tempo, meter, beats, downbeats, hits (rhythmic hits that stand out from their surroundings, such as a kick, a snare or a cymbal crash, each with the band that rose most and whether it is strong: the places worth cutting on), key and mode, sections (quiet, build, peak, release) with their loudness and tone (low, mid and high frequency levels), swells (crescendos and decrescendos, sudden or gradual) and silences. Use a frame window for long music. A clip whose music is not analyzed yet says so; ask the user to analyze it in Audio → Music.",
   input: z
@@ -128,6 +129,7 @@ const offset = described(
 
 export const checkAlignment = defineOperation({
   name: 'check_alignment',
+  title: 'Check cuts against the music',
   description:
     'Measure how the cut follows the music: for every boundary of every video track (or one), the frame the viewer perceives as the change (the cut, the middle of a dissolve, the middle of a black pause), its nearest beat, downbeat and strong hit and the signed offsets in frames, and a summary. Within one frame of a beat or hit counts as on it.',
   input: z
@@ -170,6 +172,7 @@ export const checkAlignment = defineOperation({
 
 export const snapCutsToBeats = defineOperation({
   name: 'snap_cuts_to_beats',
+  title: 'Snap cuts to beats',
   description:
     "Move the boundaries of one Ripple video track onto the music: left to right, trim each boundary's left clip so the change lands on the nearest beat (or downbeat, or strong hit), shortening it, or lengthening it where its recording has footage inside the kept ranges, else taking the nearest one on the other side; each clip stays at least minimumSeconds long and transitions keep their durations; later clips follow. Returns the proposed trim commands and each boundary before and after; with apply, saves them as one edit (needs the session and expectedRevision). Do the arithmetic with this rather than by hand.",
   input: z

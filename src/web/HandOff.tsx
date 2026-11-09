@@ -248,6 +248,10 @@ function Connection({ connection }: Readonly<{ connection: Readiness['connection
           </button>
           <output>{copied}</output>
         </div>
+        <p>
+          Clients keep the tools they loaded: after updating PasCap, restart its server in your client (in VS Code,{' '}
+          <strong>MCP: List Servers</strong> → pascap → <strong>Restart Server</strong>).
+        </p>
       </details>
     </section>
   );

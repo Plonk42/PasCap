@@ -763,7 +763,8 @@ or **Analyze N** (queued like the Media actions, shown in Activity); the list re
 they run. None of them blocks the hand-off; a save error or an active gesture does.
 **Assistant connection** says whether an MCP client has called PasCap since the service started
 (and which, when it named itself); **How to connect** shows the endpoint, the token file and a
-VS Code `mcp.json` entry with **Copy configuration**. Confirm
+VS Code `mcp.json` entry with **Copy configuration**, and asks to restart the server in the
+client after updating PasCap, since clients keep the tools they loaded. Confirm
 saves pending changes, then starts the session (`session_start`, which checkpoints the
 project).
 

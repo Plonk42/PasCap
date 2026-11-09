@@ -306,13 +306,13 @@ Read; for editor and assistant. List the saved projects, most recently saved fir
 
 #### `describe_project`
 
-Read; for editor and assistant. Summarize a saved project: its revision, duration, video tracks with their clips in timeline order (project frames and timecodes, source ranges, speed, direction, grade, non-neutral Detail), transitions, adjustments, music tracks, the recordings with the ranges the user kept and whether their selection is done, and bookmarks. Values left out are at their default (neutral, normal speed, forwards, cuts, no fades). Frames are integers at 30000/1001 fps. Read it before editing and after each edit batch.
+Read; for editor and assistant. Summarize a saved project: its revision, duration, video tracks with their clips in timeline order (project frames and timecodes, source ranges, speed, direction, grade, non-neutral Detail), transitions, adjustments, music tracks, the recordings with the ranges the user kept and whether their selection is done, and bookmarks. Values left out are at their default (neutral, normal speed, forwards, cuts, no fades). Frames are integers at 30000/1001 fps. Read it before editing; edit returns what each batch changed.
 
-| Input       | Type                                                                                    | Description                                                                                                                                                                                                                                                       |
-| ----------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `projectId` | string                                                                                  | ID of the saved project.                                                                                                                                                                                                                                          |
-| `include`   | array of "videoTracks" or "adjustments" or "musicTracks" or "recordings" or "bookmarks" | Parts to return besides the id, title, revision and duration: videoTracks, adjustments, musicTracks, recordings (video and music) and bookmarks; all when omitted. Ask only for what the step needs: videoTracks after an edit, recordings when choosing footage. |
-| `layerId`   | string                                                                                  | Only this video track in videoTracks.                                                                                                                                                                                                                             |
+| Input       | Type                                                                                    | Description                                                                                                                                                                                                                                                     |
+| ----------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId` | string                                                                                  | ID of the saved project.                                                                                                                                                                                                                                        |
+| `include`   | array of "videoTracks" or "adjustments" or "musicTracks" or "recordings" or "bookmarks" | Parts to return besides the id, title, revision and duration: videoTracks, adjustments, musicTracks, recordings (video and music) and bookmarks; all when omitted. Ask only for what the step needs: videoTracks for the cut, recordings when choosing footage. |
+| `layerId`   | string                                                                                  | Only this video track in videoTracks.                                                                                                                                                                                                                           |
 
 #### `describe_track`
 
@@ -410,7 +410,7 @@ Write; for editor and assistant. End the active assistant session and give the p
 
 #### `edit`
 
-Write; for editor and assistant. Apply up to 64 edit commands to a saved project, in order, as one step: either every command applies and the project is saved once with the next revision, or nothing changes and the first rejected command's reason is returned. A stale expectedRevision is rejected; read the project again first.
+Write; for editor and assistant. Apply up to 64 edit commands to a saved project, in order, as one step: either every command applies and the project is saved once with the next revision, or nothing changes and the first rejected command's reason is returned. A stale expectedRevision is rejected; read the project again first. Returns the new revision, the duration and what changed, as describe_project gives it, so no read is needed to follow the batch.
 
 | Input              | Type            | Description                                                          |
 | ------------------ | --------------- | -------------------------------------------------------------------- |
@@ -588,7 +588,7 @@ registry; the assistant never sees them.
 | `session_status`     | both      | State, brief, edit log, notes (editor banner and LLM resource)                                                                                                                                                                                                                                                                                                                          |                                                                                        |
 | `session_end`        | both      | Take over (editor) or finish with notes (assistant); the notes appear in the editor's hand-off dialog                                                                                                                                                                                                                                                                                   |                                                                                        |
 | `checkpoint`         | both      | Named checkpoint of the current document; `checkpoint_restore` replaces the document in one revision after checkpointing the current state; `checkpoint_copy` (editor only) saves a checkpoint as a new project                                                                                                                                                                         | Last 5 per project                                                                     |
-| `edit`               | both      | Apply a batch of commands atomically; with a session it also enforces selects and bin membership; returns the new revision and a one-line summary, or the first failing command's message                                                                                                                                                                                               | ≤ 64 commands                                                                          |
+| `edit`               | both      | Apply a batch of commands atomically; with a session it also enforces selects and bin membership; returns the new revision, the duration and what changed, or the first failing command's message                                                                                                                                                                                       | ≤ 64 commands                                                                          |
 | `preview_edits`      | both      | Dry run of a batch against the saved revision: resulting timeline summary and errors, no save                                                                                                                                                                                                                                                                                           |                                                                                        |
 | `describe_project`   | both      | Compact timeline: tracks with their Transform Opacity and keyframe count, clips with timecodes and grade summaries, transitions, adjustments with what they change, music, recordings with their kept ranges, bookmarks                                                                                                                                                                 |                                                                                        |
 | `describe_track`     | both      | One video track's Transform (Opacity included) and keyframes, what each clip's grade changes with the adjustments over it, its keyed settings, the clip grade and adjustment keyframes on request and the values that apply at requested frames, with the adjustment there ([#252](https://github.com/Plonk42/PasCap/issues/252), [#288](https://github.com/Plonk42/PasCap/issues/288)) | ≤ 32 frames                                                                            |
@@ -887,7 +887,16 @@ its own.
 Conventions, by the operations rather than the endpoint: frames are authoritative and
 outputs also carry `MM:SS:FF` timecode (30 fps NDF, as the editor shows); every write returns
 the new revision; validation failures are tool errors with the service's message (for
-example an overlap or an invalid fade), never exceptions.
+example an overlap or an invalid fade), never exceptions. `edit` also returns what the batch
+changed in `describe_project`'s shape: tracks, adjustments and music tracks added or changed,
+every clip whose description changed (those a Ripple track moved included) with its track,
+the IDs of what it removed, recordings whose kept ranges changed and the bookmarks when they
+changed, so the model follows its batches without reading the project again.
+
+Each tool carries its operation's `title` (shown by clients, for example in approval prompts)
+and annotations: reads are `readOnlyHint`; writes are `destructiveHint` unless the operation is
+`additive` (`checkpoint`, `session_start`, `session_end`), and `idempotentHint` only for
+`checkpoint`, which returns an existing identical checkpoint.
 
 ### Resources and prompt
 
@@ -986,7 +995,9 @@ Follow mode, Take over, restore and the Hand off dialog are implemented
   call's time and the name the client gave, from `initialize` or the 2026 revision's
   `io.modelcontextprotocol/clientInfo` meta), refreshed every 5 s. **How to connect** gives the
   endpoint, the token file and a VS Code `mcp.json` entry that prompts for the token, with
-  **Copy configuration**; the token itself never reaches the editor.
+  **Copy configuration**, and says to restart the server in the client after updating PasCap:
+  clients keep the tool list they loaded (VS Code: **MCP: List Servers** → **Restart Server**),
+  and the stateless endpoint cannot notify them. The token itself never reaches the editor.
 
 The dialog places no music (owner, 2026-10-21): placing is an edit, not part of a brief. The
 **Music track** field names a placed track; with none placed, the assistant finds the project's

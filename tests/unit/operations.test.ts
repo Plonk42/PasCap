@@ -6,6 +6,8 @@ import { z } from 'zod';
 import { CATALOG_DOCUMENT, withCatalog } from '../../scripts/operation-catalog.js';
 import { createApp } from '../../src/server/app.js';
 import { createConfig } from '../../src/server/config.js';
+import { describeDocument } from '../../src/server/operations/describe-project.js';
+import { editChanges } from '../../src/server/operations/edit.js';
 import { runners } from '../../src/server/operations/index.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { createClipGrade } from '../../src/shared/grade.js';
@@ -50,11 +52,12 @@ function call(app: Awaited<ReturnType<typeof createApp>>['app'], name: string, p
 }
 
 describe('operation registry', () => {
-  it('has unique snake_case names, explicit audiences and one runner each', () => {
+  it('has unique snake_case names, titles, explicit audiences and one runner each', () => {
     const names = operations.map((operation) => operation.name);
     expect(new Set(names).size).toBe(names.length);
     for (const operation of operations) {
       expect(operation.name).toMatch(/^[a-z]+(?:_[a-z]+)*$/);
+      expect(operation.title, operation.name).toMatch(/^[A-Z][a-z]+(?: [a-z]+)+$/);
       expect(operation.audience.length, operation.name).toBeGreaterThan(0);
       expect(new Set(operation.audience).size).toBe(operation.audience.length);
     }
@@ -104,7 +107,14 @@ describe('operation routes', () => {
       ],
     });
     expect(edited.statusCode).toBe(200);
-    expect(edited.json()).toEqual({ revision: 2, duration: { frames: 0, seconds: 0, timecode: '00:00:00' } });
+    expect(edited.json()).toEqual({
+      revision: 2,
+      duration: { frames: 0, seconds: 0, timecode: '00:00:00' },
+      changes: {
+        videoTracks: [{ id: 'video-2', name: 'Overlay', opacity: 0.5, transitions: [] }],
+        bookmarks: [30, 90],
+      },
+    });
 
     const after = (await call(app, 'describe_project', { projectId: project.id })).json<{
       revision: number;
@@ -184,6 +194,47 @@ describe('operation routes', () => {
       ],
     });
     expect(durationOf(386)).toEqual({ frames: 386, seconds: 12.88, timecode: '00:12:26' });
+  });
+
+  it('reports the clips an edit changed, those a Ripple track moved and those it removed', () => {
+    const clip = (id: string, start: number) => ({
+      id,
+      mediaId: 'rec-1',
+      layerId: 'video-1',
+      start,
+      sourceIn: 0,
+      sourceOut: 30,
+      speed: { mode: 'constant', rate: 1 },
+      reverse: false,
+      detail: { sharpen: 0, clarity: 0, denoise: 0 },
+      grade: createClipGrade(),
+    });
+    const project = createProject('ripple', 'Ripple');
+    const cut = (leftId: string, rightId: string) => ({ type: 'cut', leftId, rightId, duration: 0 });
+    const before: ProjectDocument = projectSchema.parse({
+      ...project,
+      layers: [{ ...project.layers[0], transitions: [cut('a', 'b'), cut('b', 'c'), cut('c', 'd')] }],
+      media: { videoIds: ['rec-1'], audioIds: [] },
+      clips: [clip('a', 0), clip('b', 30), clip('c', 60), clip('d', 90)],
+    });
+    const after = [
+      { type: 'trim', clipId: 'b', sourceIn: 10, sourceOut: 30 },
+      { type: 'delete', clipId: 'd' },
+      { type: 'bookmark-add', frame: 5 },
+    ].reduce((document, command) => applyCommand(document, command as never), before);
+    const media = {
+      library: { get: () => ({ name: 'DJI_0001.MP4', metadata: { frameCount: 300 }, status: 'ready' }) },
+      audio: { get: () => ({ name: 'song.wav' }) },
+    } as unknown as Parameters<typeof describeDocument>[1];
+    const changes = editChanges(describeDocument(before, media), describeDocument(after, media));
+    expect(Object.keys(changes)).toEqual(['clips', 'removedClips', 'bookmarks']);
+    expect(changes.clips!.map(({ id, layerId, start, end, sourceIn }) => [id, layerId, start, end, sourceIn])).toEqual([
+      ['b', 'video-1', 30, 50, 10],
+      ['c', 'video-1', 50, 80, 0],
+    ]);
+    expect(changes.removedClips).toEqual(['d']);
+    expect(changes.bookmarks).toEqual([5]);
+    expect(editChanges(describeDocument(after, media), describeDocument(after, media))).toEqual({});
   });
 
   it('describes clips with their recording, timecodes and kept ranges', async () => {

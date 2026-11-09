@@ -6,6 +6,7 @@ import { durationSchema } from './timecode.js';
 
 export const listProjects = defineOperation({
   name: 'list_projects',
+  title: 'List projects',
   description:
     'List the saved projects, most recently saved first, with their title, revision, number of clips and duration. Use it to find the ID of the project the user means; ask when several could match. A project that cannot be opened carries the reason.',
   input: z.object({}).strict(),

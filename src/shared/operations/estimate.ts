@@ -32,6 +32,7 @@ const detailResultSchema = z
 
 export const estimate = defineOperation({
   name: 'estimate',
+  title: 'Estimate corrections',
   description: `Measure footage the way the editor's automatic tools do, from proxy frames, and return the values with the edit commands that apply them (pass them to edit; nothing changes until then). kind auto-adjust is Color → Auto: eleven Color settings balancing exposure, contrast, white balance and color. white-balance is Auto white balance: Temperature and Tint. detail measures noise and softness and suggests the clip's Denoise and Sharpen (never Clarity, a look). Analyze a clip (clipId: the whole clip, or with frame the second around that project frame, as at the playhead), several clips each on its own (clipIds, up to ${MAX_ESTIMATE_CLIPS}), a whole track (layerId: each clip on its own for detail or applyAs shots; all its clips by duration for one compromise, values only with commands false) or a recording range (mediaId, sourceIn, sourceOut: values only, no commands). Commands write clip grades, applied before any adjustment; for a grade per shot use applyAs shots. Estimates and pictures render one at a time: a call waits its turn, up to a few minutes. Judge the result with a still.`,
   input: z
     .object({

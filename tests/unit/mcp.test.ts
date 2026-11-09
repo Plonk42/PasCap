@@ -101,8 +101,21 @@ describe('MCP endpoint', () => {
       expect(edit.inputSchema.required).toEqual(['projectId', 'expectedRevision', 'commands']);
       // The SDK's JSON Schema keeps the descriptions nested inside the commands.
       expect(JSON.stringify(edit.inputSchema)).toContain('Project frame without a bookmark.');
-      expect(edit.annotations).toEqual({ readOnlyHint: false, openWorldHint: false });
-      expect(tools.find((tool) => tool.name === 'still')!.annotations?.readOnlyHint).toBe(true);
+      expect(edit.title).toBe('Edit project');
+      expect(edit.annotations).toEqual({
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false,
+      });
+      expect(tools.find((tool) => tool.name === 'checkpoint')!.annotations).toMatchObject({
+        destructiveHint: false,
+        idempotentHint: true,
+      });
+      expect(tools.find((tool) => tool.name === 'still')!.annotations).toEqual({
+        readOnlyHint: true,
+        openWorldHint: false,
+      });
       // Picture tools state this service's image budget; the instructions carry the playbook's steps.
       const describedAs = (name: string) => tools.find((tool) => tool.name === name)!.description;
       expect(describedAs('still')).toMatch(/at most 480 pixels wide/);

@@ -14,6 +14,7 @@ const analysis = described(
 
 export const handOffReadiness = defineOperation({
   name: 'hand_off_readiness',
+  title: 'Check hand off readiness',
   description:
     'What an assistant can use in a project: each video recording of its bin with its proxy and camera motion analysis, each music recording with its playback cache and tempo analysis, whether an export is running (stills wait for it), and how an MCP client connects.',
   input: z.object({ projectId: described(idSchema, 'ID of the saved project.') }).strict(),

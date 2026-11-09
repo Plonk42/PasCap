@@ -132,6 +132,7 @@ export type TrackDescription = z.infer<typeof trackDescriptionSchema>;
 
 export const describeTrack = defineOperation({
   name: 'describe_track',
+  title: 'Describe track',
   description:
     "Read every appearance value of one video track: its Transform (with Opacity) and keyframes, which settings follow keyframes, what each clip grade changes (scalar settings, HSL ranges, curves and a keyframe count), each clip's non-neutral Detail (Sharpen, Clarity, Denoise) and the adjustments over it, the keyframes on request, and the values that apply at the requested project frames, including the adjustment grading every track there. Settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve), so read the grades before changing them; afterwards, include keyframes or at with the settings you changed reads far less.",
   input: z

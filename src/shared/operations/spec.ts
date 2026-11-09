@@ -22,12 +22,18 @@ export interface OperationSpec<
 > {
   /** snake_case; the route segment and the MCP tool name. */
   name: N;
+  /** Short label MCP clients show for the tool, such as in approval prompts. */
+  title: string;
   /** Written for an LLM: when to use it and what it returns. */
   description: string;
   input: I;
   output: O;
   /** Write operations change a saved project and bump its revision. */
   access: 'read' | 'write';
+  /** A write that only adds (a checkpoint) or hands the project over, never changing or removing its content. */
+  additive?: true;
+  /** A write that a repeated identical call leaves as the first one did. */
+  idempotent?: true;
   audience: readonly OperationAudience[];
 }
 

@@ -6,6 +6,7 @@ import { defineOperation } from './spec.js';
 
 export const musicWaveform = defineOperation({
   name: 'music_waveform',
+  title: 'Read music waveform',
   description:
     'The level of a prepared music recording for drawing its waveform in the editor: the lowest and highest sample of either channel for every 10 ms of its playback cache, read from a saved cache or drawn from the cache once.',
   input: z.object({ mediaId: described(idSchema, 'ID of a prepared music recording.') }).strict(),

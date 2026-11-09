@@ -270,6 +270,7 @@ test('hands off with a brief after showing what the assistant can use, then open
   await expect(connection.getByLabel('VS Code MCP configuration')).toContainText(
     '"Authorization": "Bearer ${input:pascap-token}"',
   );
+  await expect(connection).toContainText('after updating PasCap, restart its server in your client');
 
   await dialog.getByLabel('What should it make?').fill('A calm cut of the lake');
   await dialog.getByLabel('Target length (s)').fill('30');

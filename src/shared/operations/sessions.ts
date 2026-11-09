@@ -22,6 +22,7 @@ export const sessionViewSchema = sessionSchema
 
 export const sessionStart = defineOperation({
   name: 'session_start',
+  title: 'Start assistant session',
   description:
     "Take the project's write lease for an assistant session, after checkpointing it, so the editor follows your edits read-only until the user takes over or you call session_end. Required before edit, checkpoint_restore or any write. Pass the user's brief from the conversation. Refused while another session is active or when the revision is stale. The session lasts until the user takes over or you call session_end, unless the service ends idle sessions (expiresAt).",
   input: z
@@ -36,11 +37,13 @@ export const sessionStart = defineOperation({
     .strict(),
   output: sessionViewSchema,
   access: 'write',
+  additive: true,
   audience: ['editor', 'assistant'],
 });
 
 export const sessionStatus = defineOperation({
   name: 'session_status',
+  title: 'Read assistant session',
   description:
     "Read the project's latest assistant session (null if none): whether it is active, its brief, its edit log and the notes it ended with, the project's saved revision and its checkpoints, newest first.",
   input: z
@@ -62,6 +65,7 @@ export const sessionStatus = defineOperation({
 
 export const sessionEnd = defineOperation({
   name: 'session_end',
+  title: 'End assistant session',
   description:
     'End the active assistant session and give the project back to the user, with notes: what you built, the choices you made and anything the user should look at. From the editor it is the Take over action.',
   input: z
@@ -72,11 +76,13 @@ export const sessionEnd = defineOperation({
     .strict(),
   output: z.object({ session: sessionViewSchema.nullable() }).strict(),
   access: 'write',
+  additive: true,
   audience: ['editor', 'assistant'],
 });
 
 export const checkpoint = defineOperation({
   name: 'checkpoint',
+  title: 'Save checkpoint',
   description:
     'Keep a copy of the project as it is saved now, to restore later with checkpoint_restore; only the most recent checkpoints of a project are kept. When a checkpoint with the same content (revision aside) exists, that one is returned instead of a duplicate.',
   input: z
@@ -84,11 +90,14 @@ export const checkpoint = defineOperation({
     .strict(),
   output: checkpointSummarySchema,
   access: 'write',
+  additive: true,
+  idempotent: true,
   audience: ['editor', 'assistant'],
 });
 
 export const checkpointRestore = defineOperation({
   name: 'checkpoint_restore',
+  title: 'Restore checkpoint',
   description:
     'Replace the project with one of its checkpoints, as one new revision; the current state is checkpointed first, so it can be restored in turn.',
   input: z
@@ -101,6 +110,7 @@ export const checkpointRestore = defineOperation({
 
 export const checkpointCopy = defineOperation({
   name: 'checkpoint_copy',
+  title: 'Copy checkpoint as a new project',
   description:
     "Save one of the project's checkpoints as a new project with its own ID, leaving the project unchanged; returns the new project.",
   input: z
@@ -112,11 +122,13 @@ export const checkpointCopy = defineOperation({
     .strict(),
   output: z.object({ projectId: idSchema, title: z.string() }).strict(),
   access: 'write',
+  additive: true,
   audience: ['editor'],
 });
 
 export const previewEdits = defineOperation({
   name: 'preview_edits',
+  title: 'Preview edits',
   description: `Try up to ${MAX_EDIT_COMMANDS} edit commands against the saved project without saving: the same checks as edit, including the session rules, and the resulting duration and clip count, or the first rejected command's reason.`,
   input: z
     .object({

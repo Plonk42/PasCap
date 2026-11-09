@@ -53,6 +53,7 @@ const projectPicture = z
 
 export const still = defineOperation({
   name: 'still',
+  title: 'Render still',
   description:
     "Render one project frame as the export composes it (every enabled track with its Color, Detail, Transform, Opacity and transitions), from the 720p editing proxies, as a JPEG. Use crop for a 1:1 detail of the 1280 × 720 composition, for example to judge Sharpen or Denoise, and compare to judge a candidate grade beside the saved or original image in one picture. Width and crop size are limited by the service's image budget.",
   input: z
@@ -89,6 +90,7 @@ export const still = defineOperation({
 
 export const timelineSheet = defineOperation({
   name: 'timeline_sheet',
+  title: 'Render timeline sheet',
   description:
     "Render several project frames as one contact sheet, row by row, with a legend naming each cell's frame, timecode and clips. Cheaper than several stills for checking pacing, shot order or a grade across the cut. The number of frames and the cell width are limited by the service's image budget.",
   input: z
@@ -105,6 +107,7 @@ export const timelineSheet = defineOperation({
 
 export const recordingSheet = defineOperation({
   name: 'recording_sheet',
+  title: 'Render recording sheet',
   description:
     "Render source frames of one video recording's editing proxy as a contact sheet, without any grade or Transform, to choose footage before placing it. A single frame renders at the still width.",
   input: z
@@ -150,6 +153,7 @@ const candidateSchema = z
 
 export const compareRecordings = defineOperation({
   name: 'compare_recordings',
+  title: 'Compare recordings',
   description:
     "Show candidate shots from several video recordings in one contact sheet, without any grade or Transform, to pick the best of similar takes before placing it. Each candidate takes `frames` cells in a row, spread across its range (frames 1 lays the candidates out row by row). A candidate without a range shows its recording's best steady range (rank 1) inside the kept ranges within the session's steady-range limits, as describe_recording lists them, else its first kept range or the whole recording. The number of cells is limited by the service's image budget.",
   input: z

@@ -8,7 +8,8 @@ what the footage shows from its pictures.
 ## 1. Read
 - list_projects, then describe_project: video tracks and clips, transitions, music tracks, the
   recordings of the bin with the ranges the user kept, and bookmarks. Later, include only the
-  parts a step needs (videoTracks after an edit, with layerId for one track).
+  parts a step needs (layerId for one track); edit returns what each batch changed, clips a
+  Ripple track moved included, so it needs no read after it.
 - session_status: an active session started by the user's Hand off carries their brief (notes,
   music track, target length, steady-range limits on jolts, movement and flight speed, most clips).
   Follow it.
