@@ -24,27 +24,6 @@ import type { SpeedSettings } from '../../src/shared/speed.js';
  * commands naming a clip grade or an adjustment (#286); the inferred type must stay identical.
  */
 type FormerEditCommand =
-  | {
-      type: 'color-setting';
-      clipId?: string | undefined;
-      adjustmentId?: string | undefined;
-      setting: ScalarColorSetting;
-      value: number;
-    }
-  | {
-      type: 'hsl-band';
-      clipId?: string | undefined;
-      adjustmentId?: string | undefined;
-      band: HslBand;
-      values: { hue: number; saturation: number; lightness: number };
-    }
-  | {
-      type: 'color-curve';
-      clipId?: string | undefined;
-      adjustmentId?: string | undefined;
-      channel: CurveChannel;
-      points: ColorCurvePoint[];
-    }
   | { type: 'transform-setting'; layerId: string; setting: SpatialChannel; value: number }
   | { type: 'insert'; clip: Omit<VideoClip, 'grade'>; index: number }
   | { type: 'delete'; clipId: string }
@@ -59,6 +38,14 @@ type FormerEditCommand =
       clipIds?: string[] | undefined;
       adjustmentId?: string | undefined;
       color: ColorSettings;
+    }
+  | {
+      type: 'color-patch';
+      clipIds?: string[] | undefined;
+      adjustmentId?: string | undefined;
+      settings?: { [K in ScalarColorSetting]?: number | null } | undefined;
+      hsl?: { [K in HslBand]?: { hue: number; saturation: number; lightness: number } | null } | undefined;
+      curves?: { [K in CurveChannel]?: ColorCurvePoint[] | null } | undefined;
     }
   | { type: 'speed'; clipId: string; speed: SpeedSettings }
   | { type: 'reverse'; clipId: string; reverse: boolean }
@@ -157,21 +144,12 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
   },
   duplicate: { type: 'duplicate', clipId: 'clip-1', newClipId: 'clip-3' },
   color: { type: 'color', adjustmentId: 'look', color: createColorSettings() },
-  'color-setting': { type: 'color-setting', clipId: 'clip-1', setting: 'exposure', value: 0.5 },
-  'hsl-band': {
-    type: 'hsl-band',
-    adjustmentId: 'look',
-    band: 'blue',
-    values: { hue: 5, saturation: 0.2, lightness: 0 },
-  },
-  'color-curve': {
-    type: 'color-curve',
-    clipId: 'clip-1',
-    channel: 'master',
-    points: [
-      { x: 0, y: 0.05 },
-      { x: 1, y: 0.95 },
-    ],
+  'color-patch': {
+    type: 'color-patch',
+    clipIds: ['clip-1', 'clip-2'],
+    settings: { exposure: 0.5, contrast: null },
+    hsl: { blue: null },
+    curves: { master: null },
   },
   'transform-setting': { type: 'transform-setting', layerId: 'video-1', setting: 'opacity', value: 0.5 },
   speed: { type: 'speed', clipId: 'clip-1', speed: { mode: 'constant', rate: 2 } },
@@ -297,7 +275,7 @@ describe('editCommandSchema', () => {
     // Opacity belongs to the track Transform, and a track has no Color of its own.
     expect(editCommandSchema.safeParse({ ...samples['layer-key-value'], setting: 'opacity' }).success).toBe(false);
     expect(editCommandSchema.safeParse({ type: 'opacity', layerId: 'video-1', opacity: 0.5 }).success).toBe(false);
-    expect(editCommandSchema.safeParse({ ...samples['color-setting'], layerId: 'video-1' }).success).toBe(false);
+    expect(editCommandSchema.safeParse({ ...samples['color-patch'], layerId: 'video-1' }).success).toBe(false);
     expect(editCommandSchema.safeParse({ ...samples['adjustment-range'], keyframes: 'follow' }).success).toBe(false);
     expect(editCommandSchema.safeParse({ ...samples['adjustment-add'], duration: 0 }).success).toBe(false);
     expect(editCommandSchema.safeParse({ ...samples['select-narrow'], ranges: [] }).success).toBe(false);
@@ -315,7 +293,7 @@ describe('editCommandSchema', () => {
     expect(referencedEditCommandSchema.safeParse({ ...samples['bookmark-add'], frame: 1.5 }).success).toBe(false);
     expect(referencedEditCommandSchema.safeParse({ type: 'export' }).success).toBe(false);
     const published = JSON.stringify(z.toJSONSchema(referencedEditCommandSchema, { io: 'input' }));
-    expect(published).toContain('color-setting');
+    expect(published).toContain('color-patch');
     expect(published.length).toBeLessThan(1_500);
   });
 

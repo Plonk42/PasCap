@@ -32,7 +32,7 @@ const INSTRUCTIONS = [
   '3. Choose footage with describe_recording (without its sheet) and compare_recordings: whole camera movements inside the ranges the user kept; clips outside them are refused.',
   '4. Structure: order the shots to tell the flight, longer clips on quiet music, cuts on downbeats or strong hits at peaks.',
   '5. Build with edit: its commands apply together against the expectedRevision you last read, or not at all, and a rejected command returns its reason; preview_edits checks a batch first. Then snap_cuts_to_beats (keep deliberate cuts, maxShift), check_alignment, and dissolves with keepCut so cuts stay on the music.',
-  '6. Grade: describe_track first, then estimate (applyAs shots for a grade per shot, keyed once the cut is final); layer-key-set keys several settings at one frame, detail-clips sets Detail on several clips.',
+  '6. Grade: describe_track first, then estimate (applyAs shots for a grade per shot, keyed once the cut is final); color-patch changes several settings of several clips (null returns one to neutral), layer-key-set keys several settings at one frame, detail-clips sets Detail on several clips.',
   '7. Finish: look with timeline_sheet or still, check the length, and call session_end with notes.',
   'Every read reports the revision it used; read again when it is older than your last edit. Every picture stays in the conversation and many clients limit how many it may hold: put many cells in one sheet rather than looking at shots one by one.',
 ].join(' ');

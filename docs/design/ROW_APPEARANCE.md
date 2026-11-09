@@ -50,8 +50,8 @@ A clip grade is what one shot needs. It belongs to the clip
   reversed clip plays its keys backwards.
 - Trims, moves (to another track too), Ripple, splits, cuts, duplicates, Reverse and Move to new
   track keep the grade with its footage; split, cut and duplicate copy it.
-- Commands: `color` (with `clipIds`, several clips at once), `color-setting`, `hsl-band`,
-  `color-curve` and the `layer-key-*` keyframe commands take a `clipId`; their frames are then
+- Commands: `color` and `color-patch` (with `clipIds`, several clips at once) and the
+  `layer-key-*` keyframe commands (with a `clipId`) change clip grades; keyframe frames are then
   source frames.
 
 ## Adjustments

@@ -253,15 +253,16 @@ hand-written union, and `applyCommand` is unchanged. The `edit` operation's inpu
 `{ projectId, expectedRevision, commands: editCommandSchema.array().max(64) }`. Any command
 added later for the editor is exposed to the assistant the moment it is in the union.
 
-Four commands change one appearance setting of a clip grade, an adjustment or a track and keep
-every other saved value, so the
-assistant never resends a whole Color or Transform
-([#252](https://github.com/Plonk42/PasCap/issues/252)): `color-setting` (one of the fourteen
-scalar Color settings of a clip's grade or an adjustment), `hsl-band` (one HSL range),
-`color-curve` (one curve) and
-`transform-setting` (one Transform base setting, Opacity included). A setting with keyframes follows them, so
-setting its base is rejected with the keyframe count; the assistant changes the keyframes with
-`layer-key-value` instead. The editor keeps sending whole `color` and `transform` commands.
+Two commands change appearance settings and keep every other saved value, so the assistant never
+resends a whole Color or Transform ([#252](https://github.com/Plonk42/PasCap/issues/252),
+[#309](https://github.com/Plonk42/PasCap/issues/309)). `color-patch` changes Color settings of
+one or several clips' grades (`clipIds`) or of an adjustment: a listed scalar setting, HSL range
+or curve takes its value, `null` returns it to neutral (identity for a curve), and what it leaves
+out keeps its saved value, as reads leave out neutral values. `transform-setting` changes one
+Transform base setting, Opacity included. A setting with keyframes follows them, so setting its
+base is rejected with the keyframe count (a `color-patch` as a whole, whichever target has them);
+the assistant changes the keyframes with `layer-key-set` or `layer-key-value` instead. The editor
+keeps sending whole `color` and `transform` commands.
 
 The editor's `layer-add` and `layer-update` carry a complete track (every Transform
 setting and keyframe): half of the command schema. `edit` offers the assistant
@@ -292,7 +293,7 @@ Read; for editor and assistant. List the saved projects, most recently saved fir
 
 #### `describe_project`
 
-Read; for editor and assistant. Summarize a saved project: its revision, duration, video tracks with their clips in timeline order (project frames and timecodes, source ranges, speed, direction, grade, Detail), transitions, adjustments, music tracks, the recordings with the ranges the user kept and whether their selection is done, and bookmarks. Frames are integers at 30000/1001 fps. Read it before editing and after each edit batch.
+Read; for editor and assistant. Summarize a saved project: its revision, duration, video tracks with their clips in timeline order (project frames and timecodes, source ranges, speed, direction, grade, non-neutral Detail), transitions, adjustments, music tracks, the recordings with the ranges the user kept and whether their selection is done, and bookmarks. Frames are integers at 30000/1001 fps. Read it before editing and after each edit batch.
 
 | Input       | Type                                                                                    | Description                                                                                                                                                                                                                                                       |
 | ----------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -302,7 +303,7 @@ Read; for editor and assistant. Summarize a saved project: its revision, duratio
 
 #### `describe_track`
 
-Read; for editor and assistant. Read every appearance value of one video track: its Transform (with Opacity) and keyframes, which settings follow keyframes, what each clip grade changes (scalar settings, HSL ranges, curves and a keyframe count, or every value with complete), each clip's Detail (Sharpen, Clarity, Denoise) and the adjustments over it, the keyframes on request, and the values that apply at the requested project frames, including the adjustment grading every track there. Settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve), so read the grades before changing them; afterwards, include keyframes or at with the settings you changed reads far less.
+Read; for editor and assistant. Read every appearance value of one video track: its Transform (with Opacity) and keyframes, which settings follow keyframes, what each clip grade changes (scalar settings, HSL ranges, curves and a keyframe count), each clip's non-neutral Detail (Sharpen, Clarity, Denoise) and the adjustments over it, the keyframes on request, and the values that apply at the requested project frames, including the adjustment grading every track there. Settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve), so read the grades before changing them; afterwards, include keyframes or at with the settings you changed reads far less.
 
 | Input       | Type                                                                                                                                                                                                                                                                                                                                 | Description                                                                                                                                                                                                                                                                                                       |
 | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -310,7 +311,6 @@ Read; for editor and assistant. Read every appearance value of one video track: 
 | `layerId`   | string                                                                                                                                                                                                                                                                                                                               | ID of the video track.                                                                                                                                                                                                                                                                                            |
 | `frames`    | array of integer                                                                                                                                                                                                                                                                                                                     | Up to 32 project frames at which to report the values that apply; none when omitted.                                                                                                                                                                                                                              |
 | `include`   | array of "track" or "keyframes" or "grades" or "at"                                                                                                                                                                                                                                                                                  | Parts to return besides revision and keyed: track (the whole saved track, the largest part), keyframes (each Transform, clip grade and adjustment keyframe with only its keyed settings), grades (what each clip grade changes and its Detail, with the adjustments over the clip) and at (the values at frames). |
-| `complete`  | boolean                                                                                                                                                                                                                                                                                                                              | In grades, report every Color value of each clip grade, neutral ones included (all scalar settings, HSL ranges and curves), for example to copy a whole grade with the color command.                                                                                                                             |
 | `settings`  | array of "temperature" or "tint" or "exposure" or "brightness" or "contrast" or "hue" or "saturation" or "vibrance" or "highlights" or "shadows" or "whites" or "blacks" or "hdr" or "localContrast" or "cropLeft" or "cropRight" or "cropTop" or "cropBottom" or "scale" or "translateX" or "translateY" or "rotation" or "opacity" | Report only these Color and Transform (Opacity included) settings in at; all when omitted.                                                                                                                                                                                                                        |
 
 #### `describe_recording`
@@ -535,9 +535,7 @@ The `commands` of `edit`; their fields are described in the JSON Schema of the t
 | `remove-source-range` | `clipId`, `sourceIn`, `sourceOut`, `newClipId`                 | Cut source frames [sourceIn, sourceOut) out of a clip. Removing the middle leaves two clips; removing an end trims the clip; removing everything deletes it. A Ripple track closes the gap; otherwise the remaining pieces keep their timeline positions. The range must lie within the clip's own range.       |
 | `duplicate`           | `clipId`, `newClipId`                                          | Copy a clip (range, speed, direction and detail) right after it. A Ripple track inserts the copy into its sequence; otherwise it starts at the original's end and must not overlap another clip.                                                                                                                |
 | `color`               | `clipIds`, `adjustmentId`, `color`                             | Replace the whole Color of clips' grades or of an adjustment; keyed settings follow their keyframes.                                                                                                                                                                                                            |
-| `color-setting`       | `clipId`, `adjustmentId`, `setting`, `value`                   | Set one scalar Color setting of a clip's grade or an adjustment, keeping the others. Rejected while the setting has keyframes there: change those with layer-key-value.                                                                                                                                         |
-| `hsl-band`            | `clipId`, `adjustmentId`, `band`, `values`                     | Set one HSL range of a clip's grade or an adjustment, keeping the rest.                                                                                                                                                                                                                                         |
-| `color-curve`         | `clipId`, `adjustmentId`, `channel`, `points`                  | Replace one curve of a clip's grade or an adjustment, keeping the rest.                                                                                                                                                                                                                                         |
+| `color-patch`         | `clipIds`, `adjustmentId`, `settings`, `hsl`, `curves`         | Change Color settings of clips' grades or of an adjustment: a listed setting takes its value, null returns it to neutral, and settings left out keep theirs. Rejected as a whole while a listed scalar setting has keyframes on a target: change those with layer-key-set.                                      |
 | `transform-setting`   | `layerId`, `setting`, `value`                                  | Set one Transform base setting of a video track, keeping the others. Rejected while the setting has Transform keyframes, which it then follows.                                                                                                                                                                 |
 | `speed`               | `clipId`, `speed`                                              | Set a clip's speed. Its duration changes with it: a Ripple track re-sequences the clips after it, and overlaps or transitions that no longer fit reject the edit.                                                                                                                                               |
 | `reverse`             | `clipId`, `reverse`                                            | Play a clip backwards or forwards; its duration and placement do not change.                                                                                                                                                                                                                                    |
@@ -771,9 +769,11 @@ reported by what they change ([#288](https://github.com/Plonk42/PasCap/issues/28
 settings that differ from neutral, the HSL ranges and curves that are not neutral, and a keyframe
 count, for each adjustment in `describe_project` and each clip in `describe_track` (with the IDs
 of the adjustments over it); `describe_track`'s `keyframes` part lists the clip grade and
-adjustment keyframes. `describe_track` with `complete` reports every value of each clip grade,
-neutral ones included, and both reads give each clip's Detail (Sharpen, Clarity, Denoise)
-([#309](https://github.com/Plonk42/PasCap/issues/309)). On a synthetic project shaped like the owner's rough cut (29 graded clips
+adjustment keyframes. Both reads also give each clip's Detail (Sharpen, Clarity, Denoise) that is
+not neutral ([#309](https://github.com/Plonk42/PasCap/issues/309)). Reads leave out neutral
+values and writes keep what they leave out: `color-patch` changes several Color settings of
+several clips or of an adjustment, with `null` returning a setting to neutral, so copying a look
+lists only what differs. On a synthetic project shaped like the owner's rough cut (29 graded clips
 on two tracks, 6 adjustments), `describe_track` with six frames reads 9.5 KB instead of 24 KB
 (its clip grades 4.6 KB instead of 19 KB), and `describe_project` 13.3 KB. The method
 as built, with its constants and measured agreement, is in

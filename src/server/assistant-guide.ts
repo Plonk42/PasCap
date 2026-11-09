@@ -77,10 +77,9 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   clip grades, for a shared look, such as one per music section: adjustment-add with its
   settings, then an adjustmentId on the color commands; adjustment-range moves or trims it,
   adjustment-split cuts it in two. Adjustments never overlap and stay at their project frames
-  when clips move. describe_project lists them with what they change, and each clip's Detail;
-  describe_track gives what each clip's grade changes, its Detail and the adjustments over it
-  (with complete, every value of each clip grade, to copy a whole grade with the color command).
-  Read them before changing a grade:
+  when clips move. describe_project lists them with what they change, and each clip's Detail that
+  is not neutral; describe_track gives what each clip's grade changes, its Detail and the
+  adjustments over it. Reads leave out neutral values. Read them before changing a grade:
   settings interact (Contrast with Shadows, Highlights, Whites and Blacks shape one tone curve).
   Prefer static grades; animate only when the brief asks or the light changes within a shot
   (clip keyframes are source frames, adjustment keyframes count from its start). describe_track
@@ -91,9 +90,12 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   correction per shot, estimate with applyAs shots (layerId or clipIds) writes each clip's own
   correction into its clip grade in one call; dissolves blend the two grades. Keep adjustments
   for the look shared by every shot of a stretch.
-- Change one setting with color-setting, hsl-band, color-curve or transform-setting, which
-  keep every other value; a keyed setting follows its keyframes, so change those instead
-  (layer-key-value). The color and transform commands replace everything and suit a full grade.
+- color-patch changes Color settings of clips (clipIds, one or several) or of an adjustment: a
+  listed setting, HSL range or curve takes its value, null returns it to neutral, and what it
+  leaves out keeps its value. To copy a look onto other clips, list its changed settings and
+  null those the targets change that it leaves neutral. The color and transform commands replace
+  everything; transform-setting changes one Transform setting. A keyed setting follows its
+  keyframes, so change those instead (layer-key-set).
   detail-clips sets the same Detail on several clips in one command.
 - To animate, layer-key-set keys several settings at one frame in one command, with one Easing
   (hold keeps a grade until the next keyframe) or one per setting; settings left out keep what

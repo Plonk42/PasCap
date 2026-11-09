@@ -6,7 +6,6 @@ import {
   generateCube,
   gradePixel,
   NEUTRAL_COLOR,
-  scalarColorValues,
   type ColorSettings,
   type RGB,
 } from '../../src/shared/color.js';
@@ -236,10 +235,10 @@ describe('clip grade commands', () => {
     });
     expect(next.clips[1]!.grade.keyframes).toEqual([gradeKey(120, { exposure: 1 })]);
     expect(next.layers).toEqual(project().layers);
-    expect(() => applyCommand(next, { type: 'color-setting', clipId: 'b', setting: 'exposure', value: 0 })).toThrow(
+    expect(() => applyCommand(next, { type: 'color-patch', clipIds: ['b'], settings: { exposure: 0 } })).toThrow(
       'follows 1 clip keyframe on clip b',
     );
-    next = applyCommand(next, { type: 'color-setting', clipId: 'b', setting: 'contrast', value: 1.5 });
+    next = applyCommand(next, { type: 'color-patch', clipIds: ['b'], settings: { contrast: 1.5 } });
     expect(next.clips[1]!.grade.color.contrast).toBe(1.5);
     // Opacity belongs to the track Transform: no grade keyframe can hold it.
     const opacityKey = { type: 'layer-key-toggle', clipId: 'b', frame: 120, setting: 'opacity', value: 0.5 };
@@ -270,20 +269,16 @@ describe('clip grade commands', () => {
   });
 
   it('changes HSL ranges and curves of a clip grade', () => {
-    let next = applyCommand(project(), {
-      type: 'hsl-band',
-      clipId: 'a',
-      band: 'blue',
-      values: { hue: 5, saturation: 0.1, lightness: 0 },
-    });
-    next = applyCommand(next, {
-      type: 'color-curve',
-      clipId: 'a',
-      channel: 'master',
-      points: [
-        { x: 0, y: 0.05 },
-        { x: 1, y: 1 },
-      ],
+    const next = applyCommand(project(), {
+      type: 'color-patch',
+      clipIds: ['a'],
+      hsl: { blue: { hue: 5, saturation: 0.1, lightness: 0 } },
+      curves: {
+        master: [
+          { x: 0, y: 0.05 },
+          { x: 1, y: 1 },
+        ],
+      },
     });
     expect(next.clips[0]!.grade.color.hsl.blue).toEqual({ hue: 5, saturation: 0.1, lightness: 0 });
     expect(next.clips[0]!.grade.color.curves.master).toHaveLength(2);
@@ -291,7 +286,7 @@ describe('clip grade commands', () => {
   });
 
   it('keeps the grade with the footage through trims, moves, splits and duplicates', () => {
-    let next = applyCommand(project(), { type: 'color-setting', clipId: 'a', setting: 'exposure', value: 0.5 });
+    let next = applyCommand(project(), { type: 'color-patch', clipIds: ['a'], settings: { exposure: 0.5 } });
     next = applyCommand(next, { type: 'layer-key-set', clipId: 'a', frame: 40, values: { tint: 0.3 } });
     const grade = next.clips[0]!.grade;
     next = applyCommand(next, { type: 'trim', clipId: 'a', sourceIn: 10, sourceOut: 50 });
@@ -321,14 +316,10 @@ describe('clip grades for the assistant', () => {
       curves: { master: color.curves.master },
       keyframes: 2,
     });
-    // Complete: every value, neutral ones included.
-    const complete = gradeSummary({ color, keyframes: [] }, true);
-    expect(complete.settings).toEqual(scalarColorValues(color));
-    expect(complete.hsl).toEqual(color.hsl);
-    expect(complete.curves).toEqual(color.curves);
   });
   it('reads each clip grade on its track, the grade shown at a frame and the adjustment there', async () => {
-    let document = applyCommand(project(), { type: 'color-setting', clipId: 'a', setting: 'saturation', value: 1.3 });
+    let document = applyCommand(project(), { type: 'color-patch', clipIds: ['a'], settings: { saturation: 1.3 } });
+    document = applyCommand(document, { type: 'detail', clipId: 'a', detail: { ...NEUTRAL_DETAIL, sharpen: 0.4 } });
     document = applyCommand(document, { type: 'layer-key-set', clipId: 'a', frame: 10, values: { tint: 0.2 } });
     document = projectSchema.parse({
       ...document,
@@ -349,18 +340,18 @@ describe('clip grades for the assistant', () => {
       frames: [10, 70],
       include: ['grades', 'keyframes', 'at'],
       settings: ['tint', 'saturation'],
-      complete: false,
     });
-    // Each clip compactly with its Detail and the adjustments over it; the keyframes on request.
+    // Each clip compactly with its non-neutral Detail and the adjustments over it; the keyframes on request.
     expect(described.grades).toEqual([
       {
         clipId: 'a',
         grade: { settings: { saturation: 1.3 }, keyframes: 1 },
-        detail: NEUTRAL_DETAIL,
+        detail: { sharpen: 0.4 },
         adjustmentIds: [],
       },
-      { clipId: 'b', grade: { settings: {}, keyframes: 0 }, detail: NEUTRAL_DETAIL, adjustmentIds: ['look'] },
+      { clipId: 'b', grade: { settings: {}, keyframes: 0 }, adjustmentIds: ['look'] },
     ]);
+    expect(Object.keys(described.grades![1]!)).not.toContain('detail');
     expect(described.keyframes).toEqual({
       transform: [],
       clips: [
@@ -395,19 +386,6 @@ describe('clip grades for the assistant', () => {
         transform: {},
       },
     ]);
-    // Complete: every value of each clip grade, enough to rebuild a color command.
-    const complete = await runners.describe_track(context, {
-      projectId: document.id,
-      layerId: 'video-1',
-      include: ['grades'],
-      complete: true,
-    });
-    expect(complete.grades![0]!.grade).toEqual({
-      settings: scalarColorValues(document.clips[0]!.grade.color),
-      hsl: document.clips[0]!.grade.color.hsl,
-      curves: document.clips[0]!.grade.color.curves,
-      keyframes: 1,
-    });
   });
 });
 

@@ -1,6 +1,6 @@
 import { isNeutralClipGrade, type ClipGrade } from '../../shared/grade.js';
 import { projectParts, type describeProject } from '../../shared/operations/describe-project.js';
-import { gradeSummary } from '../../shared/operations/grade-summary.js';
+import { detailSummary, gradeSummary } from '../../shared/operations/grade-summary.js';
 import { durationOf } from '../../shared/operations/timecode.js';
 import { calculateLayout } from '../../shared/timeline.js';
 import { formatTimecode } from '../../shared/timing.js';
@@ -52,20 +52,23 @@ export const runDescribeProject: OperationRunner<typeof describeProject> = async
         closingFade: layer.closingFade,
         clips: layout.clips
           .filter((placed) => placed.clip.layerId === layer.id)
-          .map(({ clip, start, end }) => ({
-            id: clip.id,
-            recording: { id: clip.mediaId, name: videoName(clip.mediaId) },
-            ...span(start, end),
-            sourceIn: clip.sourceIn,
-            sourceOut: clip.sourceOut,
-            speed:
-              clip.speed.mode === 'constant'
-                ? `${clip.speed.rate}×`
-                : `curve, ${clip.speed.keyframes.length} keyframes`,
-            reverse: clip.reverse,
-            grade: gradeLabel(clip.grade),
-            detail: clip.detail,
-          })),
+          .map(({ clip, start, end }) => {
+            const detail = detailSummary(clip.detail);
+            return {
+              id: clip.id,
+              recording: { id: clip.mediaId, name: videoName(clip.mediaId) },
+              ...span(start, end),
+              sourceIn: clip.sourceIn,
+              sourceOut: clip.sourceOut,
+              speed:
+                clip.speed.mode === 'constant'
+                  ? `${clip.speed.rate}×`
+                  : `curve, ${clip.speed.keyframes.length} keyframes`,
+              reverse: clip.reverse,
+              grade: gradeLabel(clip.grade),
+              ...(detail && { detail }),
+            };
+          }),
         transitions: layer.transitions,
       }));
   const musicTracks = () =>

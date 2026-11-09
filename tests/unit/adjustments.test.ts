@@ -190,7 +190,7 @@ describe('adjustments', () => {
 
   it('split into two pieces with the whole grade, each keeping the keyframes within its range', () => {
     let document = applyCommand(project(), { type: 'adjustment-add', adjustmentId: 'a', start: 10, duration: 40 });
-    document = applyCommand(document, { type: 'color-setting', adjustmentId: 'a', setting: 'saturation', value: 0.5 });
+    document = applyCommand(document, { type: 'color-patch', adjustmentId: 'a', settings: { saturation: 0.5 } });
     for (const frame of [5, 30])
       document = applyCommand(document, {
         type: 'layer-key-toggle',
@@ -237,10 +237,9 @@ describe('adjustments', () => {
       applyCommand(document, { type: 'color', clipIds: ['lower'], adjustmentId: 'a', color: createColorSettings() }),
     ).toThrow('Give either');
     const graded = applyCommand(document, {
-      type: 'color-setting',
+      type: 'color-patch',
       adjustmentId: 'a',
-      setting: 'saturation',
-      value: 1.4,
+      settings: { saturation: 1.4 },
     });
     expect(graded.adjustments[0]!.color.saturation).toBe(1.4);
     expect(graded.clips.every((clip) => clip.grade.color.saturation === 1)).toBe(true);

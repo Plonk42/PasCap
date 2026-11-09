@@ -43,9 +43,10 @@ import {
   MAX_ADJUSTMENTS,
   MAX_GRADE_KEYFRAMES,
   type Adjustment,
+  type ClipGrade,
 } from './grade.js';
-import { colorCurveSchema, hslBandSchema } from './advanced-color.js';
-import { colorSchema, type ColorSettings, type ScalarColorSetting } from './color.js';
+import type { ColorCurvePoint, CurveChannel, HslBand, HslSettings } from './advanced-color.js';
+import { colorSchema, NEUTRAL_COLOR, type ColorSettings, type ScalarColorSetting } from './color.js';
 import { spatialPoseSchema, spatialSettingsSchema } from './spatial.js';
 import { clipDuration } from './speed.js';
 import { trimByOutputFrames } from './source-range.js';
@@ -136,27 +137,6 @@ function followsKeyframes(name: string, setting: string, keys: number, list: str
     );
 }
 
-type ColorSettingCommand = Extract<EditCommand, { type: 'color-setting' | 'hsl-band' | 'color-curve' }>;
-
-/** Changes one Color setting of a track or a clip's grade, keeping every other one as saved. */
-function editColorSetting(owner: ColorOwner, command: ColorSettingCommand): void {
-  const { color } = owner;
-  switch (command.type) {
-    case 'color-setting':
-      followsKeyframes(owner.name, command.setting, keyCount(owner.keyframes, command.setting), owner.kind);
-      owner.color = { ...color, [command.setting]: colorSchema.shape[command.setting].parse(command.value) };
-      break;
-    case 'hsl-band':
-      owner.color = { ...color, hsl: { ...color.hsl, [command.band]: hslBandSchema.parse(command.values) } };
-      break;
-    case 'color-curve': {
-      const points = colorCurveSchema.parse(command.points).map((point) => ({ ...point }));
-      owner.color = { ...color, curves: { ...color.curves, [command.channel]: points } };
-      break;
-    }
-  }
-}
-
 function editTransformSetting(layer: VideoLayer, command: Extract<EditCommand, { type: 'transform-setting' }>): void {
   const { transform } = layer;
   followsKeyframes(layer.name, command.setting, keyCount(transform.keyframes, command.setting), 'Transform');
@@ -166,20 +146,55 @@ function editTransformSetting(layer: VideoLayer, command: Extract<EditCommand, {
   };
 }
 
-/** The same Color on each listed clip's grade, or on an adjustment, keeping their keyframes. */
-function setColor(next: ProjectDocument, command: Extract<EditCommand, { type: 'color' }>): void {
-  const color = colorSchema.parse(command.color);
+/** The clip grades (clipIds) or the adjustment (adjustmentId) a command changes. */
+function colorTargets(
+  next: ProjectDocument,
+  command: Extract<EditCommand, { type: 'color' | 'color-patch' }>,
+): { kind: string; name: string; grade: Pick<ClipGrade, 'color' | 'keyframes'> }[] {
   if ((command.adjustmentId === undefined) === (command.clipIds === undefined))
     throw new Error("Give either clipIds, for clips' own grades, or adjustmentId, for an adjustment.");
   if (command.adjustmentId !== undefined) {
-    requiredAdjustment(next, command.adjustmentId).color = structuredClone(color);
-    return;
+    const grade = requiredAdjustment(next, command.adjustmentId);
+    return [{ kind: 'adjustment', name: `adjustment ${command.adjustmentId}`, grade }];
   }
-  const ids = new Set(command.clipIds);
-  if (ids.size !== command.clipIds!.length) throw new Error('List each clip once.');
-  const missing = command.clipIds!.find((id) => !next.clips.some((clip) => clip.id === id));
-  if (missing !== undefined) throw new Error(`Clip ${missing} no longer exists.`);
-  for (const clip of next.clips) if (ids.has(clip.id)) clip.grade = { ...clip.grade, color: structuredClone(color) };
+  const ids = command.clipIds!;
+  if (new Set(ids).size !== ids.length) throw new Error('List each clip once.');
+  return ids.map((id) => {
+    const clip = next.clips.find((item) => item.id === id);
+    if (!clip) throw new Error(`Clip ${id} no longer exists.`);
+    return { kind: 'clip', name: `clip ${id}`, grade: clip.grade };
+  });
+}
+
+/** The same Color on each listed clip's grade, or on an adjustment, keeping their keyframes. */
+function setColor(next: ProjectDocument, command: Extract<EditCommand, { type: 'color' }>): void {
+  const color = colorSchema.parse(command.color);
+  for (const { grade } of colorTargets(next, command)) grade.color = structuredClone(color);
+}
+
+/** Listed settings take their value, or neutral for null, on every target; the others keep theirs. */
+function patchColor(next: ProjectDocument, command: Extract<EditCommand, { type: 'color-patch' }>): void {
+  const settings = Object.entries(command.settings ?? {}) as [ScalarColorSetting, number | null][];
+  const bands = Object.entries(command.hsl ?? {}) as [HslBand, HslSettings[HslBand] | null][];
+  const curves = Object.entries(command.curves ?? {}) as [CurveChannel, ColorCurvePoint[] | null][];
+  if (settings.length + bands.length + curves.length === 0) throw new Error('List at least one setting to change.');
+  for (const { kind, name, grade } of colorTargets(next, command)) {
+    for (const [setting] of settings) followsKeyframes(name, setting, keyCount(grade.keyframes, setting), kind);
+    const { color } = grade;
+    const patched = {
+      ...color,
+      ...Object.fromEntries(settings.map(([setting, value]) => [setting, value ?? NEUTRAL_COLOR[setting]])),
+      hsl: {
+        ...color.hsl,
+        ...Object.fromEntries(bands.map(([band, values]) => [band, values ?? NEUTRAL_COLOR.hsl[band]])),
+      },
+      curves: {
+        ...color.curves,
+        ...Object.fromEntries(curves.map(([channel, points]) => [channel, points ?? NEUTRAL_COLOR.curves[channel]])),
+      },
+    };
+    grade.color = structuredClone(colorSchema.parse(patched));
+  }
 }
 
 function keyCount<K extends string>(keyframes: readonly { values: Record<K, number | null> }[], setting: K): number {
@@ -865,6 +880,9 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'color':
       setColor(next, command);
       return projectSchema.parse(next);
+    case 'color-patch':
+      patchColor(next, command);
+      return projectSchema.parse(next);
     case 'speed':
       next.clips[index] = { ...next.clips[index]!, speed: { ...command.speed } };
       break;
@@ -883,14 +901,6 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'detail-clips':
       setClipsDetail(next, command.clipIds, command.detail);
       return projectSchema.parse(next);
-    case 'color-setting':
-    case 'hsl-band':
-    case 'color-curve': {
-      const { owner, save } = colorOwner(next, command);
-      editColorSetting(owner, command);
-      save();
-      return projectSchema.parse(next);
-    }
     case 'transform-setting':
       editTransformSetting(requiredLayer(next, command.layerId), command);
       return projectSchema.parse(next);

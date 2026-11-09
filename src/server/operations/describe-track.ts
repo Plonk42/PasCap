@@ -2,7 +2,7 @@ import { scalarColorValues } from '../../shared/color.js';
 import { adjustmentAt, adjustmentColorAt, gradeColorAt, isNeutralClipGrade } from '../../shared/grade.js';
 import type { Interpolation } from '../../shared/keyframes.js';
 import type { describeTrack } from '../../shared/operations/describe-track.js';
-import { gradeSummary } from '../../shared/operations/grade-summary.js';
+import { detailSummary, gradeSummary } from '../../shared/operations/grade-summary.js';
 import { evaluateSpatial, hasSpatialChannelKeys, SPATIAL_CHANNELS } from '../../shared/spatial.js';
 import { calculateLayout, gradePosition } from '../../shared/timeline.js';
 import { formatTimecode } from '../../shared/timing.js';
@@ -36,7 +36,7 @@ function only<T extends object>(values: T, settings: ReadonlySet<string> | null)
 
 export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
   { projects },
-  { projectId, layerId, frames = [], include, settings, complete },
+  { projectId, layerId, frames = [], include, settings },
 ) => {
   const project = await projects.load(projectId);
   const track = project.layers.find((layer) => layer.id === layerId);
@@ -69,12 +69,15 @@ export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
       },
     }),
     ...(parts.has('grades') && {
-      grades: placed.map((item) => ({
-        clipId: item.clip.id,
-        grade: gradeSummary(item.clip.grade, complete),
-        detail: item.clip.detail,
-        adjustmentIds: over(item).map((adjustment) => adjustment.id),
-      })),
+      grades: placed.map((item) => {
+        const detail = detailSummary(item.clip.detail);
+        return {
+          clipId: item.clip.id,
+          grade: gradeSummary(item.clip.grade),
+          ...(detail && { detail }),
+          adjustmentIds: over(item).map((adjustment) => adjustment.id),
+        };
+      }),
     }),
     keyed: {
       transform: SPATIAL_CHANNELS.filter((channel) => hasSpatialChannelKeys(track.transform, channel)),

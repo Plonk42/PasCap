@@ -233,7 +233,7 @@ describe('operation routes', () => {
         speed: '2×',
         reverse: true,
         grade: 'none',
-        detail: { sharpen: 0.4, clarity: -0.2, denoise: 0 },
+        detail: { sharpen: 0.4, clarity: -0.2 },
       },
     ]);
     expect(description.recordings).toEqual([
@@ -261,7 +261,7 @@ describe('operation routes', () => {
         },
       },
     } as unknown as Parameters<typeof runners.still>[0];
-    const candidate = [{ type: 'color-setting', clipId: 'clip-1', setting: 'exposure', value: 0.5 }] as const;
+    const candidate = [{ type: 'color-patch' as const, clipIds: ['clip-1'], settings: { exposure: 0.5 } }];
     const compared = await runners.still(pictures, {
       projectId: project.id,
       frame: 10,

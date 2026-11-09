@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { colorCurveSchema, curvesSchema, hslBandSchema, hslSchema } from './advanced-color.js';
-import { COLOR_CONTROLS, colorSchema, NEUTRAL_COLOR, type ScalarColorSetting } from './color.js';
+import { colorCurveSchema, CURVE_CHANNELS, HSL_BANDS, hslBandSchema } from './advanced-color.js';
+import { COLOR_CONTROLS, colorSchema, NEUTRAL_COLOR } from './color.js';
 import { described } from './described.js';
 import { detailSchema } from './detail.js';
 import { gradeKeyValuesPatchSchema, gradeSettingSchema } from './grade.js';
@@ -46,17 +46,13 @@ const colorRanges = COLOR_CONTROLS.map((control) => `${control.key} ${control.mi
 const colorBounds = `Bounds: ${colorRanges}. Neutral (no change): ${neutralNotZero.join(', ')}, every other 0; Saturation 0 is grayscale.`;
 const keyframeSetting = described(
   gradeSettingSchema,
-  'Scalar Color setting; bounds and neutral values as in color-setting.',
+  'Scalar Color setting; bounds and neutral values as in color-patch.',
 );
 const easingPatch = interpolationSchema.or(z.partialRecord(gradeSettingSchema, interpolationSchema));
 const mediaId = described(idSchema, 'ID of a video recording of the project.');
 const selectRanges = described(
   z.array(selectRangeSchema).max(MAX_SELECTS),
   `Kept source ranges (OUT exclusive), ascending and separated by at least one frame, at most ${MAX_SELECTS}.`,
-);
-const colorSetting = described(
-  z.enum(COLOR_CONTROLS.map((control) => control.key) as [ScalarColorSetting, ...ScalarColorSetting[]]),
-  `Scalar Color setting. ${colorBounds}`,
 );
 const settingValue = described(z.number(), "New base value, within the setting's bounds.");
 
@@ -128,26 +124,28 @@ export const editCommandSchema = z.discriminatedUnion('type', [
     },
   ),
   command(
-    'color-setting',
-    "Set one scalar Color setting of a clip's grade or an adjustment, keeping the others. Rejected while the setting has keyframes there: change those with layer-key-value.",
-    { ...colorOwner, setting: colorSetting, value: settingValue },
+    'color-patch',
+    "Change Color settings of clips' grades or of an adjustment: a listed setting takes its value, null returns it to neutral, and settings left out keep theirs. Rejected as a whole while a listed scalar setting has keyframes on a target: change those with layer-key-set.",
+    {
+      clipIds: described(
+        z.array(idSchema).min(1).optional(),
+        'Clips whose grade to change, each once; or adjustmentId.',
+      ),
+      adjustmentId: colorAdjustmentId,
+      settings: described(
+        z.partialRecord(gradeSettingSchema, z.number().nullable()).optional(),
+        `Scalar Color settings: a value, or null for neutral. ${colorBounds}`,
+      ),
+      hsl: described(
+        z.partialRecord(z.enum(HSL_BANDS), hslBandSchema.nullable()).optional(),
+        'HSL ranges (red, orange, yellow, green, cyan, blue, purple, magenta): hue shift −30–30°, saturation −1–1 and lightness −0.5–0.5, or null for neutral (all 0).',
+      ),
+      curves: described(
+        z.partialRecord(z.enum(CURVE_CHANNELS), colorCurveSchema.nullable()).optional(),
+        'Curves (master, red, green, blue): 2–16 control nodes {x, y} in 0–1 with inputs strictly ascending from 0 to 1, or null for identity (0,0), (0.5,0.5), (1,1).',
+      ),
+    },
   ),
-  command('hsl-band', "Set one HSL range of a clip's grade or an adjustment, keeping the rest.", {
-    ...colorOwner,
-    band: described(hslSchema.keyof(), 'Color range: red, orange, yellow, green, cyan, blue, purple or magenta.'),
-    values: described(
-      hslBandSchema,
-      'Hue shift −30–30°, saturation −1–1 and lightness −0.5–0.5 of the range; all 0 is neutral.',
-    ),
-  }),
-  command('color-curve', "Replace one curve of a clip's grade or an adjustment, keeping the rest.", {
-    ...colorOwner,
-    channel: described(curvesSchema.keyof(), 'Curve: master, red, green or blue.'),
-    points: described(
-      colorCurveSchema,
-      '2–16 control nodes {x, y} in 0–1 with inputs strictly ascending from 0 to 1; identity is (0,0), (0.5,0.5), (1,1).',
-    ),
-  }),
   command(
     'transform-setting',
     'Set one Transform base setting of a video track, keeping the others. Rejected while the setting has Transform keyframes, which it then follows.',
@@ -342,7 +340,7 @@ export const editCommandSchema = z.discriminatedUnion('type', [
       duration: described(frameSchema.min(1), 'Frames it grades from start.'),
       settings: described(
         z.partialRecord(gradeSettingSchema, z.number()).optional(),
-        'Its scalar Color settings, as in color-setting; others neutral.',
+        'Its scalar Color settings, as in color-patch; others neutral.',
       ),
     },
   ),

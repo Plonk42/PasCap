@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { NEUTRAL_COLOR } from '../../src/shared/color.js';
 import { applyCommand, type EditCommand } from '../../src/shared/commands.js';
 import { createAdjustment, type ClipGrade } from '../../src/shared/grade.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
@@ -82,7 +83,7 @@ const OWNERS = [
   },
   {
     owner: 'a clip grade',
-    target: { clipId: 'shot' },
+    target: { clipIds: ['shot'] as string[] },
     grade: (project: ProjectDocument): ClipGrade => project.clips[0]!.grade,
     keyed: 'exposure follows 1 clip keyframe on clip shot',
   },
@@ -92,28 +93,53 @@ describe('partial appearance commands', () => {
   const project = graded();
   const layerId = project.layers[0]!.id;
 
-  it.each(OWNERS)('change one setting of $owner and keep every other saved value', ({ target, grade }) => {
-    expect(applyCommand(project, { type: 'color-setting', ...target, setting: 'contrast', value: 1.4 })).toEqual(
-      expected(project, (copy) => {
-        grade(copy).color.contrast = 1.4;
-      }),
-    );
+  it.each(OWNERS)('change settings of $owner, return null ones to neutral and keep the others', ({ target, grade }) => {
     const band = { hue: 4, saturation: -0.5, lightness: 0.1 };
-    expect(applyCommand(project, { type: 'hsl-band', ...target, band: 'green', values: band })).toEqual(
-      expected(project, (copy) => {
-        grade(copy).color.hsl.green = band;
-      }),
-    );
     const points = [
       { x: 0, y: 0 },
       { x: 0.4, y: 0.5 },
       { x: 1, y: 1 },
     ];
-    expect(applyCommand(project, { type: 'color-curve', ...target, channel: 'master', points })).toEqual(
+    const patched = applyCommand(project, {
+      type: 'color-patch',
+      ...target,
+      settings: { contrast: 1.4, shadows: null },
+      hsl: { green: band, blue: null },
+      curves: { master: points, red: null },
+    });
+    expect(patched).toEqual(
       expected(project, (copy) => {
-        grade(copy).color.curves.master = points;
+        const { color } = grade(copy);
+        color.contrast = 1.4;
+        color.shadows = 0;
+        color.hsl.green = band;
+        color.hsl.blue = NEUTRAL_COLOR.hsl.blue;
+        color.curves.master = points;
+        color.curves.red = NEUTRAL_COLOR.curves.red;
       }),
     );
+  });
+
+  it('sets the same settings on several clips in one command', () => {
+    const document = structuredClone(project);
+    document.clips.push({ ...createClip('other', 'rec', 100, 200), start: 100 });
+    document.layers[0]!.transitions = [{ leftId: 'shot', rightId: 'other', type: 'cut', duration: 0 }];
+    const patched = applyCommand(document, {
+      type: 'color-patch',
+      clipIds: ['shot', 'other'],
+      settings: { saturation: 1.3, contrast: null },
+    });
+    expect(patched).toEqual(
+      expected(document, (copy) => {
+        for (const clip of copy.clips) Object.assign(clip.grade.color, { saturation: 1.3, contrast: 1 });
+      }),
+    );
+    // One keyed target, unknown or repeated clips reject the whole command.
+    const patch = (clipIds: string[]) => () =>
+      applyCommand(document, { type: 'color-patch', clipIds, settings: { exposure: 0 } });
+    expect(patch(['other', 'shot'])).toThrow(/exposure follows 1 clip keyframe on clip shot/);
+    expect(patch(['other', 'gone'])).toThrow('Clip gone no longer exists.');
+    expect(patch(['other', 'other'])).toThrow('List each clip once.');
   });
 
   it('change one Transform setting and keep every other saved value', () => {
@@ -125,7 +151,7 @@ describe('partial appearance commands', () => {
   });
 
   it.each(OWNERS)('refuse a setting of $owner that follows keyframes, naming them', ({ target, keyed }) => {
-    expect(() => applyCommand(project, { type: 'color-setting', ...target, setting: 'exposure', value: 1 })).toThrow(
+    expect(() => applyCommand(project, { type: 'color-patch', ...target, settings: { exposure: 1 } })).toThrow(
       `${keyed}, so its base value is not used; change that keyframe instead.`,
     );
     expect(() => applyCommand(project, { type: 'transform-setting', layerId, setting: 'scale', value: 2 })).toThrow(
@@ -133,27 +159,30 @@ describe('partial appearance commands', () => {
     );
   });
 
-  it('refuse out-of-bounds values, invalid curves and unknown owners or tracks without changing anything', () => {
-    expect(() =>
-      applyCommand(project, { type: 'color-setting', adjustmentId: 'look', setting: 'tint', value: 3 }),
-    ).toThrow();
-    expect(() => applyCommand(project, { type: 'color-setting', clipId: 'shot', setting: 'tint', value: 3 })).toThrow();
+  it('refuse out-of-bounds values, invalid curves, empty patches and unknown owners or tracks without changing anything', () => {
+    expect(() => applyCommand(project, { type: 'color-patch', adjustmentId: 'look', settings: { tint: 3 } })).toThrow();
+    expect(() => applyCommand(project, { type: 'color-patch', clipIds: ['shot'], settings: { tint: 3 } })).toThrow();
     expect(() =>
       applyCommand(project, {
-        type: 'color-curve',
+        type: 'color-patch',
         adjustmentId: 'look',
-        channel: 'blue',
-        points: [
-          { x: 0.2, y: 0 },
-          { x: 1, y: 1 },
-        ],
+        curves: {
+          blue: [
+            { x: 0.2, y: 0 },
+            { x: 1, y: 1 },
+          ],
+        },
       }),
     ).toThrow(/ascend from 0 to 1/);
-    expect(() =>
-      applyCommand(project, { type: 'color-setting', adjustmentId: 'gone', setting: 'tint', value: 0 }),
-    ).toThrow('Adjustment no longer exists.');
-    expect(() => applyCommand(project, { type: 'color-setting', clipId: 'gone', setting: 'tint', value: 0 })).toThrow(
-      'Clip no longer exists.',
+    expect(() => applyCommand(project, { type: 'color-patch', adjustmentId: 'look' })).toThrow(
+      'List at least one setting to change.',
+    );
+    expect(() => applyCommand(project, { type: 'color-patch', settings: { tint: 0 } })).toThrow('Give either');
+    expect(() => applyCommand(project, { type: 'color-patch', adjustmentId: 'gone', settings: { tint: 0 } })).toThrow(
+      'Adjustment no longer exists.',
+    );
+    expect(() => applyCommand(project, { type: 'color-patch', clipIds: ['gone'], settings: { tint: 0 } })).toThrow(
+      'Clip gone no longer exists.',
     );
     expect(() =>
       applyCommand(project, { type: 'transform-setting', layerId: 'video-9', setting: 'rotation', value: 0 }),
