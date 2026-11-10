@@ -26,6 +26,7 @@ import {
   rememberAnalysis,
   settingLabel,
   type AutoAdjustContext,
+  withStyle,
   type AutoAdjustSource,
 } from '../../src/web/auto-adjust.js';
 import { adjustmentColorOwner, gradeOwnerOf } from '../../src/web/color-owner.js';
@@ -332,6 +333,26 @@ describe('Match to this clip', () => {
     expect(target(patched, 'b', 10, 'match').key).toBe(match.key);
     const hued = applyCommand(document, { type: 'color-patch', clipIds: ['a'], settings: { hue: 20 } });
     expect(target(hued, 'b', 10, 'match').key).not.toBe(match.key);
+  });
+
+  it('aims the same clips at a registered style as another analysis', () => {
+    const document = project();
+    const whole = target(document, 'a', 10);
+    const look = {
+      levels: [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1],
+      middle: 0.45,
+      shadow: 0.2,
+      cast: null,
+      muted: 0.2,
+      strong: 0.7,
+      colorfulness: 50,
+    };
+    const style = { id: 'bright', name: 'Bright', references: [], look, createdAt: '2026-11-10T00:00:00.000Z' };
+    const styled = withStyle(whole, style);
+    expect(styled.parts).toEqual(whole.parts);
+    expect(styled.style).toBe(style);
+    expect(styled.key).not.toBe(whole.key);
+    expect(withStyle(whole, { ...style, createdAt: '2026-11-11T00:00:00.000Z' }).key).not.toBe(styled.key);
   });
 
   it('needs another clip on the track, every recording prepared', () => {

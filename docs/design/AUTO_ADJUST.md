@@ -25,7 +25,11 @@ readable. It is unavailable, with the reason in its tooltip and description, whe
 cannot be edited or the clip's recording has no verified proxy. It analyzes the selected clip,
 wherever the playhead is, also in a dissolve.
 
-Choosing Auto opens a nonmodal popover naming what it analyzes, with two choices. **Source**
+Choosing Auto opens a nonmodal popover naming what it analyzes, with three choices. **Look** is
+what it aims at: **Generic**, Auto's balance described below, or one of the user's
+[registered styles](#registered-styles), remembered across sessions (preference
+`pascap-auto-look`); **Styles…** beside it opens the Styles dialog. A match aims at its hero, so
+Look is unavailable with Match. **Source**
 is what it analyzes, named by its scope rather than its container, since the track has no grade
 of its own:
 
@@ -321,6 +325,38 @@ to a graded hero and a shot of the same scene end within 0.03 encoded luma of th
 0.03 of its saturations, their casts within 0.08. A match takes about 0.6 s per clip of 16 analysis
 frames on the development machine, on the editor's main thread between clips.
 
+## Registered styles
+
+Auto's constants aim at a generic balance, not at what the user likes: the owner's own edits are
+brighter and softer than Auto's result. A **style**
+([#314](https://github.com/Plonk42/PasCap/issues/314)) is the look of the user's finished edits,
+which Auto can aim at instead, with every source and Apply as, within **Auto's own settings and
+bounds** (its tone bounds, Saturation 0.9–1.5, Vibrance 0–1, Temperature ±0.5 and Tint ±0.3,
+Auto white balance's soft limits). Implementation: [styles](../../src/shared/styles.ts), the
+[registry](../../src/server/styles.ts) and the [dialog](../../src/web/StylesDialog.tsx).
+
+**Registering.** **Styles…** in the Auto popover opens the **Styles** dialog: the registered
+styles, each with its references (**2 videos, 1 still**) and **Delete** (then **Delete it**; the
+references are untouched), and **New style**: a name and up to 8 references, videos (`.mp4`,
+`.mov`, `.m4v`) or JPEG stills, chosen in the approved footage folders. **Register style**
+measures them: the service reads 8 frames of each video, at the centers of equal slices, or the
+still, with FFmpeg at the analysis size, in place (never copied or modified), and stores the
+[look](#matching-a-look) of all those frames together, as they are, with the style in
+`styles.json` beside the video and music registries. Only registering reads the references:
+moving or deleting them later leaves the style as measured. The assistant lists styles with
+`list_styles` and aims `estimate` at one with `style`; the Hand off dialog's **Look** names it in
+the session brief.
+
+**Aiming.** With a style, Auto fits the eleven settings exactly as a match does, aiming at the
+style's look instead of a hero's, within Auto's bounds: its luma levels, log-average and shadow
+areas, its cast and its muted and strong saturations. Intensity scales the result like Auto's.
+On synthetic fixtures, a style made of brighter, softer, less colorful footage takes a shot less
+than half as far from that look as Auto's generic balance, brighter than it.
+
+The issue's profile also named sky luma and fine-detail energy: the upper luma percentiles
+cover bright skies without recognizing them, and no setting Auto sets controls fine detail, so
+neither is measured. A style is one global look, not one per scene type.
+
 ## Limits
 
 - Grade values are one correction per clip, from one moment or the whole clip. Keyframes adapt
@@ -348,6 +384,10 @@ frames on the development machine, on the editor's main thread between clips.
   flight and light. An animated hero is measured at its middle analyzed frame, and its
   adjustments are not part of its look (they apply to both shots alike when they cover both).
   Shadows, Highlights and Vibrance are approximated on flat areas, as in Auto's fit.
+- A style is aimed at as statistics too: footage of a very different scene (a dark forest under a
+  style made of snowy edits) is pushed towards that scene's levels, within Auto's bounds. Lower
+  Intensity, or register styles per kind of scene. PNG stills are not read: the qualified FFmpeg
+  build decodes JPEG only.
 - The scalar tone settings approximate, not reproduce, a camera's flat-to-Rec.709
   conversion; Auto never sets color curves.
 - The unit tests use synthetic fixtures only: neutral, flat, under- and overexposed, casts,
@@ -382,3 +422,10 @@ other clips of the track, the hero measured and unchanged, its session memory), 
 tests the hero by clip or frame, its exclusion and its errors, and the browser test that Apply
 writes exactly the match the shared code fits to the pixels the page decodes, leaving the hero
 unchanged.
+
+Styles are tested on synthetic fixtures (a style of brighter, softer footage brings a shot closer
+to it than the generic fit, within Auto's bounds), in `estimate` (the style's fit, its kind and
+unknown styles), natively (videos and JPEG stills measured in place and left unchanged, listing
+without paths, deletion, references outside the footage folders, links and other files refused,
+an unreadable registry left unchanged) and in the browser (Look aims Auto at the style and is
+remembered, Match disables it, the dialog registers and deletes styles).

@@ -21,6 +21,7 @@ import {
   runSessionStart,
   runSessionStatus,
 } from './sessions.js';
+import { runListStyles } from './styles.js';
 
 export const runners: OperationRunners = {
   list_projects: runListProjects,
@@ -45,6 +46,7 @@ export const runners: OperationRunners = {
   recording_sheet: runRecordingSheet,
   compare_recordings: runCompareRecordings,
   estimate: runEstimate,
+  list_styles: runListStyles,
 };
 
 export async function runOperation(operation: Operation, context: ServiceContext, input: unknown): Promise<unknown> {

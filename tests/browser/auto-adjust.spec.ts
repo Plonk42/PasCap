@@ -20,8 +20,9 @@ import { analysisSize, frameIlluminant, poolWhiteBalance, type AnalysisFrame } f
 import { analysisFrameArgs } from '../../src/server/stills.js';
 import { autoAdjustCommand } from '../../src/shared/auto-color.js';
 import { layerKeyAsGradeKey } from '../../src/shared/grade.js';
-import { heroColor, matchLook, measureLook } from '../../src/shared/look-match.js';
-import { autoAdjustCommands, autoAdjustTarget, type AutoAdjustContext } from '../../src/web/auto-adjust.js';
+import { heroColor, matchLook, measureLook, STYLE_BOUNDS } from '../../src/shared/look-match.js';
+import type { StyleSummary } from '../../src/shared/styles.js';
+import { autoAdjustCommands, autoAdjustTarget, withStyle, type AutoAdjustContext } from '../../src/web/auto-adjust.js';
 import { gradeOwnerOf } from '../../src/web/color-owner.js';
 import { adjustmentFrom0, expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
@@ -665,6 +666,109 @@ test('Match to this clip gives every other clip of the track its look as graded,
   expect(expected.clips[1]!.grade.color.exposure).toBe(correction.exposure);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(before);
+});
+
+test('a registered style aims Auto at its look, is remembered, and Styles… registers and deletes styles', async ({
+  page,
+}) => {
+  const before = await current(page);
+  const frames = autoAdjustFrames(30, 120);
+  const images = await pageFrames(page, frames);
+  const ordered = frames.map((source) => images.get(source)!);
+  // A brighter, warmer finished look than Auto's balance.
+  const look = measureLook(ordered, { ...flatGrade(before).color, exposure: 0.8, temperature: 0.4, contrast: 0.9 })!;
+  const style: StyleSummary = {
+    id: 'bright',
+    name: 'Bright edits',
+    references: [{ name: 'summer.mp4', kind: 'video', frames: 8 }],
+    look,
+    createdAt: '2026-11-10T00:00:00.000Z',
+  };
+  let styles: StyleSummary[] = [style];
+  await page.route('**/api/ops/list_styles', (route) => route.fulfill({ json: { styles } }));
+  const correction = matchLook(look, ordered, flatGrade(before).color, STYLE_BOUNDS)!;
+  const target = withStyle(autoAdjustTarget(context(before, 45)).target!, style);
+
+  await auto(page).click();
+  await expect(apply(page)).toBeVisible();
+  const choose = page.getByRole('combobox', { name: 'Look', exact: true });
+  await expect(choose).toHaveValue('');
+  await choose.selectOption('bright');
+  await expect(apply(page)).toBeVisible();
+  await apply(page).click();
+  const expected = autoAdjustCommands(
+    context(before, 45),
+    target,
+    'values',
+    new Map([['flat', correction]]),
+    0.8,
+  ).reduce(applyCommand, before);
+  await expect.poll(() => current(page)).toEqual(expected);
+  expect(flatGrade(expected).color.exposure).toBeGreaterThan(analyzeAutoAdjust(ordered)!.exposure);
+  expect(await page.evaluate(() => localStorage.getItem('pascap-auto-look'))).toBe('bright');
+
+  // Reopened, Auto aims at the style again; a match aims at this clip instead.
+  await auto(page).click();
+  await expect(choose).toHaveValue('bright');
+  await choice(page, 'Match every other clip on Track 1 to this clip').check();
+  await expect(choose).toBeDisabled();
+  await choice(page, 'This clip').check();
+
+  let registered: unknown = null;
+  await page.route('**/api/footage/roots', (route) =>
+    route.fulfill({ json: { roots: [{ id: 'root-0', name: 'Edits', path: '/edits', available: true, error: null }] } }),
+  );
+  await page.route('**/api/styles/browse?*', (route) =>
+    route.fulfill({
+      json: {
+        rootId: 'root-0',
+        directory: '/edits',
+        parent: null,
+        entries: [
+          { name: 'autumn.mp4', path: '/edits/autumn.mp4', kind: 'video', size: 10 },
+          { name: 'frame.jpg', path: '/edits/frame.jpg', kind: 'still', size: 10 },
+        ],
+        ignored: 0,
+        truncated: false,
+        warnings: [],
+      },
+    }),
+  );
+  await page.route('**/api/styles', async (route) => {
+    registered = route.request().postDataJSON();
+    const added: StyleSummary = {
+      ...style,
+      id: 'autumn',
+      name: 'Autumn',
+      references: [
+        { name: 'autumn.mp4', kind: 'video', frames: 8 },
+        { name: 'frame.jpg', kind: 'still', frames: 1 },
+      ],
+    };
+    styles = [...styles, added];
+    await route.fulfill({ json: { style: added } });
+  });
+  await page.route('**/api/styles/bright', async (route) => {
+    expect(route.request().method()).toBe('DELETE');
+    styles = styles.filter((item) => item.id !== 'bright');
+    await route.fulfill({ json: { deleted: true } });
+  });
+  await page.getByRole('button', { name: 'Styles…', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Styles', exact: true });
+  await expect(dialog.getByRole('list', { name: 'Registered styles' })).toContainText('Bright edits1 video');
+  await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Autumn');
+  await dialog.getByRole('checkbox', { name: /autumn\.mp4/ }).check();
+  await dialog.getByRole('checkbox', { name: /frame\.jpg/ }).check();
+  await expect(dialog.getByText('2 of 8 references selected', { exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Register style', exact: true }).click();
+  await expect(dialog.getByRole('list', { name: 'Registered styles' })).toContainText('Autumn1 video, 1 still');
+  expect(registered).toEqual({ name: 'Autumn', paths: ['/edits/autumn.mp4', '/edits/frame.jpg'] });
+  await dialog.getByRole('button', { name: 'Delete style Bright edits', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Confirm deleting style Bright edits', exact: true }).click();
+  await expect(dialog.getByRole('list', { name: 'Registered styles' })).not.toContainText('Bright edits');
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(await current(page)).toEqual(expected);
 });
 
 test('explains when it cannot run, and a canceled or failed analysis leaves no edit', async ({ page }) => {

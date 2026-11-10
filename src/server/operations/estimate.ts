@@ -15,7 +15,15 @@ import { detailFrames, measureDetail, suggestDetail } from '../../shared/detail-
 import { createColorSettings, type ScalarColorSetting } from '../../shared/color.js';
 import { gradeKeyAsLayerKey } from '../../shared/grade.js';
 import { hasLayerKeys } from '../../shared/keyframes.js';
-import { heroColor, matchLook, measureLook, type LookProfile } from '../../shared/look-match.js';
+import {
+  heroColor,
+  MATCH_BOUNDS,
+  matchLook,
+  measureLook,
+  STYLE_BOUNDS,
+  type LookProfile,
+  type MatchBounds,
+} from '../../shared/look-match.js';
 import type { ProjectDocument } from '../../shared/model.js';
 import type { estimate } from '../../shared/operations/estimate.js';
 import { projectVideoIds } from '../../shared/projects.js';
@@ -145,6 +153,8 @@ function checkChoice(input: Input): void {
   if (input.kind === 'match' && !reference)
     throw invalid('A match needs its hero: give referenceClipId, referenceFrame or both.');
   if (input.kind !== 'match' && reference) throw invalid('referenceClipId and referenceFrame belong to kind match.');
+  if (input.style !== undefined && input.kind !== 'auto-adjust')
+    throw invalid('style aims Auto adjust: use it with kind auto-adjust.');
 }
 
 const heroUnchanged = (hero: string): ServiceError =>
@@ -297,11 +307,11 @@ function correctionEdits(fitted: AutoCorrection, { grade }: Target, input: Input
   return { fields, commands: command ? [command] : [], unchanged: animatedSettings(grade.values) };
 }
 
-/** The eleven settings making the target look like the hero; its grade's other settings are kept. */
-function estimateMatch(look: LookProfile) {
+/** The eleven settings making the target look like `look` within `bounds`; its grade's other settings are kept. */
+function estimateLook(look: LookProfile, bounds: MatchBounds) {
   return async (context: ServiceContext, target: Target, input: Input): Promise<Estimated> => {
     const base = target.clip?.clip.grade.color ?? createColorSettings();
-    const fitted = matchLook(look, await colorFrames(context.stills, target.reads), base);
+    const fitted = matchLook(look, await colorFrames(context.stills, target.reads), base, bounds);
     if (!fitted) throw tooUniform();
     return correctionEdits(fitted, target, input);
   };
@@ -382,10 +392,14 @@ export const runEstimate: OperationRunner<typeof estimate> = async (context, inp
     const full = keyframeLimitReason(values, keyFrame!, owner);
     if (full !== null) throw new ServiceError(full, 409);
   }
-  const estimator = matched
-    ? estimateMatch(await heroLook(context, matched))
-    : estimators[input.kind as keyof typeof estimators];
-  const reference = matched ? { reference: { clipId: hero!, frames: new Set(matched.sourceFrames).size } } : {};
+  const style = input.style === undefined ? null : await context.styles.get(input.style);
+  let estimator: Estimator = estimators[input.kind as keyof typeof estimators];
+  if (matched) estimator = estimateLook(await heroLook(context, matched), MATCH_BOUNDS);
+  else if (style) estimator = estimateLook(style.look, STYLE_BOUNDS);
+  const reference = {
+    ...(matched && { reference: { clipId: hero!, frames: new Set(matched.sourceFrames).size } }),
+    ...(style && { style: { id: style.id, name: style.name } }),
+  };
   if (clips) {
     const { analyzed, results, commands } = await estimateClips(context, clips, input, estimator);
     return {

@@ -17,6 +17,7 @@ import {
   rememberAnalysis,
   settingLabel,
   trackNameOf,
+  withStyle,
   type AutoAdjustApply,
   type AutoAdjustAvailability,
   type AutoAdjustContext,
@@ -28,6 +29,8 @@ import { Icon } from './icons.js';
 import { livePreview } from './live-preview.js';
 import { Popover } from './Popover.js';
 import { ResetLabel } from './SettingValueControl.js';
+import { rememberedLook, rememberLook, useStyles } from './styles.js';
+import { StylesDialog } from './StylesDialog.js';
 import { ValueControl } from './ValueControl.js';
 import './auto-adjust.css';
 
@@ -158,10 +161,16 @@ function AutoAdjustPopover({
   const [percent, setPercent] = useState(BALANCED);
   const [draft, setDraft] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const styles = useStyles(open);
+  // Undefined until chosen in this popover: the look last chosen, once the styles have loaded.
+  const [lookId, setLookId] = useState<string | null | undefined>(undefined);
+  const [managing, setManaging] = useState(false);
+  const look = lookId === undefined ? rememberedLook(styles) : (styles.find((style) => style.id === lookId) ?? null);
 
   const available = availabilities[source];
   const reason = available.reason ?? (applyAs === 'keyframe' ? keyframeReason(context, source) : null);
-  const target: AutoAdjustTarget | null = reason === null ? available.target : null;
+  const aimed = available.target && look && source !== 'match' ? withStyle(available.target, look) : available.target;
+  const target: AutoAdjustTarget | null = reason === null ? aimed : null;
   const targetKey = target?.key ?? null;
   // A new source or, from the playhead, a new playhead is a new analysis; leaving it cancels the old one.
   useEffect(() => {
@@ -217,6 +226,7 @@ function AutoAdjustPopover({
       const initial = initialChoice(context);
       setSource(initial.source);
       setApplyAs(initial.apply);
+      setLookId(undefined);
     } else setPhase({ kind: 'idle' });
   };
 
@@ -264,6 +274,43 @@ function AutoAdjustPopover({
               <p className="auto-adjust-source" title={analyzed}>
                 From {shortName(analyzed)}
               </p>
+              <div className="auto-adjust-look">
+                <label htmlFor={`${id}-look`}>Look</label>
+                <select
+                  id={`${id}-look`}
+                  value={source === 'match' ? '' : (look?.id ?? '')}
+                  disabled={source === 'match'}
+                  title={
+                    source === 'match'
+                      ? 'A match aims at this clip’s look.'
+                      : 'What Auto aims at: its generic balance, or one of your styles'
+                  }
+                  onChange={(event) => {
+                    const chosen = styles.find((style) => style.id === event.target.value) ?? null;
+                    setDraft(null);
+                    setLookId(chosen?.id ?? null);
+                    rememberLook(chosen);
+                  }}
+                >
+                  <option value="">Generic</option>
+                  {styles.map((style) => (
+                    <option key={style.id} value={style.id}>
+                      {style.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="text-button"
+                  title="Register or delete styles measured on your own finished edits"
+                  onClick={() => {
+                    close();
+                    setManaging(true);
+                  }}
+                >
+                  Styles…
+                </button>
+              </div>
               <fieldset className="auto-adjust-mode">
                 <legend>Source</legend>
                 {sources(trackNameOf(context)).map((option) => (
@@ -392,6 +439,7 @@ function AutoAdjustPopover({
           );
         }}
       </Popover>
+      {managing && <StylesDialog onClose={() => setManaging(false)} />}
       <span className="sr-only" aria-live="polite">
         {announcement}
       </span>

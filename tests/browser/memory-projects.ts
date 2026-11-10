@@ -116,6 +116,8 @@ export async function memoryProjects(page: Page, initial: ProjectDocument): Prom
   };
   // The waveform of a placed synthetic music fixture is a read of its prepared cache.
   await page.route('**/api/ops/music_waveform', (route) => route.continue());
+  // No style is registered: Auto and Hand off offer the generic look only.
+  await page.route('**/api/ops/list_styles', (route) => route.fulfill({ json: { styles: [] } }));
   await page.route(
     /\/api\/ops\/(session_status|session_start|session_end|checkpoint|checkpoint_restore|checkpoint_copy|hand_off_readiness)$/,
     async (route) => {

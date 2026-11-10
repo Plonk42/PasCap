@@ -15,6 +15,7 @@ import { Icon } from './icons.js';
 import { Modal } from './Modal.js';
 import { callOperation } from './operations.js';
 import { steadyLimitsText, useSteadyLimits } from './SmoothRange.js';
+import { useStyles } from './styles.js';
 import './hand-off.css';
 
 type Readiness = OperationOutput<'hand_off_readiness'>;
@@ -276,6 +277,8 @@ export function HandOffDialog({
   const [useLimits, setUseLimits] = useState(true);
   const [limits] = useSteadyLimits();
   const [maxClips, setMaxClips] = useState('');
+  const styles = useStyles();
+  const [styleId, setStyleId] = useState('');
   const [pending, setPending] = useState(false);
   const [queueError, setQueueError] = useState('');
   const submission = useRef(false);
@@ -308,6 +311,7 @@ export function HandOffDialog({
         targetSeconds: targetSeconds.value,
         ...briefLimits(useLimits ? limits : null),
         maxClips: clips.value,
+        style: styles.some((style) => style.id === styleId) ? styleId : null,
       });
       if (ok) onClose();
     } finally {
@@ -412,6 +416,24 @@ export function HandOffDialog({
         </div>
         {field('target', 'Target length (s)', target, setTarget, targetSeconds.error, 'Music', 'any')}
         {field('clips', 'Most clips', maxClips, setMaxClips, clips.error, 'Any', '1')}
+        {styles.length > 0 && (
+          <div className="hand-off-field">
+            <label htmlFor={`${id}-style`}>Look</label>
+            <select
+              id={`${id}-style`}
+              value={styleId}
+              disabled={submitting}
+              onChange={(event) => setStyleId(event.target.value)}
+            >
+              <option value="">Generic</option>
+              {styles.map((style) => (
+                <option key={style.id} value={style.id}>
+                  {style.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="hand-off-check">
           <input
             id={`${id}-limits`}

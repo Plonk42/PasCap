@@ -1,6 +1,6 @@
 import {
   AUTO_ADJUST,
-  autoAdjustFrames,
+  AUTO_TONE,
   bySaturation,
   colorfulness,
   lineSearch,
@@ -17,16 +17,16 @@ import {
   type ToneSetting,
   type ToneStatistics,
 } from './auto-adjust.js';
-import {
-  COLOR_CONTROLS,
-  createColorSettings,
-  encode709,
-  isNeutralColor,
-  temperatureTintGains,
-  type ColorSettings,
-} from './color.js';
+import { createColorSettings, encode709, isNeutralColor, temperatureTintGains, type ColorSettings } from './color.js';
 import { gradeColorAt, type ClipGrade } from './grade.js';
-import { frameIlluminant, LINEAR_CODES, median, type AnalysisFrame, type WhiteBalance } from './white-balance.js';
+import {
+  frameIlluminant,
+  LINEAR_CODES,
+  median,
+  WHITE_BALANCE,
+  type AnalysisFrame,
+  type WhiteBalance,
+} from './white-balance.js';
 
 /** Shot matching (#315): constants of the fit; see docs/design/AUTO_ADJUST.md (Matching a look). */
 export const LOOK_MATCH = Object.freeze({
@@ -67,23 +67,48 @@ export interface LookProfile {
   colorfulness: number;
 }
 
-/** Fitted tone settings, with the bounds and regularization scales of a match: wider than Auto's balance. */
-const MATCH_TONE: readonly { key: ToneSetting; low: number; high: number; scale: number }[] = [
-  { key: 'exposure', low: -2, high: 2, scale: 1 },
-  { key: 'blacks', low: -1, high: 1, scale: 0.6 },
-  { key: 'whites', low: -1, high: 1, scale: 0.6 },
-  { key: 'contrast', low: 0.5, high: 2, scale: 0.8 },
-  { key: 'brightness', low: -0.3, high: 0.3, scale: 0.1 },
-  { key: 'highlights', low: -1, high: 1, scale: 0.4 },
-  { key: 'shadows', low: -1, high: 1, scale: 0.4 },
-];
-const SATURATION = { low: 0, high: 2, scale: 0.5 };
-const VIBRANCE = { low: -1, high: 1, scale: 0.5 };
-const BOUNDS = new Map<string, { min: number; max: number }>(COLOR_CONTROLS.map((control) => [control.key, control]));
-const bounded = (setting: string, value: number): number => {
-  const { min, max } = BOUNDS.get(setting)!;
-  return Math.min(max, Math.max(min, value));
-};
+interface Range {
+  low: number;
+  high: number;
+}
+/** What a fit may set: each setting's range, and the tone settings' regularization scales. */
+export interface MatchBounds {
+  tone: readonly (Range & { key: ToneSetting; scale: number })[];
+  saturation: Range;
+  vibrance: Range;
+  temperature: Range;
+  tint: Range;
+}
+
+/** A match: wider than Auto's balance, so that shots can take a graded hero's look. */
+export const MATCH_BOUNDS: MatchBounds = Object.freeze<MatchBounds>({
+  tone: [
+    { key: 'exposure', low: -2, high: 2, scale: 1 },
+    { key: 'blacks', low: -1, high: 1, scale: 0.6 },
+    { key: 'whites', low: -1, high: 1, scale: 0.6 },
+    { key: 'contrast', low: 0.5, high: 2, scale: 0.8 },
+    { key: 'brightness', low: -0.3, high: 0.3, scale: 0.1 },
+    { key: 'highlights', low: -1, high: 1, scale: 0.4 },
+    { key: 'shadows', low: -1, high: 1, scale: 0.4 },
+  ],
+  saturation: { low: 0, high: 2 },
+  vibrance: { low: -1, high: 1 },
+  temperature: { low: -2, high: 2 },
+  tint: { low: -1, high: 1 },
+});
+
+/** A style: Auto's own settings and bounds, aimed at the style instead of Auto's constants. */
+export const STYLE_BOUNDS: MatchBounds = Object.freeze<MatchBounds>({
+  tone: AUTO_TONE,
+  saturation: { low: AUTO_ADJUST.minimumSaturation, high: AUTO_ADJUST.maximumSaturation },
+  vibrance: { low: 0, high: AUTO_ADJUST.maximumVibrance },
+  temperature: { low: -WHITE_BALANCE.temperatureLimit, high: WHITE_BALANCE.temperatureLimit },
+  tint: { low: -WHITE_BALANCE.tintLimit, high: WHITE_BALANCE.tintLimit },
+});
+
+/** Regularization scales of Saturation (in stops) and Vibrance. */
+const CHROMA_SCALE = 0.5;
+const within = ({ low, high }: Range, value: number): number => Math.min(high, Math.max(low, value));
 const NEUTRAL_BALANCE: Readonly<WhiteBalance> = Object.freeze({ temperature: 0, tint: 0 });
 
 type Render = ReturnType<typeof renderFlat>;
@@ -209,21 +234,27 @@ export function measureLook(
   return isNeutralColor(color) ? finishedLook(small) : gradedLook(small, elevenOf(color), color);
 }
 
-function regularization(tone: Readonly<Tone>): number {
+function regularization(tone: Readonly<Tone>, bounds: MatchBounds): number {
   let sum = 0;
-  for (const { key, scale } of MATCH_TONE) {
+  for (const { key, scale } of bounds.tone) {
     const value = key === 'contrast' ? Math.log2(tone[key]) : tone[key];
     sum += (value / scale) ** 2;
   }
   return AUTO_ADJUST.regularization * sum;
 }
 
+/** What a fit renders through: the white balance, the grade's other settings, and the bounds of what it sets. */
+interface FitSettings {
+  balance: WhiteBalance;
+  base: Readonly<ColorSettings>;
+  bounds: MatchBounds;
+}
+
 /** The tone settings whose output levels, shadow areas and log-average come closest to the aimed ones, on gray anchors. */
 function matchTone(
   aim: Readonly<LookProfile>,
   statistics: ToneStatistics,
-  balance: WhiteBalance,
-  base: Readonly<ColorSettings>,
+  { balance, base, bounds }: FitSettings,
   start: Readonly<Tone>,
 ): Tone {
   const anchors = [...statistics.levels, statistics.logAverage, statistics.shadow];
@@ -234,11 +265,11 @@ function matchTone(
     anchors.forEach((anchor, index) => {
       sum += ((luma(render([anchor, anchor, anchor])) - targets[index]!) / LOOK_MATCH.scale) ** 2;
     });
-    return sum + regularization(tone);
+    return sum + regularization(tone, bounds);
   };
   const tone = { ...start };
   for (let sweep = 0; sweep < LOOK_MATCH.sweeps; sweep++)
-    for (const { key, low, high } of MATCH_TONE)
+    for (const { key, low, high } of bounds.tone)
       tone[key] = lineSearch((value) => cost({ ...tone, [key]: value }), low, high, tone[key]);
   return tone;
 }
@@ -255,6 +286,7 @@ function matchChroma(
   tone: Readonly<Tone>,
   base: Readonly<ColorSettings>,
   start: Readonly<Chroma>,
+  bounds: MatchBounds,
 ): Chroma {
   const picked: number[] = [];
   for (const item of samples) {
@@ -270,8 +302,7 @@ function matchChroma(
     return NEUTRAL_CHROMA;
   const cost = (chroma: Readonly<Chroma>): number => {
     const { muted, strong } = saturationQuantiles(pooled, renderFlat(balance, tone, chroma, base));
-    const pull =
-      (Math.log2(Math.max(chroma.saturation, 1e-3)) / SATURATION.scale) ** 2 + (chroma.vibrance / VIBRANCE.scale) ** 2;
+    const pull = (Math.log2(Math.max(chroma.saturation, 1e-3)) ** 2 + chroma.vibrance ** 2) / CHROMA_SCALE ** 2;
     return (
       ((muted - aim.muted) / LOOK_MATCH.scale) ** 2 +
       ((strong - aim.strong) / LOOK_MATCH.scale) ** 2 +
@@ -282,15 +313,15 @@ function matchChroma(
   for (let sweep = 0; sweep < LOOK_MATCH.chromaSweeps; sweep++) {
     chroma.saturation = lineSearch(
       (value) => cost({ ...chroma, saturation: value }),
-      SATURATION.low,
-      SATURATION.high,
+      bounds.saturation.low,
+      bounds.saturation.high,
       chroma.saturation,
       LOOK_MATCH.chromaSteps,
     );
     chroma.vibrance = lineSearch(
       (value) => cost({ ...chroma, vibrance: value }),
-      VIBRANCE.low,
-      VIBRANCE.high,
+      bounds.vibrance.low,
+      bounds.vibrance.high,
       chroma.vibrance,
       LOOK_MATCH.chromaSteps,
     );
@@ -312,49 +343,51 @@ function reaim(aim: LookProfile, look: Readonly<LookProfile>, measured: Readonly
 }
 
 /** Temperature and Tint moved so the output's cast becomes the look's, within their bounds. */
-function rebalance(balance: WhiteBalance, look: Readonly<LookProfile>, measured: Readonly<LookProfile>): WhiteBalance {
+function rebalance(
+  balance: WhiteBalance,
+  look: Readonly<LookProfile>,
+  measured: Readonly<LookProfile>,
+  bounds: MatchBounds,
+): WhiteBalance {
   if (!look.cast || !measured.cast) return balance;
   return {
-    temperature: bounded('temperature', balance.temperature + measured.cast.temperature - look.cast.temperature),
-    tint: bounded('tint', balance.tint + measured.cast.tint - look.cast.tint),
+    temperature: within(bounds.temperature, balance.temperature + measured.cast.temperature - look.cast.temperature),
+    tint: within(bounds.tint, balance.tint + measured.cast.tint - look.cast.tint),
   };
 }
 
 /**
  * The eleven settings that make frames look like `look`, replacing the grade's values of those settings, with
- * `base`, the grade's other settings (Hue, HSL, curves), kept. Tone and color are fitted through the real grade;
- * then the graded frames are measured, Temperature and Tint move their cast to the look's, and the fit aims again
- * at what it missed. Null when no frame has usable pixels.
+ * `base`, the grade's other settings (Hue, HSL, curves), kept, each within `bounds`. Tone and color are fitted
+ * through the real grade; then the graded frames are measured, Temperature and Tint move their cast to the look's,
+ * and the fit aims again at what it missed. Null when no frame has usable pixels.
  */
 export function matchLook(
   look: Readonly<LookProfile>,
   frames: readonly AnalysisFrame[],
   base: Readonly<ColorSettings> = createColorSettings(),
+  bounds: MatchBounds = MATCH_BOUNDS,
 ): AutoCorrection | null {
   const small = frames.map(reduced);
   const before = finishedLook(small);
   if (!before) return null;
-  let balance = rebalance({ ...NEUTRAL_BALANCE }, look, before);
+  let balance = rebalance({ ...NEUTRAL_BALANCE }, look, before, bounds);
   let aim: LookProfile = { ...look };
   let tone: Tone = { ...NEUTRAL_TONE };
   let chroma: Chroma = { ...NEUTRAL_CHROMA };
   for (let pass = 0; pass < LOOK_MATCH.passes; pass++) {
     const statistics = toneStatistics(small, balance, LOOK_MATCH.samples);
     if (!statistics) return null;
-    tone = matchTone(aim, statistics, balance, base, tone);
-    chroma = matchChroma(aim, statistics.samples, balance, tone, base, chroma);
+    tone = matchTone(aim, statistics, { balance, base, bounds }, tone);
+    chroma = matchChroma(aim, statistics.samples, balance, tone, base, chroma, bounds);
     if (pass === LOOK_MATCH.passes - 1) break;
     const measured = gradedLook(small, { ...balance, ...tone, ...chroma }, base);
     if (!measured) break;
     aim = reaim(aim, look, measured);
-    balance = rebalance(balance, look, measured);
+    balance = rebalance(balance, look, measured, bounds);
   }
   return scaleCorrection({ ...balance, ...tone, ...chroma }, AUTO_ADJUST.balancedIntensity);
 }
-
-/** Source frames a hero clip is measured on: the centers of up to 16 slices of its whole source range. */
-export const heroFrames = (clip: { sourceIn: number; sourceOut: number }): number[] =>
-  autoAdjustFrames(clip.sourceIn, clip.sourceOut);
 
 /** The hero's grade as it looks over the analyzed frames: its Color at the middle one. */
 export function heroColor(

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { AUTO_ADJUST_SETTINGS, type AutoCorrection } from '../../src/shared/auto-adjust.js';
+import { analyzeAutoAdjust, AUTO_ADJUST_SETTINGS, type AutoCorrection } from '../../src/shared/auto-adjust.js';
 import { createColorSettings, type ColorSettings } from '../../src/shared/color.js';
-import { heroColor, matchLook, measureLook, type LookProfile } from '../../src/shared/look-match.js';
+import { heroColor, matchLook, measureLook, STYLE_BOUNDS, type LookProfile } from '../../src/shared/look-match.js';
 import { type AnalysisFrame } from '../../src/shared/white-balance.js';
 import { flat, frame, frames, scene } from './analysis-fixtures.js';
 
@@ -76,6 +76,27 @@ describe('Shot matching', () => {
     const black = [frame(() => [0, 0, 0])];
     expect(matchLook(heroLook, black)).toBeNull();
     expect(measureLook(black)).toBeNull();
+  });
+
+  it('aims Auto at a registered style within its own bounds, closer to the style than the generic fit', () => {
+    // The style's references: brighter, softer and less colorful finished footage of other scenes.
+    const references = frames(8, (seed) => scene(seed + 200, { gain: 1.6, chroma: 0.45 }));
+    const style = look(references);
+    const shot = frames(8, (seed) => scene(seed + 240, { gain: 0.8 }));
+    const styled = matchLook(style, shot, createColorSettings(), STYLE_BOUNDS)!;
+    const generic = analyzeAutoAdjust(shot)!;
+    const distance = (correction: AutoCorrection): number => {
+      const result = look(shot, graded(correction));
+      return lumaGap(result, style) + Math.abs(result.muted - style.muted) + Math.abs(result.strong - style.strong);
+    };
+    expect(distance(styled)).toBeLessThan(distance(generic) / 2);
+    expect(look(shot, graded(styled)).middle).toBeGreaterThan(look(shot, graded(generic)).middle);
+    for (const { key, low, high } of STYLE_BOUNDS.tone) {
+      expect(styled[key]).toBeGreaterThanOrEqual(low);
+      expect(styled[key]).toBeLessThanOrEqual(high);
+    }
+    expect(styled.saturation).toBeGreaterThanOrEqual(STYLE_BOUNDS.saturation.low);
+    expect(Math.abs(styled.temperature)).toBeLessThanOrEqual(STYLE_BOUNDS.temperature.high);
   });
 
   it('measures an animated hero at the middle analyzed frame', () => {

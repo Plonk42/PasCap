@@ -16,8 +16,17 @@ import {
 } from '../shared/auto-color.js';
 import { COLOR_CONTROLS, type ColorSettings } from '../shared/color.js';
 import type { EditCommand } from '../shared/commands.js';
-import { heroColor, matchLook, measureLook, type LookProfile } from '../shared/look-match.js';
+import {
+  heroColor,
+  MATCH_BOUNDS,
+  matchLook,
+  measureLook,
+  STYLE_BOUNDS,
+  type LookProfile,
+  type MatchBounds,
+} from '../shared/look-match.js';
 import type { MediaAsset } from '../shared/media.js';
+import type { StyleSummary } from '../shared/styles.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { PlacedClip, TimelineLayout } from '../shared/timeline.js';
@@ -53,6 +62,8 @@ export interface AutoAdjustTarget {
   parts: AutoAdjustPart[];
   /** For a match: the graded clip, the hero whose look the parts take; it is measured, never changed. */
   reference?: AutoAdjustPart;
+  /** A registered style each part is aimed at instead of Auto's generic balance. */
+  style?: StyleSummary;
 }
 
 export type AutoAdjustAvailability = { target: AutoAdjustTarget; reason: null } | { target: null; reason: string };
@@ -159,6 +170,11 @@ function matchTarget(context: AutoAdjustContext, hero: PlacedClip): AutoAdjustAv
     target: { source: 'match', label, key, parts: others, reference: { ...reference, name: 'This clip' } },
     reason: null,
   };
+}
+
+/** The same clips aimed at a registered style instead of Auto's generic balance: another analysis. */
+export function withStyle(target: AutoAdjustTarget, style: StyleSummary): AutoAdjustTarget {
+  return { ...target, style, key: `${target.key}:style:${style.id}:${style.createdAt}` };
 }
 
 /** Why a keyframe cannot take the correction from `source` at the playhead, or null. */
@@ -322,22 +338,36 @@ export async function analyzeTarget(
   await forEachSerial(target.parts, async (part) => {
     const frames = await partFrames(part, signal, progress);
     before += part.sourceFrames.length;
-    const correction = look ? await matchPart(look, part, frames, signal) : await balancePart(frames, signal);
+    const correction = await fitPart(look, target.style, part, frames, signal);
     if (!correction) throw new Error(named(part.name, TOO_UNIFORM));
     corrections.set(part.clip.clip.id, correction);
   });
   return corrections;
 }
 
+/** A part's correction: matched to the hero, aimed at a style, or Auto's generic balance. */
+function fitPart(
+  hero: LookProfile | null,
+  style: StyleSummary | undefined,
+  part: AutoAdjustPart,
+  frames: readonly AnalysisFrame[],
+  signal: AbortSignal,
+): Promise<AutoCorrection | null> {
+  if (hero) return matchPart(hero, MATCH_BOUNDS, part, frames, signal);
+  if (style) return matchPart(style.look, STYLE_BOUNDS, part, frames, signal);
+  return balancePart(frames, signal);
+}
+
 async function matchPart(
   look: LookProfile,
+  bounds: MatchBounds,
   part: AutoAdjustPart,
   frames: readonly AnalysisFrame[],
   signal: AbortSignal,
 ): Promise<AutoCorrection | null> {
   await nextTask();
   signal.throwIfAborted();
-  return matchLook(look, frames, part.clip.clip.grade.color);
+  return matchLook(look, frames, part.clip.clip.grade.color, bounds);
 }
 
 async function balancePart(frames: readonly AnalysisFrame[], signal: AbortSignal): Promise<AutoCorrection | null> {
