@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { applyCommand } from './commands.js';
 import { frameSchema, idSchema, projectSchema, type ProjectDocument } from './model.js';
 import { musicClips, removeMusicClips } from './music-lanes.js';
+import { PROJECT_FPS, sameRate, videoRate, type FrameRate } from './timing.js';
 
 export const projectSummarySchema = z
   .object({
@@ -24,6 +25,19 @@ export function projectVideoIds(project: ProjectDocument): Set<string> {
 
 export function projectAudioIds(project: ProjectDocument): Set<string> {
   return new Set([...project.media.audioIds, ...musicClips(project.music).map((clip) => clip.mediaId)]);
+}
+
+/** Records the registered rate of every recording in the bin; one the registry lacks keeps its entry. */
+export function withVideoRates(
+  project: ProjectDocument,
+  rateOf: (mediaId: string) => Readonly<FrameRate> | undefined,
+): ProjectDocument {
+  const videoRates: Record<string, FrameRate> = {};
+  for (const id of project.media.videoIds) {
+    const rate = rateOf(id) ?? videoRate(project, id);
+    if (!sameRate(rate, PROJECT_FPS)) videoRates[id] = { numerator: rate.numerator, denominator: rate.denominator };
+  }
+  return { ...project, videoRates };
 }
 
 export interface MediaRemoval {
@@ -69,6 +83,7 @@ export function removeProjectMedia(project: ProjectDocument, removal: MediaRemov
     ...next,
     selects: Object.fromEntries(Object.entries(next.selects).filter(([id]) => !removal.videoIds.includes(id))),
     selectsDone: next.selectsDone.filter((id) => !removal.videoIds.includes(id)),
+    videoRates: Object.fromEntries(Object.entries(next.videoRates).filter(([id]) => !removal.videoIds.includes(id))),
     media: {
       videoIds: next.media.videoIds.filter((id) => !removal.videoIds.includes(id)),
       audioIds: next.media.audioIds.filter((id) => !removal.audioIds.includes(id)),

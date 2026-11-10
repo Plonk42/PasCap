@@ -9,6 +9,49 @@ export function sameRate(a: FrameRate, b: FrameRate): boolean {
   return a.numerator * b.denominator === b.numerator * a.denominator;
 }
 
+/** Constant recording rates PasCap accepts, at most 60 fps; source frame n is presented at n / rate. */
+export const SOURCE_FRAME_RATES: readonly Readonly<FrameRate>[] = Object.freeze(
+  [
+    [24_000, 1_001],
+    [24, 1],
+    [25, 1],
+    [30_000, 1_001],
+    [30, 1],
+    [48_000, 1_001],
+    [48, 1],
+    [50, 1],
+    [60_000, 1_001],
+    [60, 1],
+  ].map(([numerator, denominator]) => Object.freeze({ numerator: numerator!, denominator: denominator! })),
+);
+
+/** The accepted recording rate equal to `rate`, in its stored form, or undefined. */
+export function sourceFrameRate(rate: FrameRate): Readonly<FrameRate> | undefined {
+  return SOURCE_FRAME_RATES.find((accepted) => sameRate(accepted, rate));
+}
+
+export function rateText(rate: FrameRate): string {
+  return `${rate.numerator}/${rate.denominator}`;
+}
+
+/** A rate in frames per second for people: 29.97, 30, 59.94. */
+export function rateLabel(rate: FrameRate): string {
+  return String(Math.round((rate.numerator / rate.denominator) * 100) / 100);
+}
+
+/** Recording frames that pass during one project frame at normal speed; exactly 1 at the project rate. */
+export function sourceFramesPerProjectFrame(rate: FrameRate): number {
+  return (rate.numerator * PROJECT_FPS.denominator) / (rate.denominator * PROJECT_FPS.numerator);
+}
+
+/** Frame rate of a project's recording: its own entry, else the project rate. */
+export function videoRate(
+  project: { videoRates: Readonly<Record<string, FrameRate>> },
+  mediaId: string,
+): Readonly<FrameRate> {
+  return Object.hasOwn(project.videoRates, mediaId) ? project.videoRates[mediaId]! : PROJECT_FPS;
+}
+
 export function framesToSeconds(frames: number, rate: FrameRate = PROJECT_FPS): number {
   return (frames * rate.denominator) / rate.numerator;
 }

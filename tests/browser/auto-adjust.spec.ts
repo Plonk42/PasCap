@@ -24,6 +24,7 @@ import { autoAdjustCommands, autoAdjustTarget, type AutoAdjustContext } from '..
 import { gradeOwnerOf } from '../../src/web/color-owner.js';
 import { adjustmentFrom0, expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
+import { PROJECT_FPS } from '../../src/shared/timing.js';
 
 /**
  * A disposable proxy in the editing-proxy format: 30 black frames, then 90 frames of colored patches
@@ -290,7 +291,7 @@ async function compareDecodes(
     for (const frame of frames) {
       const { stdout } = await promisify(execFile)(
         process.env['PASCAP_FFMPEG'] ?? 'ffmpeg',
-        analysisFrameArgs(path.join(directory, `flat-patches-${scale}.mp4`), size, frame, 'rgba'),
+        analysisFrameArgs(path.join(directory, `flat-patches-${scale}.mp4`), size, frame, PROJECT_FPS, 'rgba'),
         { encoding: 'buffer', maxBuffer: size.width * size.height * 4 + 1 },
       );
       service.set(frame, { ...size, data: new Uint8Array(stdout) });
@@ -325,9 +326,13 @@ async function compareDecodes(
 async function expectExactConversion(image: AnalysisFrame, frame: number): Promise<void> {
   const { stdout: yuv } = await promisify(execFile)(
     process.env['PASCAP_FFMPEG'] ?? 'ffmpeg',
-    analysisFrameArgs(path.join(directory, 'flat-patches-1.mp4'), { width: 320, height: 180 }, frame, 'rgba').map(
-      (arg) => (arg.startsWith('scale=') ? 'format=yuv420p' : arg),
-    ),
+    analysisFrameArgs(
+      path.join(directory, 'flat-patches-1.mp4'),
+      { width: 320, height: 180 },
+      frame,
+      PROJECT_FPS,
+      'rgba',
+    ).map((arg) => (arg.startsWith('scale=') ? 'format=yuv420p' : arg)),
     { encoding: 'buffer', maxBuffer: 320 * 180 * 2 },
   );
   for (let y = 18; y < 180; y += 36)

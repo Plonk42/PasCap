@@ -18,6 +18,7 @@ import {
 import { applyCommand } from '../../src/shared/commands.js';
 import { gradeChainPixel, sourceGrades } from '../../src/shared/grade.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
+import { PROJECT_FPS } from '../../src/shared/timing.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sources', () => {
@@ -174,7 +175,7 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
       expect(receipt.verification.frameCount).toBe(duration);
       expect(receipt.verification.colorSpace).toBe('bt709');
       for (const frame of [0, duration - 1, ...(type === 'fade-through-black' ? [89, 90] : [])]) {
-        const pixels = await extractComparisonFrame(config, filename, frame, 'tv');
+        const pixels = await extractComparisonFrame(config, filename, frame, PROJECT_FPS, 'tv');
         expect(pixels.reduce((total, pixel) => total + pixel, 0) / pixels.length).toBeLessThan(1);
       }
       // Numeric agreement at the fade curve/dissolve midpoint, not just duration or screenshots.
@@ -187,6 +188,7 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
             config,
             source.sourcePath,
             layer.sourceFrame,
+            PROJECT_FPS,
             source.metadata.colorRange,
           );
           for (let index = 0; index < pixels.length; index += 3) {
@@ -198,7 +200,7 @@ describe.skipIf(!enabled)('native FFmpeg integration · disposable synthetic sou
               expected[index + channel]! += graded[channel]! * 255 * layer.weight;
           }
         }
-        const actual = await extractComparisonFrame(config, filename, frame, 'tv');
+        const actual = await extractComparisonFrame(config, filename, frame, PROJECT_FPS, 'tv');
         const error = actual.reduce((sum, value, index) => sum + Math.abs(value - expected[index]!), 0) / actual.length;
         console.log(`${type}, frame ${frame}: native/shared-model MAE ${error.toFixed(3)} / 255`);
         expect(error).toBeLessThan(4);

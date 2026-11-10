@@ -195,11 +195,22 @@ describe('strict production export request and immutable validation', () => {
     ).toThrow('source frame count');
     expect(() =>
       validateExport(document, fakeLibrary(videoAsset({ frameRate: { numerator: 24, denominator: 1 } }))),
-    ).toThrow('project-rate');
+    ).toThrow('frame rate the project records');
+    const film = { numerator: 24, denominator: 1 };
+    const filmed = projectSchema.parse({
+      ...document,
+      media: { ...document.media, videoIds: ['video'] },
+      videoRates: { video: film },
+    });
+    const filmAsset = videoAsset({ frameRate: film, frameCount: 40, durationSeconds: 40 / 24 });
+    expect(validateExport(filmed, fakeLibrary(filmAsset)).clips).toHaveLength(1);
+    expect(() => validateExport(document, fakeLibrary(filmAsset))).toThrow('frame rate the project records');
     expect(() => validateExport(document, fakeLibrary(videoAsset({ pixelFormat: 'yuv420p10le' })))).toThrow(
       '8-bit BT.709 SDR',
     );
-    expect(() => validateExport(document, fakeLibrary(videoAsset({ durationSeconds: 20 })))).toThrow('project-rate');
+    expect(() => validateExport(document, fakeLibrary(videoAsset({ durationSeconds: 20 })))).toThrow(
+      'frame rate the project records',
+    );
   });
   it('checks kept ranges of recordings that no clip uses against their registered frames', () => {
     const document = documentWithClips();
@@ -397,14 +408,16 @@ describe('sequential output-frame chunk planning', () => {
         if (chunk.kind === 'body') {
           expect(layers).toHaveLength(1);
           expect(layers[0]!.sourceFrame).toBe(
-            compileRetiming(document.clips[chunk.clipIndex]!).sourceAt(chunk.sourceIn + frame),
+            compileRetiming(document.clips[chunk.clipIndex]!, PROJECT_FPS).sourceAt(chunk.sourceIn + frame),
           );
         } else {
           expect(layers).toHaveLength(2);
           expect(layers[0]!.sourceFrame).toBe(
-            compileRetiming(document.clips[chunk.leftIndex]!).sourceAt(chunk.leftIn + frame),
+            compileRetiming(document.clips[chunk.leftIndex]!, PROJECT_FPS).sourceAt(chunk.leftIn + frame),
           );
-          expect(layers[1]!.sourceFrame).toBe(compileRetiming(document.clips[chunk.rightIndex]!).sourceAt(frame));
+          expect(layers[1]!.sourceFrame).toBe(
+            compileRetiming(document.clips[chunk.rightIndex]!, PROJECT_FPS).sourceAt(frame),
+          );
           expect(layers[1]!.weight).toBe(frame / chunk.duration);
         }
       }
@@ -481,6 +494,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
       const report = await retimeRawVideo({
         ffmpeg: process.execPath,
         cwd: directory,
+        sourceRate: PROJECT_FPS,
         decodeArgs: () => ['-e', decode],
         encodeArgs: ['-e', encode],
         clip,
@@ -488,7 +502,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
         signal: new AbortController().signal,
       });
       const actual = await readFile(destination);
-      const map = compileRetiming(clip);
+      const map = compileRetiming(clip, PROJECT_FPS);
       expect(actual).toHaveLength(map.duration * 6);
       for (let frame = 0; frame < map.duration; frame++)
         expect([...actual.subarray(frame * 6, (frame + 1) * 6)]).toEqual(Array(6).fill(map.sourceAt(frame)));
@@ -508,7 +522,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
     it(`owns an immutable shared map even after a cached caller clip is mutated (${speed.mode})`, async () => {
       const directory = await temp();
       const clip = { ...createClip('snapshot', 'video', 20007, 20019), speed };
-      const cached = compileRetiming(clip);
+      const cached = compileRetiming(clip, PROJECT_FPS);
       const expected = Array.from({ length: cached.duration }, (_, frame) => cached.sourceAt(frame));
       const destination = path.join(directory, 'snapshot.rgb');
       const decode =
@@ -518,6 +532,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
       await retimeRawVideo({
         ffmpeg: process.execPath,
         cwd: directory,
+        sourceRate: PROJECT_FPS,
         decodeArgs: () => ['-e', decode],
         encodeArgs: ['-e', encode],
         clip,
@@ -542,6 +557,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
       retimeRawVideo({
         ffmpeg: process.execPath,
         cwd: directory,
+        sourceRate: PROJECT_FPS,
         decodeArgs: () => ['-e', 'process.stdout.write(Buffer.alloc(11));'],
         encodeArgs: ['-e', 'process.stdin.resume();setInterval(()=>{},1000);'],
         clip: createClip('raw', 'video', 0, 2),
@@ -556,6 +572,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
       retimeRawVideo({
         ffmpeg: process.execPath,
         cwd: directory,
+        sourceRate: PROJECT_FPS,
         decodeArgs: () => ['-e', 'setInterval(()=>{},1000);'],
         encodeArgs: ['-e', 'process.stderr.write("intentional encoder failure");process.exit(23);'],
         clip: createClip('raw', 'video', 0, 2),
@@ -571,6 +588,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
       retimeRawVideo({
         ffmpeg: '/does-not-exist',
         cwd: await temp(),
+        sourceRate: PROJECT_FPS,
         decodeArgs: () => [],
         encodeArgs: [],
         clip: createClip('raw', 'video', 0, 2),
@@ -588,6 +606,7 @@ describe('bounded raw-stream discrete retimer (no FFmpeg needed)', () => {
       retimeRawVideo({
         ffmpeg: process.execPath,
         cwd: directory,
+        sourceRate: PROJECT_FPS,
         decodeArgs: () => [
           '-e',
           'process.on("SIGTERM",()=>{});process.stdout.write(Buffer.alloc(6));setInterval(()=>{},1000);',

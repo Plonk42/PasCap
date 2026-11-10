@@ -81,7 +81,7 @@ import {
   type PreviewLayer,
   type TimelineLayout,
 } from '../../src/shared/timeline.js';
-import { framesToSeconds } from '../../src/shared/timing.js';
+import { framesToSeconds, PROJECT_FPS } from '../../src/shared/timing.js';
 import { singleClipLane } from '../music-lanes.js';
 import { observedJobBytes } from './scratch-observation.js';
 
@@ -842,7 +842,7 @@ describe.skipIf(!enabled)('current-schema layered native export · disposable sy
       }
       expect(sampleTimeline(project, overlap.start + 1, layout)).toHaveLength(count * 2);
       for (const placed of layout.clips.filter((placed) => placed.clip.layerId === 'packed-track')) {
-        expect(placed.retiming).toBe(compileRetiming(placed.clip));
+        expect(placed.retiming).toBe(compileRetiming(placed.clip, PROJECT_FPS));
         const steps = Array.from(
           { length: placed.duration },
           (_, offset) => placed.retiming.sourcePositionAt(offset + 1) - placed.retiming.sourcePositionAt(offset),

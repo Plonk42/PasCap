@@ -1,11 +1,12 @@
 import type { DamagedRange, MediaAsset } from '../shared/media.js';
-import { framesToSeconds } from '../shared/timing.js';
+import { framesToSeconds, rateText, type FrameRate } from '../shared/timing.js';
 import type { ServiceConfig } from './config.js';
 import { runProcess } from './process.js';
 
 async function videoPackets(
   config: ServiceConfig,
   filename: string,
+  rate: FrameRate,
   signal: AbortSignal,
 ): Promise<{ frame: number; keyframe: boolean }[]> {
   const output = await runProcess(
@@ -13,7 +14,7 @@ async function videoPackets(
     ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'packet=pts_time,flags', '-of', 'csv=p=0', filename],
     { signal },
   );
-  const period = framesToSeconds(1);
+  const period = framesToSeconds(1, rate);
   return output
     .toString('utf8')
     .trim()
@@ -52,13 +53,14 @@ export async function findDamage(
   original: string,
   proxy: string,
   frameCount: number,
+  rate: FrameRate,
   signal: AbortSignal,
 ): Promise<{ missing: number; damage: DamagedRange[] }> {
-  const present = new Set((await videoPackets(config, proxy, signal)).map((packet) => packet.frame));
+  const present = new Set((await videoPackets(config, proxy, rate, signal)).map((packet) => packet.frame));
   const missing: number[] = [];
   for (let frame = 0; frame < frameCount; frame++) if (!present.has(frame)) missing.push(frame);
   if (!missing.length) return { missing: 0, damage: [] };
-  const keyframes = (await videoPackets(config, original, signal))
+  const keyframes = (await videoPackets(config, original, rate, signal))
     .filter((packet) => packet.keyframe)
     .map((packet) => packet.frame);
   return { missing: missing.length, damage: damagedRanges(missing, keyframes, frameCount) };
@@ -68,9 +70,10 @@ export async function findDamage(
 export async function hasReorderedFrames(
   config: ServiceConfig,
   original: string,
+  rate: FrameRate,
   signal: AbortSignal,
 ): Promise<boolean> {
-  const packets = await videoPackets(config, original, signal);
+  const packets = await videoPackets(config, original, rate, signal);
   return packets.some((packet, index) => index > 0 && packet.frame < packets[index - 1]!.frame);
 }
 
@@ -94,8 +97,8 @@ export function originalErrorArgs(asset: Pick<MediaAsset, 'damage'>): string[] {
  * refills the frames the decoder drops (so frame counts stay exact) and blacks
  * out every damaged range. Empty for undamaged originals.
  */
-export function repairFilter(damage: readonly DamagedRange[], first: number): string {
+export function repairFilter(damage: readonly DamagedRange[], first: number, rate: FrameRate): string {
   if (!damage.length) return '';
   const enable = damage.map((range) => `between(n,${range.start - first},${range.end - 1 - first})`).join('+');
-  return `fps=30000/1001:start_time=0,tpad=stop=-1:stop_mode=clone,drawbox=c=black:t=fill:enable='${enable}',`;
+  return `fps=${rateText(rate)}:start_time=0,tpad=stop=-1:stop_mode=clone,drawbox=c=black:t=fill:enable='${enable}',`;
 }

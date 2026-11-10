@@ -2,7 +2,9 @@
 export const ASSISTANT_GUIDE = `# Building a rough cut in PasCap
 
 PasCap edits drone-flight videos. Frames are integers at 30000/1001 fps (about 29.97 per second);
-timecodes are MM:SS:FF with 30 nominal frames per second. PasCap measures and computes; you judge
+timecodes are MM:SS:FF with 30 nominal frames per second. A recording with an fps (such as 59.94)
+counts its source frames at that rate and plays in real time: at 1× a clip of it advances fps / 29.97
+source frames per project frame. PasCap measures and computes; you judge
 what the footage shows from its pictures.
 
 ## 1. Read

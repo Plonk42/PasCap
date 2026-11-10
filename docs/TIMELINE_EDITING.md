@@ -48,11 +48,12 @@ short laptop screens; opening the list does not resize source review. The popup
 shows original ranges/tracks; Escape closes just the popup and **Show** selects, seeks and horizontally
 reveals that clip. Library reuse badges count clips, not duplicate recording files.
 
-Timeline source OUT is exclusive. Integer frames at 30000/1001 remain the
-authoritative stored timing; displayed seconds are derived, not accumulated.
+Timeline source OUT is exclusive. Integer project frames at 30000/1001 remain the
+authoritative stored timing; displayed seconds are derived, not accumulated. Source frames count at their
+recording's own constant rate (project `videoRates`, below).
 Output duration/source sampling uses each authoritative **`PlacedClip.retiming`**,
 the clip's own compiled speed map, not the raw source-range length at non-1× speed.
-A clip's duration depends only on its own speed and source range, never its track,
+A clip's duration depends only on its own speed, source range and recording rate, never its track,
 start or Ripple position. See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md).
 Transform belongs to the video track and evaluates at project time;
 Transform edits do not change placement or duration. See

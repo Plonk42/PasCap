@@ -19,7 +19,7 @@ import {
   useBestRanges,
   type BestRangeChange,
 } from './best-ranges.js';
-import { durationLabel, MEDIA_DRAG_TYPE, mediaReady, shortName } from './display.js';
+import { durationLabel, MEDIA_DRAG_TYPE, mediaReady, otherRateLabel, shortName } from './display.js';
 import { Icon } from './icons.js';
 import type { RelinkTarget } from './ImportDialog.js';
 import './media-review.css';
@@ -99,7 +99,11 @@ function LibraryDuration({
             const ranges = selects[asset.id];
             if (!ranges) return sum + asset.metadata.durationSeconds;
             return (
-              sum + framesToSeconds(ranges.reduce((frames, range) => frames + range.sourceOut - range.sourceIn, 0))
+              sum +
+              framesToSeconds(
+                ranges.reduce((frames, range) => frames + range.sourceOut - range.sourceIn, 0),
+                asset.metadata.frameRate,
+              )
             );
           }, 0),
         )
@@ -902,6 +906,7 @@ export function MediaLibrary({
                       {durationLabel(asset.metadata.durationSeconds)}{' '}
                       <span className="media-resolution">
                         · {asset.metadata.width} × {asset.metadata.height}
+                        {otherRateLabel(asset)}
                       </span>
                     </span>
                     {excerptCount > 0 && (

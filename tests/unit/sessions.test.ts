@@ -11,6 +11,7 @@ import type { EditCommand } from '../../src/shared/commands.js';
 import { createClipGrade } from '../../src/shared/grade.js';
 import { createProject, projectSchema, type ProjectDocument, type VideoClip } from '../../src/shared/model.js';
 import { operationNamed, type OperationName } from '../../src/shared/operations/index.js';
+import { PROJECT_FPS } from '../../src/shared/timing.js';
 
 vi.mock('../../src/server/files.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/server/files.js')>()),
@@ -56,7 +57,7 @@ async function setup(options: { ready?: boolean; checkpoints?: number; leaseMs?:
     status: options.ready === false ? 'preparing' : 'ready',
     sourcePath: '/footage/DJI_0001.MP4',
     fingerprint: {},
-    metadata: { frameCount: 600 },
+    metadata: { frameCount: 600, frameRate: PROJECT_FPS },
   };
   const resources = {
     projects,

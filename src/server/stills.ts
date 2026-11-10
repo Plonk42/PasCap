@@ -5,7 +5,7 @@ import type { LumaFrame } from '../shared/detail-estimate.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
 import { calculateLayout, sampleSlots, sampleTimeline, type TimelineLayout } from '../shared/timeline.js';
-import { framesToSeconds } from '../shared/timing.js';
+import { framesToSeconds, type FrameRate } from '../shared/timing.js';
 import { analysisSize, type AnalysisFrame } from '../shared/white-balance.js';
 import type { AssistantImageBudget, ServiceConfig } from './config.js';
 import { ServiceError } from './errors.js';
@@ -46,6 +46,7 @@ export function proxyFrameArgs(proxy: string, asset: MediaAsset, sourceFrame: nu
   return decodeArgs(
     proxy,
     sourceFrame,
+    asset.metadata.frameRate,
     `scale=${bounds.width}:${bounds.height}:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:` +
       `in_range=tv:out_range=pc,format=rgb24,` +
       `pad=${STILL_SIZE.width}:${STILL_SIZE.height}:${bounds.x}:${bounds.y}:black,setsar=1`,
@@ -60,20 +61,22 @@ export function analysisFrameArgs(
   proxy: string,
   size: { width: number; height: number },
   sourceFrame: number,
+  rate: Readonly<FrameRate>,
   format: 'rgba' | 'gray',
 ): string[] {
   // Full chroma interpolation with accurate rounding comes closest to the browser's canvas readback.
   return decodeArgs(
     proxy,
     sourceFrame,
+    rate,
     `scale=${size.width}:${size.height}:flags=area+accurate_rnd+full_chroma_int:` +
       `in_color_matrix=bt709:out_color_matrix=bt709:in_range=tv:out_range=pc,format=${format}`,
   );
 }
 
-function decodeArgs(proxy: string, sourceFrame: number, filter: string): string[] {
+function decodeArgs(proxy: string, sourceFrame: number, rate: Readonly<FrameRate>, filter: string): string[] {
   // A quarter frame early: accurate seeking keeps the first frame at or after the time, never one later.
-  const seek = sourceFrame > 0 ? ['-ss', framesToSeconds(sourceFrame - 0.25).toFixed(9)] : [];
+  const seek = sourceFrame > 0 ? ['-ss', framesToSeconds(sourceFrame - 0.25, rate).toFixed(9)] : [];
   return [
     '-hide_banner',
     '-loglevel',
@@ -435,7 +438,13 @@ export class StillRenderer {
       const { width, height } = analysisSize(asset.prepared!.width, asset.prepared!.height);
       const frames = new Map<number, AnalysisFrame>();
       await forEachSerial([...new Set(sourceFrames)], async (frame) => {
-        const args = analysisFrameArgs(this.library.proxyPath(asset), { width, height }, frame, 'rgba');
+        const args = analysisFrameArgs(
+          this.library.proxyPath(asset),
+          { width, height },
+          frame,
+          asset.metadata.frameRate,
+          'rgba',
+        );
         const data = await this.#decodeRaw(asset, frame, args, width * height * 4, signal);
         frames.set(frame, { width, height, data });
       });
@@ -450,7 +459,7 @@ export class StillRenderer {
       const size = { width: asset.prepared!.width, height: asset.prepared!.height };
       const frames: LumaFrame[] = [];
       await forEachSerial(sourceFrames, async (frame) => {
-        const args = analysisFrameArgs(this.library.proxyPath(asset), size, frame, 'gray');
+        const args = analysisFrameArgs(this.library.proxyPath(asset), size, frame, asset.metadata.frameRate, 'gray');
         const data = await this.#decodeRaw(asset, frame, args, size.width * size.height, signal);
         frames.push({ ...size, data });
       });

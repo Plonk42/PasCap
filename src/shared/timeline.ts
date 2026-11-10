@@ -6,6 +6,7 @@ import type { ProjectDocument, Transition, VideoClip, VideoLayer } from './model
 import { musicClips, validateMusicLane } from './music-lanes.js';
 import { evaluateSpatial, type SpatialPose } from './spatial.js';
 import { compileRetiming, type Retiming } from './speed.js';
+import { videoRate } from './timing.js';
 
 export interface PlacedClip {
   clip: VideoClip;
@@ -184,7 +185,7 @@ function placeLayer(
     const closing = index === ordered.length - 1 ? layer.closingFade : 0;
     const previous = clips[index - 1];
     const start = placementStart(clip, layer, previous, incoming);
-    const retiming = compileRetiming(clip);
+    const retiming = compileRetiming(clip, videoRate(project, clip.mediaId));
     const duration = retiming.duration;
     if (start + duration > 2_147_483_647) throw new RangeError('Track duration exceeds supported project frames.');
     validateClipRegions(clip, duration, incoming, outgoing, opening, closing);

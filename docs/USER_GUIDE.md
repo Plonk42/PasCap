@@ -107,9 +107,13 @@ file/folder drops only block navigation and show Import guidance; internal dragg
 of ready Media into Timeline is supported.
 
 MP4/MOV/M4V extensions are not a guarantee of compatibility. Current source checks
-require one unrotated video stream, constant **30000/1001 fps**, unambiguous zero-start
+require one unrotated video stream at a constant **23.976, 24, 25, 29.97, 30, 47.95, 48, 50, 59.94
+or 60 fps**, unambiguous zero-start
 timestamps/frame counts, 8-bit `yuv420p`, and explicit SDR BT.709 color/range tags.
-HDR, untagged color and ambiguous timing are rejected, not silently normalized.
+HDR, untagged color, variable or other frame rates and ambiguous timing are rejected, not silently normalized.
+The project stays at 29.97 fps: a recording at another rate plays in real time, showing at
+each project frame the recording frame due at that moment (a 60 fps recording advances about two frames per project
+frame at 1×, so 0.5× plays every one of them). Media shows such a recording's rate beside its size.
 See [TIMELINE_EDITING.md](TIMELINE_EDITING.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
 
 Preparation and export run the service's FFmpeg. When it cannot run, lacks a required

@@ -1,5 +1,4 @@
 import type { ProjectDocument, VideoClip, VideoLayer } from './model.js';
-import { clipDuration } from './speed.js';
 import { transitionOffset, type PlacedClip, type TimelineLayout } from './timeline.js';
 
 /** Several selected clips moved together by one timeline-frame delta. */
@@ -63,13 +62,13 @@ function ownTrackBlocks(selected: ReadonlySet<string>, previous: readonly Placed
 }
 
 /** Starts where a block can join the remaining Ripple sequence: before each remaining clip, or after the last. */
-function rippleSlots(layer: VideoLayer, remainder: readonly VideoClip[], anchor: number, first: string): number[] {
+function rippleSlots(layer: VideoLayer, remainder: readonly PlacedClip[], anchor: number, first: string): number[] {
   const slots = [anchor];
   let cursor = anchor;
-  for (const [index, clip] of remainder.entries()) {
-    const left = remainder[index - 1];
+  for (const [index, { clip, duration }] of remainder.entries()) {
+    const left = remainder[index - 1]?.clip;
     const pair = left && layer.transitions.find((item) => item.leftId === left.id && item.rightId === clip.id);
-    cursor += transitionOffset(pair) + clipDuration(clip);
+    cursor += transitionOffset(pair) + duration;
     const incoming = layer.transitions.find((item) => item.leftId === clip.id && item.rightId === first);
     slots.push(cursor + transitionOffset(incoming));
   }
@@ -100,7 +99,15 @@ function rippleSequence(
     : [{ ids: group.map((placed) => placed.clip.id), requested: group[0]!.start + delta }];
   const slots = blocks.map((block) =>
     remainder.length
-      ? nearestSlot(rippleSlots(layer, remainder, previous[0]!.start, block.ids[0]!), block.requested)
+      ? nearestSlot(
+          rippleSlots(
+            layer,
+            remainder.map((clip) => previous.find((placed) => placed.clip.id === clip.id)!),
+            previous[0]!.start,
+            block.ids[0]!,
+          ),
+          block.requested,
+        )
       : 0,
   );
   // Only the track's own first clip, still first, sets a new anchor; an empty track starts where asked.

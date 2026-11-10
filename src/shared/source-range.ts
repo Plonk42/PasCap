@@ -2,6 +2,7 @@ import type { EditCommand } from './commands.js';
 import type { ProjectDocument, VideoClip } from './model.js';
 import { clipDuration } from './speed.js';
 import { calculateLayout } from './timeline.js';
+import { sourceFramesPerProjectFrame, videoRate, type FrameRate } from './timing.js';
 
 export type TrimEdge = 'in' | 'out';
 
@@ -57,20 +58,27 @@ export function validateSourceRanges(project: ProjectDocument, frameCounts: Read
   }
 }
 
-/** Find an original endpoint whose retimed duration matches a pointer delta. */
+/** Find an original endpoint whose retimed duration matches a pointer delta; `sourceRate` is the recording's. */
 export function trimByOutputFrames(
   clip: VideoClip,
   edge: TrimEdge,
   delta: number,
   sourceFrameCount: number,
+  sourceRate: Readonly<FrameRate>,
 ): Extract<EditCommand, { type: 'trim' }> {
   trimByFrames(clip, edge, 0, sourceFrameCount);
   if (!Number.isSafeInteger(delta)) throw new Error('Trim needs integer output frames.');
   if (delta === 0) return trimByFrames(clip, edge, 0, sourceFrameCount);
   if (clip.speed.mode === 'constant')
-    return trimByFrames(clip, edge, Math.round(delta * clip.speed.rate), sourceFrameCount);
-  const target = Math.max(1, clipDuration(clip) + (edge === 'in' ? -delta : delta));
-  return trimToDuration(clip, edge, sourceFrameCount, target, safeDuration);
+    return trimByFrames(
+      clip,
+      edge,
+      Math.round(delta * clip.speed.rate * sourceFramesPerProjectFrame(sourceRate)),
+      sourceFrameCount,
+    );
+  const durationOf = safeDuration(sourceRate);
+  const target = Math.max(1, durationOf(clip) + (edge === 'in' ? -delta : delta));
+  return trimToDuration(clip, edge, sourceFrameCount, target, durationOf);
 }
 
 function durationOrInfinity(compile: () => number): number {
@@ -83,8 +91,8 @@ function durationOrInfinity(compile: () => number): number {
     throw error;
   }
 }
-function safeDuration(clip: VideoClip): number {
-  return durationOrInfinity(() => clipDuration(clip));
+function safeDuration(sourceRate: Readonly<FrameRate>): (clip: VideoClip) => number {
+  return (clip) => durationOrInfinity(() => clipDuration(clip, sourceRate));
 }
 
 /** Rounding creates duration plateaus. Select the endpoint nearest the current
@@ -172,8 +180,8 @@ function trimToDuration(
 }
 
 /** The start that keeps the retained OUT, or null before project frame zero. */
-function startForRightEdge(clip: VideoClip, right: number): number | null {
-  const start = right - safeDuration(clip);
+function startForRightEdge(edge: LeftEdge, clip: VideoClip, right: number): number | null {
+  const start = right - edge.duration(clip);
   return start >= 0 ? start : null;
 }
 
@@ -185,15 +193,22 @@ interface LeftEdge {
   at: (distance: number) => VideoClip;
   current: number;
   shrunk: number;
+  duration: (clip: VideoClip) => number;
 }
-function leftEdge(clip: VideoClip, sourceFrameCount: number): LeftEdge {
+function leftEdge(clip: VideoClip, sourceFrameCount: number, duration: (clip: VideoClip) => number): LeftEdge {
   return clip.reverse
     ? {
         at: (distance) => ({ ...clip, sourceOut: sourceFrameCount - distance }),
         current: sourceFrameCount - clip.sourceOut,
         shrunk: sourceFrameCount - clip.sourceIn - 1,
+        duration,
       }
-    : { at: (distance) => ({ ...clip, sourceIn: distance }), current: clip.sourceIn, shrunk: clip.sourceOut - 1 };
+    : {
+        at: (distance) => ({ ...clip, sourceIn: distance }),
+        current: clip.sourceIn,
+        shrunk: clip.sourceOut - 1,
+        duration,
+      };
 }
 const placeTrim = (clip: VideoClip, start: number): Extract<EditCommand, { type: 'trim-place' }> => ({
   type: 'trim-place',
@@ -209,7 +224,7 @@ function minimumPositionedDistance(edge: LeftEdge, right: number): number {
   let high = edge.shrunk;
   while (low < high) {
     const middle = Math.floor((low + high) / 2);
-    if (safeDuration(edge.at(middle)) > right) low = middle + 1;
+    if (edge.duration(edge.at(middle)) > right) low = middle + 1;
     else high = middle;
   }
   return low;
@@ -221,7 +236,7 @@ function sourcePositionedTrim(
   distance: number,
 ): Extract<EditCommand, { type: 'trim-place' }> {
   const trimmed = edge.at(Math.max(minimumPositionedDistance(edge, right), Math.min(edge.shrunk, distance)));
-  const start = startForRightEdge(trimmed, right);
+  const start = startForRightEdge(edge, trimmed, right);
   if (start === null)
     throw new Error('This source-frame trim cannot keep the positioned clip OUT at an integer project frame.');
   return placeTrim(trimmed, start);
@@ -251,12 +266,12 @@ function outputPositionedTrim(
   const preferred = Math.max(0, Math.min(right - 1, clip.start + delta));
   const target = right - preferred;
   const endpoint = nearestEndpoint(minimum, edge.shrunk, edge.current, target, false, (distance) =>
-    safeDuration(edge.at(distance)),
+    edge.duration(edge.at(distance)),
   );
   let best: LeftTrim | null = null;
   for (const distance of new Set([endpoint, endpoint - 1, endpoint + 1])) {
     if (distance < minimum || distance > edge.shrunk) continue;
-    const start = startForRightEdge(edge.at(distance), right);
+    const start = startForRightEdge(edge, edge.at(distance), right);
     if (start !== null && betterLeftTrim({ distance, start }, best, preferred, edge.current))
       best = { distance, start };
   }
@@ -287,13 +302,14 @@ export function trimOnTimeline(
   const sourceEdge = clip.reverse ? flip(edge) : edge;
   const sourceCommand = trimByFrames(clip, sourceEdge, clip.reverse ? -delta : delta, sourceFrameCount);
   if (unit !== 'output' && unit !== 'source') throw new Error('Trim unit must be output or source frames.');
+  const durationOf = safeDuration(videoRate(project, clip.mediaId));
   if (edge !== 'in' || layer.ripple) {
     if (unit === 'source') return sourceCommand;
     const target = Math.max(1, placed.duration + (edge === 'in' ? -delta : delta));
-    return trimToDuration(clip, sourceEdge, sourceFrameCount, target, safeDuration);
+    return trimToDuration(clip, sourceEdge, sourceFrameCount, target, durationOf);
   }
   if (delta === 0) return { ...sourceCommand, type: 'trim-place', start: placed.start };
-  const left = leftEdge(clip, sourceFrameCount);
+  const left = leftEdge(clip, sourceFrameCount, durationOf);
   if (unit === 'source') return sourcePositionedTrim(left, placed.end, left.current + delta);
   return outputPositionedTrim(clip, left, placed.end, delta);
 }

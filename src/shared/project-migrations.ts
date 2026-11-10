@@ -10,6 +10,8 @@ type Migration = (document: SavedProject) => SavedProject;
 const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = {
   // Schema 29 adds the recordings whose range selection is marked done: none yet.
   28: (document) => ({ ...document, selectsDone: [] }),
+  // Schema 30 records recordings at other frame rates; earlier builds only imported project-rate ones.
+  29: (document) => ({ ...document, videoRates: {} }),
 };
 
 /**

@@ -5,14 +5,13 @@ import { projectVideoIds } from '../../shared/projects.js';
 import { recordingShots } from '../../shared/recording-shots.js';
 import { forEachSerial } from '../../shared/serial.js';
 import { calculateLayout, sampleTimeline } from '../../shared/timeline.js';
-import { formatTimecode, framesToSeconds, PROJECT_FPS } from '../../shared/timing.js';
+import { formatTimecode, framesToSeconds } from '../../shared/timing.js';
 import { ServiceError } from '../errors.js';
 import { assertSourceRanges } from '../project-sources.js';
 import type { OperationRunner, ServiceContext } from './context.js';
 import { steadyLimitsFor } from './describe-recording.js';
 import { applyBatch } from './edit.js';
 
-const FPS = PROJECT_FPS.numerator / PROJECT_FPS.denominator;
 type CompareOutput = Awaited<ReturnType<OperationRunner<typeof compareRecordings>>>;
 
 /** The saved project, with candidate commands applied in memory and validated like a save. */
@@ -89,13 +88,14 @@ export const runTimelineSheet: OperationRunner<typeof timelineSheet> = async (
 };
 
 export const runRecordingSheet: OperationRunner<typeof recordingSheet> = async (
-  { stills, images },
+  { stills, images, library },
   { mediaId, frames },
 ) => {
   withinBudget(frames.length, images.sheetCells, 'frames per sheet');
+  const rate = library.get(mediaId).metadata.frameRate;
   return {
     image: await stills.recordingSheet(mediaId, frames, images),
-    legend: frames.map((frame, cell) => ({ cell, frame, timecode: formatTimecode(frame) })),
+    legend: frames.map((frame, cell) => ({ cell, frame, timecode: formatTimecode(frame, rate) })),
   };
 };
 
@@ -109,7 +109,9 @@ async function defaultRange(
   const kept = project.selects[mediaId];
   const analysis = await library.motion(mediaId);
   if (analysis) {
-    const { shots } = recordingShots(analysis, asset.damage, kept, await steadyLimitsFor(sessions, project.id), FPS);
+    const rate = asset.metadata.frameRate;
+    const limits = await steadyLimitsFor(sessions, project.id);
+    const { shots } = recordingShots(analysis, asset.damage, kept, limits, rate.numerator / rate.denominator);
     const best = shots.find((shot) => shot.rank === 1);
     if (best) return { sourceIn: best.sourceIn, sourceOut: best.sourceOut };
   }
@@ -144,7 +146,7 @@ export const runCompareRecordings: OperationRunner<typeof compareRecordings> = a
       mediaId,
       name: asset.name,
       ...range,
-      seconds: Math.round(framesToSeconds(length) * 100) / 100,
+      seconds: Math.round(framesToSeconds(length, asset.metadata.frameRate) * 100) / 100,
       frames: Array.from(
         { length: perCandidate },
         (_, cell) => range.sourceIn + Math.floor(((cell + 0.5) * length) / perCandidate),

@@ -182,8 +182,8 @@ describe.skipIf(!enabled)('automatic video proxy imports · disposable native fi
     for (const proxy of proxies) {
       const head = new Uint8Array(proxy.buffer, proxy.byteOffset, proxy.byteLength);
       expect(locateIndex(head.subarray(0, 65_536)).end).toBeLessThanOrEqual(proxy.byteLength);
-      const index = parseProxyIndex(head, PROJECT_FPS);
-      expect(index).toMatchObject({ width: 160, height: 90, frameCount: 12 });
+      const index = parseProxyIndex(head);
+      expect(index).toMatchObject({ width: 160, height: 90, frameCount: 12, frameRate: PROJECT_FPS });
       expect(index.codec).toMatch(/^avc1\.[0-9a-f]{6}$/);
       expect([...index.keyframes]).toEqual([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
       expect(index.offsets[11]! + index.sizes[11]!).toBeLessThanOrEqual(proxy.byteLength);

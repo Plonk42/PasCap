@@ -1,5 +1,4 @@
 import { whileSerial } from '../shared/serial.js';
-import { PROJECT_FPS } from '../shared/timing.js';
 import { keyframeBefore, locateIndex, parseProxyIndex, type ProxyIndex } from './proxy-index.js';
 import {
   DECODER_FRAME_BUDGET,
@@ -371,7 +370,7 @@ export class VideoReader {
         let bytes = await this.#read(url, 0, HEAD_BYTES, signal, true);
         const location = locateIndex(bytes);
         if (location.end > bytes.byteLength) bytes = await this.#read(url, 0, location.end, signal);
-        return parseProxyIndex(bytes, PROJECT_FPS);
+        return parseProxyIndex(bytes);
       })();
     else this.#indexes.delete(url);
     this.#indexes.set(url, index);

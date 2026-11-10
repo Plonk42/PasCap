@@ -1,5 +1,5 @@
 import type { describeRecording } from '../../shared/operations/describe-recording.js';
-import { durationOf } from '../../shared/operations/timecode.js';
+import { durationOf, recordingFps } from '../../shared/operations/timecode.js';
 import { projectVideoIds } from '../../shared/projects.js';
 import { recordingShots, type SteadyShot } from '../../shared/recording-shots.js';
 import {
@@ -9,11 +9,9 @@ import {
   type SteadyLimitSource,
   type SteadyLimits,
 } from '../../shared/motion-analysis.js';
-import { formatTimecode, framesToSeconds, PROJECT_FPS } from '../../shared/timing.js';
+import { formatTimecode, framesToSeconds } from '../../shared/timing.js';
 import { ServiceError } from '../errors.js';
 import type { OperationRunner, ServiceContext } from './context.js';
-
-const FPS = PROJECT_FPS.numerator / PROJECT_FPS.denominator;
 
 /** The shots a contact sheet of `cells` shows: all of them, else the best-ranked, in source order. */
 function pictured(shots: readonly SteadyShot[], cells: number): SteadyShot[] {
@@ -46,17 +44,20 @@ export const runDescribeRecording: OperationRunner<typeof describeRecording> = a
   const limits = await steadyLimitsFor(sessions, projectId, asked);
   const analysis = await library.motion(mediaId);
   const kept = project.selects[mediaId];
+  const rate = asset.metadata.frameRate;
   const { shots, stillShare } = analysis
-    ? recordingShots(analysis, asset.damage, kept, limits, FPS)
+    ? recordingShots(analysis, asset.damage, kept, limits, rate.numerator / rate.denominator)
     : { shots: [], stillShare: null };
   const shown = sheet ? pictured(shots, images.sheetCells) : [];
   const middles = shown.map((shot) => Math.floor((shot.sourceIn + shot.sourceOut) / 2));
+  const fps = recordingFps(rate);
   return {
     revision: project.revision,
     recording: {
       id: asset.id,
       name: asset.name,
-      duration: durationOf(asset.metadata.frameCount),
+      duration: durationOf(asset.metadata.frameCount, rate),
+      ...(fps !== undefined && { fps }),
       damaged: asset.damage.map((range) => ({ sourceIn: range.start, sourceOut: range.end })),
       stillShare,
       flightData: (analysis?.telemetry.length ?? 0) > 0,
@@ -66,9 +67,9 @@ export const runDescribeRecording: OperationRunner<typeof describeRecording> = a
     motionAnalyzed: analysis !== null,
     steadyRanges: shots.map((shot) => ({
       ...shot,
-      inTimecode: formatTimecode(shot.sourceIn),
-      outTimecode: formatTimecode(shot.sourceOut),
-      seconds: Math.round(framesToSeconds(shot.sourceOut - shot.sourceIn) * 100) / 100,
+      inTimecode: formatTimecode(shot.sourceIn, rate),
+      outTimecode: formatTimecode(shot.sourceOut, rate),
+      seconds: Math.round(framesToSeconds(shot.sourceOut - shot.sourceIn, rate) * 100) / 100,
       cell: shown.includes(shot) ? shown.indexOf(shot) : null,
     })),
     ...(middles.length ? { image: await stills.recordingSheet(mediaId, middles, images) } : {}),

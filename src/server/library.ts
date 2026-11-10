@@ -14,7 +14,7 @@ import {
   type SourceFingerprint,
   type VideoMetadata,
 } from '../shared/media.js';
-import { framesToSeconds } from '../shared/timing.js';
+import { framesToSeconds, sameRate, type FrameRate } from '../shared/timing.js';
 import { MOTION_ANALYSIS_VERSION, motionAnalysisSchema, type MotionAnalysis } from '../shared/motion-analysis.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { ServiceConfig } from './config.js';
@@ -556,8 +556,8 @@ export class MediaLibrary {
     if (asset.prepared?.profile === PROXY_PROFILE) {
       let cached = false;
       try {
-        await probeVideo(this.config, this.proxyPath(asset), context.signal);
-        cached = true;
+        const proxy = await probeVideo(this.config, this.proxyPath(asset), context.signal);
+        cached = sameRate(proxy.frameRate, asset.metadata.frameRate);
       } catch (error) {
         if (context.signal.aborted) throw error;
       }
@@ -587,7 +587,14 @@ export class MediaLibrary {
       const sources = await originals;
       const samples: { frame: number; meanAbsoluteError8Bit: number }[] = [];
       await forEachSerial(frames.entries(), async ([index, frame]) => {
-        const proxy = await extractComparisonFrame(this.config, temporary, frame, 'tv', context.signal);
+        const proxy = await extractComparisonFrame(
+          this.config,
+          temporary,
+          frame,
+          asset.metadata.frameRate,
+          'tv',
+          context.signal,
+        );
         const mae = meanAbsoluteError(sources[index]!, proxy);
         if (mae > FRAME_SAMPLE_MAE_LIMIT)
           throw new ServiceError(
@@ -611,7 +618,7 @@ export class MediaLibrary {
             '-threads',
             '2',
             '-ss',
-            framesToSeconds(frame).toFixed(9),
+            seekBefore(frame, asset.metadata.frameRate),
             '-i',
             this.proxyPath(asset),
             '-frames:v',
@@ -693,7 +700,14 @@ export class MediaLibrary {
     const decoded: Buffer[] = [];
     await forEachSerial(frames, async (frame) => {
       decoded.push(
-        await extractComparisonFrame(this.config, asset.sourcePath, frame, asset.metadata.colorRange, signal),
+        await extractComparisonFrame(
+          this.config,
+          asset.sourcePath,
+          frame,
+          asset.metadata.frameRate,
+          asset.metadata.colorRange,
+          signal,
+        ),
       );
     });
     return decoded;
@@ -726,7 +740,7 @@ export class MediaLibrary {
         '-sn',
         '-dn',
         '-vf',
-        `${repairFilter(repair, 0)}scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:in_range=${inputRange}:out_range=tv,setsar=1`,
+        `${repairFilter(repair, 0, asset.metadata.frameRate)}scale=w='min(1280,iw)':h='min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2:flags=bicubic:in_color_matrix=bt709:out_color_matrix=bt709:in_range=${inputRange}:out_range=tv,setsar=1`,
         ...repairedFrameLimit(repair, asset.metadata.frameCount),
         '-fps_mode',
         'passthrough',
@@ -763,7 +777,7 @@ export class MediaLibrary {
         '-movflags',
         '+faststart',
         '-video_track_timescale',
-        '30000',
+        String(proxyTimescale(asset.metadata.frameRate)),
         '-progress',
         'pipe:1',
         temporary,
@@ -799,11 +813,16 @@ export class MediaLibrary {
       await this.#recordDamage(asset, repair, proxy, context);
       throw new ServiceError('Proxy frame count differs from the original. Editing disabled.', 422);
     }
+    if (!sameRate(metadata.frameRate, asset.metadata.frameRate))
+      throw new ServiceError('Proxy frame rate differs from the original. Editing disabled.', 422);
     return metadata;
   }
   /** The repair keeps the pictures' own timestamps, which only follow decode order without B-frames. */
   async #assertRepairable(asset: MediaAsset, repair: readonly DamagedRange[], context: JobContext): Promise<void> {
-    if (repair.length && (await hasReorderedFrames(this.config, asset.sourcePath, context.signal)))
+    if (
+      repair.length &&
+      (await hasReorderedFrames(this.config, asset.sourcePath, asset.metadata.frameRate, context.signal))
+    )
       throw new ServiceError(
         'This recording uses B-frames, so its damaged frames cannot be shown black without risking shifted frames.',
         422,
@@ -821,12 +840,26 @@ export class MediaLibrary {
   ): Promise<void> {
     const count = asset.metadata.frameCount;
     const original = (frame: number) =>
-      extractComparisonFrame(this.config, asset.sourcePath, frame, asset.metadata.colorRange, context.signal);
+      extractComparisonFrame(
+        this.config,
+        asset.sourcePath,
+        frame,
+        asset.metadata.frameRate,
+        asset.metadata.colorRange,
+        context.signal,
+      );
     const checked = repair
       .flatMap((range) => [range.end, range.end + 1])
       .filter((frame) => frame < count && !damagedAt(repair, frame));
     await forEachSerial(checked, async (frame) => {
-      const shown = await extractComparisonFrame(this.config, proxy, frame, 'tv', context.signal);
+      const shown = await extractComparisonFrame(
+        this.config,
+        proxy,
+        frame,
+        asset.metadata.frameRate,
+        'tv',
+        context.signal,
+      );
       const same = meanAbsoluteError(await original(frame), shown);
       let neighbor = Infinity;
       const neighbors = [frame - 1, frame + 1].filter((item) => item < count && !damagedAt(repair, item));
@@ -849,7 +882,14 @@ export class MediaLibrary {
   ): Promise<void> {
     // A repaired proxy refills those gaps; its damage was found by an earlier preparation.
     if (repair.length) return;
-    const found = await findDamage(this.config, asset.sourcePath, proxy, asset.metadata.frameCount, context.signal);
+    const found = await findDamage(
+      this.config,
+      asset.sourcePath,
+      proxy,
+      asset.metadata.frameCount,
+      asset.metadata.frameRate,
+      context.signal,
+    );
     if (!found.damage.length) return;
     asset.damage = found.damage;
     throw new ServiceError(damageMessage(asset, found.missing), 422);
@@ -898,10 +938,23 @@ export class MediaLibrary {
   }
 }
 
+/** A seek strictly between frame `frame` and the one before: accurate seeking then starts exactly at it. */
+function seekBefore(frame: number, rate: Readonly<FrameRate>): string {
+  return Math.max(0, framesToSeconds(frame - 0.25, rate)).toFixed(9);
+}
+
+/** An MP4 timescale holding every frame timestamp of `rate` exactly: 30000 for whole rates. */
+export function proxyTimescale(rate: Readonly<FrameRate>): number {
+  const timescale = rate.denominator === 1 ? 30_000 : rate.numerator;
+  if ((timescale * rate.denominator) % rate.numerator !== 0) throw new Error('No exact proxy timescale for this rate.');
+  return timescale;
+}
+
 export async function extractComparisonFrame(
   config: ServiceConfig,
   filename: string,
   frame: number,
+  rate: Readonly<FrameRate>,
   range: 'tv' | 'pc',
   signal?: AbortSignal,
 ): Promise<Buffer> {
@@ -915,7 +968,7 @@ export async function extractComparisonFrame(
       '-threads',
       '2',
       '-ss',
-      framesToSeconds(frame).toFixed(9),
+      seekBefore(frame, rate),
       '-i',
       filename,
       '-map',

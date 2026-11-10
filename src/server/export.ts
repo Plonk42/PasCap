@@ -26,7 +26,7 @@ import type { MusicTrack, ProjectDocument } from '../shared/model.js';
 import { musicTracks } from '../shared/music-lanes.js';
 import { forEachSerial } from '../shared/serial.js';
 import { validateSourceRanges } from '../shared/source-range.js';
-import { framesToSeconds, PROJECT_FPS, sameRate } from '../shared/timing.js';
+import { framesToSeconds, PROJECT_FPS, sameRate, videoRate, type FrameRate } from '../shared/timing.js';
 import { ServiceError } from './errors.js';
 import { exportStorageFailure, readExportSpace, requireExportReserve } from './export-space.js';
 import { assertSourceIdentity } from './files.js';
@@ -116,15 +116,15 @@ function freezeSnapshot<T>(value: T): T {
 function checkCanceled(context: JobContext): void {
   if (context.signal.aborted) throw new ServiceError('Job canceled.', 499);
 }
-function validateVideo(clipId: string, sourceOut: number, asset: MediaAsset): void {
+function validateVideo(clipId: string, sourceOut: number, asset: MediaAsset, rate: Readonly<FrameRate>): void {
   const metadata = asset.metadata;
   if (sourceOut > metadata.frameCount)
     throw new ServiceError(`Clip ${clipId} exceeds its registered source frame count.`, 422);
   if (
-    !sameRate(metadata.frameRate, PROJECT_FPS) ||
-    Math.abs(metadata.durationSeconds - framesToSeconds(metadata.frameCount)) > 1e-5
+    !sameRate(metadata.frameRate, rate) ||
+    Math.abs(metadata.durationSeconds - framesToSeconds(metadata.frameCount, rate)) > 1e-5
   ) {
-    throw new ServiceError(`Clip ${clipId} does not have verified constant project-rate timing.`, 422);
+    throw new ServiceError(`Clip ${clipId} does not have the verified constant frame rate the project records.`, 422);
   }
   if (
     metadata.pixelFormat !== 'yuv420p' ||
@@ -147,7 +147,7 @@ function captureInputs(
     const asset = mediaAssetSchema.parse(library.get(clip.mediaId));
     if (asset.id !== clip.mediaId)
       throw new ServiceError(`Clip ${clip.id} resolved to a different media identity.`, 409);
-    validateVideo(clip.id, clip.sourceOut, asset);
+    validateVideo(clip.id, clip.sourceOut, asset, videoRate(request.document, clip.mediaId));
     return freezeSnapshot(asset);
   });
   const plan = needsLayeredExport(request.document)
@@ -327,6 +327,7 @@ async function retimeClip(
     ffmpeg: library.config.ffmpeg,
     cwd: directory,
     clip,
+    sourceRate: videoRate(inputs.snapshot, clip.mediaId),
     frameBytes: target.width * target.height * 3,
     signal: context.signal,
     decodeArgs: (excerpt) => [

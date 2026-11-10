@@ -27,7 +27,7 @@ import {
   type PlacedClip,
   type PreviewLayer,
 } from '../shared/timeline.js';
-import { framesToSeconds } from '../shared/timing.js';
+import { framesToSeconds, videoRate } from '../shared/timing.js';
 import { originalErrorArgs } from './damage.js';
 import { ServiceError } from './errors.js';
 import { assertSourceIdentity } from './files.js';
@@ -530,6 +530,7 @@ class SequentialLayeredRenderer {
       ffmpeg,
       cwd: directory,
       clip,
+      sourceRate: videoRate(this.options.document, clip.mediaId),
       retiming: placed.retiming,
       frameBytes: this.#rgb[0].length,
       frameBuffer: this.#rgb[0],

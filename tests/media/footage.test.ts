@@ -12,6 +12,7 @@ import { probeVideo } from '../../src/server/probe.js';
 import { runProcess } from '../../src/server/process.js';
 import { footageDirectorySchema, footageRootSchema, type FootageRoot } from '../../src/shared/footage.js';
 import { registrySchema } from '../../src/shared/media.js';
+import { PROJECT_FPS, rateText, type FrameRate } from '../../src/shared/timing.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 const temporary: string[] = [];
@@ -39,7 +40,12 @@ async function fixture() {
 }
 
 /** Twelve disposable 160x90 SDR lavfi frames, always outside the service cache. */
-async function syntheticOriginal(config: ServiceConfig, filename: string): Promise<void> {
+async function syntheticOriginal(
+  config: ServiceConfig,
+  filename: string,
+  rate: FrameRate = PROJECT_FPS,
+  timescale = 30_000,
+): Promise<void> {
   await runProcess(config.ffmpeg, [
     '-hide_banner',
     '-loglevel',
@@ -49,7 +55,7 @@ async function syntheticOriginal(config: ServiceConfig, filename: string): Promi
     '-f',
     'lavfi',
     '-i',
-    'testsrc2=size=160x90:rate=30000/1001',
+    `testsrc2=size=160x90:rate=${rateText(rate)}`,
     '-frames:v',
     '12',
     '-vf',
@@ -79,7 +85,7 @@ async function syntheticOriginal(config: ServiceConfig, filename: string): Promi
     '-color_range',
     'tv',
     '-video_track_timescale',
-    '30000',
+    String(timescale),
     '-movflags',
     '+faststart',
     filename,
@@ -120,6 +126,38 @@ describe.skipIf(!enabled)('approved-root no-copy import · disposable native pro
     await Promise.all(permissions.splice(0).map(({ filename, mode }) => chmod(filename, mode)));
     await Promise.all(services.splice(0).map((service) => service.app.close()));
     await Promise.all(temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
+  });
+
+  it.each([
+    { rate: { numerator: 30, denominator: 1 }, timescale: 15_360 },
+    { rate: { numerator: 60_000, denominator: 1_001 }, timescale: 60_000 },
+    { rate: { numerator: 24_000, denominator: 1_001 }, timescale: 24_000 },
+    { rate: { numerator: 25, denominator: 1 }, timescale: 12_800 },
+  ])(
+    'registers and prepares a $rate.numerator/$rate.denominator fps original at its own rate',
+    async ({ rate, timescale }) => {
+      const { sources, config, library, jobs } = await fixture();
+      const filename = path.join(sources, 'Other rate.MP4');
+      await syntheticOriginal(config, filename, rate, timescale);
+      const asset = await library.register(filename);
+      expect(asset.metadata).toMatchObject({ frameRate: rate, frameCount: 12 });
+      const completed = await jobs.wait((await library.prepare(asset.id)).id);
+      expect(completed.state, completed.message).toBe('completed');
+      const ready = library.get(asset.id);
+      expect(ready.prepared!.verification.samples.every((sample) => sample.meanAbsoluteError8Bit <= 6)).toBe(true);
+      const proxy = await probeVideo(config, library.proxyPath(ready));
+      expect(proxy).toMatchObject({ frameRate: rate, frameCount: 12 });
+      for (const frame of ready.prepared!.thumbnailFrames)
+        expect((await stat(library.thumbnailPath(ready, frame))).size).toBeGreaterThan(0);
+    },
+  );
+
+  it('rejects a recording at a rate it does not accept, naming the rate', async () => {
+    const { sources, config, library } = await fixture();
+    const filename = path.join(sources, 'Slow motion.MP4');
+    await syntheticOriginal(config, filename, { numerator: 120, denominator: 1 }, 15_360);
+    await expect(library.register(filename)).rejects.toThrow('120 fps recordings are not supported');
+    expect(library.list()).toEqual([]);
   });
 
   it('browses and registers a readonly original over JSON HTTP, verifies its proxy and reuses it across restart without copying', async () => {

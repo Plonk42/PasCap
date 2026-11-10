@@ -19,8 +19,26 @@ Speed belongs only to the clip and is positive, **0.1×–8×**. The project
 requires each clip's `speed` to be `{ mode: 'constant', rate }` or
 `{ mode: 'curve', keyframes }`; there is no track Speed setting, ramp mode or
 project-wide speed field. A clip's duration and sampled frames depend only on its
-own speed and source range, never on its track, start, Ripple position or other
+own speed, source range and recording rate, never on its track, start, Ripple position or other
 clips: moving it to another track or time never changes its duration.
+
+### Recording frame rates
+
+Recordings are accepted at a constant `SOURCE_FRAME_RATES` rate: 24000/1001, 24, 25, 30000/1001, 30,
+48000/1001, 48, 50, 60000/1001 or 60 fps (`src/shared/timing.ts`); the probe rejects others, and variable
+rates, naming the rate found. Source frame $n$ is presented at $n / R_s$, verified packet by packet like
+the project rate. The project stays at $R_p$ = 30000/1001 and stores the rate of each recording in its bin
+that differs from it in `videoRates` (no entry: $R_p$), checked against the registry on every save.
+
+Speed is relative to real time: at rate $r$ a clip advances $r \cdot k$ recording frames per project frame,
+with $k = R_s / R_p$ (`sourceFramesPerProjectFrame`, exactly 1 at $R_p$). Every formula below divides by
+$k$ once more, so a constant clip lasts $\max(1,\operatorname{round}(\text{sourceFrames}/(\text{rate}\cdot k)))$
+and a curve $\max(1,\operatorname{round}(T/k))$; positions stay normalized to that duration. At 1× a
+30 fps recording skips one frame in about 1001, a 60 fps one shows every other frame (0.5× shows them all)
+and a 23.976 fps one repeats one frame in four. Kept ranges, clip ranges, speed and grade keyframes, damage
+and motion analysis stay in recording frames. Proxies keep the recording's timestamps (MP4 timescale
+30000 for whole rates, the numerator otherwise), and every decode seeks originals and proxies at $R_s$.
+Source preview timecodes count the recording's nominal frames per second.
 
 ### Constant speed
 
@@ -672,7 +690,8 @@ remains an image named **Waveform for music track…**.
 ## Versioning
 
 The current project schema requires explicit `media.videoIds` and `media.audioIds` arrays,
-unique and limited to 10,000 IDs each, plus a complete `grade` on every clip (Color with
+unique and limited to 10,000 IDs each, a `videoRates` record of bin recordings not at the project rate,
+plus a complete `grade` on every clip (Color with
 Temperature/Tint/Vibrance/Whites/Blacks/HDR/Local contrast and static HSL/curves, and 0–64
 source-frame keyframes with all fourteen nullable value fields), the `adjustments` array, clip
 constant or 1–256-keyframe custom-curve

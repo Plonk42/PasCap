@@ -3,7 +3,7 @@ import { described } from '../described.js';
 import { frameSchema, idSchema, musicTransitionSchema, selectRangeSchema, transitionSchema } from '../model.js';
 import { defineOperation } from './spec.js';
 import { detailSummarySchema, gradeSummarySchema } from './grade-summary.js';
-import { durationSchema, timecodeSchema } from './timecode.js';
+import { durationSchema, recordingFpsSchema, timecodeSchema } from './timecode.js';
 
 const span = {
   start: described(frameSchema, 'First project frame.'),
@@ -101,6 +101,7 @@ export const recordingDescriptionSchema = z
     id: idSchema,
     name: z.string().nullable(),
     frameCount: z.number().int().nullable(),
+    fps: recordingFpsSchema,
     ready: described(
       z.literal(false).optional(),
       'false when not prepared, so it cannot be placed or previewed; absent when ready.',

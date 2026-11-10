@@ -29,6 +29,7 @@ import {
 import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
 import { calculateLayout, layerClips, sampleTimeline } from '../../src/shared/timeline.js';
 import { singleClipLane } from '../music-lanes.js';
+import { PROJECT_FPS } from '../../src/shared/timing.js';
 
 // Complete durations of these in-memory recordings, independent of any excerpt.
 const SOURCE_COUNTS = new Map([
@@ -144,7 +145,7 @@ function overlayProject(
   upper.transform.base.opacity = 0.65;
   document.layers.push(upper, row('other-row', [point(50, { opacity: 0.4 })]));
   const selected = rushClip('top', upper.id, 50, speed);
-  const end = selected.start + compileRetiming(selected).duration;
+  const end = selected.start + compileRetiming(selected, PROJECT_FPS).duration;
   document.clips = [
     createClip('base', 'recording', 300, 400),
     { ...createClip('upper-before', 'other', 0, 20), layerId: upper.id, start: 10 },
@@ -624,7 +625,7 @@ describe('atomic source removal on the primary ripple row', () => {
         expect(next.adjustments).toEqual(document.adjustments);
         expect(excerpt.clip).not.toHaveProperty('opacity');
         expect(next.layers[0]!.transform.base.opacity).toBe(0.65);
-        expect(excerpt.duration).toBe(compileRetiming(excerpt.clip).duration);
+        expect(excerpt.duration).toBe(compileRetiming(excerpt.clip, PROJECT_FPS).duration);
         const samples = Array.from({ length: excerpt.duration }, (_, frame) => excerpt.retiming.sourceAt(frame));
         expect(
           samples.every(
