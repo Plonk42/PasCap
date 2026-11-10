@@ -253,6 +253,11 @@ Auto and Auto white balance write **clip grades only** (#285): as clip values or
 at the playhead. There is no Auto on items. The Track source grades each clip of the track on its
 own, and the track-level compromise grade is removed with track Color.
 
+**Match to this clip** ([#315](https://github.com/Plonk42/PasCap/issues/315), and `estimate` kind
+`match`) writes the other clips' grades so that they look like a hero clip as its grade shows it;
+the hero is never changed. Shots are matched in their clip grades first, then one adjustment
+over them carries the shared look ([Matching a look](AUTO_ADJUST.md#matching-a-look)).
+
 ## Assistant
 
 - **Clip grades (owner, implemented):** the patch commands take several clips (`color-patch` and

@@ -20,6 +20,7 @@ import { analysisSize, frameIlluminant, poolWhiteBalance, type AnalysisFrame } f
 import { analysisFrameArgs } from '../../src/server/stills.js';
 import { autoAdjustCommand } from '../../src/shared/auto-color.js';
 import { layerKeyAsGradeKey } from '../../src/shared/grade.js';
+import { heroColor, matchLook, measureLook } from '../../src/shared/look-match.js';
 import { autoAdjustCommands, autoAdjustTarget, type AutoAdjustContext } from '../../src/web/auto-adjust.js';
 import { gradeOwnerOf } from '../../src/web/color-owner.js';
 import { adjustmentFrom0, expandedInspectorPreferences, inspectorTab, sharedPoint } from './editor-helpers.js';
@@ -247,10 +248,16 @@ function keyframed(document: ProjectDocument, frame: number, correction: AutoCor
 const auto = (page: Page) => page.locator('summary[aria-label="Auto adjust"]');
 const apply = (page: Page) => page.getByRole('button', { name: 'Apply', exact: true });
 const intensity = (page: Page) => page.getByRole('spinbutton', { name: 'Auto adjust intensity', exact: true });
-/** A Source (Playhead, This clip, Every clip on Track 1) or Apply as (Grade values, Keyframe at playhead) choice. */
+/** A Source (Playhead, This clip, Every clip on Track 1, Match…) or Apply as (Grade values, Keyframe at playhead) choice. */
 const choice = (
   page: Page,
-  name: 'Playhead' | 'This clip' | 'Every clip on Track 1' | 'Grade values' | 'Keyframe at playhead',
+  name:
+    | 'Playhead'
+    | 'This clip'
+    | 'Every clip on Track 1'
+    | 'Match every other clip on Track 1 to this clip'
+    | 'Grade values'
+    | 'Keyframe at playhead',
 ) => page.getByRole('radio', { name, exact: true });
 const flatGrade = (document: ProjectDocument) => document.clips.find((clip) => clip.id === 'flat')!.grade;
 const selectClip = (page: Page, clipId: string) =>
@@ -599,6 +606,63 @@ test('the Track source grades each clip of the track on its own in one Undo step
     corrections.get('later')!.temperature,
   ]);
   expect(expected.layers).toEqual(before.layers);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  expect(await current(page)).toEqual(before);
+});
+
+test('Match to this clip gives every other clip of the track its look as graded, leaving it unchanged', async ({
+  page,
+}) => {
+  const seeded = await current(page);
+  seeded.clips[1] = { ...seeded.clips[1]!, id: 'later', sourceIn: 40, sourceOut: 120 };
+  seeded.layers[0]!.transitions = [{ leftId: 'flat', rightId: 'later', type: 'cut', duration: 0 }];
+  flatGrade(seeded).color = { ...flatGrade(seeded).color, exposure: 0.3, contrast: 1.2, saturation: 1.3 };
+  memory.seed(projectSchema.parse(seeded));
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => window.pascapLab?.engine.diagnostics().status)).toBe('paused');
+  await inspectorTab(page, 'Clip grade');
+  await seek(page, 45);
+  const before = await current(page);
+  const target = autoAdjustTarget(context(before, 45), 'match').target!;
+  expect(target.reference!.sourceFrames).toEqual(autoAdjustFrames(30, 120));
+  expect(target.parts.map(({ clip }) => clip.clip.id)).toEqual(['later']);
+  const hero = await pageFrames(page, autoAdjustFrames(30, 120));
+  const look = measureLook(
+    autoAdjustFrames(30, 120).map((source) => hero.get(source)!),
+    heroColor(flatGrade(before), autoAdjustFrames(30, 120)),
+  )!;
+  const later = await pageFrames(page, autoAdjustFrames(40, 120));
+  const laterGrade = before.clips.find((clip) => clip.id === 'later')!.grade;
+  const correction = matchLook(
+    look,
+    autoAdjustFrames(40, 120).map((source) => later.get(source)!),
+    laterGrade.color,
+  )!;
+
+  await auto(page).click();
+  await expect(apply(page)).toBeVisible();
+  await choice(page, 'Match every other clip on Track 1 to this clip').check();
+  await expect(choice(page, 'Grade values')).toBeChecked();
+  await expect(choice(page, 'Keyframe at playhead')).toBeDisabled();
+  await expect(page.locator('label', { has: choice(page, 'Keyframe at playhead') })).toHaveAttribute(
+    'title',
+    'A match sets the grade values of the other clips.',
+  );
+  await expect(page.locator('.auto-adjust-source')).toHaveText('From 1 other clip on Track 1');
+  const applyOne = page.getByRole('button', { name: 'Apply to 1 clip', exact: true });
+  await expect(applyOne).toBeVisible();
+  expect(await current(page)).toEqual(before);
+  await applyOne.click();
+  const expected = autoAdjustCommands(
+    context(before, 45),
+    target,
+    'values',
+    new Map([['later', correction]]),
+    0.8,
+  ).reduce(applyCommand, before);
+  await expect.poll(() => current(page)).toEqual(expected);
+  expect(flatGrade(expected)).toEqual(flatGrade(before));
+  expect(expected.clips[1]!.grade.color.exposure).toBe(correction.exposure);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   expect(await current(page)).toEqual(before);
 });

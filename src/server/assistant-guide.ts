@@ -96,7 +96,9 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   and the edit applying it to its clip grade; white-balance only Temperature and Tint; detail
   suggests a clip's Denoise and Sharpen (clipIds or layerId: every clip in one call). For a
   correction per shot, estimate with applyAs shots (layerId or clipIds) writes each clip's own
-  correction into its clip grade in one call; dissolves blend the two grades. Keep adjustments
+  correction into its clip grade in one call; dissolves blend the two grades. To make shots look
+  alike, estimate kind match with a hero (referenceClipId, or referenceFrame) gives each other
+  clip the hero's look as its grade shows it, leaving the hero unchanged. Keep adjustments
   for the look shared by every shot of a stretch.
 - Every edit command follows one rule: a listed setting takes its value, null returns it to
   neutral, and what it leaves out keeps its value. color-patch changes Color settings of clips
