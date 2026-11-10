@@ -901,12 +901,12 @@ export function MediaLibrary({
                   <span className="media-recording-meta">
                     <span
                       className="media-recording-duration"
-                      title={`${durationLabel(asset.metadata.durationSeconds)} · ${asset.metadata.frameCount} original source frames`}
+                      title={`${durationLabel(asset.metadata.durationSeconds)}${otherRateLabel(asset)} · ${asset.metadata.frameCount} original source frames`}
                     >
-                      {durationLabel(asset.metadata.durationSeconds)}{' '}
+                      {durationLabel(asset.metadata.durationSeconds)}
+                      {otherRateLabel(asset)}{' '}
                       <span className="media-resolution">
                         · {asset.metadata.width} × {asset.metadata.height}
-                        {otherRateLabel(asset)}
                       </span>
                     </span>
                     {excerptCount > 0 && (
