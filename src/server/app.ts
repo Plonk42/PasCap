@@ -28,6 +28,8 @@ import { AssistantSessions } from './sessions.js';
 import { startReference } from './reference.js';
 import { StillRenderer } from './stills.js';
 import { ensurePrivateDirectory, ProjectStore } from './storage.js';
+import { StyleLibrary } from './styles.js';
+import { MAX_STYLE_REFERENCES, styleNameSchema, styleSummary } from '../shared/styles.js';
 
 const idParams = z.object({ id: idSchema });
 const importSchema = z.object({ directory: z.string().min(1).max(4096) }).strict();
@@ -46,6 +48,9 @@ const createProjectSchema = z.object({ title: titleSchema }).strict();
 const renameProjectSchema = z.object({ title: titleSchema, expectedRevision: frameSchema }).strict();
 const deleteProjectSchema = z.object({ expectedRevision: frameSchema.nullable() }).strict();
 const importProjectSchema = z.object({ document: z.unknown() }).strict();
+const createStyleSchema = z
+  .object({ name: styleNameSchema, paths: z.array(z.string().min(1).max(4096)).min(1).max(MAX_STYLE_REFERENCES) })
+  .strict();
 
 function validateLocalRequest(request: FastifyRequest, reply: FastifyReply, config: ServiceConfig): void {
   const host = request.headers.host;
@@ -141,6 +146,7 @@ export async function createApp(config = createConfig(), toolchain: Toolchain | 
   await library.initialize();
   await audio.initialize();
   const archiveWarnings = await restoreExports(config, jobs);
+  const styles = new StyleLibrary(config, footage);
   const operationContext = {
     projects,
     sessions: new AssistantSessions(config.dataDir, config.assistantSessions, projects),
@@ -150,6 +156,7 @@ export async function createApp(config = createConfig(), toolchain: Toolchain | 
     stills: new StillRenderer(config, library, jobs),
     assistant: new AssistantConnection(config.port, config.dataDir),
     images: config.assistantImages,
+    styles,
   };
   archiveWarnings.forEach((message) => app.log.warn({ message }, 'Skipped invalid export receipt'));
   app.addHook('onRequest', async (request, reply) => validateLocalRequest(request, reply, config));
@@ -276,6 +283,18 @@ export async function createApp(config = createConfig(), toolchain: Toolchain | 
   app.get('/api/audio/browse', async (request) => {
     const query = footageQuerySchema.parse(request.query);
     return footage.browseAudio(query.rootId, query.directory);
+  });
+  app.get('/api/styles/browse', async (request) => {
+    const query = footageQuerySchema.parse(request.query);
+    return footage.browseReferences(query.rootId, query.directory);
+  });
+  app.post('/api/styles', async (request) => {
+    const { name, paths } = createStyleSchema.parse(request.body);
+    return { style: styleSummary(await styles.create(name, paths)) };
+  });
+  app.delete('/api/styles/:id', async (request) => {
+    await styles.remove(idParams.parse(request.params).id);
+    return { deleted: true };
   });
   app.post('/api/audio/register-selected', async (request, reply) => {
     const selected = footage.validateAudioPath(registerSchema.parse(request.body).path);

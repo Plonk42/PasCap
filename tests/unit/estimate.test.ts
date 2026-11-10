@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { analyzeAutoAdjust, autoAdjustFrames, scaleCorrection } from '../../src/shared/auto-adjust.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { windowSourceFrames } from '../../src/shared/auto-color.js';
-import { heroColor, matchLook, measureLook } from '../../src/shared/look-match.js';
+import { heroColor, matchLook, measureLook, STYLE_BOUNDS } from '../../src/shared/look-match.js';
 import {
   DETAIL_ESTIMATE,
   detailFrames,
@@ -372,6 +372,43 @@ describe('estimate operation', () => {
     const b = calculateLayout(graded).clips.find((item) => item.clip.id === 'b')!;
     expect(reads[0]).toEqual({ mediaId: 'rec-2', frames: windowSourceFrames(b, 310) });
     expect(around.reference).toEqual({ clipId: 'b', frames: windowSourceFrames(b, 310).length });
+  });
+
+  it('aims Auto adjust at a registered style within its own bounds', async () => {
+    const look = measureLook([patches(2), patches(4)])!;
+    const style = { id: 'bright', name: 'Bright edits', look };
+    const styled = {
+      ...context,
+      styles: {
+        get: async (id: string) => {
+          if (id !== style.id) throw Object.assign(new Error('No such style.'), { statusCode: 404 });
+          return style;
+        },
+      },
+    } as unknown as Context;
+    reads.length = 0;
+    const result = await runners.estimate(styled, { ...input, kind: 'auto-adjust', clipId: 'a', style: 'bright' });
+    const sourceFrames = autoAdjustFrames(0, 300);
+    const expected = scaleCorrection(
+      matchLook(
+        look,
+        sourceFrames.map((frame) => patches(frame / 30)),
+        project.clips[0]!.grade.color,
+        STYLE_BOUNDS,
+      )!,
+      0.8,
+    );
+    expect(result).toMatchObject({
+      style: { id: 'bright', name: 'Bright edits' },
+      correction: expected,
+      commands: [{ type: 'color-patch', clipIds: ['a'], settings: expected }],
+    });
+    await expect(
+      runners.estimate(styled, { ...input, kind: 'detail', clipId: 'a', style: 'bright' }),
+    ).rejects.toMatchObject({ statusCode: 422 });
+    await expect(
+      runners.estimate(styled, { ...input, kind: 'auto-adjust', clipId: 'a', style: 'gone' }),
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it('rejects ambiguous, misplaced and unsupported targets', async () => {

@@ -107,6 +107,8 @@ const TONE = [
   { key: 'highlights', low: -0.6, high: 0.2, scale: 0.4 },
   { key: 'shadows', low: 0, high: 0.5, scale: 0.4 },
 ] as const;
+/** Auto's tone settings with their bounds and regularization scales, which a style's fit keeps. */
+export const AUTO_TONE = TONE;
 export type ToneSetting = (typeof TONE)[number]['key'];
 export type Tone = Record<ToneSetting, number>;
 export type Chroma = Pick<ColorSettings, 'saturation' | 'vibrance'>;

@@ -8,6 +8,7 @@ import type { MediaLibrary } from '../library.js';
 import type { AssistantSessions } from '../sessions.js';
 import type { StillRenderer } from '../stills.js';
 import type { ProjectStore, ProjectWriter } from '../storage.js';
+import type { StyleLibrary } from '../styles.js';
 
 /** Who calls an operation: the editor through its HTTP route, or an assistant through MCP. */
 export type Caller = 'editor' | 'assistant';
@@ -38,6 +39,7 @@ export interface ServiceContext {
   >;
   assistant: Pick<AssistantConnection, 'url' | 'tokenFile' | 'lastClient' | 'seen'>;
   images: AssistantImageBudget;
+  styles: Pick<StyleLibrary, 'list' | 'get'>;
 }
 
 /** The service parts every surface shares; each surface adds its caller. */

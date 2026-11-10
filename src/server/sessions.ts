@@ -57,6 +57,7 @@ function describeBrief(brief: Brief): string {
     brief.minFlightSpeed !== null && `flight speed at least ${brief.minFlightSpeed} m/s`,
     brief.maxFlightSpeed !== null && `flight speed at most ${brief.maxFlightSpeed} m/s`,
     brief.maxClips !== null && `at most ${brief.maxClips} clips`,
+    brief.style !== null && `style ${brief.style} (list_styles)`,
   ].filter((part): part is string => typeof part === 'string' && part !== '');
   return parts.length ? `Brief: ${parts.join('; ')}.` : 'The brief is empty.';
 }

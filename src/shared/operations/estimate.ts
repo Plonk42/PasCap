@@ -62,6 +62,10 @@ export const estimate = defineOperation({
         frameSchema.optional(),
         'match: measure the hero over the second around this project frame instead; without referenceClipId, the hero is the clip playing then (give referenceClipId when several tracks play one).',
       ),
+      style: described(
+        idSchema.optional(),
+        "auto-adjust: aim at this registered style (list_styles), the user's own finished look, instead of Auto's generic balance, within the same settings and bounds.",
+      ),
       applyAs: described(
         z.enum(['values', 'keyframe', 'shots']).default('values'),
         "Color kinds: values replaces the clip grade's values (clipId; leaving animated settings unchanged); keyframe keys the settings in the clip grade at the source frame shown at frame, which needs clipId and frame; shots writes each clip's own whole-clip correction (clipId, clipIds or every clip of layerId) into its clip grade. Clip grades apply before any adjustment and stay with the clip when it moves; a setting the grade animates follows its keyframes.",
@@ -87,6 +91,10 @@ export const estimate = defineOperation({
       reference: described(
         z.object({ clipId: idSchema, frames: z.number().int().nonnegative() }).strict().optional(),
         'match: the hero clip and how many of its proxy frames were measured.',
+      ),
+      style: described(
+        z.object({ id: idSchema, name: z.string() }).strict().optional(),
+        'auto-adjust with style: the style aimed at.',
       ),
       correction: described(
         correctionSchema.optional(),

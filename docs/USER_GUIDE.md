@@ -511,7 +511,10 @@ close to how they were. It lowers only very colorful footage, with Saturation.
 First choose its **Source**, what it analyzes: **Playhead** (the second around it, with the
 playhead on the clip), **This clip** (16 frames spread over the whole clip) or **Every clip on** the track (each clip
 analyzed on its own, so each gets its own correction; Apply then reads **Apply to N clips**).
-Keyframes always go to the selected clip only, at the playhead. Then choose how to **Apply as**:
+Keyframes always go to the selected clip only, at the playhead. **Match to this clip** instead
+makes every other clip of the track look like this one as its grade shows it, leaving this clip
+unchanged: match shots to each other first, then give the shared look to one adjustment. Then
+choose how to **Apply as**:
 
 - **Grade values** sets Temperature, Tint, Saturation, Vibrance, Exposure, Brightness,
   Contrast, Highlights, Shadows, Whites and Blacks of the clip's grade (with Track, of each
@@ -527,7 +530,12 @@ exaggerated look. Then **Apply** makes the change in one Undo step, even for eve
 track. **Cancel**, Escape or a click elsewhere leaves the grades as they were. Reopening Auto on
 the same frames skips the analysis and starts at the intensity you last applied, so you can
 change it later. The correction belongs to the clip, so it follows the shot when you trim, move
-or reorder clips. Adjustments have no Auto: set their sliders yourself. See
+or reorder clips. Adjustments have no Auto: set their sliders yourself.
+
+**Look** chooses what Auto aims at: **Generic**, its balance, or one of your **styles**, the
+look of your own finished edits. **Styles…** registers a style from up to 8 of your finished
+videos or JPEG stills in the footage folders (read where they are, never copied or changed) and
+deletes styles. Auto remembers the look you chose. See
 [Auto adjust](design/AUTO_ADJUST.md).
 
 ### HDR

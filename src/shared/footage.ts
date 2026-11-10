@@ -11,6 +11,11 @@ export function isAudioFilename(filename: string): boolean {
   return /\.(wav|mp3|m4a|aac|flac|ogg|opus|aiff|aif|wma)$/i.test(filename);
 }
 
+/** Still images a style may take as references. */
+export function isStillFilename(filename: string): boolean {
+  return /\.jpe?g$/i.test(filename);
+}
+
 const pathSchema = z
   .string()
   .min(1)
@@ -66,6 +71,24 @@ export const audioDirectorySchema = footageDirectorySchema
     entries: z.array(audioEntrySchema).max(MAX_FOOTAGE_ENTRIES),
   })
   .strict();
+const referenceEntrySchema = z.discriminatedUnion('kind', [
+  directoryEntrySchema,
+  z
+    .object({
+      name: z.string().min(1),
+      path: pathSchema,
+      kind: z.enum(['video', 'still']),
+      size: z.number().int().nonnegative(),
+    })
+    .strict(),
+]);
+/** A folder of possible style references: videos and stills. */
+export const referenceDirectorySchema = footageDirectorySchema
+  .extend({
+    entries: z.array(referenceEntrySchema).max(MAX_FOOTAGE_ENTRIES),
+  })
+  .strict();
 export type FootageRoot = z.infer<typeof footageRootSchema>;
 export type FootageDirectory = z.infer<typeof footageDirectorySchema>;
 export type AudioDirectory = z.infer<typeof audioDirectorySchema>;
+export type ReferenceDirectory = z.infer<typeof referenceDirectorySchema>;

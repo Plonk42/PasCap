@@ -76,6 +76,10 @@ export const briefSchema = z
       (initial) => `null keeps ${initial}`,
     ),
     maxClips: described(z.number().int().positive().max(1000).nullable().default(null), 'Most clips in the cut.'),
+    style: described(
+      idSchema.nullable().default(null),
+      "Registered style (list_styles) the user wants the grade to aim at: estimate auto-adjust with this style; null for Auto's generic balance.",
+    ),
   })
   .strict()
   .superRefine((brief, context) => {

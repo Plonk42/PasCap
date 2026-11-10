@@ -854,6 +854,10 @@ incompatible and never rewritten with fallback/default local fields; there is no
 automatic deletion of
 projects, receipts or finished videos. Proxy/current PCM formats are unchanged; the
 registries are `videos.json` version 3 and `music.json` version 2, with full-content checksums.
+Registered styles ([#314](https://github.com/Plonk42/PasCap/issues/314)) are in `styles.json`
+version 1 beside them: each style's name, the paths of its references (read in place, never
+copied) and the look measured on them. A registry this build cannot read is reported and left
+unchanged.
 Registered recordings and currently
 verified ready proxies are reusable.
 The live sample appearing incompatible is expected. No sample preparation or

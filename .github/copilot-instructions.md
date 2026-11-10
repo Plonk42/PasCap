@@ -192,7 +192,9 @@ request: read one only when the task touches its area.
   quarter) and applies one Undo step. **Source** (named by scope): Playhead (±30 frames), This clip (whole graded clip) or Every clip on <track>
   (each analyzed on its own, one `color` edit per clip, **Apply to N clips**; keyframes go to this clip only), or #315
   **Match to this clip** (every other clip on the track takes this hero clip's look as its grade shows it, the hero
-  never changes; `estimate` kind `match`, `src/shared/look-match.ts`). **Apply as**: Grade values edits
+  never changes; `estimate` kind `match`, `src/shared/look-match.ts`). #314 **Look**: Generic or a registered style
+  (`styles.json`, references read in place; `estimate` `style`, brief `style`), fitted like a match within Auto's
+  bounds. **Apply as**: Grade values edits
   the grades' values, leaving animated settings and keyframes unchanged; Keyframe (Playhead source only)
   captures all eleven at the source frame like their diamonds (initial, with Playhead, once any is
   animated). Constants in `src/shared/auto-adjust.ts`, no schema/render change

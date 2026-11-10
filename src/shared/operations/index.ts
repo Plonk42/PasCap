@@ -18,6 +18,7 @@ import {
   sessionStart,
   sessionStatus,
 } from './sessions.js';
+import { listStyles } from './styles.js';
 
 /** Every operation of the service; one that is not listed here does not exist. */
 export const operations = [
@@ -43,6 +44,7 @@ export const operations = [
   recordingSheet,
   compareRecordings,
   estimate,
+  listStyles,
 ] as const;
 
 export type Operation = (typeof operations)[number];

@@ -163,7 +163,9 @@ restore.
 The **brief** is what the user tells the assistant, in the chat or later in the Hand off
 dialog: notes (≤ 2,000 characters), music track, target length in seconds, the steady-range
 limits of Source preview (`maxJolts`, `minMovement`, `maxMovement`, `minFlightSpeed`,
-`maxFlightSpeed`) and the maximum number of clips, all optional. It carries no permissions:
+`maxFlightSpeed`), the maximum number of clips and a registered **style**
+([#314](https://github.com/Plonk42/PasCap/issues/314), `list_styles`) the grade should aim at, all
+optional. It carries no permissions:
 the assistant may use every operation. The service applies its limits to `describe_recording` and
 `compare_recordings` and otherwise only stores and returns it. A session saved before the
 limits were named keeps its `allowedMovement` as `maxJolts`.
@@ -531,9 +533,17 @@ Read; for editor and assistant. Measure footage the way the editor's automatic t
 | `sourceOut`       | integer                                                 | Source frame after the recording range (exclusive).                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | `referenceClipId` | string                                                  | match: the hero clip, measured whole through its grade. It is never changed, and left out of layerId.                                                                                                                                                                                                                                                                                                                                                                   |
 | `referenceFrame`  | integer                                                 | match: measure the hero over the second around this project frame instead; without referenceClipId, the hero is the clip playing then (give referenceClipId when several tracks play one).                                                                                                                                                                                                                                                                              |
+| `style`           | string                                                  | auto-adjust: aim at this registered style (list_styles), the user's own finished look, instead of Auto's generic balance, within the same settings and bounds.                                                                                                                                                                                                                                                                                                          |
 | `applyAs`         | "values" or "keyframe" or "shots"                       | Color kinds: values replaces the clip grade's values (clipId; leaving animated settings unchanged); keyframe keys the settings in the clip grade at the source frame shown at frame, which needs clipId and frame; shots writes each clip's own whole-clip correction (clipId, clipIds or every clip of layerId) into its clip grade. Clip grades apply before any adjustment and stay with the clip when it moves; a setting the grade animates follows its keyframes. |
 | `intensity`       | number                                                  | auto-adjust and match: strength of the correction in %; 80 is the correction as fitted, 100 exaggerates it by a quarter.                                                                                                                                                                                                                                                                                                                                                |
 | `commands`        | boolean                                                 | False returns the values only, without the edit commands (applying as values repeats the clip grade's whole Color, HSL ranges and curves included).                                                                                                                                                                                                                                                                                                                     |
+
+#### `list_styles`
+
+Read; for editor and assistant. List the styles the user registered from their own finished edits (reference videos or stills), with the file names of their references. estimate kind auto-adjust with style aims Auto's correction at a style's tone and color instead of its generic balance; the session brief may name the style the user wants.
+
+| Input | Type | Description |
+| ----- | ---- | ----------- |
 
 #### Edit commands
 
@@ -733,7 +743,11 @@ is the fitted correction); `white-balance` runs `frameIlluminant` and `poolWhite
 `referenceClipId` (whole) or the clip playing at `referenceFrame` (the second around it; both
 together pick that second of that clip), through its grade with `measureLook`, then fits each
 target with `matchLook` ([Matching a look](AUTO_ADJUST.md#matching-a-look)) and reports the hero
-in `reference`. The hero is left out of `layerId` and refused in `clipId` or `clipIds`. Their
+in `reference`. The hero is left out of `layerId` and refused in `clipId` or `clipIds`. With
+`style` ([#314](https://github.com/Plonk42/PasCap/issues/314)), `auto-adjust` aims at a registered
+style's look instead of Auto's constants, within Auto's settings and bounds
+([Registered styles](AUTO_ADJUST.md#registered-styles)), and reports the style in `style`;
+`list_styles` (both) lists the styles with their references' file names and looks. Their
 commands are the editor's and write clip grades only, never adjustments: with `clipId`, the
 clip grade's values as one `color` edit leaving animated settings unchanged
 (listed in `unchanged`), or with `applyAs: keyframe` the settings captured at the source frame
