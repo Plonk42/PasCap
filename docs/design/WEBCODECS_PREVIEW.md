@@ -20,8 +20,9 @@ and [source playback](../../src/web/source-transport.ts).
 
 Preview reads only the verified editing proxy, never an original, through the
 existing guarded byte-range route. Proxies are already prepared as faststart
-H.264 MP4 with a 15-frame closed GOP, no B-frames and a 30000 timescale; the
-proxy format is unchanged. The reader reads the first 64 KiB, locates `moov`
+H.264 MP4 with a 15-frame closed GOP, no B-frames and the recording's own frame timestamps (timescale 30000,
+or the rate's numerator for 24000/1001, 48000/1001 and 60000/1001); the
+proxy format is unchanged for 30000/1001 recordings. The reader reads the first 64 KiB, locates `moov`
 (reading the rest of it when larger) and builds a sample index: byte offset,
 size and keyframe flag for every frame. It requires:
 
@@ -29,7 +30,8 @@ size and keyframe flag for every frame. It requires:
 - exactly one H.264 (`avc1`/`avc3`) video track with an `avcC` description;
 - no edit offset (edit-list media time 0) and no composition offsets
   (no reordered frames);
-- uniform 1001/30000 s frame durations and strictly increasing sample offsets;
+- one uniform frame duration of an accepted recording rate (`SOURCE_FRAME_RATES`) and strictly increasing
+  sample offsets;
 - a keyframe as the first sample.
 
 A violation is an explicit error naming the problem and asking to prepare the

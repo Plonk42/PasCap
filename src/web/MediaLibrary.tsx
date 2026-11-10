@@ -19,7 +19,7 @@ import {
   useBestRanges,
   type BestRangeChange,
 } from './best-ranges.js';
-import { durationLabel, MEDIA_DRAG_TYPE, mediaReady, shortName } from './display.js';
+import { durationLabel, MEDIA_DRAG_TYPE, mediaReady, otherRateLabel, shortName } from './display.js';
 import { Icon } from './icons.js';
 import type { RelinkTarget } from './ImportDialog.js';
 import './media-review.css';
@@ -99,7 +99,11 @@ function LibraryDuration({
             const ranges = selects[asset.id];
             if (!ranges) return sum + asset.metadata.durationSeconds;
             return (
-              sum + framesToSeconds(ranges.reduce((frames, range) => frames + range.sourceOut - range.sourceIn, 0))
+              sum +
+              framesToSeconds(
+                ranges.reduce((frames, range) => frames + range.sourceOut - range.sourceIn, 0),
+                asset.metadata.frameRate,
+              )
             );
           }, 0),
         )
@@ -897,9 +901,10 @@ export function MediaLibrary({
                   <span className="media-recording-meta">
                     <span
                       className="media-recording-duration"
-                      title={`${durationLabel(asset.metadata.durationSeconds)} · ${asset.metadata.frameCount} original source frames`}
+                      title={`${durationLabel(asset.metadata.durationSeconds)}${otherRateLabel(asset)} · ${asset.metadata.frameCount} original source frames`}
                     >
-                      {durationLabel(asset.metadata.durationSeconds)}{' '}
+                      {durationLabel(asset.metadata.durationSeconds)}
+                      {otherRateLabel(asset)}{' '}
                       <span className="media-resolution">
                         · {asset.metadata.width} × {asset.metadata.height}
                       </span>

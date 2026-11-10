@@ -8,6 +8,7 @@ import { calculateLayout } from '../../src/shared/timeline.js';
 import { clipKeyframeKind, clipKeyframeSlideTarget } from '../../src/web/clip-keyframe-drag.js';
 import { clipKeyframeMarkers } from '../../src/web/clip-keyframe-markers.js';
 import { previewClipSource } from '../../src/web/clip-speed-geometry.js';
+import { PROJECT_FPS } from '../../src/shared/timing.js';
 
 function reversed(
   sourceIn: number,
@@ -30,7 +31,7 @@ function shown(document: ProjectDocument): number[][] {
 
 describe('reversed retiming map', () => {
   it('plays OUT − 1 back to IN at 1× with unchanged duration and mirrored inverses', () => {
-    const map = compileRetiming(reversed(10, 20));
+    const map = compileRetiming(reversed(10, 20), PROJECT_FPS);
     expect(map.duration).toBe(10);
     expect(Array.from({ length: 10 }, (_, frame) => map.sourceAt(frame))).toEqual([
       19, 18, 17, 16, 15, 14, 13, 12, 11, 10,
@@ -41,8 +42,8 @@ describe('reversed retiming map', () => {
 
   it.each([0.1, 0.37, 0.5, 1, 2, 3, 8])('mirrors constant %s× exactly within the source range', (rate) => {
     const speed = { mode: 'constant', rate } as const;
-    const forward = compileRetiming({ ...reversed(7, 61, speed), reverse: false });
-    const backward = compileRetiming(reversed(7, 61, speed));
+    const forward = compileRetiming({ ...reversed(7, 61, speed), reverse: false }, PROJECT_FPS);
+    const backward = compileRetiming(reversed(7, 61, speed), PROJECT_FPS);
     expect(backward.duration).toBe(forward.duration);
     for (let frame = 0; frame < forward.duration; frame++)
       expect(backward.sourceAt(frame)).toBe(7 + 61 - 1 - forward.sourceAt(frame));
@@ -57,8 +58,8 @@ describe('reversed retiming map', () => {
         { frame: 70, rate: 1, interpolation: 'smooth' },
       ],
     };
-    const forward = compileRetiming({ ...reversed(0, 100, speed), reverse: false });
-    const backward = compileRetiming(reversed(0, 100, speed));
+    const forward = compileRetiming({ ...reversed(0, 100, speed), reverse: false }, PROJECT_FPS);
+    const backward = compileRetiming(reversed(0, 100, speed), PROJECT_FPS);
     expect(backward.duration).toBe(forward.duration);
     const count = (map: typeof forward, from: number, to: number): number =>
       Array.from({ length: map.duration }, (_, frame) => map.sourceAt(frame)).filter(

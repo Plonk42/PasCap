@@ -401,14 +401,14 @@ export function SourceReview({
         <button
           className="primary-button small"
           type="button"
-          aria-label={`Add clip ${sourceSeconds(range.sourceOut - range.sourceIn)} to timeline`}
+          aria-label={`Add clip ${sourceSeconds(range.sourceOut - range.sourceIn, asset.metadata.frameRate)} to timeline`}
           title={`Append this range to ${targetLayer} as a new, independent clip; omitted source frames remain available`}
           disabled={insertDisabled}
           onKeyDown={keyboard}
           onClick={() => insertExcerpt()}
         >
           <Icon name="plus" size={15} />
-          Add clip {sourceSeconds(range.sourceOut - range.sourceIn)}
+          Add clip {sourceSeconds(range.sourceOut - range.sourceIn, asset.metadata.frameRate)}
         </button>
         <button
           className="icon-button"
@@ -1299,7 +1299,7 @@ function KeptRanges({
                 <button
                   type="button"
                   className="source-kept-choose"
-                  aria-label={`Kept range ${index + 1}, ${formatTimecode(item.sourceIn, rate)} to ${formatTimecode(item.sourceOut, rate)}, ${sourceSeconds(item.sourceOut - item.sourceIn)}`}
+                  aria-label={`Kept range ${index + 1}, ${formatTimecode(item.sourceIn, rate)} to ${formatTimecode(item.sourceOut, rate)}, ${sourceSeconds(item.sourceOut - item.sourceIn, rate)}`}
                   aria-pressed={index === activeKept}
                   disabled={busy}
                   onClick={() => onActivate(index)}
@@ -1308,7 +1308,7 @@ function KeptRanges({
                   <span className="source-kept-range">
                     {formatTimecode(item.sourceIn, rate)} → {formatTimecode(item.sourceOut, rate)}
                   </span>
-                  <span className="source-kept-length">{sourceSeconds(item.sourceOut - item.sourceIn)}</span>
+                  <span className="source-kept-length">{sourceSeconds(item.sourceOut - item.sourceIn, rate)}</span>
                 </button>
                 <button
                   type="button"

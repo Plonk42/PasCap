@@ -59,6 +59,7 @@ import {
 import { clipDuration } from './speed.js';
 import { trimByOutputFrames } from './source-range.js';
 import { calculateLayout, layerClips, transitionOffset, type TimelineLayout } from './timeline.js';
+import { videoRate } from './timing.js';
 
 const MAX_FRAME = 2_147_483_647;
 
@@ -288,7 +289,7 @@ function splitClip(next: ProjectDocument, index: number, command: Extract<EditCo
   const lower = { sourceIn: original.sourceIn, sourceOut: command.sourceFrame };
   const upper = { sourceIn: command.sourceFrame, sourceOut: original.sourceOut };
   const [first, second] = original.reverse ? [upper, lower] : [lower, upper];
-  const leftDuration = clipDuration({ ...original, ...first });
+  const leftDuration = clipDuration({ ...original, ...first }, videoRate(next, original.mediaId));
   const right = {
     ...original,
     ...second,
@@ -874,9 +875,21 @@ function keepCutTransition(document: ProjectDocument, value: Transition): Projec
     const clip = (id: string) => project.clips.find((item) => item.id === id)!;
     // The displayed end and start: a reversed clip shows its source OUT first.
     const lengthenEnd = (item: VideoClip, frames: number) =>
-      trimByOutputFrames(item, item.reverse ? 'in' : 'out', item.reverse ? -frames : frames, MAX_FRAME);
+      trimByOutputFrames(
+        item,
+        item.reverse ? 'in' : 'out',
+        item.reverse ? -frames : frames,
+        MAX_FRAME,
+        videoRate(project, item.mediaId),
+      );
     const lengthenStart = (item: VideoClip, frames: number) =>
-      trimByOutputFrames(item, item.reverse ? 'out' : 'in', item.reverse ? frames : -frames, MAX_FRAME);
+      trimByOutputFrames(
+        item,
+        item.reverse ? 'out' : 'in',
+        item.reverse ? frames : -frames,
+        MAX_FRAME,
+        videoRate(project, item.mediaId),
+      );
     const widened = applyCommand(project, lengthenStart(clip(right.id), toRight));
     return applyCommand(widened, lengthenEnd(clip(left.id), toLeft));
   };

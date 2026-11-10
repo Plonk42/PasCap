@@ -117,8 +117,12 @@ request: read one only when the task touches its area.
   WebCodecs preview, `docs/design/WEBCODECS_PREVIEW.md`.
 - Speed is clip-only: strict constant `rate` or a 1–256-keyframe curve on original
   source frames (presets such as Ramp up replace its keyframes). A clip's duration
-  depends only on its own speed and source range, never its track, start or Ripple
+  depends only on its own speed, source range and recording rate, never its track, start or Ripple
   position; there is no track Speed channel.
+- #323: recordings may be at any constant `SOURCE_FRAME_RATES` rate (23.976–60 fps); the project
+  stays 30000/1001 and records each other rate in `videoRates`. Speed is relative to real time:
+  retiming advances `sourceFramesPerProjectFrame(rate)` recording frames per project frame at 1×.
+  Every source-frame ↔ time conversion (seeks, proxies, timecodes, motion) uses the recording's rate.
 - #171: every clip requires boolean `reverse` (Clip → Speed checkbox), a
   direction, not a negative rate. The retiming map mirrors forward output time, so
   duration and speed-keyframe footage are unchanged. Timeline edits act on the clip as

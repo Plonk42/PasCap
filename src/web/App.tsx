@@ -38,6 +38,7 @@ import {
   projectAudioIds,
   projectVideoIds,
   removeProjectMedia,
+  withVideoRates,
   type MediaRemoval,
   type ProjectSummary,
 } from '../shared/projects.js';
@@ -157,6 +158,7 @@ function timingKey(project: ProjectDocument): string {
   return JSON.stringify({
     id: project.id,
     frameRate: project.frameRate,
+    videoRates: project.videoRates,
     colorProfile: project.colorProfile,
     layers: project.layers
       .filter((layer) => project.clips.some((clip) => clip.layerId === layer.id))
@@ -547,13 +549,22 @@ export function App() {
       // unless the user explicitly removed them from the project.
       const bin = (ids: Iterable<string>, gone: readonly string[] = []) =>
         [...new Set(ids)].filter((id) => !gone.includes(id));
-      const document = {
-        ...next,
-        media: {
-          videoIds: bin([...projectVideoIds(next), ...(previous ? projectVideoIds(previous) : [])], removed?.videoIds),
-          audioIds: bin([...projectAudioIds(next), ...(previous ? projectAudioIds(previous) : [])], removed?.audioIds),
+      const document = withVideoRates(
+        {
+          ...next,
+          media: {
+            videoIds: bin(
+              [...projectVideoIds(next), ...(previous ? projectVideoIds(previous) : [])],
+              removed?.videoIds,
+            ),
+            audioIds: bin(
+              [...projectAudioIds(next), ...(previous ? projectAudioIds(previous) : [])],
+              removed?.audioIds,
+            ),
+          },
         },
-      };
+        (id) => latestAssets.current.find((asset) => asset.id === id)?.metadata.frameRate,
+      );
       validate(document);
       if (!history.current) throw new Error('Project has not loaded yet.');
       if (following.current) {
@@ -2386,6 +2397,7 @@ export function App() {
                       visible.clips.length === 2 &&
                       visible.music.length === 0 &&
                       visible.clips.every((clip) => clip.speed.mode === 'constant' && clip.speed.rate === 1) &&
+                      Object.keys(visible.videoRates).length === 0 &&
                       layout.duration <= 3600 &&
                       draft === null
                     }

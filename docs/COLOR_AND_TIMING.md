@@ -184,7 +184,8 @@ unavailable. Speed and music settings have none. The **Original** button shows t
 
 - Project placements, Transform keyframes, adjustments and output durations use integer **project frames**;
   source bounds, clip grade keyframes and clip-speed anchors use integer **original-source frames**.
-  Rate: exactly `30000/1001`.
+  Project rate: exactly `30000/1001`. Original-source frames count at their recording's constant rate
+  (`SOURCE_FRAME_RATES`, 23.976–60 fps); see [recording rates](SPEED_AND_AUDIO.md#recording-frame-rates).
   Seconds exist only at media API / FFmpeg boundaries. Source OUT is exclusive.
 - Cuts consume zero frames. With Ripple on, a track sequences from its first
   anchor: its OUT is that start plus each clip's own retimed duration minus dissolve

@@ -32,7 +32,7 @@ import { trimOnTimeline, type TrimEdge } from '../shared/source-range.js';
 import { spatialKeyChannels } from '../shared/spatial.js';
 import { clipDuration } from '../shared/speed.js';
 import { calculateLayout, transitionOffset, type PlacedClip } from '../shared/timeline.js';
-import { formatTimecode, framesToSeconds, secondsToFrames } from '../shared/timing.js';
+import { formatTimecode, framesToSeconds, secondsToFrames, videoRate } from '../shared/timing.js';
 import { AdjustmentLane, type AdjustmentGesture } from './AdjustmentLane.js';
 import {
   addAdjustmentReason,
@@ -357,15 +357,19 @@ function keyboardTrimDelta(key: string, shift: boolean, clip: VideoClip, edge: T
 }
 
 /** Output frames of omitted footage beyond the clip's left edge (after OUT when reversed). */
-function recoverableHead(placed: PlacedClip | undefined, frameCount: number | undefined): number {
+function recoverableHead(
+  placed: PlacedClip | undefined,
+  frameCount: number | undefined,
+  project: ProjectDocument,
+): number {
   if (!placed || frameCount === undefined) return 0;
   const restored = placed.clip.reverse ? { sourceOut: frameCount } : { sourceIn: 0 };
-  return clipDuration({ ...placed.clip, ...restored }) - placed.duration;
+  return clipDuration({ ...placed.clip, ...restored }, videoRate(project, placed.clip.mediaId)) - placed.duration;
 }
 /** Output frames of omitted footage beyond the clip's right edge (before IN when reversed). */
-function recoverableTail(placed: PlacedClip, frameCount: number): number {
+function recoverableTail(placed: PlacedClip, frameCount: number, project: ProjectDocument): number {
   const restored = placed.clip.reverse ? { sourceIn: 0 } : { sourceOut: frameCount };
-  return clipDuration({ ...placed.clip, ...restored }) - placed.duration;
+  return clipDuration({ ...placed.clip, ...restored }, videoRate(project, placed.clip.mediaId)) - placed.duration;
 }
 
 /** A trim handle reports the source endpoint it edits: OUT at the left edge of a reversed clip. */
@@ -1003,13 +1007,15 @@ export function Timeline(props: Readonly<Props>) {
   const source = assets.find((asset) => asset.id === selected?.clip.mediaId);
   // Reserve access to omitted head/tail footage, including the first/last clip.
   // Outward trimming must not require dragging beyond the edge of the browser.
-  const availableHead = recoverableHead(selected, source?.metadata.frameCount);
+  const availableHead = recoverableHead(selected, source?.metadata.frameCount, visible);
   // Selection must not move frame zero beneath the mouse. The timeline origin
   // stays fixed; omitted source is still recoverable through handles/Home/End.
   const leading =
     drag.current?.leading ?? movement.current?.leading ?? musicGesture?.leading ?? adjustmentGesture?.leading ?? 32;
   const unusedTail =
-    source && selected ? recoverableTail(selected, source.metadata.frameCount) - (layout.duration - selected.end) : 0;
+    source && selected
+      ? recoverableTail(selected, source.metadata.frameCount, visible) - (layout.duration - selected.end)
+      : 0;
   const trailing = Math.max(TRAILING_MIN, unusedTail * scale + 24);
   const musicEnd = timelineMusicExtent(project, musicGesture);
   // Stored points after video or music OUT stay reachable, without extending the playable duration.
@@ -1219,7 +1225,7 @@ export function Timeline(props: Readonly<Props>) {
     const asset = assets.find((item) => item.id === clip.mediaId);
     if (!asset || !scroll.current) return;
     const placed = baseLayout.clips.find((item) => item.clip.id === clip.id)!;
-    const head = recoverableHead(placed, asset.metadata.frameCount);
+    const head = recoverableHead(placed, asset.metadata.frameCount, project);
     const originShift = edge === 'in' ? Math.max(0, Math.ceil((head - placed.start) * scale)) : 0;
     event.preventDefault();
     event.stopPropagation();
@@ -1740,7 +1746,11 @@ export function Timeline(props: Readonly<Props>) {
                 style={{
                   top: rowTop(selected.clip.layerId) - LANE_OFFSET,
                   left: leading + (selected.start - availableHead) * scale,
-                  width: clipDuration({ ...selected.clip, sourceIn: 0, sourceOut: source.metadata.frameCount }) * scale,
+                  width:
+                    clipDuration(
+                      { ...selected.clip, sourceIn: 0, sourceOut: source.metadata.frameCount },
+                      videoRate(visible, selected.clip.mediaId),
+                    ) * scale,
                 }}
               />
             )}
@@ -1888,7 +1898,10 @@ export function Timeline(props: Readonly<Props>) {
                       aria-valuemin={trimHandleValue(clip, edge, asset?.metadata.frameCount).min}
                       aria-valuemax={trimHandleValue(clip, edge, asset?.metadata.frameCount).max}
                       aria-valuenow={trimHandleValue(clip, edge, asset?.metadata.frameCount).now}
-                      aria-valuetext={sourceSeconds(trimHandleValue(clip, edge, asset?.metadata.frameCount).now)}
+                      aria-valuetext={sourceSeconds(
+                        trimHandleValue(clip, edge, asset?.metadata.frameCount).now,
+                        asset?.metadata.frameRate,
+                      )}
                       title={`Trim ${edge === 'in' ? 'start' : 'end'}; drag outward to restore recording frames. Arrow keys: one frame; Shift: ten.`}
                       onPointerDown={(event) => beginTrim(event, placed.clip, edge)}
                       onPointerMove={moveTrim}

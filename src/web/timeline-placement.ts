@@ -3,6 +3,7 @@ import type { ProjectDocument, VideoClip } from '../shared/model.js';
 import { musicClips } from '../shared/music-lanes.js';
 import { NO_BEATS, type BeatSnap } from '../shared/snap.js';
 import { clipDuration } from '../shared/speed.js';
+import { videoRate } from '../shared/timing.js';
 import { calculateLayout, layerClips, transitionOffset, type PlacedClip } from '../shared/timeline.js';
 import { adjustmentMoveCommands } from './adjustment-ui.js';
 
@@ -150,7 +151,7 @@ function rippleSlots(
   const placed = ordered.map((clip, index) => {
     cursor += transitionOffset(transitions[index - 1]);
     const start = cursor;
-    cursor += clipDuration(clip);
+    cursor += clipDuration(clip, videoRate(project, clip.mediaId));
     return { clip, start, end: cursor };
   });
   return Array.from({ length: ordered.length + 1 }, (_, order) => {
@@ -299,13 +300,13 @@ function planGroupDrop(
   return plan;
 }
 
-function durationAt(clips: readonly VideoClip[]): number {
-  return clips.reduce((total, clip) => total + clipDuration(clip), 0);
+function durationAt(project: ProjectDocument, clips: readonly VideoClip[]): number {
+  return clips.reduce((total, clip) => total + clipDuration(clip, videoRate(project, clip.mediaId)), 0);
 }
 
 /** Leading or trailing edge snaps; a clip keeps its own duration wherever it moves. */
 function snapRowPlacement(
-  clips: readonly VideoClip[],
+  duration: number,
   requested: number,
   points: readonly number[],
   tolerance: number,
@@ -321,7 +322,6 @@ function snapRowPlacement(
       closest = distance;
     }
   };
-  const duration = durationAt(clips);
   for (const point of points) {
     consider(point, point);
     consider(point - duration, point);
@@ -360,7 +360,7 @@ function ripplePlacement(
   // The rest of the track follows its anchor, so its boundaries are no targets.
   const excluded = new Set([...clips, ...trackClips].map((clip) => clip.id));
   const points = snapPointsWithout(project, excluded, playhead, beatsOf(snapping));
-  return { index: slot.index, ...snapRowPlacement(clips, requested, points, tolerance) };
+  return { index: slot.index, ...snapRowPlacement(durationAt(project, clips), requested, points, tolerance) };
 }
 
 /** Both drag feedback and drop commit consume this same integer-frame plan. */
@@ -407,7 +407,7 @@ function planSingleDrop(
         playhead,
         beatsOf(snapping),
       );
-      placement = { index, ...snapRowPlacement(clips, requested, points, tolerance) };
+      placement = { index, ...snapRowPlacement(durationAt(project, clips), requested, points, tolerance) };
     }
     const { start } = placement;
     plan.index = placement.index;
@@ -415,7 +415,7 @@ function planSingleDrop(
     plan.guide = placement.guide;
     plan.command =
       payload.kind === 'clip' ? { type: 'place', clipId: payload.clipId, layerId, start, index: plan.index } : null;
-    plan.duration = durationAt(clips);
+    plan.duration = durationAt(project, clips);
     const candidate = candidateDocument(project, payload, plan);
     const layout = calculateLayout(candidate);
     const placed = layout.clips.find((item) => item.clip.id === first.id)!;

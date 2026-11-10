@@ -150,7 +150,12 @@ function finite(value: number): number {
  * quadrature. Only final duration is rounded, with the existing clip-base clock
  * normalization. Storage is O(keys), never O(recording duration).
  */
-export function compileClipSpeedCurve(sourceIn: number, sourceOut: number, speed: Readonly<SpeedCurve>): Retiming {
+export function compileClipSpeedCurve(
+  sourceIn: number,
+  sourceOut: number,
+  speed: Readonly<SpeedCurve>,
+  scale: number,
+): Retiming {
   const keys = speed.keyframes;
   const boundaries = [
     sourceIn,
@@ -178,7 +183,8 @@ export function compileClipSpeedCurve(sourceIn: number, sourceOut: number, speed
     segments.push(Object.freeze(segment));
   }
   Object.freeze(segments);
-  const duration = Math.max(1, Math.round(total));
+  // `total` counts source-rate frames; the normalized clock below needs no other change.
+  const duration = Math.max(1, Math.round(total / scale));
   const sourceAtTime = (time: number): number => {
     const bounded = Math.max(0, Math.min(total, time));
     const segment = segmentAt(segments, bounded, 'timeEnd');

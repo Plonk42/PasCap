@@ -4,13 +4,13 @@ import { PROJECT_FPS } from '../../src/shared/timing.js';
 import { buildProxy, type ProxyFixtureOptions } from './proxy-fixture.js';
 
 function parse(options: ProxyFixtureOptions = {}) {
-  return parseProxyIndex(buildProxy(options).bytes, PROJECT_FPS);
+  return parseProxyIndex(buildProxy(options).bytes);
 }
 
 describe('editing proxy sample index', () => {
   it.each([false, true])('maps every frame to its exact byte range (64-bit offsets=%s)', (wide) => {
     const fixture = buildProxy({ frames: 47, wide });
-    const index = parseProxyIndex(fixture.bytes, PROJECT_FPS);
+    const index = parseProxyIndex(fixture.bytes);
     expect(index).toMatchObject({ codec: 'avc1.64001f', width: 1280, height: 720, frameCount: 47 });
     expect([...index.offsets]).toEqual(fixture.offsets);
     expect([...index.sizes]).toEqual(fixture.sizes);
@@ -25,7 +25,13 @@ describe('editing proxy sample index', () => {
 
   it('accepts an index without an edit list and any equivalent timescale', () => {
     expect(parse({ editMediaTime: null }).frameCount).toBe(60);
-    expect(parse({ timescale: 60_000, delta: 2002 }).frameCount).toBe(60);
+    expect(parse({ timescale: 60_000, delta: 2002 })).toMatchObject({ frameCount: 60, frameRate: PROJECT_FPS });
+  });
+
+  it('reads the accepted recording rate of a proxy from its frame duration', () => {
+    expect(parse({ delta: 1000 }).frameRate).toEqual({ numerator: 30, denominator: 1 });
+    expect(parse({ timescale: 60_000, delta: 1001 }).frameRate).toEqual({ numerator: 60_000, denominator: 1_001 });
+    expect(parse({ timescale: 30_000, delta: 1250 }).frameRate).toEqual({ numerator: 24, denominator: 1 });
   });
 
   it('locates the index before the media from a bounded head read', () => {
@@ -33,13 +39,13 @@ describe('editing proxy sample index', () => {
     const location = locateIndex(fixture.bytes.subarray(0, 64));
     expect(location.start).toBeGreaterThan(0);
     expect(location.end).toBe(fixture.offsets[0]! - 8);
-    expect(() => parseProxyIndex(fixture.bytes.subarray(0, location.end - 1), PROJECT_FPS)).toThrow(/truncated/);
+    expect(() => parseProxyIndex(fixture.bytes.subarray(0, location.end - 1))).toThrow(/truncated/);
   });
 
   it.each<[string, ProxyFixtureOptions, RegExp]>([
     ['an index after the media', { indexFirst: false }, /faststart/],
     ['reordered frames', { reordered: true }, /reordered \(B\) frames/],
-    ['another frame rate', { delta: 1000 }, /frame duration is not 1001\/30000/],
+    ['a frame rate no recording has', { delta: 250 }, /frame rate 30000\/250 is not an accepted recording rate/],
     ['a shifting edit list', { editMediaTime: 1001 }, /edit list shifts frames/],
     ['another codec', { sampleEntry: 'hvc1' }, /not H\.264/],
     ['two video tracks', { videoTracks: 2 }, /exactly one video track/],

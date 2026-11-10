@@ -1,6 +1,14 @@
 import { z } from 'zod';
 import { metadataSchema, type VideoMetadata } from '../shared/media.js';
-import { framesToSeconds, parseRate, PROJECT_FPS, sameRate } from '../shared/timing.js';
+import {
+  framesToSeconds,
+  parseRate,
+  rateLabel,
+  sameRate,
+  SOURCE_FRAME_RATES,
+  sourceFrameRate,
+  type FrameRate,
+} from '../shared/timing.js';
 import type { ServiceConfig } from './config.js';
 import { ServiceError } from './errors.js';
 import { runProcess } from './process.js';
@@ -45,16 +53,13 @@ export async function probeVideo(
   const videos = probe.streams.filter((stream) => stream.codec_type === 'video');
   if (videos.length !== 1) throw new ServiceError('Exactly one video stream is supported.', 422);
   const video = videos[0]!;
-  const average = parseRate(video.avg_frame_rate);
-  const nominal = parseRate(video.r_frame_rate);
-  if (!sameRate(average, PROJECT_FPS) || !sameRate(nominal, PROJECT_FPS))
-    throw new ServiceError('Only constant 30000/1001 fps footage is supported.', 422);
+  const frameRate = constantRate(video.avg_frame_rate, video.r_frame_rate);
   const frameCount = Number(video.nb_frames);
   if (!Number.isSafeInteger(frameCount) || frameCount <= 0 || video.duration_ts === undefined || video.start_pts !== 0)
     throw new ServiceError('Ambiguous frame count, duration or non-zero source start timestamp.', 422);
   const timeBase = parseRate(video.time_base);
   const duration = (video.duration_ts * timeBase.numerator) / timeBase.denominator;
-  if (Math.abs(duration - framesToSeconds(frameCount)) > 1e-5)
+  if (Math.abs(duration - framesToSeconds(frameCount, frameRate)) > 1e-5)
     throw new ServiceError(
       'Frame count and source timestamps disagree; variable/ambiguous timing is unsupported.',
       422,
@@ -76,13 +81,13 @@ export async function probeVideo(
       'Only 8-bit yuv420p SDR sources are supported. Other pixel formats are not silently converted.',
       422,
     );
-  await verifyPacketTiming(config, filename, frameCount, signal);
+  await verifyPacketTiming(config, filename, frameCount, frameRate, signal);
   return metadataSchema.parse({
     width: video.width,
     height: video.height,
     codec: video.codec_name,
     pixelFormat: video.pix_fmt,
-    frameRate: { ...PROJECT_FPS },
+    frameRate: { ...frameRate },
     frameCount,
     durationSeconds: duration,
     colorPrimaries: video.color_primaries,
@@ -93,10 +98,37 @@ export async function probeVideo(
   });
 }
 
+const ACCEPTED_RATES = `${SOURCE_FRAME_RATES.slice(0, -1).map(rateLabel).join(', ')} or ${rateLabel(SOURCE_FRAME_RATES.at(-1)!)} fps`;
+
+/** The accepted rate both stream headers agree on; anything else is rejected with the rate found. */
+export function constantRate(averageText: string, nominalText: string): Readonly<FrameRate> {
+  let average: FrameRate;
+  let nominal: FrameRate;
+  try {
+    average = parseRate(averageText);
+    nominal = parseRate(nominalText);
+  } catch {
+    throw new ServiceError(`The frame rate is unknown; only constant ${ACCEPTED_RATES} recordings are supported.`, 422);
+  }
+  if (!sameRate(average, nominal))
+    throw new ServiceError(
+      `The frame rate varies (${rateLabel(average)} fps on average, ${rateLabel(nominal)} fps nominal); only constant ${ACCEPTED_RATES} recordings are supported.`,
+      422,
+    );
+  const rate = sourceFrameRate(average);
+  if (!rate)
+    throw new ServiceError(
+      `${rateLabel(average)} fps recordings are not supported; only constant ${ACCEPTED_RATES} ones are.`,
+      422,
+    );
+  return rate;
+}
+
 export async function verifyPacketTiming(
   config: ServiceConfig,
   filename: string,
   frameCount: number,
+  rate: Readonly<FrameRate>,
   signal?: AbortSignal,
 ): Promise<void> {
   const output = await runProcess(
@@ -117,7 +149,7 @@ export async function verifyPacketTiming(
   );
   const packets = output.toString('utf8').trim().split('\n');
   if (packets.length !== frameCount) throw new ServiceError('Packet count does not match the source frame count.', 422);
-  const period = framesToSeconds(1);
+  const period = framesToSeconds(1, rate);
   const seen = new Set<number>();
   for (const packet of packets) {
     const [ptsText, durationText] = packet.split(',');

@@ -5,10 +5,10 @@ import {
   type ProjectDescription,
 } from '../../shared/operations/describe-project.js';
 import { detailSummary, gradeSummary } from '../../shared/operations/grade-summary.js';
-import { durationOf } from '../../shared/operations/timecode.js';
+import { durationOf, recordingFps } from '../../shared/operations/timecode.js';
 import { calculateLayout, type PlacedClip } from '../../shared/timeline.js';
 import type { MusicLane, ProjectDocument, VideoClip, VideoLayer } from '../../shared/model.js';
-import { formatTimecode } from '../../shared/timing.js';
+import { formatTimecode, videoRate } from '../../shared/timing.js';
 import { ServiceError } from '../errors.js';
 import type { OperationRunner, ServiceContext } from './context.js';
 
@@ -102,6 +102,7 @@ function describeRecording(project: ProjectDocument, id: string, library: Servic
     id,
     name: asset?.name ?? null,
     frameCount: asset?.metadata.frameCount ?? null,
+    ...unlessDefault('fps', recordingFps(videoRate(project, id))),
     ...(asset?.status !== 'ready' && { ready: false as const }),
     ...unlessDefault('kept', project.selects[id]),
     ...(project.selectsDone.includes(id) && { selectionDone: true as const }),

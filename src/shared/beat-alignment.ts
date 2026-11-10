@@ -5,6 +5,7 @@ import type { PlacedBeat } from './music-analysis.js';
 import { trimAtPlayhead } from './rush-editing.js';
 import { trimByOutputFrames } from './source-range.js';
 import { calculateLayout, type PlacedTransition } from './timeline.js';
+import { videoRate, type FrameRate } from './timing.js';
 
 /** Project frames where a source sample of a music clip plays, once per loop repeat. */
 export function musicSampleFrames(music: MusicTrack, sample: number): number[] {
@@ -136,10 +137,10 @@ export interface SnapSources {
 type Step = { command: EditCommand; document: ProjectDocument; after: number } | { skipped: string };
 
 /** Lengthens a clip's displayed end by `frames` output frames: its source OUT, or IN when reversed. */
-function lengthen(clip: VideoClip, frames: number, frameCount: number): EditCommand {
+function lengthen(clip: VideoClip, frames: number, frameCount: number, rate: Readonly<FrameRate>): EditCommand {
   return clip.reverse
-    ? trimByOutputFrames(clip, 'in', -frames, frameCount)
-    : trimByOutputFrames(clip, 'out', frames, frameCount);
+    ? trimByOutputFrames(clip, 'in', -frames, frameCount, rate)
+    : trimByOutputFrames(clip, 'out', frames, frameCount, rate);
 }
 
 /** The trim moving the left clip's end (its source OUT, or IN when reversed) to `beat`, or why it cannot. */
@@ -161,7 +162,7 @@ function reachBeat(
     const command =
       delta < 0
         ? trimAtPlayhead(document, leftId, left.end + delta - 1, 'out')
-        : lengthen(clip, delta, sources.frameCount(clip.mediaId));
+        : lengthen(clip, delta, sources.frameCount(clip.mediaId), videoRate(document, clip.mediaId));
     if (command.type === 'trim') {
       const kept = sources.kept(clip.mediaId);
       if (kept && !kept.some((range) => command.sourceIn >= range.sourceIn && command.sourceOut <= range.sourceOut))

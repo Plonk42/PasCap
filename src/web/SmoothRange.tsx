@@ -592,7 +592,7 @@ function suggestionText(best: SmoothRange | undefined, kind: ShotKind | null, ap
     };
   const from = formatTimecode(best.sourceIn, rate);
   const to = formatTimecode(best.sourceOut, rate);
-  const span = `${KIND_NAMES[kind]} · ${sourceSeconds(best.sourceOut - best.sourceIn)} · ${from} – ${to}`;
+  const span = `${KIND_NAMES[kind]} · ${sourceSeconds(best.sourceOut - best.sourceIn, rate)} · ${from} – ${to}`;
   return {
     span,
     label: `Use best steady range ${from} to ${to}`,

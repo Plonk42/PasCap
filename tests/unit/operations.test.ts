@@ -14,6 +14,7 @@ import { createProject, projectSchema, type ProjectDocument } from '../../src/sh
 import type { TrackDescription } from '../../src/shared/operations/describe-track.js';
 import { operations } from '../../src/shared/operations/index.js';
 import { durationOf } from '../../src/shared/operations/timecode.js';
+import { PROJECT_FPS } from '../../src/shared/timing.js';
 
 const headers = { host: '127.0.0.1:4318', 'x-pascap-client': 'preview-lab' };
 const temporary: string[] = [];
@@ -222,7 +223,9 @@ describe('operation routes', () => {
       { type: 'bookmark-add', frame: 5 },
     ].reduce((document, command) => applyCommand(document, command as never), before);
     const media = {
-      library: { get: () => ({ name: 'DJI_0001.MP4', metadata: { frameCount: 300 }, status: 'ready' }) },
+      library: {
+        get: () => ({ name: 'DJI_0001.MP4', metadata: { frameCount: 300, frameRate: PROJECT_FPS }, status: 'ready' }),
+      },
       audio: { get: () => ({ name: 'song.wav' }) },
     } as unknown as Parameters<typeof editChanges>[2];
     const changes = editChanges(before, after, media);
@@ -269,7 +272,7 @@ describe('operation routes', () => {
     const context = {
       projects: { load: async () => project, save: async () => project },
       library: {
-        get: () => ({ name: 'DJI_0001.MP4', metadata: { frameCount: 300 }, status: 'ready' }),
+        get: () => ({ name: 'DJI_0001.MP4', metadata: { frameCount: 300, frameRate: PROJECT_FPS }, status: 'ready' }),
       },
       audio: { get: () => ({ name: 'song.wav' }) },
     } as unknown as Parameters<typeof runners.describe_project>[0];
@@ -307,7 +310,14 @@ describe('operation routes', () => {
     const picture = { mimeType: 'image/jpeg', data: '', width: 964, height: 270 } as const;
     const pictures = {
       ...context,
-      library: { get: (id: string) => ({ id, name: 'DJI_0001.MP4', metadata: { frameCount: 300 }, status: 'ready' }) },
+      library: {
+        get: (id: string) => ({
+          id,
+          name: 'DJI_0001.MP4',
+          metadata: { frameCount: 300, frameRate: PROJECT_FPS },
+          status: 'ready',
+        }),
+      },
       images: { stillWidth: 480, sheetCellWidth: 240, sheetCells: 16 },
       stills: {
         comparison: async (...args: unknown[]) => {
@@ -524,7 +534,7 @@ describe('operation routes', () => {
           name: 'DJI_0001.MP4',
           status: 'ready',
           damage: [{ start: 100, end: 130 }],
-          metadata: { frameCount: 600 },
+          metadata: { frameCount: 600, frameRate: PROJECT_FPS },
         }),
         motion: async () => ({
           version: 3,
@@ -601,9 +611,27 @@ describe('operation routes', () => {
       selects: { 'rec-1': [{ sourceIn: 30, sourceOut: 570 }] },
     });
     const assets: Record<string, object> = {
-      'rec-1': { id: 'rec-1', name: 'A.MP4', status: 'ready', damage: [], metadata: { frameCount: 600 } },
-      'rec-2': { id: 'rec-2', name: 'B.MP4', status: 'ready', damage: [], metadata: { frameCount: 600 } },
-      'rec-3': { id: 'rec-3', name: 'C.MP4', status: 'preparing', damage: [], metadata: { frameCount: 600 } },
+      'rec-1': {
+        id: 'rec-1',
+        name: 'A.MP4',
+        status: 'ready',
+        damage: [],
+        metadata: { frameCount: 600, frameRate: PROJECT_FPS },
+      },
+      'rec-2': {
+        id: 'rec-2',
+        name: 'B.MP4',
+        status: 'ready',
+        damage: [],
+        metadata: { frameCount: 600, frameRate: PROJECT_FPS },
+      },
+      'rec-3': {
+        id: 'rec-3',
+        name: 'C.MP4',
+        status: 'preparing',
+        damage: [],
+        metadata: { frameCount: 600, frameRate: PROJECT_FPS },
+      },
     };
     const sheets: { cells: unknown; columns: number | null }[] = [];
     const context = {

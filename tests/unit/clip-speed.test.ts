@@ -21,6 +21,7 @@ import {
   type SpeedCurveKeyframe,
 } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
+import { PROJECT_FPS } from '../../src/shared/timing.js';
 
 const key = (frame: number, rate: number, interpolation: Interpolation = 'linear'): SpeedCurveKeyframe => ({
   frame,
@@ -90,8 +91,8 @@ describe('precise bounded curve integration and immutable shared maps', () => {
   it('matches constant clip-base duration and samples exactly for a flat curve', () => {
     for (const rate of [0.1, 0.25, 0.5, 1, 1.125, 2, 8]) {
       const base = createClip('base', 'source', 10, 310);
-      const flat = compileRetiming({ ...base, speed: curve(key(10, rate), key(310, rate)) });
-      const constant = compileRetiming({ ...base, speed: { mode: 'constant', rate } });
+      const flat = compileRetiming({ ...base, speed: curve(key(10, rate), key(310, rate)) }, PROJECT_FPS);
+      const constant = compileRetiming({ ...base, speed: { mode: 'constant', rate } }, PROJECT_FPS);
       expect(flat.duration).toBe(constant.duration);
       for (const frame of [0, 1, Math.floor(flat.duration / 2), flat.duration - 1]) {
         expect(flat.sourceAt(frame)).toBe(constant.sourceAt(frame));
@@ -101,7 +102,7 @@ describe('precise bounded curve integration and immutable shared maps', () => {
   });
   it('uses the closed-form logarithmic integral and inverse for a linear rate ramp', () => {
     const speed = curve(key(0, 0.5), key(300, 2));
-    const map = compileRetiming(clip(speed, 0, 300));
+    const map = compileRetiming(clip(speed, 0, 300), PROJECT_FPS);
     const total = (300 * Math.log(4)) / 1.5;
     expect(map.duration).toBe(Math.round(total));
     for (const output of [0, 1, 50, 200, map.duration - 1]) {
@@ -114,7 +115,7 @@ describe('precise bounded curve integration and immutable shared maps', () => {
   });
   it('does not miss a one-source-frame slow hold on a million-frame recording', () => {
     const speed = curve(key(0, 1, 'hold'), key(123, 0.1, 'hold'), key(124, 1, 'hold'), key(1_000_000, 1));
-    const map = compileRetiming(clip(speed, 0, 1_000_000));
+    const map = compileRetiming(clip(speed, 0, 1_000_000), PROJECT_FPS);
     expect(map.duration).toBe(1_000_009);
     expect(map.outputAt(123)).toBe(123);
     expect(map.outputAt(124)).toBe(133);
@@ -126,7 +127,7 @@ describe('precise bounded curve integration and immutable shared maps', () => {
     'agrees with an independent fine integration for extreme %s rates and retains monotonic frame bounds',
     (interpolation) => {
       const speed = curve(key(0, 0.1, interpolation), key(100, 8));
-      const map = compileRetiming(clip(speed, 0, 100));
+      const map = compileRetiming(clip(speed, 0, 100), PROJECT_FPS);
       let independent = 0;
       for (let index = 0; index < 100_000; index++)
         independent += 0.001 / (0.1 + 7.9 * interpolatedProgress((index + 0.5) / 100_000, interpolation));
@@ -148,9 +149,9 @@ describe('precise bounded curve integration and immutable shared maps', () => {
   );
   it('owns copied point values/times/easing so edits cannot mutate an export or cache entry', () => {
     const original = clip(curve(key(0, 0.5, 'smooth'), key(120, 2)));
-    const map = compileRetiming(original);
+    const map = compileRetiming(original, PROJECT_FPS);
     const values = [map.duration, map.sourceAt(30), map.outputAt(60), map.sourcePositionAt(30)];
-    expect(compileRetiming(structuredClone(original))).toBe(map);
+    expect(compileRetiming(structuredClone(original), PROJECT_FPS)).toBe(map);
     original.speed.keyframes[0]!.rate = 8;
     original.speed.keyframes[1]!.frame = 200;
     original.speed.keyframes.reverse();
@@ -158,16 +159,16 @@ describe('precise bounded curve integration and immutable shared maps', () => {
     expect(Object.isFrozen(map)).toBe(true);
   });
   it('clamps finite source/output queries but rejects nonfinite queries without duration-sized storage', () => {
-    const map = compileRetiming(clip(curve(key(0, 1), key(120, 1))));
+    const map = compileRetiming(clip(curve(key(0, 1), key(120, 1))), PROJECT_FPS);
     expect(map.sourceAt(-10)).toBe(0);
     expect(map.sourceAt(500)).toBe(119);
     expect(map.outputAt(-10)).toBe(0);
     expect(map.outputAt(500)).toBe(119);
     for (const query of [map.sourceAt, map.outputAt, map.sourcePositionAt])
       for (const value of [NaN, Infinity, -Infinity]) expect(() => query(value)).toThrow('finite');
-    expect(() => compileRetiming(clip(curve(key(0, 0.1), key(2_147_483_647, 0.1)), 0, 2_147_483_647))).toThrow(
-      'supported project frames',
-    );
+    expect(() =>
+      compileRetiming(clip(curve(key(0, 0.1), key(2_147_483_647, 0.1)), 0, 2_147_483_647), PROJECT_FPS),
+    ).toThrow('supported project frames');
   });
 });
 
@@ -246,8 +247,10 @@ describe('presets, exact key edits and existing timeline operations', () => {
     expect(history.undo()).toEqual(duplicated);
     expect(history.canUndo).toBe(false);
     expect(history.redo()).toEqual(updated);
-    expect(compileRetiming(trimmed.clips[0]!).duration).toBeLessThan(compileRetiming(document.clips[0]!).duration);
-    expect(trimByOutputFrames(trimmed.clips[0]!, 'out', -10, 120).sourceOut).toBeLessThan(100);
+    expect(compileRetiming(trimmed.clips[0]!, PROJECT_FPS).duration).toBeLessThan(
+      compileRetiming(document.clips[0]!, PROJECT_FPS).duration,
+    );
+    expect(trimByOutputFrames(trimmed.clips[0]!, 'out', -10, 120, PROJECT_FPS).sourceOut).toBeLessThan(100);
   });
   it('static export uses the same custom map, and invalid speed changes never shorten existing dissolves', () => {
     const document = createProject('native-curve', 'Native curve');
@@ -255,7 +258,9 @@ describe('presets, exact key edits and existing timeline operations', () => {
     expect(needsLayeredExport(document)).toBe(false);
     expect(planExport(document).duration).toBe(calculateLayout(document).duration);
     for (let frame = 0; frame < calculateLayout(document).duration; frame++)
-      expect(sampleTimeline(document, frame)[0]!.sourceFrame).toBe(compileRetiming(document.clips[0]!).sourceAt(frame));
+      expect(sampleTimeline(document, frame)[0]!.sourceFrame).toBe(
+        compileRetiming(document.clips[0]!, PROJECT_FPS).sourceAt(frame),
+      );
     document.clips.push(createClip('b', 'source', 0, 120));
     document.layers[0]!.transitions = [{ leftId: 'a', rightId: 'b', type: 'cross-dissolve', duration: 30 }];
     const before = structuredClone(document);

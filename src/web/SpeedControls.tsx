@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { addClipSpeedKey, editableClipSpeed, editClipSpeedRate, removeClipSpeedKey } from '../shared/clip-speed.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import type { ProjectDocument, VideoClip } from '../shared/model.js';
-import { MAX_CLIP_SPEED_KEYS, sourceRateAt, type SpeedSettings } from '../shared/speed.js';
+import { clipDuration, MAX_CLIP_SPEED_KEYS, NORMAL_SPEED, sourceRateAt, type SpeedSettings } from '../shared/speed.js';
+import { videoRate } from '../shared/timing.js';
 import { KeyframeLine } from './AnimationControls.js';
 import { previewClipSource } from './clip-speed-geometry.js';
 import { ClipSpeedCurve } from './ClipSpeedCurve.js';
@@ -264,14 +265,15 @@ export function SpeedControls({
               Reset
             </button>
           </KeyframeLine>
-          {placedDuration !== null && placedDuration !== clip.sourceOut - clip.sourceIn && (
-            <div className="speed-overview">
-              <span>
-                {sourceSeconds(clip.sourceOut - clip.sourceIn)} <Icon name="arrow" size={12} />{' '}
-                {sourceSeconds(placedDuration)}
-              </span>
-            </div>
-          )}
+          {placedDuration !== null &&
+            placedDuration !== clipDuration({ ...clip, speed: NORMAL_SPEED }, videoRate(project, clip.mediaId)) && (
+              <div className="speed-overview">
+                <span>
+                  {sourceSeconds(clip.sourceOut - clip.sourceIn, videoRate(project, clip.mediaId))}{' '}
+                  <Icon name="arrow" size={12} /> {sourceSeconds(placedDuration)}
+                </span>
+              </div>
+            )}
           <select
             aria-label="Speed mode"
             disabled={unavailable}

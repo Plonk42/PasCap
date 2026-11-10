@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { damageLabel, mediaAssetSchema } from '../../src/shared/media.js';
 import { damagedRanges, originalErrorArgs, repairFilter } from '../../src/server/damage.js';
+import { PROJECT_FPS } from '../../src/shared/timing.js';
 
 describe('damaged recordings', () => {
   it('extends undecodable frames to their whole groups of pictures and merges neighbors', () => {
@@ -25,7 +26,7 @@ describe('damaged recordings', () => {
 
   it('decodes undamaged originals strictly and unchanged', () => {
     expect(originalErrorArgs({ damage: [] })).toEqual(['-xerror', '-err_detect', 'explode']);
-    expect(repairFilter([], 0)).toBe('');
+    expect(repairFilter([], 0, PROJECT_FPS)).toBe('');
     expect(originalErrorArgs({ damage: [{ start: 0, end: 30 }] })).toEqual(['-bsf:v', 'setts=dts=NOPTS']);
     expect(
       repairFilter(
@@ -34,6 +35,7 @@ describe('damaged recordings', () => {
           { start: 60, end: 90 },
         ],
         10,
+        PROJECT_FPS,
       ),
     ).toContain("enable='between(n,-10,19)+between(n,50,79)'");
   });

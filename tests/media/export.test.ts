@@ -8,7 +8,7 @@ import { preparedFixture } from '../../scripts/fixtures.js';
 import { createConfig, type ServiceConfig } from '../../src/server/config.js';
 import { renderExport, startExport, type ExportReceipt } from '../../src/server/export.js';
 import { fingerprintFile } from '../../src/server/files.js';
-import { extractComparisonFrame } from '../../src/server/library.js';
+import { extractComparisonFrame, proxyTimescale } from '../../src/server/library.js';
 import { probeVideo } from '../../src/server/probe.js';
 import * as nativeProcesses from '../../src/server/process.js';
 import { runProcess } from '../../src/server/process.js';
@@ -24,7 +24,7 @@ import {
   planExportMusic,
   type ExportMusicPlan,
 } from '../../src/shared/export.js';
-import { gradeChainPixel, sourceGrades } from '../../src/shared/grade.js';
+import { createAdjustment, gradeChainPixel, sourceGrades } from '../../src/shared/grade.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import {
   createClip,
@@ -37,7 +37,7 @@ import { removeSelectedRange } from '../../src/shared/rush-editing.js';
 import { forEachSerial } from '../../src/shared/serial.js';
 import { compileRetiming, type SpeedSettings } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
-import { framesToSeconds } from '../../src/shared/timing.js';
+import { framesToSeconds, PROJECT_FPS, rateText } from '../../src/shared/timing.js';
 import { arrangeMusicLane, musicTracks, setMusicTransition } from '../../src/shared/music-lanes.js';
 import { singleClipLane } from '../music-lanes.js';
 import { observedJobBytes } from './scratch-observation.js';
@@ -278,6 +278,8 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
   let config: ServiceConfig;
   let fixture: Awaited<ReturnType<typeof preparedFixture>>;
   let assets: MediaAsset[];
+  /** A 60 fps and a 23.976 fps original. */
+  let rated: MediaAsset[];
   let originals: Map<string, Buffer>;
   let audio: AudioAsset;
   let mixSources: AudioAsset[];
@@ -343,6 +345,55 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     originals = new Map(
       await Promise.all(assets.map(async (asset) => [asset.id, await rawVideo(config, asset)] as const)),
     );
+    rated = [];
+    for (const [rate, frames] of [
+      [{ numerator: 60, denominator: 1 }, 48],
+      [{ numerator: 24_000, denominator: 1_001 }, 24],
+    ] as const) {
+      const filename = path.join(directory, 'synthetic-sources', `export-rate-${rate.numerator}.mp4`);
+      await runProcess(config.ffmpeg, [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-nostdin',
+        '-n',
+        '-f',
+        'lavfi',
+        '-i',
+        `nullsrc=size=160x90:rate=${rateText(rate)},geq=lum='30+4*N':cb='60+3*N':cr='200-3*N',setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709`,
+        '-frames:v',
+        String(frames),
+        '-c:v',
+        'libx264',
+        '-preset',
+        'ultrafast',
+        '-crf',
+        '10',
+        '-pix_fmt',
+        'yuv420p',
+        '-threads',
+        '2',
+        '-filter_threads',
+        '2',
+        '-bf',
+        '0',
+        '-an',
+        '-color_primaries',
+        'bt709',
+        '-color_trc',
+        'bt709',
+        '-colorspace',
+        'bt709',
+        '-color_range',
+        'tv',
+        '-video_track_timescale',
+        String(proxyTimescale(rate)),
+        filename,
+      ]);
+      const asset = await fixture.library.register(filename);
+      rated.push(asset);
+      originals.set(asset.id, await rawVideo(config, asset));
+    }
     const audioPath = path.join(directory, 'synthetic-sources', 'selected-tone.wav');
     await runProcess(config.ffmpeg, [
       '-hide_banner',
@@ -529,6 +580,36 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     },
   );
 
+  it.each([false, true])(
+    'exports 60 and 23.976 fps originals in real time, each project frame showing the frame its retiming names (layered: %s)',
+    async (layered) => {
+      const [sixty, film] = rated as [MediaAsset, MediaAsset];
+      const project = createProject('native-rates', 'Recordings at other frame rates');
+      project.media.videoIds = [sixty.id, film.id];
+      project.videoRates = { [sixty.id]: sixty.metadata.frameRate, [film.id]: film.metadata.frameRate };
+      project.clips = [{ ...createClip('sixty', sixty.id, 3, 45), reverse: true }, createClip('film', film.id, 2, 22)];
+      project.layers[0]!.transitions = [{ leftId: 'sixty', rightId: 'film', type: 'cut', duration: 0 }];
+      if (layered) {
+        const lift = createAdjustment('lift', 0, 30);
+        lift.color.exposure = 0.2;
+        project.adjustments = [lift];
+      }
+      const captured = projectSchema.parse(project);
+      expect(needsLayeredExport(captured)).toBe(layered);
+      const layout = calculateLayout(captured);
+      // 42 frames at 60 fps and 20 at 23.976 fps last 0.7 s and 0.83 s.
+      expect(layout.clips.map((placed) => placed.duration)).toEqual([21, 25]);
+      const result = await completed(captured);
+      expect(result.receipt.settings.pipeline).toBe(layered ? 'sequential-layered' : 'static-single-layer');
+      expect(result.receipt.retiming.map((report) => report.decodedFrames)).toEqual([42, 20]);
+      const output = await rawVideo(config, { ...sixty, sourcePath: result.filename });
+      expect(output).toHaveLength(layout.duration * FRAME_BYTES);
+      for (let frame = 0; frame < layout.duration; frame++)
+        assertPixels(captured, frame, output.subarray(frame * FRAME_BYTES, (frame + 1) * FRAME_BYTES), originals);
+      for (const asset of rated) expect(await fingerprintFile(asset.sourcePath)).toEqual(asset.fingerprint);
+    },
+  );
+
   it('exports static clip grades through one native LUT per clip', async () => {
     const project = document(6);
     const second = { ...createClip('two', assets[1]!.id, 2, 8), start: 6 };
@@ -611,7 +692,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     expect(result.receipt.retiming).toHaveLength(speeds.length);
     for (const [index, report] of result.receipt.retiming.entries()) {
       expect(report.decodedFrames).toBe(18);
-      expect(report.outputFrames).toBe(compileRetiming(project.clips[index]!).duration);
+      expect(report.outputFrames).toBe(compileRetiming(project.clips[index]!, PROJECT_FPS).duration);
       expect(report.rawFrameBuffers).toBe(1);
       expect(report.largestReadChunkBytes).toBeLessThanOrEqual(256 * 1024);
     }
@@ -702,7 +783,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     project.layers[0]!.transitions = [{ leftId: 'one', rightId: 'two', type: 'cross-dissolve', duration: 1 }];
     const result = await completed(project);
     expect(result.receipt.timeline.chunks).toHaveLength(1);
-    const pixels = await extractComparisonFrame(config, result.filename, 0, 'tv');
+    const pixels = await extractComparisonFrame(config, result.filename, 0, PROJECT_FPS, 'tv');
     assertPixels(project, 0, pixels, originals);
   });
 
@@ -715,7 +796,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
     const result = await completed(project, 'final4k');
     expect(result.receipt.verification.frameCount).toBe(3);
     for (const frame of [0, 1, 2]) {
-      const pixels = await extractComparisonFrame(config, result.filename, frame, 'tv');
+      const pixels = await extractComparisonFrame(config, result.filename, frame, PROJECT_FPS, 'tv');
       assertPixels(project, frame, pixels, originals);
       if (frame !== 1) expect(pixels.reduce((sum, pixel) => sum + pixel, 0) / pixels.length).toBeLessThan(1);
     }
@@ -807,7 +888,7 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
         expect(rms(samples, 0, exportAudioSample(19))).toBeLessThan(0.0001);
         expect(rms(samples, exportAudioSample(22), 480)).toBeGreaterThan(0.07);
         for (const frame of [12, 19, 22, 27]) {
-          const pixels = await extractComparisonFrame(config, result.filename, frame, 'tv');
+          const pixels = await extractComparisonFrame(config, result.filename, frame, PROJECT_FPS, 'tv');
           expect(
             pixels.every((value) => value <= 1),
             `black music-only frame ${frame}`,
@@ -1166,7 +1247,12 @@ describe.skipIf(!enabled)('production native export · opt-in disposable media o
       expect(Math.abs(rms(encoded, first, 480) - rms(accumulated, first, 480))).toBeLessThan(0.004);
     }
     for (const frame of [0, 18, 35, 36, 40, 45])
-      assertPixels(project, frame, await extractComparisonFrame(config, result.filename, frame, 'tv'), originals);
+      assertPixels(
+        project,
+        frame,
+        await extractComparisonFrame(config, result.filename, frame, PROJECT_FPS, 'tv'),
+        originals,
+      );
     await forEachSerial(mixSources, async (source) =>
       expect(await fingerprintFile(source.sourcePath)).toEqual(source.fingerprint),
     );

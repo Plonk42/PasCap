@@ -141,7 +141,7 @@ describe('current-schema production dispatch and read-only validation', () => {
   it('keeps static constant/curve speed on the cheap path and dispatches keyed adjustments with their placed map', () => {
     const project = document();
     expect(needsLayeredExport(project)).toBe(false);
-    expect(planExport(project).duration).toBe(compileRetiming(project.clips[0]!).duration);
+    expect(planExport(project).duration).toBe(compileRetiming(project.clips[0]!, PROJECT_FPS).duration);
     for (const speed of [
       { mode: 'constant' as const, rate: 2 },
       {
@@ -154,13 +154,13 @@ describe('current-schema production dispatch and read-only validation', () => {
     ]) {
       project.clips[0]!.speed = speed;
       expect(needsLayeredExport(project)).toBe(false);
-      expect(planExport(project).duration).toBe(compileRetiming(project.clips[0]!).duration);
+      expect(planExport(project).duration).toBe(compileRetiming(project.clips[0]!, PROJECT_FPS).duration);
     }
     project.adjustments = [look([point(0, { exposure: 0.5 }, 'smooth'), point(40, { exposure: 2 }, 'hold')])];
     expect(needsLayeredExport(project)).toBe(true);
     expect(() => planExport(project)).toThrow('layered exporter');
     const placed = calculateLayout(project).clips[0]!;
-    expect(planLayeredExport(project).duration).toBe(compileRetiming(project.clips[0]!).duration);
+    expect(planLayeredExport(project).duration).toBe(compileRetiming(project.clips[0]!, PROJECT_FPS).duration);
     expect(placed.retiming.duration).toBe(planLayeredExport(project).duration);
     expect(exportRequestSchema.parse({ document: project, profile: 'draft720' }).document.schemaVersion).toBe(
       PROJECT_SCHEMA_VERSION,
@@ -448,12 +448,13 @@ describe('bounded retiming maps and native pipe ownership without FFmpeg', () =>
   it('rejects supplied partial continuous-query maps and bad endpoints before starting children', async () => {
     const directory = await temp();
     const clip = createClip('invalid-map', 'video', 7, 19);
-    const baseline = compileRetiming(clip);
+    const baseline = compileRetiming(clip, PROJECT_FPS);
     const { sourcePositionAt: omitted, ...partial } = baseline;
     expect(typeof omitted).toBe('function');
     const request = {
       ffmpeg: '/must-not-start-invalid-retiming',
       cwd: directory,
+      sourceRate: PROJECT_FPS,
       clip,
       decodeArgs: () => [],
       encodeArgs: [],
@@ -517,6 +518,7 @@ describe('bounded retiming maps and native pipe ownership without FFmpeg', () =>
       retimeRawVideo({
         ffmpeg: process.execPath,
         cwd: directory,
+        sourceRate: PROJECT_FPS,
         clip,
         retiming: map,
         decodeArgs: () => ['-e', 'process.stdout.write(Buffer.alloc(12*6));'],
@@ -530,11 +532,12 @@ describe('bounded retiming maps and native pipe ownership without FFmpeg', () =>
   it('rejects a throwing interior continuous query through the native ownership path', async () => {
     const directory = await temp();
     const clip = createClip('throwing-continuous', 'video', 7, 19);
-    const baseline = compileRetiming(clip);
+    const baseline = compileRetiming(clip, PROJECT_FPS);
     await expect(
       retimeRawVideo({
         ffmpeg: process.execPath,
         cwd: directory,
+        sourceRate: PROJECT_FPS,
         clip,
         retiming: {
           ...baseline,
@@ -568,6 +571,7 @@ describe('bounded retiming maps and native pipe ownership without FFmpeg', () =>
     const report = await retimeRawVideo({
       ffmpeg: process.execPath,
       cwd: directory,
+      sourceRate: PROJECT_FPS,
       clip,
       retiming: map,
       decodeArgs: () => ['-e', 'process.stdout.write(Buffer.alloc(12*6));'],
@@ -596,7 +600,7 @@ describe('bounded retiming maps and native pipe ownership without FFmpeg', () =>
         { frame: 25, rate: 2, interpolation: 'hold' as const },
       ];
       clip.speed = { mode: 'curve', keyframes };
-      const map = compileRetiming(clip);
+      const map = compileRetiming(clip, PROJECT_FPS);
       const startingPosition = map.sourcePositionAt(1);
       const expected = Array.from({ length: map.duration }, (_, output) => map.sourceAt(output));
       const destination = path.join(directory, 'mapped.rgb');
@@ -608,6 +612,7 @@ describe('bounded retiming maps and native pipe ownership without FFmpeg', () =>
       const report = await retimeRawVideo({
         ffmpeg: process.execPath,
         cwd: directory,
+        sourceRate: PROJECT_FPS,
         decodeArgs: () => ['-e', decode],
         encodeArgs: ['-e', encode],
         clip,

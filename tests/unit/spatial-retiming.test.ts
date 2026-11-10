@@ -5,6 +5,7 @@ import { NEUTRAL_SPATIAL_POSE } from '../../src/shared/spatial.js';
 import { compileRetiming, type Retiming, type SpeedSettings } from '../../src/shared/speed.js';
 import { uniformKeyframe } from '../../src/shared/keyframes.js';
 import { sampleTimeline } from '../../src/shared/timeline.js';
+import { PROJECT_FPS } from '../../src/shared/timing.js';
 
 const progress: Record<Interpolation, (u: number) => number> = {
   hold: () => 0,
@@ -37,7 +38,7 @@ describe('continuous original-source retiming for spatial animation', () => {
   it.each([0.1, 0.5, 1, 1.125, 3, 8])(
     'normalizes constant %sx to the rounded clock without changing discrete queries',
     (rate) => {
-      const map = compileRetiming(base({ mode: 'constant', rate }));
+      const map = compileRetiming(base({ mode: 'constant', rate }), PROJECT_FPS);
       const duration = Math.max(1, Math.round(30 / rate));
       expect(map.duration).toBe(duration);
       for (const frame of [0, 0.25, 1, duration / 2, duration - 0.25]) {
@@ -64,7 +65,7 @@ describe('continuous original-source retiming for spatial animation', () => {
       100,
     );
     const snapshot = structuredClone(clip);
-    const map = compileRetiming(clip);
+    const map = compileRetiming(clip, PROJECT_FPS);
     const total = Math.log(1 / 0.7) / 0.005;
     expect(map.duration).toBe(Math.round(total));
     for (const frame of [0.25, 1, 20, map.duration - 0.25]) {
@@ -92,6 +93,7 @@ describe('continuous original-source retiming for spatial animation', () => {
             { frame: 50, rate: 2, interpolation: 'hold' },
           ],
         }),
+        PROJECT_FPS,
       );
       // Fine midpoint integration is independent of the production Gauss-Legendre solver.
       const elapsed = (end: number): number => {
@@ -127,6 +129,7 @@ describe('continuous original-source retiming for spatial animation', () => {
         0,
         1000,
       ),
+      PROJECT_FPS,
     );
     expect(map.duration).toBe(1009);
     expect(map.sourcePositionAt(123.5)).toBeCloseTo(123.05, 12);
@@ -159,7 +162,7 @@ describe('continuous original-source retiming for spatial animation', () => {
       // Project time, like Color: a held image still moves on every output frame.
       expect(first!.spatial.translateX).toBeCloseTo(0.01, 12);
       expect(second!.spatial.translateX).toBeCloseTo(0.02, 12);
-      expectContinuousBounds(compileRetiming(clip), 7, 37);
+      expectContinuousBounds(compileRetiming(clip, PROJECT_FPS), 7, 37);
     }
   });
 });

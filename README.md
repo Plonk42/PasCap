@@ -85,7 +85,8 @@ targets.
 - Optional: Google Chrome or Chromium and a hardware GPU speed up heavy exports; an NVIDIA GPU with CUDA speeds up proxy preparation.
 - Enough disk space for generated proxies and export scratch. Long lossless 4K intermediate files can be large; there is no fixed-GB scratch guarantee.
 
-Video support is deliberately strict: **constant 30000/1001 fps**, landscape/unrotated,
+Video support is deliberately strict: **constant 23.976–60 fps** (the usual camera rates; the project itself
+is 29.97 fps), landscape/unrotated,
 **8-bit `yuv420p` SDR with explicit BT.709 tags** and unambiguous frame timing.
 MP4/MOV/M4V extensions do not guarantee support. Unsupported, HDR, untagged or
 variable-frame-rate footage is rejected rather than silently converted.

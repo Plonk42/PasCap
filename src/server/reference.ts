@@ -47,6 +47,8 @@ export function validateReference(project: ProjectDocument, library: MediaLibrar
     throw new ServiceError(
       'The diagnostic reference only supports normal forward speed. Use Export for retimed or reversed clips.',
     );
+  if (Object.keys(snapshot.videoRates).length > 0)
+    throw new ServiceError('The diagnostic reference only supports recordings at 30000/1001 fps. Use Export.');
   if (hasSpatialEdits(snapshot.layers[0]!.transform))
     throw new ServiceError(
       'The diagnostic reference does not support Transform or Opacity edits or keyframes. Use Export.',

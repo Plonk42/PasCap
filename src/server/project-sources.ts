@@ -2,6 +2,7 @@ import type { SourceFingerprint } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { musicClips } from '../shared/music-lanes.js';
 import { validateSourceRanges } from '../shared/source-range.js';
+import { rateLabel, sameRate, videoRate } from '../shared/timing.js';
 import type { AudioLibrary } from './audio.js';
 import { errorMessage, ServiceError } from './errors.js';
 import { assertSourceIdentity } from './files.js';
@@ -15,6 +16,14 @@ export function assertSourceRanges(
 ): void {
   document.media.videoIds.forEach((id) => library.get(id));
   document.media.audioIds.forEach((id) => audio.get(id));
+  for (const id of new Set([...document.media.videoIds, ...document.clips.map((clip) => clip.mediaId)])) {
+    const { name, metadata } = library.get(id);
+    if (!sameRate(videoRate(document, id), metadata.frameRate))
+      throw new ServiceError(
+        `${name} is recorded at ${rateLabel(metadata.frameRate)} fps, but the project plays it at ${rateLabel(videoRate(document, id))} fps.`,
+        422,
+      );
+  }
   const frameCounts = new Map(
     [...document.clips.map((clip) => clip.mediaId), ...Object.keys(document.selects)].map((mediaId) => {
       const asset = library.get(mediaId);

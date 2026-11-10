@@ -14,6 +14,7 @@ import {
 import { createClip, createLayer, createProject, projectSchema, type VideoClip } from '../../src/shared/model.js';
 import { compileRetiming, type Retiming, type SpeedCurve } from '../../src/shared/speed.js';
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
+import { PROJECT_FPS } from '../../src/shared/timing.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
 // Three 16×8 RGB frames per reversed decoder chunk, so short clips exercise several seeked chunks.
@@ -140,6 +141,7 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
     return {
       ffmpeg: config.ffmpeg,
       cwd,
+      sourceRate: PROJECT_FPS,
       clip,
       frameBytes: FRAME_BYTES,
       signal,
@@ -246,7 +248,7 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
         const placed = layout.clips[0]!;
         const map = placed.retiming;
         const expected = Array.from({ length: map.duration }, (_, output) => map.sourceAt(output));
-        expect(map.duration).toBe(compileRetiming(clip).duration);
+        expect(map.duration).toBe(compileRetiming(clip, PROJECT_FPS).duration);
         expect(Object.isFrozen(map)).toBe(true);
         const frameBuffer = Buffer.alloc(FRAME_BYTES);
         let mutated = false;
@@ -323,7 +325,7 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
           speed,
           reverse: true,
         };
-        const map = compileRetiming(clip);
+        const map = compileRetiming(clip, PROJECT_FPS);
         const expected = Array.from({ length: map.duration }, (_, output) => map.sourceAt(output));
         expect(expected[0]).toBe(18);
         const report = await retimeRawVideo(options(clip, work, 'reversed.rgb', new AbortController().signal, source));
@@ -352,7 +354,7 @@ describe.skipIf(!enabled)('supplied clip retiming maps · native pipes and dispo
     const work = await mkdtemp(path.join(root, 'invalid-map-'));
     try {
       const clip = createClip('invalid', 'generated-original', 7, 19);
-      const baseline = compileRetiming(clip);
+      const baseline = compileRetiming(clip, PROJECT_FPS);
       for (const duration of [0, -1, 0.5, NaN, Infinity, 2_147_483_648]) {
         await expect(
           retimeRawVideo({

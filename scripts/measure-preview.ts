@@ -15,7 +15,7 @@ import { PROJECT_SCHEMA_VERSION, projectSchema } from '../src/shared/model.js';
 import { forEachSerial } from '../src/shared/serial.js';
 import { hasSpatialEdits } from '../src/shared/spatial.js';
 import { calculateLayout, layerClips } from '../src/shared/timeline.js';
-import { framesToSeconds } from '../src/shared/timing.js';
+import { framesToSeconds, PROJECT_FPS } from '../src/shared/timing.js';
 
 const reportId = 'preview-v19';
 const measurementProfile = {
@@ -326,7 +326,7 @@ try {
           };
           return encodeBytes(rgb);
         }, frame);
-        const native = await extractComparisonFrame(createConfig(), nativeFile, frame, 'tv');
+        const native = await extractComparisonFrame(createConfig(), nativeFile, frame, PROJECT_FPS, 'tv');
         comparisons.push({ frame, meanAbsoluteError8Bit: meanAbsoluteError(Buffer.from(encoded, 'base64'), native) });
       },
     );

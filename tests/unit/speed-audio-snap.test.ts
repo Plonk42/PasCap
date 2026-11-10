@@ -8,6 +8,7 @@ import { clipDuration, compileRetiming, sourceFrameAt } from '../../src/shared/s
 import { calculateLayout, sampleTimeline } from '../../src/shared/timeline.js';
 import { singleClipLane } from '../music-lanes.js';
 import { EARLIER_SCHEMA_VERSIONS, unsupportedProject } from './project-fixtures.js';
+import { PROJECT_FPS } from '../../src/shared/timing.js';
 
 describe('shared retiming and recoverable speed edits', () => {
   it('requires explicit current-schema static speed settings; earlier documents are not guessed', () => {
@@ -24,11 +25,11 @@ describe('shared retiming and recoverable speed edits', () => {
     const original = createClip('a', 'source', 10, 610);
     const slow = { ...original, speed: { mode: 'constant' as const, rate: 0.5 } };
     const fast = { ...original, speed: { mode: 'constant' as const, rate: 2 } };
-    expect(clipDuration(slow)).toBe(1200);
-    expect(clipDuration(fast)).toBe(300);
-    expect([0, 1, 2, 1199].map((frame) => sourceFrameAt(slow, frame))).toEqual([10, 10, 11, 609]);
-    expect([0, 1, 299].map((frame) => sourceFrameAt(fast, frame))).toEqual([10, 12, 608]);
-    expect(trimByOutputFrames(fast, 'out', -30, 700).sourceOut).toBe(550);
+    expect(clipDuration(slow, PROJECT_FPS)).toBe(1200);
+    expect(clipDuration(fast, PROJECT_FPS)).toBe(300);
+    expect([0, 1, 2, 1199].map((frame) => sourceFrameAt(slow, PROJECT_FPS, frame))).toEqual([10, 10, 11, 609]);
+    expect([0, 1, 299].map((frame) => sourceFrameAt(fast, PROJECT_FPS, frame))).toEqual([10, 12, 608]);
+    expect(trimByOutputFrames(fast, 'out', -30, 700, PROJECT_FPS).sourceOut).toBe(550);
   });
   for (const curve of ['linear', 'ease-in', 'ease-out', 'smooth'] as const) {
     it(`compiles monotonic ${curve} curves, preserving source anchors while trimming`, () => {
@@ -42,7 +43,7 @@ describe('shared retiming and recoverable speed edits', () => {
           ],
         },
       };
-      const map = compileRetiming(clip);
+      const map = compileRetiming(clip, PROJECT_FPS);
       const samples = Array.from({ length: map.duration }, (_, frame) => map.sourceAt(frame));
       expect(samples.every((source, frame) => frame === 0 || source >= samples[frame - 1]!)).toBe(true);
       expect(samples[0]).toBe(0);
@@ -51,7 +52,7 @@ describe('shared retiming and recoverable speed edits', () => {
       expect(map.duration).toBeLessThan(1200);
       const trimmed = { ...clip, sourceIn: 150, sourceOut: 510 };
       expect(trimmed.speed).toEqual(clip.speed);
-      expect(clipDuration(trimmed)).toBeLessThan(map.duration);
+      expect(clipDuration(trimmed, PROJECT_FPS)).toBeLessThan(map.duration);
     });
   }
   it('retimes transitions in output frames and supports independent per-clip color/speed undo', () => {
@@ -85,7 +86,7 @@ describe('shared retiming and recoverable speed edits', () => {
         ],
       },
     };
-    const map = compileRetiming(clip);
+    const map = compileRetiming(clip, PROJECT_FPS);
     const before = [map.duration, map.sourceAt(30), map.sourcePositionAt(30)];
     clip.sourceOut = 60;
     clip.speed.keyframes[1]!.rate = 5;

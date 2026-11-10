@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { described } from './described.js';
 import { interpolationSchema, orderedKeys } from './keyframes.js';
 import { compileClipSpeedCurve, curveRateAt } from './speed-curve.js';
+import { sourceFrameRate, sourceFramesPerProjectFrame, type FrameRate } from './timing.js';
 
 const rate = described(z.number().min(0.1).max(8), 'Playback rate, 0.1–8; 1 is normal speed.');
 export const MAX_CLIP_SPEED_KEYS = 256;
@@ -80,8 +81,15 @@ function reversed(forward: Retiming, sourceIn: number, sourceOut: number): Retim
 }
 
 const cache = new Map<string, Retiming>();
-/** Constant rates have a closed form; curves integrate dt=ds/rate(s). See SPEED_AND_AUDIO.md. */
-export function compileRetiming(clip: RetimedClip): Retiming {
+/**
+ * Constant rates have a closed form; curves integrate dt=ds/rate(s). Speed is relative to real time:
+ * a recording at `sourceRate` advances sourceFramesPerProjectFrame(sourceRate) frames per project
+ * frame at 1×. See SPEED_AND_AUDIO.md.
+ */
+export function compileRetiming(clip: RetimedClip, sourceRate: Readonly<FrameRate>): Retiming {
+  const rate = sourceFrameRate(sourceRate);
+  if (!rate) throw new Error('Retiming requires an accepted recording frame rate.');
+  const scale = sourceFramesPerProjectFrame(rate);
   // Cached closures own the numeric range/settings; later editor mutations must
   // not change an already compiled map or another immutable export snapshot.
   clip = Object.freeze({
@@ -104,12 +112,12 @@ export function compileRetiming(clip: RetimedClip): Retiming {
     length <= 0
   )
     throw new Error('Retiming requires a positive integer source range within supported frames.');
-  const key = JSON.stringify([clip.sourceIn, clip.sourceOut, clip.speed, clip.reverse]);
+  const key = JSON.stringify([clip.sourceIn, clip.sourceOut, clip.speed, clip.reverse, rate]);
   const cached = cache.get(key);
   if (cached) return cached;
   let result: Retiming;
   if (clip.speed.mode === 'constant') {
-    const duration = Math.max(1, Math.round(length / clip.speed.rate));
+    const duration = Math.max(1, Math.round(length / (clip.speed.rate * scale)));
     const effective = length / duration;
     result = {
       duration,
@@ -128,7 +136,7 @@ export function compileRetiming(clip: RetimedClip): Retiming {
         Math.max(0, Math.min(duration - 1, Math.floor((finiteFrame(source) - clip.sourceIn) / effective + 1e-8))),
     };
   } else {
-    result = compileClipSpeedCurve(clip.sourceIn, clip.sourceOut, clip.speed);
+    result = compileClipSpeedCurve(clip.sourceIn, clip.sourceOut, clip.speed, scale);
   }
   if (result.duration > 2_147_483_647) throw new RangeError('Track duration exceeds supported project frames.');
   if (clip.reverse) result = reversed(result, clip.sourceIn, clip.sourceOut);
@@ -138,12 +146,12 @@ export function compileRetiming(clip: RetimedClip): Retiming {
   return result;
 }
 
-export function clipDuration(clip: RetimedClip): number {
-  return compileRetiming(clip).duration;
+export function clipDuration(clip: RetimedClip, sourceRate: Readonly<FrameRate>): number {
+  return compileRetiming(clip, sourceRate).duration;
 }
-export function sourceFrameAt(clip: RetimedClip, outputFrame: number): number {
-  return compileRetiming(clip).sourceAt(outputFrame);
+export function sourceFrameAt(clip: RetimedClip, sourceRate: Readonly<FrameRate>, outputFrame: number): number {
+  return compileRetiming(clip, sourceRate).sourceAt(outputFrame);
 }
-export function outputFrameAt(clip: RetimedClip, sourceFrame: number): number {
-  return compileRetiming(clip).outputAt(sourceFrame);
+export function outputFrameAt(clip: RetimedClip, sourceRate: Readonly<FrameRate>, sourceFrame: number): number {
+  return compileRetiming(clip, sourceRate).outputAt(sourceFrame);
 }

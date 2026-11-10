@@ -1,14 +1,16 @@
-import type { FrameRate } from '../shared/timing.js';
+import { sourceFrameRate, type FrameRate } from '../shared/timing.js';
 
 /**
- * Sample table of one editing proxy (H.264, no reordering, constant 30000/1001
- * frame duration, index before the media). Sample i is original source frame i.
+ * Sample table of one editing proxy (H.264, no reordering, one constant frame
+ * duration of an accepted recording rate, index before the media). Sample i is
+ * original source frame i.
  */
 export interface ProxyIndex {
   codec: string;
   description: Uint8Array<ArrayBuffer>;
   width: number;
   height: number;
+  frameRate: Readonly<FrameRate>;
   frameCount: number;
   offsets: Float64Array;
   sizes: Uint32Array;
@@ -95,18 +97,21 @@ function checkEdits(view: DataView, track: Box): void {
   if (entries !== 1 || mediaTime !== 0) throw unsupported('its edit list shifts frames');
 }
 
-function sampleTiming(view: DataView, table: Box, timescale: number, rate: FrameRate): number {
+function sampleTiming(view: DataView, table: Box, timescale: number): { samples: number; rate: Readonly<FrameRate> } {
   if (child(view, table, 'ctts')) throw unsupported('it uses reordered (B) frames');
   const stts = required(view, table, 'stts');
   let samples = 0;
+  let duration: number | null = null;
   for (let entry = 0; entry < view.getUint32(stts.body + 4); entry++) {
     const count = view.getUint32(stts.body + 8 + entry * 8);
     const delta = view.getUint32(stts.body + 12 + entry * 8);
-    if (delta * rate.numerator !== timescale * rate.denominator)
-      throw unsupported(`frame duration is not ${rate.denominator}/${rate.numerator} s`);
+    if (duration !== null && delta !== duration) throw unsupported('its frame duration varies');
+    duration = delta;
     samples += count;
   }
-  return samples;
+  const rate = duration ? sourceFrameRate({ numerator: timescale, denominator: duration }) : undefined;
+  if (!rate) throw unsupported(`its frame rate ${timescale}/${duration ?? 0} is not an accepted recording rate`);
+  return { samples, rate };
 }
 
 function sampleSizes(view: DataView, table: Box): Uint32Array {
@@ -160,7 +165,7 @@ function sampleKeys(view: DataView, table: Box, count: number): Uint8Array {
 }
 
 /** `bytes` holds the file from offset 0 through the end of its index box. */
-export function parseProxyIndex(bytes: Uint8Array, rate: FrameRate): ProxyIndex {
+export function parseProxyIndex(bytes: Uint8Array): ProxyIndex {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const location = locateIndex(bytes);
   if (location.end > bytes.byteLength) throw unsupported('its index is truncated');
@@ -182,14 +187,15 @@ export function parseProxyIndex(bytes: Uint8Array, rate: FrameRate): ProxyIndex 
   const description = bytes.slice(avcC.body, avcC.end);
   const hex = (value: number): string => value.toString(16).padStart(2, '0');
   const codec = `avc1.${hex(description[1]!)}${hex(description[2]!)}${hex(description[3]!)}`;
-  const timed = sampleTiming(view, table, timescale, rate);
+  const timed = sampleTiming(view, table, timescale);
   const sizes = sampleSizes(view, table);
-  if (!sizes.length || timed !== sizes.length) throw unsupported('its frame tables disagree');
+  if (!sizes.length || timed.samples !== sizes.length) throw unsupported('its frame tables disagree');
   return {
     codec,
     description,
     width,
     height,
+    frameRate: timed.rate,
     frameCount: sizes.length,
     offsets: sampleOffsets(view, table, sizes),
     sizes,

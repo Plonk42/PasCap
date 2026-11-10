@@ -5,7 +5,7 @@ import { adjustmentsSchema, clipGradeSchema, createClipGrade } from './grade.js'
 import { createSpatialSettings, spatialSettingsSchema } from './spatial.js';
 import { NORMAL_SPEED, speedSchema } from './speed.js';
 import { calculateLayout } from './timeline.js';
-import { PROJECT_FPS } from './timing.js';
+import { PROJECT_FPS, sameRate, sourceFrameRate } from './timing.js';
 
 /** Conventional initial identity only; it has no editing or stacking privileges. */
 export const BASE_LAYER_ID = 'video-1';
@@ -257,7 +257,18 @@ export const selectsDoneSchema = z
   .refine((ids) => new Set(ids).size === ids.length, { message: 'Recordings marked done must be unique.' });
 
 /** The only accepted project schema; bump it for every incompatible change. */
-export const PROJECT_SCHEMA_VERSION = 29;
+export const PROJECT_SCHEMA_VERSION = 30;
+
+/**
+ * Frame rate of each recording in the bin that is not recorded at the project rate; no entry means
+ * the project rate. It equals the registered recording's rate and sets how fast its frames play.
+ */
+export const videoRatesSchema = z.record(
+  idSchema,
+  rateSchema.refine((rate) => sourceFrameRate(rate) !== undefined && !sameRate(rate, PROJECT_FPS), {
+    message: 'A recording rate must be an accepted rate other than the project rate.',
+  }),
+);
 
 const baseProjectSchema = z
   .object({
@@ -277,6 +288,7 @@ const baseProjectSchema = z
       })
       .strict(),
     frameRate: rateSchema,
+    videoRates: videoRatesSchema,
     colorProfile: z.literal('bt709-sdr'),
     layers: z.array(layerSchema).min(1).max(MAX_VIDEO_LAYERS),
     clips: z.array(clipSchema).max(1_000),
@@ -314,6 +326,13 @@ export const projectSchema = baseProjectSchema.superRefine((project, context) =>
         message: `Range selection is marked done for ${mediaId}, which is not in the project's recordings.`,
       });
   }
+  for (const mediaId of Object.keys(project.videoRates)) {
+    if (!bin.has(mediaId))
+      context.addIssue({
+        code: 'custom',
+        message: `A frame rate is recorded for ${mediaId}, which is not in the project's recordings.`,
+      });
+  }
   try {
     calculateLayout(project);
   } catch (error) {
@@ -341,6 +360,7 @@ export function createProject(id: string, title: string): ProjectDocument {
     title,
     media: { videoIds: [], audioIds: [] },
     frameRate: { ...PROJECT_FPS },
+    videoRates: {},
     colorProfile: 'bt709-sdr',
     layers: [createLayer(BASE_LAYER_ID, 'Track 1')],
     clips: [],

@@ -4,7 +4,7 @@ import type { DamagedRange } from '../shared/media.js';
 import { clipSchema, type VideoClip } from '../shared/model.js';
 import { whileSerial } from '../shared/serial.js';
 import { compileRetiming, type Retiming } from '../shared/speed.js';
-import { framesToSeconds } from '../shared/timing.js';
+import { framesToSeconds, type FrameRate } from '../shared/timing.js';
 import { repairFilter } from './damage.js';
 import { ServiceError } from './errors.js';
 import { runRawVideoPass, writeRawFrame, type RawFrameReader, type RawVideoPass } from './raw-process.js';
@@ -14,6 +14,8 @@ export interface SourceExcerpt {
   sourceIn: number;
   sourceOut: number;
   reverse: boolean;
+  /** The original's frame rate: frame n is presented at n / rate. */
+  rate: Readonly<FrameRate>;
 }
 export interface RawRetimingOptions {
   ffmpeg: string;
@@ -22,6 +24,8 @@ export interface RawRetimingOptions {
   decodeArgs: (excerpt: Readonly<SourceExcerpt>) => readonly string[];
   encodeArgs: readonly string[];
   clip: VideoClip;
+  /** The frame rate of the clip's recording. */
+  sourceRate: Readonly<FrameRate>;
   /** Authoritative placed map for row keys; omission compiles the clip's constant/ramp/custom base. */
   retiming?: Retiming;
   frameBytes: number;
@@ -47,7 +51,7 @@ export interface RawRetimingReport {
  */
 export function excerptInputArgs(excerpt: Readonly<SourceExcerpt>): string[] {
   if (!excerpt.reverse || excerpt.sourceIn === 0) return [];
-  return ['-ss', (framesToSeconds(excerpt.sourceIn) - framesToSeconds(1) / 4).toFixed(12)];
+  return ['-ss', (framesToSeconds(excerpt.sourceIn, excerpt.rate) - framesToSeconds(1, excerpt.rate) / 4).toFixed(12)];
 }
 /**
  * Select the excerpt before `filter`, after repairing recorded damage; reversed
@@ -59,7 +63,7 @@ export function excerptFilter(
   damage: readonly DamagedRange[],
 ): string {
   const frames = excerpt.sourceOut - excerpt.sourceIn;
-  const repair = repairFilter(damage, excerptInputArgs(excerpt).length ? excerpt.sourceIn : 0);
+  const repair = repairFilter(damage, excerptInputArgs(excerpt).length ? excerpt.sourceIn : 0, excerpt.rate);
   return excerpt.reverse
     ? `${repair}trim=end_frame=${frames},setpts=PTS-STARTPTS,${filter},reverse`
     : `${repair}trim=start_frame=${excerpt.sourceIn}:end_frame=${excerpt.sourceOut},setpts=PTS-STARTPTS,${filter}`;
@@ -69,10 +73,10 @@ export function reverseChunkFrames(frameBytes: number): number {
   return Math.max(1, Math.floor(EXPORT_RESOURCES.reverseChunkBytes / frameBytes));
 }
 
-function captureRetiming(clip: VideoClip, supplied: Retiming | undefined): Retiming {
+function captureRetiming(clip: VideoClip, sourceRate: Readonly<FrameRate>, supplied: Retiming | undefined): Retiming {
   let map = supplied;
   // Only omission selects the static map; an explicitly invalid/null map must fail.
-  if (supplied === undefined) map = compileRetiming(clip);
+  if (supplied === undefined) map = compileRetiming(clip, sourceRate);
   if (!map || !Number.isSafeInteger(map.duration) || map.duration < 1 || map.duration > 2_147_483_647) {
     throw new ServiceError(
       'The shared retiming map duration must be a positive supported integer project-frame count.',
@@ -210,7 +214,10 @@ async function pumpReversedFrames(
     const high = low;
     low = Math.max(sourceIn, high - chunk);
     decoders++;
-    return pass.reader(options.decodeArgs({ sourceIn: low, sourceOut: high, reverse: true }), 'Original decoder');
+    return pass.reader(
+      options.decodeArgs({ sourceIn: low, sourceOut: high, reverse: true, rate: options.sourceRate }),
+      'Original decoder',
+    );
   };
   const nextImage = async (): Promise<void> => {
     if (held === low) reader = await nextChunk();
@@ -252,7 +259,7 @@ export async function retimeRawVideo(request: RawRetimingOptions): Promise<RawRe
   Object.freeze(options.clip.speed);
   Object.freeze(options.clip);
   if (options.signal.aborted) throw new ServiceError('Job canceled.', 499);
-  const retiming = captureRetiming(options.clip, options.retiming);
+  const retiming = captureRetiming(options.clip, options.sourceRate, options.retiming);
   let decoded = 0;
   let decoders = 1;
   let written = 0;
@@ -265,7 +272,10 @@ export async function retimeRawVideo(request: RawRetimingOptions): Promise<RawRe
       return;
     }
     const { sourceIn, sourceOut } = options.clip;
-    const reader = pass.reader(options.decodeArgs({ sourceIn, sourceOut, reverse: false }), 'Original decoder');
+    const reader = pass.reader(
+      options.decodeArgs({ sourceIn, sourceOut, reverse: false, rate: options.sourceRate }),
+      'Original decoder',
+    );
     const pump = { frame, encoder: pass.encoder(options.encodeArgs, 'lossless retiming encoder'), written: 0 };
     decoded = await pumpMappedFrames(options, retiming, reader, pump, pass.check);
     written = pump.written;

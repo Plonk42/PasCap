@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ProjectStore } from '../../src/server/storage.js';
 import { PROJECT_SCHEMA_VERSION, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { calculateLayout } from '../../src/shared/timeline.js';
 import {
   missingMigrations,
   OLDEST_PROJECT_SCHEMA_VERSION,
@@ -56,7 +57,7 @@ describe('project compatibility', () => {
   it('keeps the adjustments, clip grades and Transform Opacity of a schema-28 project through the load', async () => {
     const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-28.json'), 'utf8')) as ProjectDocument;
     const loaded = projectSchema.parse(upgradeProject(saved));
-    expect(loaded).toEqual({ ...saved, schemaVersion: PROJECT_SCHEMA_VERSION, selectsDone: [] });
+    expect(loaded).toEqual({ ...saved, schemaVersion: PROJECT_SCHEMA_VERSION, selectsDone: [], videoRates: {} });
     expect(loaded.adjustments.length).toBeGreaterThan(1);
     expect(loaded.adjustments[0]!.keyframes.length).toBeGreaterThan(0);
     expect(loaded.layers[0]!.transform.base.opacity).toBeLessThan(1);
@@ -70,7 +71,26 @@ describe('project compatibility', () => {
     expect(saved).toEqual(before);
     const marked = JSON.parse(await readFile(path.join(FIXTURES, 'schema-29.json'), 'utf8')) as ProjectDocument;
     expect(marked.selectsDone.length).toBeGreaterThan(0);
-    expect(projectSchema.parse(upgradeProject(marked))).toEqual(marked);
+    expect(projectSchema.parse(upgradeProject(marked))).toEqual({
+      ...marked,
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      videoRates: {},
+    });
+  });
+
+  it('plays schema-29 recordings at the project rate, and keeps the frame rates of schema-30 recordings', async () => {
+    const older = projectSchema.parse(
+      upgradeProject(JSON.parse(await readFile(path.join(FIXTURES, 'schema-29.json'), 'utf8'))),
+    );
+    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-30.json'), 'utf8')) as ProjectDocument;
+    const [mediaId, rate] = Object.entries(saved.videoRates)[0]!;
+    expect(rate).toEqual({ numerator: 60, denominator: 1 });
+    expect(projectSchema.parse(upgradeProject(saved))).toEqual(saved);
+    const duration = (project: ProjectDocument) =>
+      calculateLayout(project).clips.find((placed) => placed.clip.mediaId === mediaId)!.duration;
+    // 60 fps footage plays in real time: about two recording frames per project frame.
+    expect(duration(saved)).toBe(Math.round(duration(older) / (60 / (30000 / 1001))));
+    expect(duration({ ...saved, videoRates: {} })).toBe(duration(older));
   });
 
   it('rejects projects saved with track Color or British field names, with the reason, and leaves their files unchanged', async () => {

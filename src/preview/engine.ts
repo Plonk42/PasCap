@@ -100,6 +100,7 @@ function timingKey(project: ProjectDocument): string {
   return JSON.stringify({
     id: project.id,
     frameRate: project.frameRate,
+    videoRates: project.videoRates,
     colorProfile: project.colorProfile,
     clips: project.clips
       .map(({ id, mediaId, layerId, start, sourceIn, sourceOut, speed }) => ({
