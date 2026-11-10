@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeAutoAdjust, autoAdjustFrames, scaleCorrection } from '../../src/shared/auto-adjust.js';
 import { applyCommand } from '../../src/shared/commands.js';
+import { windowSourceFrames } from '../../src/shared/auto-color.js';
+import { heroColor, matchLook, measureLook } from '../../src/shared/look-match.js';
 import {
   DETAIL_ESTIMATE,
   detailFrames,
@@ -310,6 +312,68 @@ describe('estimate operation', () => {
     expect(track.commands).toEqual(listed.commands);
   });
 
+  it('matches clips to a hero as its grade shows it, never changing the hero', async () => {
+    const graded = applyCommand(project, {
+      type: 'color-patch',
+      clipIds: ['a'],
+      settings: { exposure: 0.4, saturation: 1.2 },
+    });
+    const heroed = { ...context, projects: { load: async () => graded } } as unknown as Context;
+    reads.length = 0;
+    const result = await runners.estimate(heroed, { ...input, kind: 'match', clipId: 'b', referenceClipId: 'a' });
+    const heroSources = autoAdjustFrames(0, 300);
+    const shotSources = autoAdjustFrames(100, 200);
+    expect(reads).toEqual([
+      { mediaId: 'rec-1', frames: heroSources },
+      { mediaId: 'rec-2', frames: shotSources },
+    ]);
+    const look = measureLook(
+      heroSources.map((frame) => patches(frame / 30)),
+      heroColor(graded.clips[0]!.grade, heroSources),
+    )!;
+    const expected = scaleCorrection(
+      matchLook(
+        look,
+        shotSources.map((frame) => patches(frame / 30)),
+        graded.clips[1]!.grade.color,
+      )!,
+      0.8,
+    );
+    expect(result).toMatchObject({
+      kind: 'match',
+      reference: { clipId: 'a', frames: 16 },
+      analyzed: { description: 'the whole clip b', frames: 16 },
+      correction: expected,
+      commands: [{ type: 'color-patch', clipIds: ['b'], settings: expected }],
+    });
+
+    // Every clip of the track but the hero, each on its own.
+    reads.length = 0;
+    const track = await runners.estimate(heroed, {
+      ...input,
+      kind: 'match',
+      layerId,
+      applyAs: 'shots',
+      referenceClipId: 'a',
+    });
+    expect(track.reference).toEqual({ clipId: 'a', frames: 16 });
+    expect(track.clips!.map((clip) => clip.clipId)).toEqual(['b']);
+    expect(track.clips![0]!.correction).toEqual(expected);
+    expect(track.commands).toEqual([{ type: 'color-patch', clipIds: ['b'], settings: expected }]);
+    // The hero playing at a frame, measured over the second around it.
+    reads.length = 0;
+    const around = await runners.estimate(heroed, {
+      ...input,
+      kind: 'match',
+      clipId: 'a',
+      referenceFrame: 310,
+      commands: false,
+    });
+    const b = calculateLayout(graded).clips.find((item) => item.clip.id === 'b')!;
+    expect(reads[0]).toEqual({ mediaId: 'rec-2', frames: windowSourceFrames(b, 310) });
+    expect(around.reference).toEqual({ clipId: 'b', frames: windowSourceFrames(b, 310).length });
+  });
+
   it('rejects ambiguous, misplaced and unsupported targets', async () => {
     const rejects = (fields: Record<string, unknown>, statusCode: number) =>
       expect(
@@ -334,5 +398,13 @@ describe('estimate operation', () => {
     await rejects({ mediaId: 'rec-9', sourceIn: 0, sourceOut: 10 }, 404);
     await rejects({ mediaId: 'rec-1', sourceIn: 10, sourceOut: 10 }, 422);
     await rejects({ mediaId: 'rec-1', sourceIn: 0, sourceOut: 601 }, 422);
+    // A match needs a hero, which never changes.
+    await rejects({ kind: 'match', clipId: 'b' }, 422);
+    await rejects({ clipId: 'b', referenceClipId: 'a' }, 422);
+    await rejects({ kind: 'match', clipId: 'a', referenceClipId: 'a' }, 422);
+    await rejects({ kind: 'match', clipIds: ['a', 'b'], applyAs: 'shots', referenceClipId: 'b' }, 422);
+    await rejects({ kind: 'match', clipId: 'b', referenceClipId: 'z' }, 404);
+    await rejects({ kind: 'match', clipId: 'b', referenceClipId: 'a', referenceFrame: 310 }, 422);
+    await rejects({ kind: 'match', clipId: 'b', referenceFrame: 9000 }, 422);
   });
 });

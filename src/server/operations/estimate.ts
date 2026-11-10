@@ -1,4 +1,4 @@
-import { analyzeAutoAdjust, autoAdjustFrames, scaleCorrection } from '../../shared/auto-adjust.js';
+import { analyzeAutoAdjust, autoAdjustFrames, scaleCorrection, type AutoCorrection } from '../../shared/auto-adjust.js';
 import {
   animatedSettings,
   autoAdjustCommand,
@@ -12,9 +12,10 @@ import {
 } from '../../shared/auto-color.js';
 import type { EditCommand } from '../../shared/commands.js';
 import { detailFrames, measureDetail, suggestDetail } from '../../shared/detail-estimate.js';
-import type { ScalarColorSetting } from '../../shared/color.js';
+import { createColorSettings, type ScalarColorSetting } from '../../shared/color.js';
 import { gradeKeyAsLayerKey } from '../../shared/grade.js';
 import { hasLayerKeys } from '../../shared/keyframes.js';
+import { heroColor, matchLook, measureLook, type LookProfile } from '../../shared/look-match.js';
 import type { ProjectDocument } from '../../shared/model.js';
 import type { estimate } from '../../shared/operations/estimate.js';
 import { projectVideoIds } from '../../shared/projects.js';
@@ -64,9 +65,10 @@ function clipGrade(clip: PlacedClip, keyFrame: number | null): GradeTarget {
 
 const invalid = (message: string): ServiceError => new ServiceError(message, 422);
 
-function clipTarget(project: ProjectDocument, input: Input): Target {
+function clipTarget(project: ProjectDocument, input: Input, hero: string | null): Target {
   const clip = calculateLayout(project).clips.find((item) => item.clip.id === input.clipId);
   if (!clip) throw new ServiceError(`The project has no clip ${input.clipId}; read describe_project.`, 404);
+  if (clip.clip.id === hero) throw heroUnchanged(hero);
   const { mediaId, sourceIn, sourceOut } = clip.clip;
   if (input.frame === undefined) {
     const sourceFrames =
@@ -94,11 +96,13 @@ function clipTarget(project: ProjectDocument, input: Input): Target {
   };
 }
 
-function trackTarget(project: ProjectDocument, input: Input): Target {
+function trackTarget(project: ProjectDocument, input: Input, hero: string | null): Target {
   const layer = project.layers.find((item) => item.id === input.layerId);
   if (!layer) throw new ServiceError(`The project has no video track ${input.layerId}; read describe_project.`, 404);
   if (input.kind === 'detail') throw invalid('Detail belongs to each clip: estimate it with clipId.');
-  const clips = calculateLayout(project).clips.filter((item) => item.clip.layerId === layer.id);
+  const clips = calculateLayout(project).clips.filter(
+    (item) => item.clip.layerId === layer.id && item.clip.id !== hero,
+  );
   if (!clips.length) throw invalid(`${layer.name} has no clips to analyze.`);
   const reads = new Map<string, Read>();
   for (const { clip, sourceFrame } of trackSamples(clips)) {
@@ -137,24 +141,55 @@ function checkChoice(input: Input): void {
   if (chosen !== 1)
     throw invalid('Give exactly one of clipId, clipIds, layerId or mediaId (with sourceIn and sourceOut).');
   if (input.frame !== undefined && input.clipId === undefined) throw invalid('frame needs the clipId it lies in.');
+  const reference = input.referenceClipId !== undefined || input.referenceFrame !== undefined;
+  if (input.kind === 'match' && !reference)
+    throw invalid('A match needs its hero: give referenceClipId, referenceFrame or both.');
+  if (input.kind !== 'match' && reference) throw invalid('referenceClipId and referenceFrame belong to kind match.');
 }
 
-function targetOf(project: ProjectDocument, input: Input, context: ServiceContext): Target {
+const heroUnchanged = (hero: string): ServiceError =>
+  invalid(`Clip ${hero} is the hero: a match never changes it. Leave it out of the analyzed clips.`);
+
+/** The hero of a match: its clip and the source frames it is measured on. */
+function heroOf(project: ProjectDocument, input: Input): { clip: PlacedClip; sourceFrames: number[] } {
+  const layout = calculateLayout(project).clips;
+  const frame = input.referenceFrame;
+  let clip: PlacedClip | undefined;
+  if (input.referenceClipId !== undefined) {
+    clip = layout.find((item) => item.clip.id === input.referenceClipId);
+    if (!clip) throw new ServiceError(`The project has no clip ${input.referenceClipId}; read describe_project.`, 404);
+  } else {
+    const playing = layout.filter((item) => frame! >= item.start && frame! < item.end);
+    if (playing.length !== 1)
+      throw invalid(
+        playing.length
+          ? `Several tracks play a clip at frame ${frame}: give referenceClipId.`
+          : `No clip plays at frame ${frame}.`,
+      );
+    clip = playing[0]!;
+  }
+  if (frame === undefined) return { clip, sourceFrames: autoAdjustFrames(clip.clip.sourceIn, clip.clip.sourceOut) };
+  if (frame < clip.start || frame >= clip.end)
+    throw invalid(`Frame ${frame} is outside clip ${clip.clip.id}, which plays frames ${clip.start}–${clip.end - 1}.`);
+  return { clip, sourceFrames: windowSourceFrames(clip, frame) };
+}
+
+function targetOf(project: ProjectDocument, input: Input, context: ServiceContext, hero: string | null): Target {
   if (input.applyAs === 'keyframe' && (input.kind === 'detail' || input.frame === undefined))
     throw invalid('A keyframe takes the light at one frame: give clipId and frame, for a Color kind.');
-  if (input.clipId !== undefined) return clipTarget(project, input);
+  if (input.clipId !== undefined) return clipTarget(project, input, hero);
   if (input.layerId !== undefined) {
     if (input.kind !== 'detail' && input.commands)
       throw invalid(
         "A track has no Color of its own: write each clip's grade with applyAs shots, or give commands false for the values of one compromise.",
       );
-    return trackTarget(project, input);
+    return trackTarget(project, input, hero);
   }
   return rangeTarget(project, input, context);
 }
 
-/** The clips analyzed each on its own, in timeline order, or null for one analysis. */
-function separateClips(project: ProjectDocument, input: Input): PlacedClip[] | null {
+/** The clips analyzed each on its own, in timeline order, or null for one analysis; a match leaves its hero out. */
+function separateClips(project: ProjectDocument, input: Input, hero: string | null): PlacedClip[] | null {
   const shots = input.applyAs === 'shots';
   if (shots && input.kind === 'detail') throw invalid('applyAs shots keys Color: use it with a Color kind.');
   if (shots && (input.frame !== undefined || input.mediaId !== undefined))
@@ -169,12 +204,16 @@ function separateClips(project: ProjectDocument, input: Input): PlacedClip[] | n
   if (input.layerId !== undefined) {
     if (!project.layers.some((layer) => layer.id === input.layerId))
       throw new ServiceError(`The project has no video track ${input.layerId}; read describe_project.`, 404);
-    const clips = layout.filter((item) => item.clip.layerId === input.layerId);
+    const clips = layout.filter((item) => item.clip.layerId === input.layerId && item.clip.id !== hero);
     if (!clips.length) throw invalid('This track has no clips to analyze.');
     return clips;
   }
-  const ids = input.clipIds ?? [input.clipId!];
+  return listedClips(layout, input.clipIds ?? [input.clipId!], hero);
+}
+
+function listedClips(layout: readonly PlacedClip[], ids: readonly string[], hero: string | null): PlacedClip[] {
   if (new Set(ids).size !== ids.length) throw invalid('List each clip once.');
+  if (hero !== null && ids.includes(hero)) throw heroUnchanged(hero);
   const missing = ids.find((id) => !layout.some((item) => item.clip.id === id));
   if (missing !== undefined) throw new ServiceError(`The project has no clip ${missing}; read describe_project.`, 404);
   return layout.filter((item) => ids.includes(item.clip.id)).sort((left, right) => left.start - right.start);
@@ -237,9 +276,14 @@ async function estimateWhiteBalance(
   return { fields, commands: whiteBalanceValues(grade, balance), unchanged };
 }
 
-async function estimateAutoAdjust(context: ServiceContext, { reads, grade }: Target, input: Input): Promise<Estimated> {
-  const fitted = analyzeAutoAdjust(await colorFrames(context.stills, reads));
+async function estimateAutoAdjust(context: ServiceContext, target: Target, input: Input): Promise<Estimated> {
+  const fitted = analyzeAutoAdjust(await colorFrames(context.stills, target.reads));
   if (!fitted) throw tooUniform();
+  return correctionEdits(fitted, target, input);
+}
+
+/** The fitted correction at the intensity asked, and the edits writing it into the target's clip grade. */
+function correctionEdits(fitted: AutoCorrection, { grade }: Target, input: Input): Estimated {
   const intensity = input.intensity / 100;
   const fields = { correction: scaleCorrection(fitted, intensity) };
   if (!grade) return { fields, commands: [], unchanged: [] };
@@ -253,11 +297,30 @@ async function estimateAutoAdjust(context: ServiceContext, { reads, grade }: Tar
   return { fields, commands: command ? [command] : [], unchanged: animatedSettings(grade.values) };
 }
 
+/** The eleven settings making the target look like the hero; its grade's other settings are kept. */
+function estimateMatch(look: LookProfile) {
+  return async (context: ServiceContext, target: Target, input: Input): Promise<Estimated> => {
+    const base = target.clip?.clip.grade.color ?? createColorSettings();
+    const fitted = matchLook(look, await colorFrames(context.stills, target.reads), base);
+    if (!fitted) throw tooUniform();
+    return correctionEdits(fitted, target, input);
+  };
+}
+
+type Estimator = (context: ServiceContext, target: Target, input: Input) => Promise<Estimated>;
 const estimators = {
   detail: estimateDetail,
   'white-balance': estimateWhiteBalance,
   'auto-adjust': estimateAutoAdjust,
-} satisfies Record<Input['kind'], (context: ServiceContext, target: Target, input: Input) => Promise<Estimated>>;
+} satisfies Record<Exclude<Input['kind'], 'match'>, Estimator>;
+
+/** What a match aims at: how the hero looks through its grade, over the frames measured. */
+async function heroLook(context: ServiceContext, { clip, sourceFrames }: ReturnType<typeof heroOf>) {
+  const frames = await colorFrames(context.stills, [{ mediaId: clip.clip.mediaId, sourceFrames }]);
+  const look = measureLook(frames, heroColor(clip.clip.grade, sourceFrames));
+  if (!look) throw invalid(`The hero clip ${clip.clip.id} is too dark, clipped or uniform to measure; choose another.`);
+  return look;
+}
 
 type ShotValues = Partial<Record<ScalarColorSetting, number>>;
 
@@ -279,7 +342,12 @@ export function shotCommands(shots: readonly { clip: PlacedClip; values: ShotVal
 }
 
 /** Each clip analyzed whole on its own: its result, and the detail edits or clip grades applying them. */
-async function estimateClips(context: ServiceContext, clips: readonly PlacedClip[], input: Input) {
+async function estimateClips(
+  context: ServiceContext,
+  clips: readonly PlacedClip[],
+  input: Input,
+  estimator: Estimator,
+) {
   const results: { clipId: string; frames: number }[] = [];
   const commands: EditCommand[] = [];
   const shots: { clip: PlacedClip; values: ShotValues }[] = [];
@@ -289,7 +357,7 @@ async function estimateClips(context: ServiceContext, clips: readonly PlacedClip
     const sourceFrames =
       input.kind === 'detail' ? detailFrames(sourceIn, sourceOut) : autoAdjustFrames(sourceIn, sourceOut);
     const target = { description: '', reads: [{ mediaId, sourceFrames }], grade: null, clip };
-    const estimated = await estimators[input.kind](context, target, input);
+    const estimated = await estimator(context, target, input);
     const count = new Set(sourceFrames).size;
     frames += count;
     results.push({ clipId: clip.clip.id, frames: count, ...estimated.fields });
@@ -305,30 +373,38 @@ async function estimateClips(context: ServiceContext, clips: readonly PlacedClip
 export const runEstimate: OperationRunner<typeof estimate> = async (context, input) => {
   const project = await context.projects.load(input.projectId);
   checkChoice(input);
-  const clips = separateClips(project, input);
+  const matched = input.kind === 'match' ? heroOf(project, input) : null;
+  const hero = matched?.clip.clip.id ?? null;
+  const clips = separateClips(project, input, hero);
+  const target = clips ? null : targetOf(project, input, context, hero);
+  if (target && input.applyAs === 'keyframe') {
+    const { values, keyFrame, owner } = target.grade!;
+    const full = keyframeLimitReason(values, keyFrame!, owner);
+    if (full !== null) throw new ServiceError(full, 409);
+  }
+  const estimator = matched
+    ? estimateMatch(await heroLook(context, matched))
+    : estimators[input.kind as keyof typeof estimators];
+  const reference = matched ? { reference: { clipId: hero!, frames: new Set(matched.sourceFrames).size } } : {};
   if (clips) {
-    const { analyzed, results, commands } = await estimateClips(context, clips, input);
+    const { analyzed, results, commands } = await estimateClips(context, clips, input, estimator);
     return {
       revision: project.revision,
       kind: input.kind,
       analyzed,
+      ...reference,
       unchanged: [],
       commands: input.commands ? commands : [],
       clips: results,
     };
   }
-  const target = targetOf(project, input, context);
-  if (input.applyAs === 'keyframe') {
-    const { values, keyFrame, owner } = target.grade!;
-    const full = keyframeLimitReason(values, keyFrame!, owner);
-    if (full !== null) throw new ServiceError(full, 409);
-  }
-  const { fields, commands, unchanged } = await estimators[input.kind](context, target, input);
-  const frames = target.reads.reduce((sum, read) => sum + new Set(read.sourceFrames).size, 0);
+  const { fields, commands, unchanged } = await estimator(context, target!, input);
+  const frames = target!.reads.reduce((sum, read) => sum + new Set(read.sourceFrames).size, 0);
   return {
     revision: project.revision,
     kind: input.kind,
-    analyzed: { description: target.description, frames },
+    analyzed: { description: target!.description, frames },
+    ...reference,
     unchanged,
     commands: input.commands ? commands : [],
     ...fields,

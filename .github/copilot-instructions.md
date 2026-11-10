@@ -190,7 +190,9 @@ request: read one only when the task touches its area.
   Saturation and Vibrance, Saturation giving way first on strong colors such as skies), previews them in a
   popover with Intensity (initially 80%, the fitted correction; 100% exaggerates it by a
   quarter) and applies one Undo step. **Source** (named by scope): Playhead (±30 frames), This clip (whole graded clip) or Every clip on <track>
-  (each analyzed on its own, one `color` edit per clip, **Apply to N clips**; keyframes go to this clip only). **Apply as**: Grade values edits
+  (each analyzed on its own, one `color` edit per clip, **Apply to N clips**; keyframes go to this clip only), or #315
+  **Match to this clip** (every other clip on the track takes this hero clip's look as its grade shows it, the hero
+  never changes; `estimate` kind `match`, `src/shared/look-match.ts`). **Apply as**: Grade values edits
   the grades' values, leaving animated settings and keyframes unchanged; Keyframe (Playhead source only)
   captures all eleven at the source frame like their diamonds (initial, with Playhead, once any is
   animated). Constants in `src/shared/auto-adjust.ts`, no schema/render change

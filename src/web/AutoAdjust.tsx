@@ -58,6 +58,12 @@ function sources(
       name: `Every clip on ${trackName}`,
       hint: `on ${trackName}, each analyzed on its own`,
     },
+    {
+      source: 'match',
+      label: 'Match to this clip',
+      name: `Match every other clip on ${trackName} to this clip`,
+      hint: `other clips on ${trackName} take its look`,
+    },
   ];
 }
 const APPLIES: readonly { apply: AutoAdjustApply; label: string; name: string; hint: string }[] = [
@@ -99,6 +105,7 @@ export function AutoAdjust({ project, clipId, layout, assets, playhead, disabled
         playhead: autoAdjustTarget(context, 'playhead'),
         clip: availability,
         track: autoAdjustTarget(context, 'track'),
+        match: autoAdjustTarget(context, 'match'),
       }}
       onEdit={onEdit}
     />
@@ -108,6 +115,7 @@ export function AutoAdjust({ project, clipId, layout, assets, playhead, disabled
 /** Why Keyframe is unavailable from `source`: keyframes go to this clip only, at the playhead. */
 function keyframeUnavailable(source: AutoAdjustSource): { hint: string; title: string } | null {
   if (source === 'playhead') return null;
+  if (source === 'match') return { hint: 'whole clips', title: 'A match sets the grade values of the other clips.' };
   return source === 'track'
     ? { hint: 'this clip only', title: 'Keyframes go to this clip only, at the playhead.' }
     : { hint: 'needs Playhead', title: 'Analyze the playhead to key it.' };
@@ -115,7 +123,14 @@ function keyframeUnavailable(source: AutoAdjustSource): { hint: string; title: s
 
 function applyHint(option: (typeof APPLIES)[number], source: AutoAdjustSource): string {
   if (option.apply === 'keyframe') return keyframeUnavailable(source)?.hint ?? option.hint;
+  if (source === 'match') return 'each other clip’s grade';
   return source === 'track' ? 'each clip’s grade' : option.hint;
+}
+
+/** The Apply button: a match never applies to this clip, so it always names how many clips it changes. */
+function applyLabel(source: AutoAdjustSource, clips: number): string {
+  if (source === 'match') return `Apply to ${clips} ${clips === 1 ? 'clip' : 'clips'}`;
+  return clips > 1 ? `Apply to ${clips} clips` : 'Apply';
 }
 
 type Phase =
@@ -366,7 +381,7 @@ function AutoAdjustPopover({
                     }
                     onClick={() => apply(close)}
                   >
-                    {clips > 1 ? `Apply to ${clips} clips` : 'Apply'}
+                    {applyLabel(source, clips)}
                   </button>
                 )}
                 <button type="button" className="secondary-button small" onClick={close}>
