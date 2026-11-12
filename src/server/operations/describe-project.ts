@@ -144,6 +144,7 @@ export function describeDocument(
       adjustments: project.adjustments.map((item) => ({
         id: item.id,
         ...span(item.start, item.start + item.duration),
+        ...(!item.enabled && { enabled: false as const }),
         grade: gradeSummary(item),
       })),
     }),

@@ -457,6 +457,47 @@ describe('operation routes', () => {
       include: ['bookmarks'],
     });
     expect(Object.keys(parts.json())).toEqual(['id', 'title', 'revision', 'duration', 'bookmarks']);
+
+    // The user turns the adjustment off: every read says so, the values it would apply stay readable.
+    const current = await app.inject({ method: 'GET', url: `/api/projects/${project.id}`, headers });
+    const document = projectSchema.parse(current.json<{ document: unknown }>().document);
+    const off = applyCommand(document, { type: 'adjustment-enable', adjustmentIds: ['look'], enabled: false });
+    const put = await app.inject({
+      method: 'PUT',
+      url: `/api/projects/${project.id}`,
+      headers,
+      payload: { document: off, expectedRevision: document.revision },
+    });
+    expect(put.statusCode).toBe(200);
+    const listed = (await call(app, 'describe_project', { projectId: project.id, include: ['adjustments'] })).json<{
+      revision: number;
+      adjustments: unknown[];
+    }>();
+    expect(listed.adjustments).toEqual([expect.objectContaining({ id: 'look', enabled: false })]);
+    const read = await call(app, 'describe_track', {
+      projectId: project.id,
+      layerId: 'video-1',
+      frames: [60],
+      include: ['at'],
+      settings: ['exposure'],
+    });
+    expect(read.json<TrackDescription>().at![0]!.adjustment).toEqual({
+      adjustmentId: 'look',
+      enabled: false,
+      values: { exposure: 0.5 },
+    });
+    const patched = await call(app, 'edit', {
+      projectId: project.id,
+      expectedRevision: listed.revision,
+      commands: [{ type: 'color-patch', adjustmentId: 'look', settings: { saturation: 1.2 } }],
+    });
+    expect(patched.json()).toMatchObject({ changes: { adjustments: [{ id: 'look', enabled: false }] } });
+    const toggled = await call(app, 'edit', {
+      projectId: project.id,
+      expectedRevision: listed.revision + 1,
+      commands: [{ type: 'adjustment-enable', adjustmentIds: ['look'], enabled: true }],
+    });
+    expect(toggled.statusCode).toBe(400);
     const one = await call(app, 'describe_project', {
       projectId: project.id,
       include: ['videoTracks'],

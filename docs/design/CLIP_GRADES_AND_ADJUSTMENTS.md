@@ -105,8 +105,9 @@ items `{ id, start, duration, enabled, color, keyframes }`, sorted by `start`, *
   range, Color and keyframes, is still moved, trimmed, split, pasted on and deleted, and still
   counts for overlaps, but grades nothing in preview, stills and export, like a hidden video
   track. New items are on; projects saved before the flag existed open with every item on. The
-  editor-only `adjustment-enable {adjustmentIds, enabled}` sets it, one Undo step; the assistant
-  neither reads nor sets it.
+  editor-only `adjustment-enable {adjustmentIds, enabled}` sets it, one Undo step. The assistant
+  cannot set it but reads it: `describe_project`, `edit` results and `describe_track` values at a
+  frame carry `enabled: false` for an item that is off, so it does not edit one expecting a change.
 
 ### Tracks after #286 (owner, implemented)
 
