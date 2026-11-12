@@ -797,7 +797,7 @@ test('export discloses three timeline representations and four 22-byte-per-pixel
   await dialog.getByRole('radio', { name: '4K final', exact: true }).check();
   await expect(resources).toContainText('4 reusable raw buffers use 182.5 MB at 3840 × 2160; up to 2 LUTs add 6.6 MB.');
   await expect(dialog.locator('.activity-export-snapshot')).toContainText(
-    'clip speed and grades, adjustments, each video track’s Transform and Opacity, Ripple, transitions and fades, enabled video tracks, bottom-to-top composition order',
+    'clip speed and grades, adjustments that are on, each video track’s Transform and Opacity, Ripple, transitions and fades, enabled video tracks, bottom-to-top composition order',
   );
   await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect(await current(page)).toEqual(before);
