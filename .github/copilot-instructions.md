@@ -205,7 +205,7 @@ request: read one only when the task touches its area.
   with the footage through every clip edit. Projects require `adjustments`: 0–1,024 items
   `{ id, start, duration, enabled, color, keyframes }`, ascending, never overlapping, each grading
   **every video track** within `[start, start + duration)` with hard edges (none while `enabled` is
-  false, #321: an eye per item and one in the track header, editor-only `adjustment-enable`; the assistant reads `enabled: false`); 0–64 keys counted from
+  false, #321: an eye per item and one in the track header, `adjustment-enable` for the editor and the assistant; reads carry `enabled: false`); 0–64 keys counted from
   the item start, always within its range (a move or trim that would leave one outside is
   refused), moving with it (`adjustment-range` `move`) or keeping their project frames (`stay`, a trim). Items never follow
   clips and never extend duration. Each source is graded by its clip grade, then the item at that

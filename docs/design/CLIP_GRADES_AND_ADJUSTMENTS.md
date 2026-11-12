@@ -104,10 +104,12 @@ items `{ id, start, duration, enabled, color, keyframes }`, sorted by `start`, *
 - `enabled` (#321) turns an item **off** without losing anything: an item that is off keeps its
   range, Color and keyframes, is still moved, trimmed, split, pasted on and deleted, and still
   counts for overlaps, but grades nothing in preview, stills and export, like a hidden video
-  track. New items are on; projects saved before the flag existed open with every item on. The
-  editor-only `adjustment-enable {adjustmentIds, enabled}` sets it, one Undo step. The assistant
-  cannot set it but reads it: `describe_project`, `edit` results and `describe_track` values at a
-  frame carry `enabled: false` for an item that is off, so it does not edit one expecting a change.
+  track. New items are on; projects saved before the flag existed open with every item on.
+  `adjustment-enable {adjustmentIds, enabled}` sets it, one Undo step, for the editor and the
+  assistant alike (like a track's `layer-options` `enabled`). `describe_project`, `edit` results
+  and `describe_track` values at a frame carry `enabled: false` for an item that is off. The
+  assistant guide has it compare with and without an item through the in-memory commands of
+  `still` and `timeline_sheet`, and report any item it leaves off in its session notes.
 
 ### Tracks after #286 (owner, implemented)
 

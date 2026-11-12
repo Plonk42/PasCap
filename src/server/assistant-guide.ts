@@ -80,9 +80,10 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   clip grades, for a shared look, such as one per music section: adjustment-add with its
   settings, then an adjustmentId on the color commands; adjustment-range moves or trims it,
   adjustment-split cuts it in two. Adjustments never overlap and stay at their project frames
-  when clips move. An adjustment read with enabled false was turned off by the user: stills,
-  sheets and export ignore it, and only the user turns it back on: grade those frames with the
-  clip grades or ask the user, rather than editing it and expecting a change.
+  when clips move. An adjustment read with enabled false is off: stills, sheets and export ignore
+  it until adjustment-enable turns it on. To judge what one adds, put adjustment-enable in the
+  commands of still or timeline_sheet rather than saving it; leave one off only when the brief
+  asks, and say so in the session notes, since the user may have turned it off on purpose.
   describe_project lists them with what they change, and each clip's Detail that
   is not neutral; describe_track gives what each clip's grade changes, its Detail and the
   adjustments over it. Reads leave out values at their default (neutral settings, normal speed,

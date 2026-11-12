@@ -68,7 +68,7 @@ export const adjustmentDescriptionSchema = z
     ...span,
     enabled: described(
       z.literal(false).optional(),
-      'false when the user turned it off: it grades nothing in stills, sheets and export until the user turns it on; absent when on.',
+      'false when it is off: it grades nothing in stills, sheets and export until adjustment-enable turns it on; absent when on.',
     ),
     grade: described(gradeSummarySchema, 'Its grade: what it changes from neutral, and its keyframe count.'),
   })

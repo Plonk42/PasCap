@@ -135,7 +135,6 @@ const EDITOR_ONLY: readonly EditCommand['type'][] = [
   'layer-key-toggle',
   'layer-key-value',
   'select-done',
-  'adjustment-enable',
 ];
 
 const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> } = {

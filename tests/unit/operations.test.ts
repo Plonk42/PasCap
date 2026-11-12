@@ -497,7 +497,10 @@ describe('operation routes', () => {
       expectedRevision: listed.revision + 1,
       commands: [{ type: 'adjustment-enable', adjustmentIds: ['look'], enabled: true }],
     });
-    expect(toggled.statusCode).toBe(400);
+    expect(toggled.statusCode).toBe(200);
+    const turnedOn = toggled.json<{ changes: { adjustments: Record<string, unknown>[] } }>().changes.adjustments;
+    expect(turnedOn).toEqual([expect.objectContaining({ id: 'look' })]);
+    expect(turnedOn[0]).not.toHaveProperty('enabled');
     const one = await call(app, 'describe_project', {
       projectId: project.id,
       include: ['videoTracks'],

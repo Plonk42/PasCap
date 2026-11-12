@@ -363,7 +363,7 @@ export const editCommandSchema = z.discriminatedUnion('type', [
   ),
   command(
     'adjustment-enable',
-    'Turn adjustments on or off; a turned-off one keeps its range, Color and keyframes but grades nothing.',
+    'Turn adjustments on or off, as the eye on each one does in the editor: one that is off keeps its range, Color and keyframes but grades nothing in stills, sheets and export. In the commands of still or timeline_sheet it compares a look with and without an adjustment without saving.',
     {
       adjustmentIds: described(z.array(idSchema).min(1), 'Existing adjustments, each once.'),
       enabled: described(z.boolean(), 'True turns them on; false turns them off.'),
@@ -409,7 +409,6 @@ const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   'layer-key-toggle',
   'layer-key-value',
   'select-done',
-  'adjustment-enable',
 ]);
 
 /** The commands of the edit operation. */
