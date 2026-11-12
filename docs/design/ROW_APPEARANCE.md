@@ -58,8 +58,8 @@ A clip grade is what one shot needs. It belongs to the clip
 
 An adjustment is what happens at a moment of the film: one grade of **every video track** over
 a project-time range. The project's `adjustments` hold at most **1,024** items
-`{ id, start, duration, color, keyframes }`, in timeline order and never overlapping. An item
-grades `[start, start + duration)` with hard edges, after each clip's grade. A look for one track
+`{ id, start, duration, enabled, color, keyframes }`, in timeline order and never overlapping. An item
+grades `[start, start + duration)` with hard edges, after each clip's grade, unless it is turned off. A look for one track
 only is a clip grade.
 
 - Its keyframes (at most **64**) have the clip grade's shape, with frames counted from its start

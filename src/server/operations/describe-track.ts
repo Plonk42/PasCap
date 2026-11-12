@@ -108,6 +108,7 @@ export const runDescribeTrack: OperationRunner<typeof describeTrack> = async (
           ...(item && {
             adjustment: {
               adjustmentId: item.id,
+              ...(!item.enabled && { enabled: false as const }),
               values: only(scalarColorValues(adjustmentColorAt(item, frame)), chosen, NEUTRAL_SCALARS),
             },
           }),

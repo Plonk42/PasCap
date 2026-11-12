@@ -105,6 +105,7 @@ export const adjustmentSchema = z
       z.number().int().positive().max(LAST_FRAME),
       'Frames it grades from its start; it never extends the project.',
     ),
+    enabled: described(z.boolean(), 'Whether it grades preview and export; a turned-off adjustment keeps everything.'),
     color: described(
       colorSchema,
       'Color of every video track within its range: twelve scalar settings, hdr, localContrast, hsl and curves.',
@@ -148,7 +149,7 @@ export const adjustmentsSchema = z
   );
 
 export function createAdjustment(id: string, start: number, duration: number): Adjustment {
-  return adjustmentSchema.parse({ id, start, duration, color: createColorSettings(), keyframes: [] });
+  return adjustmentSchema.parse({ id, start, duration, enabled: true, color: createColorSettings(), keyframes: [] });
 }
 
 /** The adjustment grading a project frame, if any. */

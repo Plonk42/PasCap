@@ -361,6 +361,14 @@ export const editCommandSchema = z.discriminatedUnion('type', [
       newAdjustmentId: described(idSchema, 'Unused ID of the second piece.'),
     },
   ),
+  command(
+    'adjustment-enable',
+    'Turn adjustments on or off; a turned-off one keeps its range, Color and keyframes but grades nothing.',
+    {
+      adjustmentIds: described(z.array(idSchema).min(1), 'Existing adjustments, each once.'),
+      enabled: described(z.boolean(), 'True turns them on; false turns them off.'),
+    },
+  ),
   command('bookmark-add', 'Add a bookmark, a snap point that is never rendered; at most 1,000.', {
     frame: described(frameSchema, 'Project frame without a bookmark.'),
   }),
@@ -401,6 +409,7 @@ const EDITOR_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   'layer-key-toggle',
   'layer-key-value',
   'select-done',
+  'adjustment-enable',
 ]);
 
 /** The commands of the edit operation. */

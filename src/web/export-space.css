@@ -76,6 +76,22 @@
   font-size: 12px;
 }
 
+.export-adjustments-off {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 14px;
+  padding: 7px 10px;
+  border: 1px solid #8a7440;
+  border-radius: 4px;
+  color: #ffd27a;
+  font-size: 12px;
+}
+
+.export-adjustments-off > svg {
+  flex-shrink: 0;
+}
+
 .export-name-field {
   display: grid;
   gap: 6px;

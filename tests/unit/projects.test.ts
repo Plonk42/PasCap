@@ -421,6 +421,8 @@ describe('multiple-project store', () => {
       { ...saved, adjustments: [{ ...item, keyframes: [{ ...first, frame: 700 }] }] },
       { ...saved, adjustments: [{ ...item, keyframes: [gradeKey(10, {})] }] },
       { ...saved, adjustments: [{ ...item, duration: 0 }] },
+      { ...saved, adjustments: [{ ...item, enabled: undefined }] },
+      { ...saved, adjustments: [{ ...item, enabled: 'false' }] },
       { ...saved, adjustments: [{ ...item, layerId: 'video-1' }] },
       { ...saved, adjustments: [item, { ...item, id: 'overlapping', start: 60 }] },
       {

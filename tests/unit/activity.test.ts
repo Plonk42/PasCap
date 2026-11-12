@@ -247,6 +247,12 @@ describe('export snapshot summary', () => {
     expect(document.adjustments).toEqual([]);
   });
 
+  it('counts the adjustments that are turned off', () => {
+    const document = createProject('off', 'Off');
+    document.adjustments = [createAdjustment('a', 0, 10), { ...createAdjustment('b', 20, 10), enabled: false }];
+    expect(summarizeExport(document)).toMatchObject({ adjustments: 2, offAdjustments: 1 });
+  });
+
   it('uses retimed duration and includes disabled overlay tails and stored keys', () => {
     const document: ProjectDocument = createProject('layers', 'Layers');
     const primary = createClip('primary', 'source', 0, 60);

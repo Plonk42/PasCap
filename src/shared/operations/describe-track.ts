@@ -96,6 +96,10 @@ export const trackDescriptionSchema = z
                 z
                   .object({
                     adjustmentId: idSchema,
+                    enabled: described(
+                      z.literal(false).optional(),
+                      'false when the user turned it off: these values are not applied; absent when on.',
+                    ),
                     values: z.partialRecord(gradeSettingSchema, z.number()),
                   })
                   .strict()

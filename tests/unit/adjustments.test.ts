@@ -230,6 +230,40 @@ describe('adjustments', () => {
     expect(sampleTimeline(document, 130)).toEqual([]);
   });
 
+  it('turn off and on in one Undo step, keeping their range, Color and keyframes', () => {
+    const history = new EditHistory(project([warm(createAdjustment('a', 0, 30), 0.5), createAdjustment('b', 40, 20)]));
+    history.commit({ type: 'layer-key-toggle', adjustmentId: 'b', frame: 5, setting: 'exposure', value: 1 });
+    const on = history.current;
+    expect(on.adjustments.every((item) => item.enabled)).toBe(true);
+    history.commit({ type: 'adjustment-enable', adjustmentIds: ['a', 'b'], enabled: false });
+    const off = history.current;
+    expect(off.adjustments).toEqual(on.adjustments.map((item) => ({ ...item, enabled: false })));
+    for (const frame of [10, 45]) {
+      expect(adjustmentColor(off, frame)).toEqual(NEUTRAL_COLOR);
+      for (const layer of sampleTimeline(off, frame)) expect(layer.color).toEqual(NEUTRAL_COLOR);
+    }
+    expect(editedFrame(on, off)).toBeNull();
+    // A turned-off adjustment is still edited, split and placed like any other.
+    const split = applyCommand(off, { type: 'adjustment-split', adjustmentId: 'b', frame: 50, newAdjustmentId: 'c' });
+    expect(split.adjustments.map((item) => item.enabled)).toEqual([false, false, false]);
+    expect(() => applyCommand(off, { type: 'adjustment-add', adjustmentId: 'd', start: 50, duration: 5 })).toThrow(
+      'Adjustments cannot overlap',
+    );
+    history.commit({ type: 'adjustment-enable', adjustmentIds: ['b'], enabled: true });
+    expect(history.current.adjustments.map((item) => item.enabled)).toEqual([false, true]);
+    expect(adjustmentColor(history.current, 45).exposure).toBe(1);
+    history.undo();
+    expect(history.current).toEqual(off);
+    history.undo();
+    expect(history.current).toEqual(on);
+    expect(() => applyCommand(on, { type: 'adjustment-enable', adjustmentIds: ['gone'], enabled: false })).toThrow(
+      'Adjustment no longer exists',
+    );
+    expect(() => applyCommand(on, { type: 'adjustment-enable', adjustmentIds: ['a', 'a'], enabled: false })).toThrow(
+      'each adjustment once',
+    );
+  });
+
   it('refuse a color command naming no target or two', () => {
     const document = applyCommand(project(), { type: 'adjustment-add', adjustmentId: 'a', start: 0, duration: 10 });
     expect(() => applyCommand(document, { type: 'color', color: createColorSettings() })).toThrow('Give either');

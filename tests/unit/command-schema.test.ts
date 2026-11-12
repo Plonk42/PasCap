@@ -119,6 +119,7 @@ type FormerEditCommand =
   | { type: 'adjustment-remove'; adjustmentId: string }
   | { type: 'adjustment-range'; adjustmentId: string; start: number; duration: number; keyframes: 'move' | 'stay' }
   | { type: 'adjustment-split'; adjustmentId: string; frame: number; newAdjustmentId: string }
+  | { type: 'adjustment-enable'; adjustmentIds: string[]; enabled: boolean }
   | { type: 'bookmark-add'; frame: number }
   | { type: 'bookmark-move'; frame: number; nextFrame: number }
   | { type: 'bookmark-remove'; frame: number }
@@ -134,6 +135,7 @@ const EDITOR_ONLY: readonly EditCommand['type'][] = [
   'layer-key-toggle',
   'layer-key-value',
   'select-done',
+  'adjustment-enable',
 ];
 
 const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> } = {
@@ -194,6 +196,7 @@ const samples: { [K in EditCommand['type']]: Extract<EditCommand, { type: K }> }
   'adjustment-remove': { type: 'adjustment-remove', adjustmentId: 'look' },
   'adjustment-range': { type: 'adjustment-range', adjustmentId: 'look', start: 0, duration: 90, keyframes: 'stay' },
   'adjustment-split': { type: 'adjustment-split', adjustmentId: 'look', frame: 30, newAdjustmentId: 'look-2' },
+  'adjustment-enable': { type: 'adjustment-enable', adjustmentIds: ['look'], enabled: false },
   'bookmark-add': { type: 'bookmark-add', frame: 30 },
   'bookmark-move': { type: 'bookmark-move', frame: 30, nextFrame: 45 },
   'bookmark-remove': { type: 'bookmark-remove', frame: 45 },

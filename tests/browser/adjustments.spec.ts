@@ -99,3 +99,73 @@ test('Original with Alt bypasses adjustments only, and with Shift clip grades on
   }
   await expect.poll(() => memory.saves).toBe(1);
 });
+
+test('an eye turns one adjustment or all of them off and on, one Undo step each, keeping them editable', async ({
+  page,
+}) => {
+  const plain = { one: await checksum(page, 10), two: await checksum(page, 60) };
+  const gray = createAdjustment('gray', 0, 40);
+  gray.color.saturation = 0;
+  const dark = createAdjustment('dark', 40, 40);
+  dark.color.exposure = -1;
+  await page.evaluate((next) => window.pascapLab!.setDocument(next), {
+    ...(await current(page)),
+    adjustments: [gray, dark],
+  });
+  await page.getByRole('slider', { name: 'Timeline zoom' }).fill('180');
+  const undo = page.getByRole('button', { name: 'Undo', exact: true });
+  const graded = { one: await checksum(page, 10), two: await checksum(page, 60) };
+  expect(graded.one).not.toBe(plain.one);
+  expect(graded.two).not.toBe(plain.two);
+  const enabled = async () => (await current(page)).adjustments.map((item) => item.enabled);
+  const item = page.locator('.adjustment-item[data-adjustment-id="gray"]');
+  const all = page.locator('.layer-sidebar-adjustments .adjustments-eye');
+  await expect(all).toHaveAttribute('data-state', 'on');
+
+  await item.getByRole('button', { name: 'Turn off adjustment 00:00:00 – 00:01:10', exact: true }).click();
+  await expect.poll(enabled).toEqual([false, true]);
+  await expect(item).toHaveClass(/\boff\b/);
+  await expect(all).toHaveAttribute('data-state', 'mixed');
+  await expect(all).toHaveAccessibleName('Turn on all adjustments');
+  await expect.poll(() => checksum(page, 10)).toBe(plain.one);
+  expect(await checksum(page, 60)).toBe(graded.two);
+
+  // Its Color tab says it is off and still edits it.
+  await item.locator('.adjustment-body').click();
+  await expect(inspector(page).locator('.color-target')).toContainText('Turned off: grades nothing');
+  const saturation = page.getByRole('spinbutton', { name: 'Saturation', exact: true });
+  await saturation.fill('0.5');
+  await saturation.press('Enter');
+  await expect
+    .poll(async () => (await current(page)).adjustments[0])
+    .toMatchObject({
+      enabled: false,
+      color: { saturation: 0.5 },
+    });
+  expect(await checksum(page, 10)).toBe(plain.one);
+  await undo.click();
+  await expect.poll(async () => (await current(page)).adjustments[0]!.color.saturation).toBe(0);
+  await inspector(page).getByRole('button', { name: 'Turn on adjustment', exact: true }).click();
+  await expect.poll(enabled).toEqual([true, true]);
+  await expect(item).not.toHaveClass(/\boff\b/);
+  // So does its menu, where the item is too short for its eye.
+  await item.locator('.adjustment-body').click({ button: 'right' });
+  await page.getByRole('button', { name: 'Turn off this adjustment', exact: true }).click();
+  await expect.poll(enabled).toEqual([false, true]);
+  await undo.click();
+  await expect.poll(enabled).toEqual([true, true]);
+
+  // The header turns every adjustment off, then on, in one step each.
+  await all.click();
+  await expect.poll(enabled).toEqual([false, false]);
+  await expect(all).toHaveAttribute('data-state', 'off');
+  await expect.poll(() => checksum(page, 60)).toBe(plain.two);
+  expect(await checksum(page, 10)).toBe(plain.one);
+  await all.click();
+  await expect.poll(enabled).toEqual([true, true]);
+  await expect.poll(() => checksum(page, 10)).toBe(graded.one);
+  await undo.click();
+  await expect.poll(enabled).toEqual([false, false]);
+  await undo.click();
+  await expect.poll(enabled).toEqual([true, true]);
+});

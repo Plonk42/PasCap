@@ -3,6 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ProjectStore } from '../../src/server/storage.js';
+import { createColorSettings } from '../../src/shared/color.js';
+import { adjustmentColor } from '../../src/shared/composition.js';
 import { PROJECT_SCHEMA_VERSION, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import {
@@ -15,6 +17,11 @@ const FIXTURES = path.join(import.meta.dirname, '../fixtures/projects');
 /** Projects saved before schema 28, with track Color or British field names: rejected, never upgraded. */
 const UNSUPPORTED = path.join(FIXTURES, 'unsupported');
 const temporary: string[] = [];
+
+/** A saved project's adjustments as an upgrade turns them on. */
+function turnedOn(saved: ProjectDocument): ProjectDocument['adjustments'] {
+  return saved.adjustments.map((item) => ({ ...item, enabled: true }));
+}
 
 afterEach(async () => {
   await Promise.all(temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
@@ -57,7 +64,13 @@ describe('project compatibility', () => {
   it('keeps the adjustments, clip grades and Transform Opacity of a schema-28 project through the load', async () => {
     const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-28.json'), 'utf8')) as ProjectDocument;
     const loaded = projectSchema.parse(upgradeProject(saved));
-    expect(loaded).toEqual({ ...saved, schemaVersion: PROJECT_SCHEMA_VERSION, selectsDone: [], videoRates: {} });
+    expect(loaded).toEqual({
+      ...saved,
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      selectsDone: [],
+      videoRates: {},
+      adjustments: turnedOn(saved),
+    });
     expect(loaded.adjustments.length).toBeGreaterThan(1);
     expect(loaded.adjustments[0]!.keyframes.length).toBeGreaterThan(0);
     expect(loaded.layers[0]!.transform.base.opacity).toBeLessThan(1);
@@ -75,6 +88,7 @@ describe('project compatibility', () => {
       ...marked,
       schemaVersion: PROJECT_SCHEMA_VERSION,
       videoRates: {},
+      adjustments: turnedOn(marked),
     });
   });
 
@@ -85,12 +99,29 @@ describe('project compatibility', () => {
     const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-30.json'), 'utf8')) as ProjectDocument;
     const [mediaId, rate] = Object.entries(saved.videoRates)[0]!;
     expect(rate).toEqual({ numerator: 60, denominator: 1 });
-    expect(projectSchema.parse(upgradeProject(saved))).toEqual(saved);
+    expect(projectSchema.parse(upgradeProject(saved))).toEqual({
+      ...saved,
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      adjustments: turnedOn(saved),
+    });
     const duration = (project: ProjectDocument) =>
       calculateLayout(project).clips.find((placed) => placed.clip.mediaId === mediaId)!.duration;
     // 60 fps footage plays in real time: about two recording frames per project frame.
     expect(duration(saved)).toBe(Math.round(duration(older) / (60 / (30000 / 1001))));
     expect(duration({ ...saved, videoRates: {} })).toBe(duration(older));
+  });
+
+  it('opens schema-30 adjustments turned on, and keeps schema-31 adjustments turned off with their grade', async () => {
+    const older = JSON.parse(await readFile(path.join(FIXTURES, 'schema-30.json'), 'utf8')) as ProjectDocument;
+    const upgraded = projectSchema.parse(upgradeProject(older));
+    expect(upgraded.adjustments.every((item) => item.enabled)).toBe(true);
+    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-31.json'), 'utf8')) as ProjectDocument;
+    const loaded = projectSchema.parse(upgradeProject(saved));
+    expect(loaded).toEqual(saved);
+    const off = loaded.adjustments.find((item) => !item.enabled)!;
+    expect(off).toEqual({ ...upgraded.adjustments.find((item) => item.id === off.id)!, enabled: false });
+    expect(adjustmentColor(upgraded, off.start)).not.toEqual(createColorSettings());
+    expect(adjustmentColor(loaded, off.start)).toEqual(createColorSettings());
   });
 
   it('rejects projects saved with track Color or British field names, with the reason, and leaves their files unchanged', async () => {

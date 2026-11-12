@@ -24,6 +24,7 @@ const PHRASES: Record<EditCommand['type'], Phrase> = {
   'adjustment-remove': ['adjustment', 'removed'],
   'adjustment-range': ['adjustment', 'moved'],
   'adjustment-split': ['adjustment', 'split'],
+  'adjustment-enable': ['adjustment', 'turned on or off'],
   'layer-key-toggle': ['keyframe setting', 'toggled'],
   'layer-key-set': ['keyframe', 'set'],
   'layer-key-value': ['keyframe value', 'changed'],

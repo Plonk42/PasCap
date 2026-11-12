@@ -12,6 +12,15 @@ const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = {
   28: (document) => ({ ...document, selectsDone: [] }),
   // Schema 30 records recordings at other frame rates; earlier builds only imported project-rate ones.
   29: (document) => ({ ...document, videoRates: {} }),
+  // Schema 31 lets adjustments be turned off; every earlier one grades.
+  30: (document) => ({
+    ...document,
+    adjustments: Array.isArray(document.adjustments)
+      ? document.adjustments.map((item: unknown) =>
+          typeof item === 'object' && item !== null ? { ...item, enabled: true } : item,
+        )
+      : document.adjustments,
+  }),
 };
 
 /**

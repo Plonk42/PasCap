@@ -1,7 +1,7 @@
 import { Fragment, memo, useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { COLOR_CONTROLS, NEUTRAL_COLOR, type ScalarColorSetting } from '../shared/color.js';
-import { gradeColorAt } from '../shared/grade.js';
+import { gradeColorAt, type Adjustment } from '../shared/grade.js';
 import { activeLayerSetting, hasLayerKeys, isKeyframeFrame } from '../shared/keyframes.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
@@ -839,6 +839,47 @@ function gradeFrames(placed: PlacedClip | undefined, projectFrame: number, sourc
   return { frame: sourceFrame, valueFrame: gradeValuePosition(placed, projectFrame) };
 }
 
+/** What the selected adjustment grades: every track in its range, or nothing while it is off. */
+function AdjustmentScope({ item }: Readonly<{ item: Adjustment }>) {
+  if (item.enabled) return 'Every track within this range';
+  return <span className="adjustment-off-note">Turned off: grades nothing until turned on</span>;
+}
+
+function AdjustmentActions({
+  item,
+  disabled,
+  onEdit,
+}: Readonly<{ item: Adjustment; disabled: boolean; onEdit: (command: EditCommand) => void }>) {
+  return (
+    <>
+      <button
+        type="button"
+        className={`icon-button${item.enabled ? '' : ' adjustment-off'}`}
+        disabled={disabled}
+        aria-label={item.enabled ? 'Turn off adjustment' : 'Turn on adjustment'}
+        title={
+          item.enabled
+            ? 'Turn off: it stops grading preview and export, keeping its range, Color and keyframes'
+            : 'Turn on: it grades preview and export again'
+        }
+        onClick={() => onEdit({ type: 'adjustment-enable', adjustmentIds: [item.id], enabled: !item.enabled })}
+      >
+        <Icon name={item.enabled ? 'eye' : 'eye-off'} size={15} />
+      </button>
+      <button
+        type="button"
+        className="icon-button"
+        disabled={disabled}
+        aria-label="Delete adjustment"
+        title="Delete this adjustment and its keyframes"
+        onClick={() => onEdit({ type: 'adjustment-remove', adjustmentId: item.id })}
+      >
+        <Icon name="trash" size={15} />
+      </button>
+    </>
+  );
+}
+
 /** Color, HSL ranges and Color curves for the selected clip's grade or the selected adjustment. */
 function ColorTab(props: Readonly<ColorTabProps>) {
   const { project, clip, placed, asset, drafting, onEdit, onPreview, onPause, onSeek } = props;
@@ -908,17 +949,8 @@ function ColorTab(props: Readonly<ColorTabProps>) {
         : header(
             'color',
             title,
-            'Every track within this range',
-            <button
-              type="button"
-              className="icon-button"
-              disabled={drafting}
-              aria-label="Delete adjustment"
-              title="Delete this adjustment and its keyframes"
-              onClick={() => onEdit({ type: 'adjustment-remove', adjustmentId: owner.id })}
-            >
-              <Icon name="trash" size={15} />
-            </button>,
+            <AdjustmentScope item={item!} />,
+            <AdjustmentActions item={item!} disabled={drafting} onEdit={onEdit} />,
           )}
       <KeyframeNavigationContext.Provider value={ownerNavigation}>
         <ColorSection
