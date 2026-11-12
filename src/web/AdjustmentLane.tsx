@@ -495,10 +495,11 @@ export function AdjustmentLane(props: Readonly<Props>) {
         const state = itemState(item.id, props, candidate);
         const { selected, grading, invalid } = state;
         const dragging = drag.current?.item.id === item.id;
+        const off = item.enabled ? '' : ' (off)';
         return (
           <div
             key={item.id}
-            className={state.className}
+            className={`${state.className}${item.enabled ? '' : ' off'}`}
             data-adjustment-id={item.id}
             data-adjustment-start={item.start}
             data-adjustment-duration={item.duration}
@@ -510,16 +511,32 @@ export function AdjustmentLane(props: Readonly<Props>) {
             <button
               type="button"
               className="adjustment-body"
-              aria-label={`Adjustment ${label}${grading ? ' (grades the selected clip)' : ''}`}
+              aria-label={`Adjustment ${label}${off}${grading ? ' (grades the selected clip)' : ''}`}
               aria-pressed={selected}
               disabled={disabled && !dragging}
-              title={`Adjustment ${label} · grades every track here${grading ? ', including the selected clip' : ''} · Click to edit its Color; Ctrl-click to select several; drag to move it with its keyframes (and the rest of the selection); Arrow keys: 1 frame, Shift: 10; Delete removes. Alt bypasses snapping.`}
+              title={`Adjustment ${label}${off} · ${item.enabled ? 'grades' : 'turned off: grades nothing on'} every track here${grading ? ', including the selected clip' : ''} · Click to edit its Color; Ctrl-click to select several; drag to move it with its keyframes (and the rest of the selection); Arrow keys: 1 frame, Shift: 10; Delete removes. Alt bypasses snapping.`}
               onPointerDown={(event) => start(event, item, 'move')}
               onClick={(event) => activate(event, item)}
               onKeyDown={(event) => keyboard(event, item, 'move')}
               {...handlers}
             >
               <span className="adjustment-label">{label}</span>
+            </button>
+            <button
+              type="button"
+              className="adjustment-eye"
+              aria-label={`${item.enabled ? 'Turn off' : 'Turn on'} adjustment ${label}`}
+              title={
+                item.enabled
+                  ? 'Turn off: it stops grading preview and export, keeping its range, Color and keyframes'
+                  : 'Turn on: it grades preview and export again'
+              }
+              disabled={disabled}
+              onClick={() =>
+                latest.current.onEdit({ type: 'adjustment-enable', adjustmentIds: [item.id], enabled: !item.enabled })
+              }
+            >
+              <Icon name={item.enabled ? 'eye' : 'eye-off'} size={11} />
             </button>
             <div className="adjustment-keyframes">
               <KeyframeMarkers

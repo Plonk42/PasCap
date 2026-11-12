@@ -53,6 +53,7 @@ export function ClipContextMenu({
   const pasteBlocked = copiedGrade ? null : 'Copy the grade of a clip or an adjustment first.';
   const pasted = pasteTargetsLabel(targets);
   const noun = clip ? 'clip' : 'adjustment';
+  const adjustment = clip ? undefined : project.adjustments.find((item) => item.id === target.id);
   const panel = useRef<HTMLFieldSetElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 
@@ -154,6 +155,24 @@ export function ClipContextMenu({
         <Icon name="color" size={15} />
         {targets.length > 1 ? `Paste grade on ${targets.length}` : 'Paste grade'}
       </button>
+      {adjustment && (
+        <button
+          className="secondary-button small"
+          aria-label={adjustment.enabled ? 'Turn off this adjustment' : 'Turn on this adjustment'}
+          title={
+            adjustment.enabled
+              ? 'Stop grading preview and export with it, keeping its range, Color and keyframes'
+              : 'Grade preview and export with it again'
+          }
+          onClick={() => {
+            onClose(true);
+            onEdit([{ type: 'adjustment-enable', adjustmentIds: [adjustment.id], enabled: !adjustment.enabled }]);
+          }}
+        >
+          <Icon name={adjustment.enabled ? 'eye-off' : 'eye'} size={15} />
+          {adjustment.enabled ? 'Turn off' : 'Turn on'}
+        </button>
+      )}
     </fieldset>
   );
 }

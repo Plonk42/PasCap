@@ -1001,6 +1001,13 @@ function editAdjustment(
   next.adjustments.sort((left, right) => left.start - right.start);
 }
 
+function enableAdjustments(next: ProjectDocument, command: Extract<EditCommand, { type: 'adjustment-enable' }>): void {
+  if (new Set(command.adjustmentIds).size !== command.adjustmentIds.length)
+    throw new Error('List each adjustment once.');
+  if (typeof command.enabled !== 'boolean') throw new Error('An adjustment must be turned on or off.');
+  for (const id of command.adjustmentIds) requiredAdjustment(next, id).enabled = command.enabled;
+}
+
 export function applyCommand(document: ProjectDocument, command: EditCommand): ProjectDocument {
   if (command.type === 'transition' && command.keepCut) return keepCutTransition(document, command.transition);
   const next = projectSchema.parse(document);
@@ -1073,6 +1080,9 @@ export function applyCommand(document: ProjectDocument, command: EditCommand): P
     case 'adjustment-split':
       editAdjustment(next, command);
       // Adjustments never move clips or extend the project.
+      return projectSchema.parse(next);
+    case 'adjustment-enable':
+      enableAdjustments(next, command);
       return projectSchema.parse(next);
     case 'layer-key-set':
     case 'layer-key-toggle':

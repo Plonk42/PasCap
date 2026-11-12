@@ -427,6 +427,13 @@ at the playhead has a dashed ring. Ctrl-click (Cmd-click) selects clips and adju
 drag or delete them at once. Use it for a look over several shots or tracks, such as a warmer sunset section; give one
 shot its own look with its clip grade.
 
+To judge what an adjustment adds, turn it off with the eye at its top right (or **Turn off** in
+its right-click menu, or the eye in the Color tab header); the eye in the adjustment track header
+turns them all off, or all back on, and is half lit when only some are off. Each switch is one
+Undo step. An adjustment that is off is dashed and dimmed and grades nothing in the preview or the
+export (the Export dialog warns about it), but keeps its range, Color and keyframes, and you can
+still edit, move, split or delete it.
+
 To give several clips or adjustments the same look, right-click one whose grade has no keyframes
 and choose **Copy grade**, then right-click another and choose **Paste grade**: it replaces that
 grade and removes its keyframes, in one Undo step. Paste on a selected clip or adjustment applies to

@@ -4,10 +4,10 @@ import type { ProjectDocument, VideoLayer } from './model.js';
 import { evaluateSpatial } from './spatial.js';
 import type { PreviewLayer } from './timeline.js';
 
-/** The Color every video track gets at a project frame: its adjustment's, or neutral without one. */
+/** The Color every video track gets at a project frame: its adjustment's, or neutral without one or while it is off. */
 export function adjustmentColor(project: Pick<ProjectDocument, 'adjustments'>, projectFrame: number): ColorSettings {
   const item = adjustmentAt(project.adjustments, projectFrame);
-  return item ? adjustmentColorAt(item, projectFrame) : createColorSettings();
+  return item?.enabled ? adjustmentColorAt(item, projectFrame) : createColorSettings();
 }
 
 /** The track's Opacity at a project frame, from its Transform. */

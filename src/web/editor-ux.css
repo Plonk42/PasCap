@@ -41,7 +41,7 @@
   color: var(--accent);
 }
 
-/* The Color tab's target: the clip or adjustment it edits, with Delete for an adjustment, pinned under the tabs. */
+/* The Color tab's target: the clip or adjustment it edits, with Turn off and Delete for an adjustment, pinned under the tabs. */
 .product-workspace .inspector-selection.color-target {
   position: sticky;
   top: 45px;
@@ -55,6 +55,20 @@
   grid-column: 3;
   grid-row: 1 / 3;
   align-self: center;
+}
+
+/* An adjustment's on/off eye, then Delete. */
+.product-workspace .inspector-selection.color-target:has(> .icon-button + .icon-button) {
+  grid-template-columns: 18px minmax(0, 1fr) auto auto;
+}
+
+.inspector-selection.color-target > .icon-button + .icon-button {
+  grid-column: 4;
+}
+
+.inspector-selection.color-target > .icon-button.adjustment-off,
+.adjustment-off-note {
+  color: #ffd27a;
 }
 
 /* The name and scope wrap rather than losing a timecode or a clip count. */

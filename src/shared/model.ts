@@ -257,7 +257,7 @@ export const selectsDoneSchema = z
   .refine((ids) => new Set(ids).size === ids.length, { message: 'Recordings marked done must be unique.' });
 
 /** The only accepted project schema; bump it for every incompatible change. */
-export const PROJECT_SCHEMA_VERSION = 30;
+export const PROJECT_SCHEMA_VERSION = 31;
 
 /**
  * Frame rate of each recording in the bin that is not recorded at the project rate; no entry means

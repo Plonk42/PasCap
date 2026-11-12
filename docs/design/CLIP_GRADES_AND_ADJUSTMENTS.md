@@ -87,7 +87,7 @@ Every clip requires `grade: { color, keyframes }`.
 ### Adjustment items (owner)
 
 The project requires `adjustments`, the single adjustment track: an array of at most **1,024**
-items `{ id, start, duration, color, keyframes }`, sorted by `start`, **never overlapping**.
+items `{ id, start, duration, enabled, color, keyframes }`, sorted by `start`, **never overlapping**.
 
 - An item grades **every video track** within `[start, start + duration)`. There is no
   per-item track choice: a look for one track only is a clip grade.
@@ -101,6 +101,12 @@ items `{ id, start, duration, color, keyframes }`, sorted by `start`, **never ov
 - Items stay at their project frames when clips are trimmed, moved, rippled, split or deleted:
   they never follow clips. They do not extend the project duration.
 - Splitting an item gives both pieces the whole grade and every key, rebased.
+- `enabled` (#321) turns an item **off** without losing anything: an item that is off keeps its
+  range, Color and keyframes, is still moved, trimmed, split, pasted on and deleted, and still
+  counts for overlaps, but grades nothing in preview, stills and export, like a hidden video
+  track. New items are on; projects saved before the flag existed open with every item on. The
+  editor-only `adjustment-enable {adjustmentIds, enabled}` sets it, one Undo step; the assistant
+  neither reads nor sets it.
 
 ### Tracks after #286 (owner, implemented)
 
@@ -120,9 +126,9 @@ shared track keyframes (`layer.keyframes`) are removed, so a track has one keyfr
 
 ### Order and equations (owner)
 
-A source has at most two grades: its clip's, and the item covering the project frame, if any.
-For a source pixel, with clip grade $c$ and item grade $a$ evaluated at that frame (neutral
-when absent):
+A source has at most two grades: its clip's, and the item covering the project frame, if any
+and on. For a source pixel, with clip grade $c$ and item grade $a$ evaluated at that frame (neutral
+when absent or off):
 
 1. Inverse track Transform mapping, unchanged.
 2. The detail kernel runs **once** on source taps. Clip Detail is unchanged. For the four local
@@ -228,6 +234,12 @@ Follows the requirements of #289: one settings panel, an unmistakable target.
 - **Item gestures** (#287): create from the selected ruler range or a clip's span, or by drawing;
   move, trim, split and delete with snapping, red refused placements and one Undo step per valid
   release.
+- **On/off (#321).** Each item wide enough has an eye at its top right, beside the end trim
+  handle; its context menu has **Turn off** / **Turn on** too. The eye in the adjustment track
+  header turns every item off when all are on, otherwise every item on; it shows on, off or a
+  half-lit mixed state. An item that is off is dashed and dimmed, and the Color tab header says
+  it grades nothing, with its own eye beside Delete; its settings stay editable. The Export
+  dialog warns when items are off: export follows the saved state.
 - **Unchanged contracts:** controls fit the 270 px Properties minimum (the sections move as they
   are; the header ellipsizes); every accepted edit or completed gesture is one Undo step;
   Escape, cancellation, lost capture and blur restore.

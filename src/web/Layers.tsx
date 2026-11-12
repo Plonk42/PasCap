@@ -112,6 +112,38 @@ function LayerName({
   );
 }
 
+/** Turns every adjustment off when all are on, otherwise every one on. */
+function AdjustmentsEye({
+  project,
+  disabled,
+  onEdit,
+}: Readonly<{ project: ProjectDocument; disabled: boolean; onEdit: (command: EditCommand) => void }>) {
+  const items = project.adjustments;
+  const on = items.filter((item) => item.enabled).length;
+  const allOn = on === items.length;
+  let state: 'on' | 'off' | 'mixed' = 'mixed';
+  if (allOn) state = 'on';
+  else if (!on) state = 'off';
+  let title = 'Turn every adjustment off, to see the clips without them; nothing else about them changes';
+  if (!items.length) title = 'No adjustments to turn off';
+  else if (state === 'off') title = 'Every adjustment is off. Turn them all on';
+  else if (state === 'mixed') title = `${items.length - on} of ${items.length} adjustments are off. Turn them all on`;
+  return (
+    <button
+      className={`icon-button adjustments-eye ${state}`}
+      aria-label={allOn ? 'Turn off all adjustments' : 'Turn on all adjustments'}
+      data-state={state}
+      title={title}
+      disabled={disabled || !items.length}
+      onClick={() =>
+        onEdit({ type: 'adjustment-enable', adjustmentIds: items.map((item) => item.id), enabled: !allOn })
+      }
+    >
+      <Icon name={on ? 'eye' : 'eye-off'} size={15} />
+    </button>
+  );
+}
+
 export function Layers({
   project,
   selectedId,
@@ -199,6 +231,7 @@ export function Layers({
           className="layer-sidebar-adjustments"
           title="Adjustments grade every video track over their range, after each clip's own grade"
         >
+          <AdjustmentsEye project={project} disabled={disabled} onEdit={onEdit} />
           <Icon name="color" size={14} />
           <span className="layer-sidebar-title">Adjustments · {project.adjustments.length}</span>
           <button

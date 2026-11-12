@@ -16,6 +16,7 @@
   top: 3px;
   height: 29px;
   min-width: 2px;
+  container-type: inline-size;
   border: 1px solid #8a7440;
   border-radius: 4px;
   background: repeating-linear-gradient(135deg, #3a3220, #3a3220 6px, #332c1c 6px, #332c1c 12px);
@@ -38,6 +39,55 @@
   border-color: var(--error);
   outline: 1px solid var(--error);
   background: #5a2c2c;
+}
+
+/* Turned off: it keeps its place and keyframes but grades nothing. */
+.adjustment-item.off {
+  border-style: dashed;
+  background: #1b2019;
+}
+
+.adjustment-item.off :is(.adjustment-label, .adjustment-keyframes) {
+  opacity: 0.45;
+}
+
+/* Beside the end trim handle, on the label's row above the keyframes. */
+.adjustment-eye {
+  position: absolute;
+  top: 0;
+  right: 11px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 13px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: #e9d6a8;
+  cursor: pointer;
+}
+
+.adjustment-eye:is(:hover, :focus-visible):not(:disabled) {
+  background: #5a4718;
+  color: #fff3d6;
+}
+
+.adjustment-eye:focus-visible {
+  outline: 1px solid var(--accent);
+}
+
+.adjustment-item.off .adjustment-eye {
+  color: #ffd27a;
+}
+
+/* Too narrow to hold the eye beside the trim handles: the item's menu and the header turn it off. */
+@container (max-width: 47px) {
+  .adjustment-eye {
+    display: none;
+  }
 }
 
 .adjustment-body {
@@ -197,11 +247,24 @@
   align-items: center;
   gap: 6px;
   height: 36px;
-  padding: 0 4px 0 9px;
+  padding: 0 4px 0 2px;
   font-size: 10px;
   color: #e9d6a8;
   background: #121a15;
   border-bottom: 1px solid #2b3e31;
+}
+
+.adjustments-eye {
+  flex-shrink: 0;
+}
+
+.adjustments-eye:is(.off, .mixed) {
+  color: #ffd27a;
+}
+
+/* Some on, some off: a half-lit eye. */
+.adjustments-eye.mixed svg {
+  opacity: 0.55;
 }
 
 .layer-sidebar-adjustments .layer-sidebar-title {

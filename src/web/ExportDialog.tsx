@@ -46,6 +46,7 @@ export function summarizeExport(project: ProjectDocument) {
     enabledLayers: project.layers.filter((layer) => layer.enabled).length,
     musicTracks: project.music.length,
     adjustments: project.adjustments.length,
+    offAdjustments: project.adjustments.filter((item) => !item.enabled).length,
     keys,
     keyframeCount: keys.points,
     layered: needsLayeredExport(project),
@@ -138,6 +139,15 @@ export function ExportDialog({
         </div>
       </dl>
       {!summary.clips && <p className="activity-empty">Add a video clip to the project before exporting.</p>}
+      {summary.offAdjustments > 0 && (
+        <p className="export-adjustments-off">
+          <Icon name="eye-off" size={15} />
+          {summary.offAdjustments === 1
+            ? '1 adjustment is turned off: the export does not apply it.'
+            : `${summary.offAdjustments} adjustments are turned off: the export does not apply them.`}{' '}
+          Turn them on in the timeline to include them.
+        </p>
+      )}
       <fieldset className="export-quality-field" disabled={submitting}>
         <legend>Quality</legend>
         <div className="export-quality-options">
@@ -216,7 +226,10 @@ export function ExportDialog({
             </div>
             <div>
               <dt>Adjustments</dt>
-              <dd>{summary.adjustments}</dd>
+              <dd>
+                {summary.adjustments}
+                {summary.offAdjustments > 0 && <small> ({summary.offAdjustments} off)</small>}
+              </dd>
             </div>
             <div>
               <dt>Color keyframes</dt>
@@ -230,8 +243,8 @@ export function ExportDialog({
             </div>
           </dl>
           <p>
-            The submitted edit includes clip speed and grades, adjustments, each video track’s Transform and Opacity,
-            Ripple, transitions and fades, enabled video tracks, bottom-to-top composition order and keyframes
+            The submitted edit includes clip speed and grades, adjustments that are on, each video track’s Transform and
+            Opacity, Ripple, transitions and fades, enabled video tracks, bottom-to-top composition order and keyframes
             {summary.musicTracks ? `, and all ${summary.musicTracks} music tracks` : '; no music tracks are placed'}.
             Later edits do not change a submitted render.
           </p>

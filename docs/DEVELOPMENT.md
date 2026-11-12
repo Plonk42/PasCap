@@ -7,7 +7,7 @@ and `localContrast` (−1…1, neutral 0; the local-detail boost split out of HD
 [local contrast](design/DETAIL_FILTERS.md#local-contrast)),
 all eight HSL bands and all four
 color curves, and 0–64 keyframes at source frames. The project's required `adjustments` array
-holds 0–1,024 ordered, non-overlapping items `{ id, start, duration, color, keyframes }` with the
+holds 0–1,024 ordered, non-overlapping items `{ id, start, duration, enabled, color, keyframes }` with the
 same Color and keyframes counted from their start ([clip grades and adjustments](design/ROW_APPEARANCE.md)).
 Grade keyframes require fourteen nullable fields, each enabled one with its own Easing, and a
 boolean `reset` (default keyframe), in control order:

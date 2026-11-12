@@ -203,8 +203,9 @@ request: read one only when the task touches its area.
   `grade: { color, keyframes }` (0–64 keys at original-source frames, fourteen nullable
   channels), evaluated at the continuous source position (one frame lower when reversed) and kept
   with the footage through every clip edit. Projects require `adjustments`: 0–1,024 items
-  `{ id, start, duration, color, keyframes }`, ascending, never overlapping, each grading
-  **every video track** within `[start, start + duration)` with hard edges; 0–64 keys counted from
+  `{ id, start, duration, enabled, color, keyframes }`, ascending, never overlapping, each grading
+  **every video track** within `[start, start + duration)` with hard edges (none while `enabled` is
+  false, #321: an eye per item and one in the track header, editor-only `adjustment-enable`); 0–64 keys counted from
   the item start, always within its range (a move or trim that would leave one outside is
   refused), moving with it (`adjustment-range` `move`) or keeping their project frames (`stay`, a trim). Items never follow
   clips and never extend duration. Each source is graded by its clip grade, then the item at that
