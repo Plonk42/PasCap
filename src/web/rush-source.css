@@ -24,12 +24,14 @@
   flex-shrink: 0;
 }
 
-.source-review.rush-source .source-selection-done {
+.source-review.rush-source .source-selection-done,
+.source-review.rush-source .source-color-reference {
   flex-shrink: 0;
   color: var(--muted);
 }
 
-.source-review.rush-source .source-selection-done[aria-pressed='true'] {
+.source-review.rush-source .source-selection-done[aria-pressed='true'],
+.source-review.rush-source .source-color-reference[aria-pressed='true'] {
   border-color: #4f7a58;
   background: var(--accent-dim);
   color: var(--accent);
@@ -229,7 +231,8 @@
 }
 
 @container rush-source (width < 420px) {
-  .source-review.rush-source .source-selection-done > span {
+  .source-review.rush-source .source-selection-done > span,
+  .source-review.rush-source .source-color-reference > span {
     display: none;
   }
 }

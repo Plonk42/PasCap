@@ -4,7 +4,6 @@ import { styleSummarySchema, type StyleSummary } from '../shared/styles.js';
 import { z } from 'zod';
 import { request } from './api.js';
 import { callOperation } from './operations.js';
-import { readPreference, writePreference } from './preferences.js';
 
 /** The styles registered on the service (#314), loaded once per page and after each change. */
 let styles: readonly StyleSummary[] = [];
@@ -36,6 +35,7 @@ export function useStyles(active = true): readonly StyleSummary[] {
       return () => listeners.delete(listener);
     },
     () => styles,
+    () => styles,
   );
 }
 
@@ -61,18 +61,6 @@ export function browseReferences(rootId: string, directory?: string) {
   const query = new URLSearchParams({ rootId });
   if (directory !== undefined) query.set('directory', directory);
   return request(`/api/styles/browse?${query}`, referenceDirectorySchema);
-}
-
-/** The look Auto aims at: a style's id, or null for its generic balance. Remembered across sessions. */
-export const AUTO_LOOK_PREFERENCE = 'pascap-auto-look';
-
-export function rememberedLook(available: readonly StyleSummary[]): StyleSummary | null {
-  const id = readPreference(AUTO_LOOK_PREFERENCE);
-  return available.find((style) => style.id === id) ?? null;
-}
-
-export function rememberLook(style: StyleSummary | null): void {
-  writePreference(AUTO_LOOK_PREFERENCE, style?.id ?? '');
 }
 
 /** "2 videos, 1 still". */

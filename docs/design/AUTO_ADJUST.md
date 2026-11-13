@@ -14,6 +14,8 @@ Implementation authorities: [estimator](../../src/shared/auto-adjust.ts) (pure, 
 constant in `AUTO_ADJUST`), [white balance](../../src/shared/white-balance.ts),
 [frame sampler](../../src/preview/frame-sampler.ts), [edits](../../src/shared/auto-color.ts),
 [editor helpers](../../src/web/auto-adjust.ts) and [popover](../../src/web/AutoAdjust.tsx).
+To make clips look like a reference frame or a registered style instead of Auto's balance, see
+[Color → Match](COLOR_MATCH.md), which starts from Auto's corrections.
 
 ## Editing
 
@@ -25,11 +27,7 @@ readable. It is unavailable, with the reason in its tooltip and description, whe
 cannot be edited or the clip's recording has no verified proxy. It analyzes the selected clip,
 wherever the playhead is, also in a dissolve.
 
-Choosing Auto opens a nonmodal popover naming what it analyzes, with three choices. **Look** is
-what it aims at: **Generic**, Auto's balance described below, or one of the user's
-[registered styles](#registered-styles), remembered across sessions (preference
-`pascap-auto-look`); **Styles…** beside it opens the Styles dialog. A match aims at its hero, so
-Look is unavailable with Match. **Source**
+Choosing Auto opens a nonmodal popover naming what it analyzes, with two choices. **Source**
 is what it analyzes, named by its scope rather than its container, since the track has no grade
 of its own:
 
@@ -40,12 +38,6 @@ of its own:
 - **Every clip on Track 1** (each analyzed on its own, with the track's name): every clip of the
   clip's track, each analyzed like This clip and graded with its own correction, like `estimate` with `clipIds`. It is unavailable,
   with the reason, until every clip of the track has a verified proxy.
-- **Match to this clip** (other clips on Track 1 take its look): every other clip of the track,
-  each analyzed whole and graded so that it looks like this clip, the **hero**, as its grade shows it
-  (see [Matching a look](#matching-a-look)). The hero is measured, never changed. It is unavailable,
-  with the reason, when the track has no other clip or one of its clips has no verified proxy.
-  Professional workflows match shots to each other first, then give the shared look to one
-  [adjustment](CLIP_GRADES_AND_ADJUSTMENTS.md).
 
 **Apply as** is what it changes:
 
@@ -54,8 +46,7 @@ of its own:
 - **Keyframe** (at playhead) keys the eleven settings of the clip's grade at the source frame
   shown at the playhead. A keyframe takes the light at the playhead, so it needs the Playhead
   source: with This clip it is unavailable (**needs Playhead**), with every clip too (**this clip
-  only**: keyframes go to the selected clip only, at the playhead), with Match too (**whole
-  clips**: a match sets the other clips' grade values), and choosing either returns
+  only**: keyframes go to the selected clip only, at the playhead), and choosing either returns
   Apply as to Grade values. It is also unavailable, with the reason, when the grade holds
   64 keyframes and none is at that source frame.
 
@@ -72,8 +63,7 @@ source starts its own analysis; changing Apply as reuses it. While it runs the p
 - For Grade values, a line per setting a grade animates, such as **Exposure is animated: not
   changed**, or **Exposure is animated on 2 clips: not changed** for every clip; for every clip,
   a line also counts the clips keeping some animated settings (**1 of 3 clips keep their
-  animated settings.**), and Apply names its reach: **Apply to 3 clips**; a match always names
-  it, **Apply to 1 clip** included, since it never changes this clip.
+  animated settings.**), and Apply names its reach: **Apply to 3 clips**.
 - **Apply** commits one Undo step and closes the popover. Hue, HDR, Local contrast, HSL,
   curves, adjustments, the tracks, Detail and other clips are untouched.
   - Grade values: one `color` edit per analyzed clip (`clipIds` of one clip), the scaled
@@ -100,8 +90,7 @@ at several frames of a clip whose light changes keys a correction at each, and o
 interpolation follows the light between them, within the clip only.
 
 The editor keeps each analysis in session memory, never saved or in history: one per
-clip, one per clip and playhead, one per track's clips as analyzed and one per match (the
-hero's grade and the settings a match keeps in each other clip's grade are part of it). Reopening Auto on the
+clip, one per clip and playhead and one per track's clips as analyzed. Reopening Auto on the
 same frames skips decoding and starts at the intensity last applied, so the user can
 lower it later; **Apply** then replaces the eleven settings again, including manual edits to
 them. The memory is dropped when a clip's source range or its proxy changes, on another
@@ -280,83 +269,6 @@ The sky filling the frame rises by 0.07 on average: its strongest tenth rises by
 0.05, its paler lower part up to 0.7. Footage without strong colors gains about as much
 color as with Saturation alone. No owner recording was analyzed for this change.
 
-## Matching a look
-
-**Match to this clip** and `estimate` kind `match`
-([#315](https://github.com/Plonk42/PasCap/issues/315)) set the same eleven settings, but aim at how
-another clip looks instead of at Auto's constants: shots processed each as far as it can be still
-drift apart, matched shots converge. Implementation: [look matching](../../src/shared/look-match.ts),
-every constant in `LOOK_MATCH`. The results are ordinary clip grade values: no schema, render or
-export change.
-
-**The look.** The hero's 16 frames (the whole clip, or the second around a frame for `estimate`
-with `referenceFrame`) are graded with its Color at the middle analyzed frame (its values when
-nothing is animated): the eleven settings and its other ones (Hue, HSL, curves), Shadows and
-Highlights on flat areas as above. Each frame is first averaged to about 80 pixels wide, by
-square blocks of codes, and the look is measured on the graded frames, each statistic the median
-over frames:
-
-- luma at the 0.5, 5, 25, 50, 75, 95 and 99.5 percentiles, the log-average and the shadow areas, as
-  encoded luma;
-- the **cast**: the light Auto white balance estimates (Shades of Gray and Gray-Edge, undamped),
-  measured on the frames graded **without** Saturation and Vibrance, which would scale it;
-- the 25th (muted) and 90th (strong) percentiles of the pixels' saturation, linear
-  $(\max-\min)/\max$ as Vibrance measures it, on 4,000 pixels shared among the frames.
-
-**The fit.** Each other clip's frames are reduced the same way. Temperature and Tint start by moving
-its cast to the hero's. Then, through the real grade with that clip's other settings kept:
-
-1. tone: Exposure, Blacks, Whites, Contrast, Brightness, Highlights and Shadows by coordinate descent
-   (8 sweeps of golden-section line searches) on gray anchors at the clip's luma percentiles,
-   log-average and shadow areas, the squared distances to the hero's levels in units of 0.02 plus
-   Auto's small pull towards no correction. The bounds are wider than Auto's: Exposure ±2, Blacks,
-   Whites, Highlights and Shadows ±1, Contrast 0.5–2, Brightness ±0.3;
-2. color: Saturation (0–2) and Vibrance (−1…1) bring the muted and strong saturations of 32 pixels
-   per frame to the hero's, re-measured at each step since clipping changes the pixels' order.
-
-The fit is approximate: gray anchors ignore what the grade does to colored pixels near clipping, and
-the illuminant estimate changes with tone. So the clip is graded with the result and measured exactly
-like the hero; Temperature and Tint move by the difference of casts, the levels and saturations aimed
-at move by what was missed, and the fit runs once more (`passes` 2). Intensity then scales the
-result like Auto's: 80% applies the match as fitted.
-
-On synthetic fixtures, an underexposed shot under a warm cast with weak colors, flat footage matched
-to a graded hero and a shot of the same scene end within 0.03 encoded luma of the hero's levels and
-0.03 of its saturations, their casts within 0.08. A match takes about 0.6 s per clip of 16 analysis
-frames on the development machine, on the editor's main thread between clips.
-
-## Registered styles
-
-Auto's constants aim at a generic balance, not at what the user likes: the owner's own edits are
-brighter and softer than Auto's result. A **style**
-([#314](https://github.com/Plonk42/PasCap/issues/314)) is the look of the user's finished edits,
-which Auto can aim at instead, with every source and Apply as, within **Auto's own settings and
-bounds** (its tone bounds, Saturation 0.9–1.5, Vibrance 0–1, Temperature ±0.5 and Tint ±0.3,
-Auto white balance's soft limits). Implementation: [styles](../../src/shared/styles.ts), the
-[registry](../../src/server/styles.ts) and the [dialog](../../src/web/StylesDialog.tsx).
-
-**Registering.** **Styles…** in the Auto popover opens the **Styles** dialog: the registered
-styles, each with its references (**2 videos, 1 still**) and **Delete** (then **Delete it**; the
-references are untouched), and **New style**: a name and up to 8 references, videos (`.mp4`,
-`.mov`, `.m4v`) or JPEG stills, chosen in the approved footage folders. **Register style**
-measures them: the service reads 8 frames of each video, at the centers of equal slices, or the
-still, with FFmpeg at the analysis size, in place (never copied or modified), and stores the
-[look](#matching-a-look) of all those frames together, as they are, with the style in
-`styles.json` beside the video and music registries. Only registering reads the references:
-moving or deleting them later leaves the style as measured. The assistant lists styles with
-`list_styles` and aims `estimate` at one with `style`; the Hand off dialog's **Look** names it in
-the session brief.
-
-**Aiming.** With a style, Auto fits the eleven settings exactly as a match does, aiming at the
-style's look instead of a hero's, within Auto's bounds: its luma levels, log-average and shadow
-areas, its cast and its muted and strong saturations. Intensity scales the result like Auto's.
-On synthetic fixtures, a style made of brighter, softer, less colorful footage takes a shot less
-than half as far from that look as Auto's generic balance, brighter than it.
-
-The issue's profile also named sky luma and fine-detail energy: the upper luma percentiles
-cover bright skies without recognizing them, and no setting Auto sets controls fine detail, so
-neither is measured. A style is one global look, not one per scene type.
-
 ## Limits
 
 - Grade values are one correction per clip, from one moment or the whole clip. Keyframes adapt
@@ -379,15 +291,6 @@ neither is measured. A style is one global look, not one per scene type.
 - The strong-color limit does not know what a sky is: any strong colors filling a tenth
   of the frame take Saturation's share away from the whole picture, and a sky paler than
   0.7 saturation may rise to it.
-- A match compares statistics, not scenes: a hero filled with sky and a shot of forest have
-  different casts and levels by content, which the match removes. It suits shots of one
-  flight and light. An animated hero is measured at its middle analyzed frame, and its
-  adjustments are not part of its look (they apply to both shots alike when they cover both).
-  Shadows, Highlights and Vibrance are approximated on flat areas, as in Auto's fit.
-- A style is aimed at as statistics too: footage of a very different scene (a dark forest under a
-  style made of snowy edits) is pushed towards that scene's levels, within Auto's bounds. Lower
-  Intensity, or register styles per kind of scene. PNG stills are not read: the qualified FFmpeg
-  build decodes JPEG only.
 - The scalar tone settings approximate, not reproduce, a camera's flat-to-Rec.709
   conversion; Auto never sets color curves.
 - The unit tests use synthetic fixtures only: neutral, flat, under- and overexposed, casts,
@@ -414,18 +317,3 @@ browser test checks, on a generated flat proxy, that Apply at the initial 80% wr
 exactly the estimator's result for the pixels the page decodes into the clip's grade, as values and as keyframes at two frames, and each clip's own correction for every clip of a track; it previews without editing and covers
 Undo, intensity including 100%, reuse without decoding, animated settings, cancellation, selecting another clip and failures, including a black clip named among the track's. The analyzed pixels equal the compositor input, as checked for Auto white
 balance.
-
-Matching is tested on synthetic shots that differ from the hero in exposure, white balance, color
-and profile (flat), and on a graded hero: each converges on the hero's look; a shot that already
-looks like it barely changes; the fit is deterministic. Editor tests cover the match target (the
-other clips of the track, the hero measured and unchanged, its session memory), the `estimate`
-tests the hero by clip or frame, its exclusion and its errors, and the browser test that Apply
-writes exactly the match the shared code fits to the pixels the page decodes, leaving the hero
-unchanged.
-
-Styles are tested on synthetic fixtures (a style of brighter, softer footage brings a shot closer
-to it than the generic fit, within Auto's bounds), in `estimate` (the style's fit, its kind and
-unknown styles), natively (videos and JPEG stills measured in place and left unchanged, listing
-without paths, deletion, references outside the footage folders, links and other files refused,
-an unreadable registry left unchanged) and in the browser (Look aims Auto at the style and is
-remembered, Match disables it, the dialog registers and deletes styles).

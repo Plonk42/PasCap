@@ -10,7 +10,7 @@ import './styles-dialog.css';
 const message = (cause: unknown, fallback: string): string => (cause instanceof Error ? cause.message : fallback);
 
 /**
- * Registered styles (#314): looks measured on the user's own finished edits, which Color → Auto can aim at. A
+ * Registered styles (#314): looks measured on the user's own finished edits, which Color → Match can aim at. A
  * style's references are videos or stills read where they are, in the approved footage folders.
  */
 export function StylesDialog({ onClose }: Readonly<{ onClose: () => void }>) {
@@ -102,7 +102,7 @@ export function StylesDialog({ onClose }: Readonly<{ onClose: () => void }>) {
         <h2 id={`${id}-title`}>Styles</h2>
       </div>
       <p id={`${id}-intro`} className="styles-intro">
-        A style is the look of your own finished edits. Color → Auto can aim at it instead of its generic balance.
+        A style is the look of your own finished edits. Color → Match can use it as the reference to match clips to.
         References are read where they are, never copied or changed.
       </p>
       {styles.length ? (

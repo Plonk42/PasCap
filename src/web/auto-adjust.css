@@ -57,30 +57,6 @@
   font-size: 12px;
 }
 
-/* Look: one row, the select taking the room between its label and Styles…. */
-.auto-adjust-look {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 6px;
-}
-
-.editor-popover-content .auto-adjust-look > label {
-  display: block;
-  font-size: 11px;
-}
-
-.editor-popover-content .auto-adjust-look > select {
-  height: 24px;
-  padding: 0 4px;
-  font-size: 12px;
-}
-
-.auto-adjust-look > .text-button {
-  font-size: 11px;
-  white-space: nowrap;
-}
-
 .auto-adjust-mode {
   display: grid;
   gap: 4px;

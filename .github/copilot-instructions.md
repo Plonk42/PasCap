@@ -190,15 +190,16 @@ request: read one only when the task touches its area.
   Saturation and Vibrance, Saturation giving way first on strong colors such as skies), previews them in a
   popover with Intensity (initially 80%, the fitted correction; 100% exaggerates it by a
   quarter) and applies one Undo step. **Source** (named by scope): Playhead (±30 frames), This clip (whole graded clip) or Every clip on <track>
-  (each analyzed on its own, one `color` edit per clip, **Apply to N clips**; keyframes go to this clip only), or #315
-  **Match to this clip** (every other clip on the track takes this hero clip's look as its grade shows it, the hero
-  never changes; `estimate` kind `match`, `src/shared/look-match.ts`). #314 **Look**: Generic or a registered style
-  (`styles.json`, references read in place; `estimate` `style`, brief `style`), fitted like a match within Auto's
-  bounds. **Apply as**: Grade values edits
+  (each analyzed on its own, one `color` edit per clip, **Apply to N clips**; keyframes go to this clip only). **Apply as**: Grade values edits
   the grades' values, leaving animated settings and keyframes unchanged; Keyframe (Playhead source only)
   captures all eleven at the source frame like their diamonds (initial, with Playhead, once any is
   animated). Constants in `src/shared/auto-adjust.ts`, no schema/render change
-  (`docs/design/AUTO_ADJUST.md`).
+  (`docs/design/AUTO_ADJUST.md`). #315/#314 **Match** (first Color tab section, clip grades only) matches each
+  selected clip's frame (playhead, else middle) to a reference frame (timeline frame as graded, Source preview
+  recording frame as shot) or a registered style (`styles.json`); the reference lives in the browser per project
+  (`pascap-color-reference-<id>`, never saved). It starts from the reference's settings plus the two frames' Auto
+  difference and follows the fitted picture only as far as the scenes look alike (`src/shared/look-match.ts`,
+  `estimate` kind `match`); Intensity moves current → match. See `docs/design/COLOR_MATCH.md`.
   Main/stored slider/exact-field/reset/diamond/navigation retain
   explicit capture and one-step gestures.
   Compare bypasses all Color, including Temperature/Tint, and clip Detail, never coverage or geometry.

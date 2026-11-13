@@ -1,6 +1,5 @@
 import {
   analyzeAutoAdjust,
-  AUTO_ADJUST_SETTINGS,
   autoAdjustFrames,
   scaleCorrection,
   type AutoAdjustSetting,
@@ -14,19 +13,9 @@ import {
   windowSourceFrames,
   type AutoOwner,
 } from '../shared/auto-color.js';
-import { COLOR_CONTROLS, type ColorSettings } from '../shared/color.js';
+import { COLOR_CONTROLS } from '../shared/color.js';
 import type { EditCommand } from '../shared/commands.js';
-import {
-  heroColor,
-  MATCH_BOUNDS,
-  matchLook,
-  measureLook,
-  STYLE_BOUNDS,
-  type LookProfile,
-  type MatchBounds,
-} from '../shared/look-match.js';
 import type { MediaAsset } from '../shared/media.js';
-import type { StyleSummary } from '../shared/styles.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { PlacedClip, TimelineLayout } from '../shared/timeline.js';
@@ -36,11 +25,8 @@ import { readyAsset } from './auto-white-balance.js';
 import { gradeOwnerOf, sourceFrameAt } from './color-owner.js';
 import { shortName } from './display.js';
 
-/**
- * What Auto analyzes: 1 s around the playhead or the whole graded clip, each clip of its track on its own, or, to
- * match them to the graded clip, each other clip of its track.
- */
-export type AutoAdjustSource = 'playhead' | 'clip' | 'track' | 'match';
+/** What Auto analyzes: 1 s around the playhead or the whole graded clip, or each clip of its track on its own. */
+export type AutoAdjustSource = 'playhead' | 'clip' | 'track';
 /** How Auto applies its correction: each analyzed clip's grade values, or a keyframe of the grade at the playhead. */
 export type AutoAdjustApply = 'values' | 'keyframe';
 
@@ -60,10 +46,6 @@ export interface AutoAdjustTarget {
   /** One analysis: the clips, recordings as prepared and source frames it reads. */
   key: string;
   parts: AutoAdjustPart[];
-  /** For a match: the graded clip, the hero whose look the parts take; it is measured, never changed. */
-  reference?: AutoAdjustPart;
-  /** A registered style each part is aimed at instead of Auto's generic balance. */
-  style?: StyleSummary;
 }
 
 export type AutoAdjustAvailability = { target: AutoAdjustTarget; reason: null } | { target: null; reason: string };
@@ -89,7 +71,6 @@ export function autoAdjustTarget(
   const placed = context.layout.clips.find((item) => item.clip.id === context.clipId);
   if (!placed) return unavailable('This clip is no longer on the timeline.');
   if (source === 'track') return trackTarget(context, placed);
-  if (source === 'match') return matchTarget(context, placed);
   const asset = readyAsset(context.assets, placed.clip.mediaId);
   if (!asset) return unavailable('Prepare the recording of this clip first.');
   const { sourceIn, sourceOut } = placed.clip;
@@ -113,74 +94,32 @@ export function trackNameOf(context: AutoAdjustContext): string {
 
 function trackTarget(context: AutoAdjustContext, graded: PlacedClip): AutoAdjustAvailability {
   const track = context.project.layers.find((layer) => layer.id === graded.clip.layerId);
-  const clips = trackClips(context, graded);
-  const parts = trackParts(context, clips);
-  if (!parts) return unavailable(`Prepare the recordings of every clip on ${track?.name ?? 'this track'} first.`);
-  const key = ['track', graded.clip.layerId, ...parts.map(partKey)].join(':');
-  const label = `${clips.length} ${clips.length === 1 ? 'clip' : 'clips'} on ${track?.name ?? 'this track'}, each on its own`;
-  return { target: { source: 'track', label, key, parts }, reason: null };
-}
-
-function trackClips(context: AutoAdjustContext, graded: PlacedClip): PlacedClip[] {
-  return context.layout.clips
+  const clips = context.layout.clips
     .filter((item) => item.clip.layerId === graded.clip.layerId)
     .sort((left, right) => left.start - right.start);
-}
-
-/** Each clip analyzed whole, named by its place on the track; null when a recording is not prepared. */
-function trackParts(context: AutoAdjustContext, clips: readonly PlacedClip[]): AutoAdjustPart[] | null {
   const parts: AutoAdjustPart[] = [];
   for (const [index, clip] of clips.entries()) {
     const asset = readyAsset(context.assets, clip.clip.mediaId);
-    if (!asset) return null;
+    if (!asset) return unavailable(`Prepare the recordings of every clip on ${track?.name ?? 'this track'} first.`);
     const { sourceIn, sourceOut } = clip.clip;
     const name = `Clip ${index + 1} (${shortName(asset.name)})`;
     parts.push({ clip, name, asset, sourceFrames: autoAdjustFrames(sourceIn, sourceOut) });
   }
-  return parts;
-}
-
-const partKey = ({ clip, asset }: AutoAdjustPart): string =>
-  `${clip.clip.id}/${asset.id}/${preparedAt(asset)}/${clip.clip.sourceIn}-${clip.clip.sourceOut}`;
-
-/** The grade's settings a match keeps, which it fits through: all but the eleven it sets. */
-function keptSettings(color: ColorSettings): string {
-  const kept: Partial<ColorSettings> = { ...color };
-  for (const setting of AUTO_ADJUST_SETTINGS) delete kept[setting];
-  return JSON.stringify(kept);
-}
-
-/** Every other clip of the graded clip's track, each matched to the graded clip as its grade shows it. */
-function matchTarget(context: AutoAdjustContext, hero: PlacedClip): AutoAdjustAvailability {
-  const trackName = trackNameOf(context);
-  const clips = trackClips(context, hero);
-  const parts = trackParts(context, clips);
-  if (!parts) return unavailable(`Prepare the recordings of every clip on ${trackName} first.`);
-  const reference = parts.find((part) => part.clip.clip.id === hero.clip.id)!;
-  const others = parts.filter((part) => part !== reference);
-  if (!others.length) return unavailable(`${trackName} has no other clip to match to this one.`);
   const key = [
-    'match',
-    partKey(reference),
-    JSON.stringify(hero.clip.grade),
-    ...others.map((part) => `${partKey(part)}/${keptSettings(part.clip.clip.grade.color)}`),
+    'track',
+    graded.clip.layerId,
+    ...parts.map(
+      ({ clip, asset }) =>
+        `${clip.clip.id}/${asset.id}/${preparedAt(asset)}/${clip.clip.sourceIn}-${clip.clip.sourceOut}`,
+    ),
   ].join(':');
-  const label = `${others.length} other ${others.length === 1 ? 'clip' : 'clips'} on ${trackName}`;
-  return {
-    target: { source: 'match', label, key, parts: others, reference: { ...reference, name: 'This clip' } },
-    reason: null,
-  };
-}
-
-/** The same clips aimed at a registered style instead of Auto's generic balance: another analysis. */
-export function withStyle(target: AutoAdjustTarget, style: StyleSummary): AutoAdjustTarget {
-  return { ...target, style, key: `${target.key}:style:${style.id}:${style.createdAt}` };
+  const label = `${clips.length} ${clips.length === 1 ? 'clip' : 'clips'} on ${track?.name ?? 'this track'}, each on its own`;
+  return { target: { source: 'track', label, key, parts }, reason: null };
 }
 
 /** Why a keyframe cannot take the correction from `source` at the playhead, or null. */
 export function keyframeReason(context: AutoAdjustContext, source: AutoAdjustSource): string | null {
   if (source === 'track') return 'Keyframes go to this clip only, at the playhead.';
-  if (source === 'match') return 'A match sets the grade values of the other clips.';
   if (source !== 'playhead') return 'A keyframe takes the light at the playhead: analyze the playhead.';
   const owner = gradeOwnerOf(context.project, context.clipId);
   const placed = context.layout.clips.find((item) => item.clip.id === context.clipId);
@@ -279,103 +218,43 @@ function nextTask(): Promise<void> {
 }
 
 export const analyzedFrames = (target: AutoAdjustTarget): number =>
-  target.parts.reduce((sum, part) => sum + part.sourceFrames.length, target.reference?.sourceFrames.length ?? 0);
-
-/** One clip's frames decoded from its proxy on a temporary reader, in sample order. */
-async function partFrames(
-  { name, asset, sourceFrames }: AutoAdjustPart,
-  signal: AbortSignal,
-  onProgress: (done: number) => void,
-): Promise<AnalysisFrame[]> {
-  const { sampleProxyFrames } = await import('../preview/frame-sampler.js');
-  const sampled = await sampleProxyFrames(proxyUrl(asset.id), sourceFrames, signal, onProgress).catch(
-    (cause: unknown) => {
-      if (signal.aborted || !(cause instanceof Error)) throw cause;
-      throw new Error(named(name, `Could not read the frames of ${asset.name}: ${cause.message}`));
-    },
-  );
-  return sourceFrames.flatMap((source): AnalysisFrame[] => {
-    const frame = sampled.get(source);
-    return frame ? [frame] : [];
-  });
-}
-
-const named = (name: string, message: string): string => (name ? `${name}: ${message}` : message);
-const TOO_UNIFORM = 'These frames are too dark or too uniform to analyze.';
-
-/** How the hero looks through its grade, over its analyzed frames. */
-async function measureHero(
-  hero: AutoAdjustPart,
-  signal: AbortSignal,
-  onProgress: (done: number) => void,
-): Promise<LookProfile> {
-  const frames = await partFrames(hero, signal, onProgress);
-  await nextTask();
-  signal.throwIfAborted();
-  const look = measureLook(frames, heroColor(hero.clip.clip.grade, hero.sourceFrames));
-  if (!look) throw new Error(named(hero.name, TOO_UNIFORM));
-  return look;
-}
+  target.parts.reduce((sum, part) => sum + part.sourceFrames.length, 0);
 
 /**
  * Decodes each clip's frames from its proxy, one temporary reader at a time, and fits each clip's correction on its
- * own (for a match, after measuring the hero); a clip that cannot be analyzed fails the whole analysis, naming it.
+ * own; a clip that cannot be analyzed fails the whole analysis, naming it.
  */
 export async function analyzeTarget(
   target: AutoAdjustTarget,
   signal: AbortSignal,
   onProgress: (done: number, total: number) => void,
 ): Promise<Map<string, AutoCorrection>> {
+  const { sampleProxyFrames } = await import('../preview/frame-sampler.js');
   const total = analyzedFrames(target);
   const corrections = new Map<string, AutoCorrection>();
   let before = 0;
-  const progress = (done: number): void => onProgress(before + done, total);
-  let look: LookProfile | null = null;
-  if (target.reference) {
-    look = await measureHero(target.reference, signal, progress);
-    before += target.reference.sourceFrames.length;
-  }
-  await forEachSerial(target.parts, async (part) => {
-    const frames = await partFrames(part, signal, progress);
-    before += part.sourceFrames.length;
-    const correction = await fitPart(look, target.style, part, frames, signal);
-    if (!correction) throw new Error(named(part.name, TOO_UNIFORM));
-    corrections.set(part.clip.clip.id, correction);
+  await forEachSerial(target.parts, async ({ clip, name, asset, sourceFrames }) => {
+    const named = (message: string): string => (name ? `${name}: ${message}` : message);
+    const sampled = await sampleProxyFrames(proxyUrl(asset.id), sourceFrames, signal, (done) =>
+      onProgress(before + done, total),
+    ).catch((cause: unknown) => {
+      if (signal.aborted || !(cause instanceof Error)) throw cause;
+      throw new Error(named(`Could not read the frames of ${asset.name}: ${cause.message}`));
+    });
+    before += sourceFrames.length;
+    const frames = sourceFrames.flatMap((source): AnalysisFrame[] => {
+      const frame = sampled.get(source);
+      return frame ? [frame] : [];
+    });
+    const illuminants: (IlluminantEstimate | null)[] = [];
+    await forEachSerial(frames, async (frame) => {
+      illuminants.push(frameIlluminant(frame));
+      await nextTask();
+      signal.throwIfAborted();
+    });
+    const correction = analyzeAutoAdjust(frames, illuminants);
+    if (!correction) throw new Error(named('These frames are too dark or too uniform to analyze.'));
+    corrections.set(clip.clip.id, correction);
   });
   return corrections;
-}
-
-/** A part's correction: matched to the hero, aimed at a style, or Auto's generic balance. */
-function fitPart(
-  hero: LookProfile | null,
-  style: StyleSummary | undefined,
-  part: AutoAdjustPart,
-  frames: readonly AnalysisFrame[],
-  signal: AbortSignal,
-): Promise<AutoCorrection | null> {
-  if (hero) return matchPart(hero, MATCH_BOUNDS, part, frames, signal);
-  if (style) return matchPart(style.look, STYLE_BOUNDS, part, frames, signal);
-  return balancePart(frames, signal);
-}
-
-async function matchPart(
-  look: LookProfile,
-  bounds: MatchBounds,
-  part: AutoAdjustPart,
-  frames: readonly AnalysisFrame[],
-  signal: AbortSignal,
-): Promise<AutoCorrection | null> {
-  await nextTask();
-  signal.throwIfAborted();
-  return matchLook(look, frames, part.clip.clip.grade.color, bounds);
-}
-
-async function balancePart(frames: readonly AnalysisFrame[], signal: AbortSignal): Promise<AutoCorrection | null> {
-  const illuminants: (IlluminantEstimate | null)[] = [];
-  await forEachSerial(frames, async (frame) => {
-    illuminants.push(frameIlluminant(frame));
-    await nextTask();
-    signal.throwIfAborted();
-  });
-  return analyzeAutoAdjust(frames, illuminants);
 }

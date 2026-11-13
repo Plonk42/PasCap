@@ -15,7 +15,6 @@ import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createLayer, createProject, type ProjectDocument } from '../../src/shared/model.js';
 import { calculateLayout, type PlacedClip } from '../../src/shared/timeline.js';
 import {
-  analyzedFrames,
   animatedParts,
   autoAdjustCommands,
   clipsKeepingAnimated,
@@ -26,7 +25,6 @@ import {
   rememberAnalysis,
   settingLabel,
   type AutoAdjustContext,
-  withStyle,
   type AutoAdjustSource,
 } from '../../src/web/auto-adjust.js';
 import { adjustmentColorOwner, gradeOwnerOf } from '../../src/web/color-owner.js';
@@ -300,71 +298,6 @@ describe('Auto adjust on clip grades', () => {
     expect(grade(next, 'a').color.contrast).toBe(scaleCorrection(CORRECTION, 0.8).contrast);
     grade(document, 'a').keyframes = [];
     expect(clipsKeepingAnimated(document, target(document, 'a', 10, 'track'))).toBe(1);
-  });
-});
-
-describe('Match to this clip', () => {
-  it('matches every other clip of the track to the graded clip, which only is measured', () => {
-    const document = project();
-    const match = target(document, 'b', 10, 'match');
-    expect(match.label).toBe('1 other clip on Track 1');
-    expect(match.reference).toMatchObject({ name: 'This clip', sourceFrames: autoAdjustFrames(0, 300) });
-    expect(match.reference!.clip.clip.id).toBe('b');
-    expect(match.parts.map(({ clip, name }) => [clip.clip.id, name])).toEqual([['a', 'Clip 1 (one)']]);
-    expect(analyzedFrames(match)).toBe(32);
-    expect(keyframeReason(context(document, 'b', 10), 'match')).toBe(
-      'A match sets the grade values of the other clips.',
-    );
-    const next = applied(
-      document,
-      autoAdjustCommands(context(document, 'b', 10), match, 'values', new Map([['a', CORRECTION]]), 0.8),
-    );
-    expect(grade(next, 'a').color).toMatchObject(scaleCorrection(CORRECTION, 0.8));
-    expect(grade(next, 'b')).toEqual(grade(document, 'b'));
-  });
-
-  it("is a new analysis once the hero's grade or a matched clip's kept settings change", () => {
-    const document = project();
-    const match = target(document, 'b', 10, 'match');
-    const regraded = applyCommand(document, { type: 'color-patch', clipIds: ['b'], settings: { exposure: 0.5 } });
-    expect(target(regraded, 'b', 10, 'match').key).not.toBe(match.key);
-    // The matched clip's eleven settings are replaced: changing them is the same analysis.
-    const patched = applyCommand(document, { type: 'color-patch', clipIds: ['a'], settings: { exposure: 0.5 } });
-    expect(target(patched, 'b', 10, 'match').key).toBe(match.key);
-    const hued = applyCommand(document, { type: 'color-patch', clipIds: ['a'], settings: { hue: 20 } });
-    expect(target(hued, 'b', 10, 'match').key).not.toBe(match.key);
-  });
-
-  it('aims the same clips at a registered style as another analysis', () => {
-    const document = project();
-    const whole = target(document, 'a', 10);
-    const look = {
-      levels: [0, 0.1, 0.3, 0.5, 0.7, 0.9, 1],
-      middle: 0.45,
-      shadow: 0.2,
-      cast: null,
-      muted: 0.2,
-      strong: 0.7,
-      colorfulness: 50,
-    };
-    const style = { id: 'bright', name: 'Bright', references: [], look, createdAt: '2026-11-10T00:00:00.000Z' };
-    const styled = withStyle(whole, style);
-    expect(styled.parts).toEqual(whole.parts);
-    expect(styled.style).toBe(style);
-    expect(styled.key).not.toBe(whole.key);
-    expect(withStyle(whole, { ...style, createdAt: '2026-11-11T00:00:00.000Z' }).key).not.toBe(styled.key);
-  });
-
-  it('needs another clip on the track, every recording prepared', () => {
-    const document = project();
-    document.clips = document.clips.filter((clip) => clip.id === 'a');
-    document.layers[0]!.transitions = [];
-    expect(autoAdjustTarget(context(document, 'a', 10), 'match').reason).toBe(
-      'Track 1 has no other clip to match to this one.',
-    );
-    expect(autoAdjustTarget(context(project(), 'a', 10, [ASSETS[0]!, asset('two', 'preparing')]), 'match').reason).toBe(
-      'Prepare the recordings of every clip on Track 1 first.',
-    );
   });
 });
 

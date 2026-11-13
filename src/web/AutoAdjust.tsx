@@ -17,7 +17,6 @@ import {
   rememberAnalysis,
   settingLabel,
   trackNameOf,
-  withStyle,
   type AutoAdjustApply,
   type AutoAdjustAvailability,
   type AutoAdjustContext,
@@ -29,8 +28,6 @@ import { Icon } from './icons.js';
 import { livePreview } from './live-preview.js';
 import { Popover } from './Popover.js';
 import { ResetLabel } from './SettingValueControl.js';
-import { rememberedLook, rememberLook, useStyles } from './styles.js';
-import { StylesDialog } from './StylesDialog.js';
 import { ValueControl } from './ValueControl.js';
 import './auto-adjust.css';
 
@@ -60,12 +57,6 @@ function sources(
       label: 'Every clip',
       name: `Every clip on ${trackName}`,
       hint: `on ${trackName}, each analyzed on its own`,
-    },
-    {
-      source: 'match',
-      label: 'Match to this clip',
-      name: `Match every other clip on ${trackName} to this clip`,
-      hint: `other clips on ${trackName} take its look`,
     },
   ];
 }
@@ -108,7 +99,6 @@ export function AutoAdjust({ project, clipId, layout, assets, playhead, disabled
         playhead: autoAdjustTarget(context, 'playhead'),
         clip: availability,
         track: autoAdjustTarget(context, 'track'),
-        match: autoAdjustTarget(context, 'match'),
       }}
       onEdit={onEdit}
     />
@@ -118,7 +108,6 @@ export function AutoAdjust({ project, clipId, layout, assets, playhead, disabled
 /** Why Keyframe is unavailable from `source`: keyframes go to this clip only, at the playhead. */
 function keyframeUnavailable(source: AutoAdjustSource): { hint: string; title: string } | null {
   if (source === 'playhead') return null;
-  if (source === 'match') return { hint: 'whole clips', title: 'A match sets the grade values of the other clips.' };
   return source === 'track'
     ? { hint: 'this clip only', title: 'Keyframes go to this clip only, at the playhead.' }
     : { hint: 'needs Playhead', title: 'Analyze the playhead to key it.' };
@@ -126,14 +115,7 @@ function keyframeUnavailable(source: AutoAdjustSource): { hint: string; title: s
 
 function applyHint(option: (typeof APPLIES)[number], source: AutoAdjustSource): string {
   if (option.apply === 'keyframe') return keyframeUnavailable(source)?.hint ?? option.hint;
-  if (source === 'match') return 'each other clip’s grade';
   return source === 'track' ? 'each clip’s grade' : option.hint;
-}
-
-/** The Apply button: a match never applies to this clip, so it always names how many clips it changes. */
-function applyLabel(source: AutoAdjustSource, clips: number): string {
-  if (source === 'match') return `Apply to ${clips} ${clips === 1 ? 'clip' : 'clips'}`;
-  return clips > 1 ? `Apply to ${clips} clips` : 'Apply';
 }
 
 type Phase =
@@ -161,16 +143,10 @@ function AutoAdjustPopover({
   const [percent, setPercent] = useState(BALANCED);
   const [draft, setDraft] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState('');
-  const styles = useStyles(open);
-  // Undefined until chosen in this popover: the look last chosen, once the styles have loaded.
-  const [lookId, setLookId] = useState<string | null | undefined>(undefined);
-  const [managing, setManaging] = useState(false);
-  const look = lookId === undefined ? rememberedLook(styles) : (styles.find((style) => style.id === lookId) ?? null);
 
   const available = availabilities[source];
   const reason = available.reason ?? (applyAs === 'keyframe' ? keyframeReason(context, source) : null);
-  const aimed = available.target && look && source !== 'match' ? withStyle(available.target, look) : available.target;
-  const target: AutoAdjustTarget | null = reason === null ? aimed : null;
+  const target: AutoAdjustTarget | null = reason === null ? available.target : null;
   const targetKey = target?.key ?? null;
   // A new source or, from the playhead, a new playhead is a new analysis; leaving it cancels the old one.
   useEffect(() => {
@@ -226,7 +202,6 @@ function AutoAdjustPopover({
       const initial = initialChoice(context);
       setSource(initial.source);
       setApplyAs(initial.apply);
-      setLookId(undefined);
     } else setPhase({ kind: 'idle' });
   };
 
@@ -274,43 +249,6 @@ function AutoAdjustPopover({
               <p className="auto-adjust-source" title={analyzed}>
                 From {shortName(analyzed)}
               </p>
-              <div className="auto-adjust-look">
-                <label htmlFor={`${id}-look`}>Look</label>
-                <select
-                  id={`${id}-look`}
-                  value={source === 'match' ? '' : (look?.id ?? '')}
-                  disabled={source === 'match'}
-                  title={
-                    source === 'match'
-                      ? 'A match aims at this clip’s look.'
-                      : 'What Auto aims at: its generic balance, or one of your styles'
-                  }
-                  onChange={(event) => {
-                    const chosen = styles.find((style) => style.id === event.target.value) ?? null;
-                    setDraft(null);
-                    setLookId(chosen?.id ?? null);
-                    rememberLook(chosen);
-                  }}
-                >
-                  <option value="">Generic</option>
-                  {styles.map((style) => (
-                    <option key={style.id} value={style.id}>
-                      {style.name}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="text-button"
-                  title="Register or delete styles measured on your own finished edits"
-                  onClick={() => {
-                    close();
-                    setManaging(true);
-                  }}
-                >
-                  Styles…
-                </button>
-              </div>
               <fieldset className="auto-adjust-mode">
                 <legend>Source</legend>
                 {sources(trackNameOf(context)).map((option) => (
@@ -428,7 +366,7 @@ function AutoAdjustPopover({
                     }
                     onClick={() => apply(close)}
                   >
-                    {applyLabel(source, clips)}
+                    {clips > 1 ? `Apply to ${clips} clips` : 'Apply'}
                   </button>
                 )}
                 <button type="button" className="secondary-button small" onClick={close}>
@@ -439,7 +377,6 @@ function AutoAdjustPopover({
           );
         }}
       </Popover>
-      {managing && <StylesDialog onClose={() => setManaging(false)} />}
       <span className="sr-only" aria-live="polite">
         {announcement}
       </span>
