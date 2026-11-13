@@ -14,6 +14,8 @@ Implementation authorities: [estimator](../../src/shared/auto-adjust.ts) (pure, 
 constant in `AUTO_ADJUST`), [white balance](../../src/shared/white-balance.ts),
 [frame sampler](../../src/preview/frame-sampler.ts), [edits](../../src/shared/auto-color.ts),
 [editor helpers](../../src/web/auto-adjust.ts) and [popover](../../src/web/AutoAdjust.tsx).
+To make clips look like a reference frame or a registered style instead of Auto's balance, see
+[Color → Match](COLOR_MATCH.md), which starts from Auto's corrections.
 
 ## Editing
 

@@ -107,11 +107,13 @@ const TONE = [
   { key: 'highlights', low: -0.6, high: 0.2, scale: 0.4 },
   { key: 'shadows', low: 0, high: 0.5, scale: 0.4 },
 ] as const;
-type ToneSetting = (typeof TONE)[number]['key'];
-type Tone = Record<ToneSetting, number>;
-type Chroma = Pick<ColorSettings, 'saturation' | 'vibrance'>;
-const NEUTRAL_CHROMA: Readonly<Chroma> = Object.freeze({ saturation: 1, vibrance: 0 });
-const NEUTRAL_TONE: Readonly<Tone> = Object.freeze({
+/** Auto's tone settings with their bounds and regularization scales, which a style's fit keeps. */
+export const AUTO_TONE = TONE;
+export type ToneSetting = (typeof TONE)[number]['key'];
+export type Tone = Record<ToneSetting, number>;
+export type Chroma = Pick<ColorSettings, 'saturation' | 'vibrance'>;
+export const NEUTRAL_CHROMA: Readonly<Chroma> = Object.freeze({ saturation: 1, vibrance: 0 });
+export const NEUTRAL_TONE: Readonly<Tone> = Object.freeze({
   exposure: 0,
   blacks: 0,
   whites: 0,
@@ -178,7 +180,7 @@ function rounded(value: number): number {
   return Math.round(value * 1000) / 1000 || 0;
 }
 
-function luma(rgb: ArrayLike<number>): number {
+export function luma(rgb: ArrayLike<number>): number {
   return LUMA[0] * rgb[0]! + LUMA[1] * rgb[1]! + LUMA[2] * rgb[2]!;
 }
 
@@ -214,11 +216,16 @@ class Histogram {
   }
 }
 
+/** Luma quantiles of `ToneStatistics.levels`, from the black point to the white point. */
+export const TONE_QUANTILES = [0.005, 0.05, 0.25, 0.5, 0.75, 0.95, 0.995] as const;
+
 /** What the tone fit needs, in white-balanced linear light: each statistic is the median over the frames. */
 export interface ToneStatistics {
   /** Luma percentiles: 0.5th and 99.5th. */
   black: number;
   white: number;
+  /** Luma at each of TONE_QUANTILES. */
+  levels: number[];
   logAverage: number;
   /** The AUTO_ADJUST.shadowArea quantile of the areas' mean luma: how dark the shadow areas are. */
   shadow: number;
@@ -230,7 +237,8 @@ export interface ToneStatistics {
   samples: Float64Array[];
 }
 
-interface FrameTone extends Omit<ToneStatistics, 'key' | 'samples'> {
+interface FrameTone extends Omit<ToneStatistics, 'key' | 'samples' | 'levels'> {
+  levels: readonly number[];
   low: number;
   high: number;
   samples: Float64Array;
@@ -280,6 +288,7 @@ class FrameAccumulator {
       low: this.luma.quantile(0.01),
       high: this.luma.quantile(0.99),
       white: this.luma.quantile(0.995),
+      levels: TONE_QUANTILES.map((q) => this.luma.quantile(q)),
       logAverage: Math.exp(this.logSum / this.luma.total),
       shadow: areas.quantile(AUTO_ADJUST.shadowArea),
       saturated: [0, 1, 2].map((channel) => this.colors[index * 3 + channel]! / weight) as unknown as RGB,
@@ -339,9 +348,13 @@ function adaptiveKey(logAverage: number, low: number, high: number): number {
  * Pixel statistics of the analyzed frames after the white balance gains. Each frame is measured on its
  * own and every statistic is the median over the frames, so one frame facing the sun cannot decide.
  */
-export function toneStatistics(frames: readonly AnalysisFrame[], balance: WhiteBalance): ToneStatistics | null {
+export function toneStatistics(
+  frames: readonly AnalysisFrame[],
+  balance: WhiteBalance,
+  samples: number = AUTO_ADJUST.saturationSamples,
+): ToneStatistics | null {
   const gains = temperatureTintGains(balance);
-  const share = AUTO_ADJUST.saturationSamples / Math.max(1, frames.length);
+  const share = samples / Math.max(1, frames.length);
   const tones = frames
     .map((frame) => frameTone(frame, gains, share))
     .filter((tone): tone is FrameTone => tone !== null);
@@ -357,6 +370,7 @@ export function toneStatistics(frames: readonly AnalysisFrame[], balance: WhiteB
   return {
     black: pooled((tone) => tone.black),
     white: pooled((tone) => tone.white),
+    levels: TONE_QUANTILES.map((_, index) => pooled((tone) => tone.levels[index]!)),
     logAverage,
     shadow: pooled((tone) => tone.shadow),
     key: high >= AUTO_ADJUST.clippedLuma ? Math.min(AUTO_ADJUST.key, key) : key,
@@ -367,15 +381,17 @@ export function toneStatistics(frames: readonly AnalysisFrame[], balance: WhiteB
 
 /**
  * Renders a white-balanced linear pixel of a flat area as PasCap does: Shadows/Highlights (local tone,
- * whose base is the area itself) on the source pixel, then the grade. Returns encoded RGB.
+ * whose base is the area itself) on the source pixel, then the grade. Returns encoded RGB. `base` supplies
+ * the grade's other settings (Hue, HSL, curves), neutral by default.
  */
 export function renderFlat(
   balance: WhiteBalance,
   tone: Readonly<Tone>,
   color: Readonly<Chroma> = NEUTRAL_CHROMA,
+  base: Readonly<ColorSettings> = createColorSettings(),
 ): (balanced: ArrayLike<number>) => RGB {
   const gains = temperatureTintGains(balance);
-  const settings: ColorSettings = { ...createColorSettings(), ...balance, ...tone, ...color };
+  const settings: ColorSettings = { ...base, ...balance, ...tone, ...color };
   const grade = compilePixelGrade(settings);
   const local = { ...tone, hdr: 0, localContrast: 0 };
   const toned = tone.shadows !== 0 || tone.highlights !== 0;
@@ -458,15 +474,21 @@ function toneCost(statistics: ToneStatistics, balance: WhiteBalance): (tone: Rea
 }
 
 const GOLDEN = (Math.sqrt(5) - 1) / 2;
-/** Golden-section search on [low, high]; keeps `current` unless the search finds a lower cost. */
-function lineSearch(cost: (value: number) => number, low: number, high: number, current: number): number {
+/** Golden-section search on [low, high] in `steps` steps; keeps `current` unless the search finds a lower cost. */
+export function lineSearch(
+  cost: (value: number) => number,
+  low: number,
+  high: number,
+  current: number,
+  steps: number = AUTO_ADJUST.lineSearchSteps,
+): number {
   let a = low;
   let b = high;
   let c = b - GOLDEN * (b - a);
   let d = a + GOLDEN * (b - a);
   let costC = cost(c);
   let costD = cost(d);
-  for (let step = 0; step < AUTO_ADJUST.lineSearchSteps; step++) {
+  for (let step = 0; step < steps; step++) {
     if (costC <= costD) {
       b = d;
       d = c;
@@ -533,7 +555,7 @@ function fitShadows(statistics: ToneStatistics, balance: WhiteBalance, tone: Rea
 }
 
 /** Hasler–Süsstrunk colorfulness of pixels after white balance and tone, on encoded 0–255 values. */
-function colorfulness(samples: Float64Array, render: (balanced: ArrayLike<number>) => RGB): number {
+export function colorfulness(samples: Float64Array, render: (balanced: ArrayLike<number>) => RGB): number {
   const count = samples.length / 3;
   let sumRg = 0;
   let sumYb = 0;
@@ -557,14 +579,14 @@ function colorfulness(samples: Float64Array, render: (balanced: ArrayLike<number
 }
 
 /** A pixel's saturation as Vibrance measures it: linear (max − min) / max of encoded RGB. */
-function pixelSaturation(encoded: RGB): number {
+export function pixelSaturation(encoded: RGB): number {
   const linear = encoded.map(decode709);
   const maximum = Math.max(...linear);
   return maximum > 0 ? (maximum - Math.min(...linear)) / maximum : 0;
 }
 
 /** One frame's samples in ascending saturation after the grade: sample offsets and their saturations. */
-function bySaturation(
+export function bySaturation(
   samples: Float64Array,
   render: (balanced: ArrayLike<number>) => RGB,
 ): { offsets: number[]; saturations: number[] } {
@@ -578,7 +600,7 @@ function bySaturation(
   return { offsets, saturations: offsets.map((offset) => saturations[offset / 3]!) };
 }
 
-const quantileIndex = (length: number, q: number): number => Math.min(length - 1, Math.floor(q * length));
+export const quantileIndex = (length: number, q: number): number => Math.min(length - 1, Math.floor(q * length));
 
 /**
  * Color towards a fairly colorful result, from the median frame colorfulness after tone. A gain below 1

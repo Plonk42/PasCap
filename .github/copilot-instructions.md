@@ -194,7 +194,12 @@ request: read one only when the task touches its area.
   the grades' values, leaving animated settings and keyframes unchanged; Keyframe (Playhead source only)
   captures all eleven at the source frame like their diamonds (initial, with Playhead, once any is
   animated). Constants in `src/shared/auto-adjust.ts`, no schema/render change
-  (`docs/design/AUTO_ADJUST.md`).
+  (`docs/design/AUTO_ADJUST.md`). #315/#314 **Match** (first Color tab section, clip grades only) matches each
+  selected clip's frame (playhead, else middle) to a reference frame (timeline frame as graded, Source preview
+  recording frame as shot) or a registered style (`styles.json`); the reference lives in the browser per project
+  (`pascap-color-reference-<id>`, never saved). It starts from the reference's settings plus the two frames' Auto
+  difference and follows the fitted picture only as far as the scenes look alike (`src/shared/look-match.ts`,
+  `estimate` kind `match`); Intensity moves current → match. See `docs/design/COLOR_MATCH.md`.
   Main/stored slider/exact-field/reset/diamond/navigation retain
   explicit capture and one-step gestures.
   Compare bypasses all Color, including Temperature/Tint, and clip Detail, never coverage or geometry.

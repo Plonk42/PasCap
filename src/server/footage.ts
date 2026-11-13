@@ -3,20 +3,24 @@ import { access, lstat, opendir } from 'node:fs/promises';
 import path from 'node:path';
 import {
   isAudioFilename,
+  isStillFilename,
   isVideoFilename,
   MAX_FOOTAGE_ENTRIES,
   MAX_FOOTAGE_FILES,
   type AudioDirectory,
   type FootageDirectory,
   type FootageRoot,
+  type ReferenceDirectory,
 } from '../shared/footage.js';
 import { forEachSerial } from '../shared/serial.js';
 import type { ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { assertNoSymlinks } from './files.js';
 
-type MediaKind = 'video' | 'audio';
-type BrowserEntry = FootageDirectory['entries'][number] | AudioDirectory['entries'][number];
+/** What a listing shows: recordings, music, or a style's references (videos and stills). */
+type MediaKind = 'video' | 'audio' | 'reference';
+type BrowserEntry =
+  FootageDirectory['entries'][number] | AudioDirectory['entries'][number] | ReferenceDirectory['entries'][number];
 type BrowserDirectory = Omit<FootageDirectory, 'entries'> & { entries: BrowserEntry[] };
 const naturalNames = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
 const MAX_WARNINGS = 20;
@@ -50,8 +54,13 @@ function entryKind(
 ): BrowserEntry['kind'] | null {
   if (info.isSymbolicLink()) return null;
   if (info.isDirectory()) return 'directory';
+  if (!info.isFile()) return null;
+  if (mediaKind === 'reference') {
+    if (isVideoFilename(name)) return 'video';
+    return isStillFilename(name) ? 'still' : null;
+  }
   const supported = mediaKind === 'audio' ? isAudioFilename(name) : isVideoFilename(name);
-  return info.isFile() && supported ? mediaKind : null;
+  return supported ? mediaKind : null;
 }
 
 function addWarning(warnings: string[], message: string): void {
@@ -110,8 +119,14 @@ export class FootageBrowser {
     return this.#scan(rootId, directory, 'audio');
   }
 
+  /** Videos and stills a style may take as references. */
+  async browseReferences(rootId: string, directory?: string): Promise<ReferenceDirectory> {
+    return this.#scan(rootId, directory, 'reference');
+  }
+
   #scan(rootId: string, directory: string | undefined, mediaKind: 'video'): Promise<FootageDirectory>;
   #scan(rootId: string, directory: string | undefined, mediaKind: 'audio'): Promise<AudioDirectory>;
+  #scan(rootId: string, directory: string | undefined, mediaKind: 'reference'): Promise<ReferenceDirectory>;
   async #scan(rootId: string, directory: string | undefined, mediaKind: MediaKind): Promise<BrowserDirectory> {
     const root = this.#roots.find((candidate) => candidate.id === rootId);
     if (!root) throw new ServiceError('Approved footage root not found.', 404);
@@ -184,6 +199,15 @@ export class FootageBrowser {
         'Select an audio path ending in .wav, .mp3, .m4a, .aac, .flac, .ogg, .opus, .aiff, .aif or .wma.',
         400,
       );
+    return selected;
+  }
+
+  /** A style's reference: a root-scoped video or still; its reader checks existence and symlinks. */
+  validateReferencePath(filename: string): string {
+    const selected = this.#scopedPath(filename);
+    const name = path.basename(selected);
+    if (!isVideoFilename(name) && !isStillFilename(name))
+      throw new ServiceError('Select references ending in .mp4, .mov, .m4v, .jpg or .jpeg.', 400);
     return selected;
   }
 
