@@ -511,10 +511,7 @@ close to how they were. It lowers only very colorful footage, with Saturation.
 First choose its **Source**, what it analyzes: **Playhead** (the second around it, with the
 playhead on the clip), **This clip** (16 frames spread over the whole clip) or **Every clip on** the track (each clip
 analyzed on its own, so each gets its own correction; Apply then reads **Apply to N clips**).
-Keyframes always go to the selected clip only, at the playhead. **Match to this clip** instead
-makes every other clip of the track look like this one as its grade shows it, leaving this clip
-unchanged: match shots to each other first, then give the shared look to one adjustment. Then
-choose how to **Apply as**:
+Keyframes always go to the selected clip only, at the playhead. Then choose how to **Apply as**:
 
 - **Grade values** sets Temperature, Tint, Saturation, Vibrance, Exposure, Brightness,
   Contrast, Highlights, Shadows, Whites and Blacks of the clip's grade (with Track, of each
@@ -530,13 +527,40 @@ exaggerated look. Then **Apply** makes the change in one Undo step, even for eve
 track. **Cancel**, Escape or a click elsewhere leaves the grades as they were. Reopening Auto on
 the same frames skips the analysis and starts at the intensity you last applied, so you can
 change it later. The correction belongs to the clip, so it follows the shot when you trim, move
-or reorder clips. Adjustments have no Auto: set their sliders yourself.
-
-**Look** chooses what Auto aims at: **Generic**, its balance, or one of your **styles**, the
-look of your own finished edits. **Styles…** registers a style from up to 8 of your finished
-videos or JPEG stills in the footage folders (read where they are, never copied or changed) and
-deletes styles. Auto remembers the look you chose. See
+or reorder clips. Adjustments have no Auto: set their sliders yourself. See
 [Auto adjust](design/AUTO_ADJUST.md).
+
+### Match colors to a reference
+
+**Match**, the first section of the **Color** tab for a clip, grades clips so they look like a
+**reference**:
+
+- a **timeline frame**, as its grade shows it: put the playhead on it and choose **Use playhead
+  frame**, or right-click a clip and choose **Use as color reference** (its frame at the
+  playhead, or its middle frame when the playhead is elsewhere);
+- a **recording frame**, as shot: in **Source preview**, choose **Use as reference** at the
+  frame shown;
+- one of your **styles**, the look of your own finished edits: open **Styles**, choose one, or
+  **Manage styles…** to register a style from up to 8 of your finished videos or JPEG stills in
+  the footage folders (read where they are, never copied or changed) or delete one.
+
+The section shows the reference with its image and remembers it for the project in this
+browser, while you select other clips. Then select the clip to match, put the playhead on the
+frame that should look like the reference, and choose **Match**. With several clips selected
+(Ctrl-click), **Match N clips** matches each one, at the playhead when it is over the clip,
+otherwise at its middle frame. A clip is never matched at the reference frame itself.
+
+Match compares the two frames. When they show the same scene, such as two moments of one flight
+over the same ridge, it matches them picture to picture. When the scenes differ, it gives the
+clip the reference's light and look instead: copying the statistics of a sky onto a forest
+would darken or wash it out. A line under the result says which it did.
+
+The result is previewed in the image. **Intensity** moves each clip from its grade (0%) to the
+match (100%). **Apply** sets the eleven settings Auto sets in each clip's grade in one Undo step,
+or with **Keyframe at playhead** keys them there for one clip, so you can match a clip at
+several frames whose light changes. Animated settings are left unchanged and listed. Matching
+the shots of a sequence to one hero, then giving their shared look to one adjustment over them,
+keeps later changes to the look in one place. See [Color match](design/COLOR_MATCH.md).
 
 ### HDR
 

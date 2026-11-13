@@ -1,0 +1,218 @@
+/* Color → Match: the reference, the clips it is applied to, and the previewed result. */
+.color-match {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.inspector-section-content > .color-match {
+  padding: 0 14px 13px;
+}
+
+.color-match p {
+  margin: 0;
+}
+
+.color-match-reference {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.color-match-reference > legend {
+  grid-column: 1 / -1;
+  margin-bottom: 4px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.color-match-thumbnail {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid #39443c;
+  border-radius: 4px;
+  background: #101512;
+  color: var(--accent);
+}
+
+.color-match-thumbnail img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.color-match-reference-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.color-match-reference-text > strong,
+.color-match-reference-text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.color-match-reference-text > strong {
+  font-size: 12px;
+}
+
+.color-match-reference-text > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.color-match-reference-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.color-match-reference-actions .secondary-button[aria-disabled='true'],
+.color-match-actions .primary-button[aria-disabled='true'] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.editor-popover.color-match-more > summary.editor-popover-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  width: auto;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid #39443c;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.color-match-menu {
+  display: grid;
+  gap: 8px;
+  max-width: 260px;
+}
+
+.color-match-menu fieldset {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.color-match-menu legend {
+  margin-bottom: 2px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.color-match-menu .text-button {
+  justify-content: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  text-align: left;
+}
+
+.color-match-menu .text-button[aria-pressed='true'] {
+  color: var(--accent);
+}
+
+.color-match-menu small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.color-match-hint {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.color-match-target,
+.color-match-note,
+.color-match-scope {
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.color-match-target,
+.color-match-scope {
+  color: var(--muted);
+}
+
+.color-match-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.color-match-actions .primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.color-match-reason,
+.color-match-progress {
+  flex: 1 1 140px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.color-match-error {
+  flex: 1 1 140px;
+  color: var(--error);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.color-match-result {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #2c362f;
+}
+
+.color-match-apply {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 12px;
+}
+
+.color-match-apply legend {
+  margin-bottom: 4px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.color-match-apply label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.color-match-apply label:has(> input:disabled) {
+  color: var(--muted);
+}

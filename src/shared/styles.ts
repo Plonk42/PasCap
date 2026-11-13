@@ -3,7 +3,7 @@ import { TONE_QUANTILES } from './auto-adjust.js';
 import type { LookProfile } from './look-match.js';
 import { idSchema } from './model.js';
 
-/** Registered styles (#314): looks measured on the user's own finished edits, which Auto can aim at. */
+/** Registered styles (#314): looks measured on the user's own finished edits, which Color → Match can aim at. */
 export const MAX_STYLES = 64;
 export const MAX_STYLE_REFERENCES = 8;
 export const MAX_STYLE_NAME = 80;

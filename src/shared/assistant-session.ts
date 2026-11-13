@@ -78,7 +78,7 @@ export const briefSchema = z
     maxClips: described(z.number().int().positive().max(1000).nullable().default(null), 'Most clips in the cut.'),
     style: described(
       idSchema.nullable().default(null),
-      "Registered style (list_styles) the user wants the grade to aim at: estimate auto-adjust with this style; null for Auto's generic balance.",
+      "Registered style (list_styles) the user wants the grade to aim at: estimate kind match with this style; null for Auto's generic balance.",
     ),
   })
   .strict()

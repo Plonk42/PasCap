@@ -3,6 +3,8 @@ import './editor-panels.css';
 import type { EditCommand } from '../shared/commands.js';
 import type { ColorSettings } from '../shared/color.js';
 import type { ProjectDocument } from '../shared/model.js';
+import { calculateLayout } from '../shared/timeline.js';
+import { clipReference, sameReference, setColorReference, useColorReference } from './color-reference.js';
 import { Icon } from './icons.js';
 import {
   copiedColor,
@@ -25,6 +27,8 @@ interface Props {
   anchor: ClipMenuAnchor;
   onDuplicate: () => void;
   project: ProjectDocument;
+  /** The playhead: a clip's reference frame is the one shown there, or its middle frame when it is off the clip. */
+  playhead: number;
   /** Every selected clip and adjustment. */
   selected: readonly GradeTarget[];
   copiedGrade: ColorSettings | null;
@@ -38,6 +42,7 @@ export function ClipContextMenu({
   anchor,
   onDuplicate,
   project,
+  playhead,
   selected,
   copiedGrade,
   onCopyGrade,
@@ -54,6 +59,9 @@ export function ClipContextMenu({
   const pasted = pasteTargetsLabel(targets);
   const noun = clip ? 'clip' : 'adjustment';
   const adjustment = clip ? undefined : project.adjustments.find((item) => item.id === target.id);
+  const placed = clip ? calculateLayout(project).clips.find((item) => item.clip.id === target.id) : undefined;
+  const reference = placed ? clipReference(placed, playhead) : null;
+  const current = useColorReference(project.id);
   const panel = useRef<HTMLFieldSetElement>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 
@@ -155,6 +163,21 @@ export function ClipContextMenu({
         <Icon name="color" size={15} />
         {targets.length > 1 ? `Paste grade on ${targets.length}` : 'Paste grade'}
       </button>
+      {reference && (
+        <button
+          className="secondary-button small"
+          aria-label="Use this clip as the color reference"
+          aria-pressed={sameReference(reference, current)}
+          title="Color → Match grades other clips to look like this clip’s frame at the playhead (its middle frame when the playhead is off it), as its grade shows it"
+          onClick={() => {
+            setColorReference(project.id, reference);
+            onClose(true);
+          }}
+        >
+          <Icon name="wand" size={15} />
+          Use as color reference
+        </button>
+      )}
       {adjustment && (
         <button
           className="secondary-button small"

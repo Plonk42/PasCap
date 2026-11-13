@@ -2147,6 +2147,7 @@ export function Timeline(props: Readonly<Props>) {
             onDuplicate();
           }}
           project={project}
+          playhead={frame}
           selected={gradeSelection}
           copiedGrade={copiedGrade}
           onCopyGrade={setCopiedGrade}

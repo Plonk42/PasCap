@@ -206,7 +206,7 @@ qualification, feedback on the assistant and native toolchain setup. See
 - [Timeline editing and kept ranges](docs/TIMELINE_EDITING.md)
 - [Tracks and keyframes](docs/LAYERS_AND_KEYFRAMES.md)
 - [Speed, music analysis and audio](docs/SPEED_AND_AUDIO.md) · [multiple music tracks](docs/design/MULTIPLE_MUSIC.md)
-- [Timing and color equations](docs/COLOR_AND_TIMING.md) · [clip grades and adjustments](docs/design/ROW_APPEARANCE.md) · [Temperature and Tint](docs/design/TEMPERATURE_AND_TINT.md) · [Auto adjust](docs/design/AUTO_ADJUST.md) · [HSL and curves](docs/design/HSL_AND_CURVES.md)
+- [Timing and color equations](docs/COLOR_AND_TIMING.md) · [clip grades and adjustments](docs/design/ROW_APPEARANCE.md) · [Temperature and Tint](docs/design/TEMPERATURE_AND_TINT.md) · [Auto adjust](docs/design/AUTO_ADJUST.md) · [Color match](docs/design/COLOR_MATCH.md) · [HSL and curves](docs/design/HSL_AND_CURVES.md)
 - [Track Transform](docs/design/SPATIAL_TRANSFORMS.md) · [detail filters, HDR and Local contrast](docs/design/DETAIL_FILTERS.md)
 - [WebCodecs preview decoding](docs/design/WEBCODECS_PREVIEW.md) · [source relinking](docs/design/SOURCE_RELINK.md)
 - [Assistant rough cut through MCP](docs/design/ASSISTANT_MCP.md)
