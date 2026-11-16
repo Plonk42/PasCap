@@ -18,9 +18,11 @@ import {
 import {
   compileColorCurve,
   isIdentityCurve,
+  isNeutralHsl,
   type ColorCurvePoint,
   type ColorCurves,
   type CurveChannel,
+  type HslSettings,
 } from './advanced-color.js';
 import { createColorSettings, encode709, isNeutralColor, temperatureTintGains, type ColorSettings } from './color.js';
 import {
@@ -304,6 +306,8 @@ export interface FrameMatch {
    * null when the clip has curves of its own, which a match never changes.
    */
   curves: ColorCurves | null;
+  /** The reference's HSL for a clip whose HSL is neutral; null when the clip has HSL of its own or the reference none. */
+  hsl: HslSettings | null;
   /** 0 for different scenes (matched by light and look only) to 1 for the same scene (matched to the picture). */
   likeness: number;
 }
@@ -709,8 +713,8 @@ function matchCurves(
  * it. They start from the reference's settings with the frames' difference of light (see frameStart), then follow the
  * fitted picture as far as the scenes are alike: statistics of different scenes differ by what they show, which no
  * grade should copy. A target whose curves are all identity takes the reference's curves, fitted with them, and
- * per-channel curves for the levels left, which follow the picture more strictly still. Null when either frame has no
- * usable pixels.
+ * per-channel curves for the levels left, which follow the picture more strictly still; one whose HSL is neutral takes
+ * the reference's HSL, fitted with it. Null when either frame has no usable pixels.
  */
 export function matchFrame(reference: GradedFrame, target: GradedFrame): FrameMatch | null {
   const look = measureLook([reference.frame], reference.color);
@@ -719,15 +723,34 @@ export function matchFrame(reference: GradedFrame, target: GradedFrame): FrameMa
   const color = chromaBalance(rendered([small], unsaturated(elevenOf(reference.color)), reference.color));
   const start = frameStart(reference, target);
   const ownCurves = !identityCurves(target.color.curves);
-  const base = ownCurves ? target.color : { ...target.color, curves: reference.color.curves };
+  const hsl =
+    isNeutralHsl(target.color.hsl) && !isNeutralHsl(reference.color.hsl) ? structuredClone(reference.color.hsl) : null;
+  const base = {
+    ...target.color,
+    ...(ownCurves ? {} : { curves: reference.color.curves }),
+    ...(hsl && { hsl }),
+  };
   const fitted = fitLook(look, [target.frame], base, start, FRAME_BOUNDS, color);
   if (!fitted) return null;
   const likeness = sceneLikeness(frameSimilarity(reference.frame, target.frame));
   const correction = blended(start, fitted, likeness);
-  if (ownCurves) return { correction, curves: null, likeness };
+  if (ownCurves) return { correction, curves: null, hsl, likeness };
   const [referenceOutput] = rendered([small], elevenOf(reference.color), reference.color);
   const [output] = rendered([reduced(target.frame)], correction, base);
-  return { correction, curves: matchCurves(referenceOutput!, output!, base.curves, likeness ** 2), likeness };
+  return { correction, curves: matchCurves(referenceOutput!, output!, base.curves, likeness ** 2), hsl, likeness };
+}
+
+/** HSL of a match moved `intensity` (0–1) of the way from neutral, the HSL of the clip it is for. */
+export function hslTowardsMatch(hsl: Readonly<HslSettings>, intensity: number): HslSettings {
+  if (!Number.isFinite(intensity) || intensity < 0 || intensity > 1)
+    throw new Error('Intensity must be between 0 and 100%.');
+  const scaled = (value: number): number => Math.round(value * intensity * 1000) / 1000 || 0;
+  return Object.fromEntries(
+    Object.entries(hsl).map(([band, { hue, saturation, lightness }]) => [
+      band,
+      { hue: scaled(hue), saturation: scaled(saturation), lightness: scaled(lightness) },
+    ]),
+  ) as unknown as HslSettings;
 }
 
 /** Curves of a match moved `intensity` (0–1) of the way from identity, the curves of the clip it is for. */

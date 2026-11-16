@@ -1,10 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { createColorCurves, evaluateColorCurve, type ColorCurves } from '../../src/shared/advanced-color.js';
+import {
+  createColorCurves,
+  createHslSettings,
+  evaluateColorCurve,
+  type ColorCurves,
+} from '../../src/shared/advanced-color.js';
 import { analyzeAutoAdjust, AUTO_ADJUST_SETTINGS, type AutoCorrection } from '../../src/shared/auto-adjust.js';
 import { createColorSettings, type ColorSettings } from '../../src/shared/color.js';
 import {
   curvesTowardsMatch,
   frameSimilarity,
+  hslTowardsMatch,
   matchFrame,
   matchStyle,
   measureLook,
@@ -200,6 +206,48 @@ describe('Match curves', () => {
     expect(curvesTowardsMatch(curves, 1)).toEqual(curves);
     expect(curvesTowardsMatch(curves, 0.5).blue[0]!.y).toBeCloseTo(curves.blue[0]!.y / 2, 3);
     expect(() => curvesTowardsMatch(curves, -0.1)).toThrow(/Intensity/);
+  });
+});
+
+describe('Match HSL', () => {
+  const hero = frame(scene(1));
+  const HSL = {
+    ...createHslSettings(),
+    orange: { hue: 6, saturation: -0.16, lightness: 0 },
+    blue: { hue: 0, saturation: -0.45, lightness: -0.085 },
+  };
+  const HSL_LOOK = { ...LOOK, hsl: HSL };
+  const heroOutput = apply(hero, eleven(LOOK), HSL_LOOK);
+  const shot = frame(scene(1, { gain: 0.6, light: [1.15, 1, 0.85] }));
+
+  it('takes a graded reference’s HSL on a clip whose HSL is neutral, whatever the scene', () => {
+    const result = match(hero, HSL_LOOK, shot);
+    expect(result.hsl).toEqual(HSL);
+    const after = difference(
+      apply(shot, result.correction, { ...createColorSettings(), hsl: result.hsl! }),
+      heroOutput,
+    );
+    expect(after).toBeLessThan(0.03);
+    expect(difference(apply(shot, result.correction), heroOutput)).toBeGreaterThan(after);
+    expect(match(hero, HSL_LOOK, frame(scene(50))).hsl).toEqual(HSL);
+    expect(match(hero, LOOK, shot).hsl).toBeNull();
+  });
+
+  it('never changes HSL the clip has', () => {
+    const own = {
+      ...createColorSettings(),
+      hsl: { ...createHslSettings(), green: { hue: 5, saturation: 0, lightness: 0 } },
+    };
+    expect(matchFrame({ frame: hero, color: HSL_LOOK }, { frame: shot, color: own })!.hsl).toBeNull();
+  });
+
+  it('scales the HSL with Intensity', () => {
+    expect(hslTowardsMatch(HSL, 0)).toEqual(createHslSettings());
+    expect(hslTowardsMatch(HSL, 1)).toEqual(HSL);
+    const half = hslTowardsMatch(HSL, 0.5).blue;
+    expect(half.saturation).toBe(-0.225);
+    expect(half.lightness).toBeCloseTo(-0.0425, 2);
+    expect(() => hslTowardsMatch(HSL, 2)).toThrow(/Intensity/);
   });
 });
 

@@ -1,4 +1,4 @@
-import { isIdentityCurve, type ColorCurves } from './advanced-color.js';
+import { HSL_BANDS, isIdentityCurve, type ColorCurves, type HslSettings } from './advanced-color.js';
 import {
   AUTO_ADJUST,
   AUTO_ADJUST_SETTINGS,
@@ -74,20 +74,41 @@ export function autoAdjustCommand(
     : { type: 'color-patch', adjustmentId: owner.adjustmentId, settings: values };
 }
 
+/** What a match sets beside the eleven settings, on a clip that had none: null leaves it as it is. */
+export interface MatchedLook {
+  curves: ColorCurves | null;
+  hsl: HslSettings | null;
+}
+
+/** The HSL ranges a match sets: those not neutral, or null when none. */
+export function matchedHslBands(hsl: Readonly<HslSettings> | null): Partial<HslSettings> | null {
+  if (!hsl) return null;
+  const bands = HSL_BANDS.filter((band) => Object.values(hsl[band]).some((value) => value !== 0));
+  return bands.length ? Object.fromEntries(bands.map((band) => [band, { ...hsl[band] }])) : null;
+}
+
 /**
- * Match's Grade values edit of a clip grade: the eleven settings as Auto writes them, with `curves` when they are not
- * identity. Null when nothing is left to change.
+ * Match's Grade values edit of a clip grade: the eleven settings as Auto writes them, with the curves when they are not
+ * identity and the HSL ranges that are not neutral. Null when nothing is left to change.
  */
 export function matchValuesCommand(
   grade: GradeValues,
   values: Readonly<AutoCorrection>,
-  curves: ColorCurves | null,
+  { curves, hsl }: MatchedLook,
   clipId: string,
 ): EditCommand | null {
   const edit = autoAdjustCommand(grade, values, AUTO_ADJUST.balancedIntensity, { kind: 'clip', clipId });
-  if (!curves || Object.values(curves).every((points) => isIdentityCurve(points))) return edit;
+  const setCurves = curves && !Object.values(curves).every((points) => isIdentityCurve(points)) ? curves : null;
+  const setHsl = matchedHslBands(hsl);
+  if (!setCurves && !setHsl) return edit;
   const settings = edit?.type === 'color-patch' ? edit.settings : undefined;
-  return { type: 'color-patch', clipIds: [clipId], ...(settings && { settings }), curves };
+  return {
+    type: 'color-patch',
+    clipIds: [clipId],
+    ...(settings && { settings }),
+    ...(setHsl && { hsl: setHsl }),
+    ...(setCurves && { curves: setCurves }),
+  };
 }
 
 /** Source frames shown at the project frames within 1 s of `frame` in `clip`, each once. */

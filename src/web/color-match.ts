@@ -5,6 +5,7 @@ import type { EditCommand } from '../shared/commands.js';
 import { gradeColorAt } from '../shared/grade.js';
 import {
   curvesTowardsMatch,
+  hslTowardsMatch,
   identityCurves,
   matchFrame,
   matchStyle,
@@ -290,7 +291,7 @@ export async function analyzeMatch(
     const { look } = reference.style;
     fit = (target) => {
       const correction = matchStyle(look, target);
-      return correction && { correction, curves: null, likeness: 0 };
+      return correction && { correction, curves: null, hsl: null, likeness: 0 };
     };
   } else {
     const graded = { frame: await referenceFrame(reference, signal), color: reference.color };
@@ -324,8 +325,8 @@ export function keyframeReason(project: ProjectDocument, parts: readonly MatchPa
 
 /**
  * The edit Match applies in one Undo step, each part moved `intensity` (0–1) of the way from its grade to its match:
- * each clip grade's values (animated settings left unchanged) and curves, or a keyframe of the eleven at the matched
- * frame, curves left out.
+ * each clip grade's values (animated settings left unchanged), HSL and curves, or a keyframe of the eleven at the
+ * matched frame, HSL and curves left out.
  */
 export function matchCommands(
   project: ProjectDocument,
@@ -341,15 +342,22 @@ export function matchCommands(
     if (!owner || !match) return [];
     const values = towardsMatch(partColor(part), match.correction, intensity);
     if (apply === 'keyframe') return captureCommands(part.sourceFrame, values, { kind: 'clip', clipId });
-    const curves = match.curves && curvesTowardsMatch(match.curves, intensity);
-    const edit = matchValuesCommand(owner, values, curves, clipId);
+    const look = {
+      curves: match.curves && curvesTowardsMatch(match.curves, intensity),
+      hsl: match.hsl && hslTowardsMatch(match.hsl, intensity),
+    };
+    const edit = matchValuesCommand(owner, values, look, clipId);
     return edit ? [edit] : [];
   });
 }
 
-/** Whether a match sets curves on any part: clips whose curves were all identity, when the match needs some. */
-export function matchSetsCurves(matched: MatchResults): boolean {
-  return [...matched.values()].some((match) => match.curves !== null && !identityCurves(match.curves));
+/** What a match sets on some part beside the eleven settings, named for its note: "HSL" and "curves". */
+export function matchSetsLook(matched: MatchResults): string[] {
+  const matches = [...matched.values()];
+  return [
+    ...(matches.some((match) => match.hsl !== null) ? ['HSL'] : []),
+    ...(matches.some((match) => match.curves !== null && !identityCurves(match.curves)) ? ['curves'] : []),
+  ];
 }
 
 /** The settings a Grade values match leaves unchanged on some part, because its grade animates them. */

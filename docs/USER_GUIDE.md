@@ -561,9 +561,10 @@ The result is previewed in the image. **Intensity** moves each clip from its gra
 match (100%). **Apply** sets the eleven settings Auto sets in each clip's grade in one Undo step,
 or with **Keyframe at playhead** keys them there for one clip, so you can match a clip at
 several frames whose light changes. Animated settings are left unchanged and listed. A clip
-whose curves you never changed also takes the reference's curves, plus red, green and blue curves
-for what the settings cannot match, such as cool shadows under warm highlights; the line **Also
-sets the curves** says so. Curves you drew are never changed, and keyframes never set curves.
+whose HSL and curves you never changed also takes the reference's, plus red, green and blue
+curves for what the settings cannot match, such as cool shadows under warm highlights; the line
+**Also sets HSL and curves** says so. HSL and curves you set are never changed, and keyframes
+never set them.
 Matching the shots of a sequence to one hero, then giving their shared look to one adjustment
 over them, keeps later changes to the look in one place. See
 [Color match](design/COLOR_MATCH.md).

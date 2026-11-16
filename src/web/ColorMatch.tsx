@@ -14,7 +14,7 @@ import {
   likenessNote,
   matchCommands,
   matchParts,
-  matchSetsCurves,
+  matchSetsLook,
   referenceAtPlayhead,
   referenceThumbnail,
   rememberMatch,
@@ -230,7 +230,7 @@ function MatchResult({
       element.querySelector('button')?.focus({ preventScroll: true });
   }, []);
   const animated = apply === 'values' ? animatedInParts(project, parts) : [];
-  const curves = matchSetsCurves(results);
+  const look = matchSetsLook(results);
   const commands = commandsAt(percent);
   return (
     <div className="color-match-result">
@@ -268,11 +268,11 @@ function MatchResult({
           Animated, not changed: {animated.map((setting) => settingLabel(setting)).join(', ')}.
         </p>
       )}
-      {curves && (
+      {look.length > 0 && (
         <p className="color-match-scope">
           {apply === 'keyframe'
-            ? 'Keyframes leave the curves unchanged: Grade values sets them.'
-            : 'Also sets the curves, where they were identity.'}
+            ? `Keyframes leave ${look.join(' and ')} unchanged: Grade values sets them.`
+            : `Also sets ${look.join(' and ')}, where they were neutral.`}
         </p>
       )}
       <div className="color-match-actions" ref={actions}>

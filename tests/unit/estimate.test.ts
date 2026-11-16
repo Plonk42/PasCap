@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { analyzeAutoAdjust, autoAdjustFrames, scaleCorrection } from '../../src/shared/auto-adjust.js';
 import { applyCommand } from '../../src/shared/commands.js';
 import { createColorSettings } from '../../src/shared/color.js';
-import { curvesTowardsMatch, matchFrame, matchStyle, measureLook, towardsMatch } from '../../src/shared/look-match.js';
+import {
+  curvesTowardsMatch,
+  hslTowardsMatch,
+  matchFrame,
+  matchStyle,
+  measureLook,
+  towardsMatch,
+} from '../../src/shared/look-match.js';
 import {
   DETAIL_ESTIMATE,
   detailFrames,
@@ -400,7 +407,7 @@ describe('estimate operation', () => {
     expect(shot.correction).toEqual(towardsMatch(shotColor, asShot.correction, 1));
   });
 
-  it('gives a clip without curves the hero’s, in values and shots but never in a keyframe', async () => {
+  it('gives a clip without curves or HSL the hero’s, in values and shots but never in a keyframe', async () => {
     const curves = {
       red: [
         { x: 0, y: 0 },
@@ -413,7 +420,8 @@ describe('estimate operation', () => {
         { x: 1, y: 0.96 },
       ],
     };
-    const graded = applyCommand(project, { type: 'color-patch', clipIds: ['a'], curves });
+    const hsl = { blue: { hue: 0, saturation: -0.45, lightness: -0.085 } };
+    const graded = applyCommand(project, { type: 'color-patch', clipIds: ['a'], curves, hsl });
     const heroed = { ...context, projects: { load: async () => graded } } as unknown as Context;
     const result = await runners.estimate(heroed, { ...matchInput, kind: 'match', clipId: 'b', referenceClipId: 'a' });
     const heroColor = graded.clips[0]!.grade.color;
@@ -422,9 +430,11 @@ describe('estimate operation', () => {
       { frame: patches(5), color: graded.clips[1]!.grade.color },
     )!;
     expect(matched.curves).toEqual(heroColor.curves);
+    expect(matched.hsl).toEqual(heroColor.hsl);
     expect(result.curves).toEqual(heroColor.curves);
+    expect(result.hsl).toEqual(hsl);
     expect(result.commands).toEqual([
-      { type: 'color-patch', clipIds: ['b'], settings: result.correction, curves: heroColor.curves },
+      { type: 'color-patch', clipIds: ['b'], settings: result.correction, hsl, curves: heroColor.curves },
     ]);
     const half = await runners.estimate(heroed, {
       ...matchInput,
@@ -434,6 +444,7 @@ describe('estimate operation', () => {
       intensity: 50,
     });
     expect(half.curves).toEqual(curvesTowardsMatch(heroColor.curves, 0.5));
+    expect(half.hsl).toEqual({ blue: hslTowardsMatch(heroColor.hsl, 0.5).blue });
 
     const keyed = await runners.estimate(heroed, {
       ...matchInput,
@@ -454,11 +465,16 @@ describe('estimate operation', () => {
     });
     expect(track.clips![0]!.curves).toEqual(heroColor.curves);
     expect(track.commands).toEqual([
-      { type: 'color-patch', clipIds: ['b'], settings: track.clips![0]!.correction, curves: heroColor.curves },
+      { type: 'color-patch', clipIds: ['b'], settings: track.clips![0]!.correction, hsl, curves: heroColor.curves },
     ]);
 
-    // A clip with curves of its own keeps them.
-    const own = applyCommand(graded, { type: 'color-patch', clipIds: ['b'], curves: { master: curves.red } });
+    // A clip with curves and HSL of its own keeps them.
+    const own = applyCommand(graded, {
+      type: 'color-patch',
+      clipIds: ['b'],
+      curves: { master: curves.red },
+      hsl: { green: { hue: 5, saturation: 0, lightness: 0 } },
+    });
     const kept = await runners.estimate({ ...context, projects: { load: async () => own } } as unknown as Context, {
       ...matchInput,
       kind: 'match',
@@ -466,6 +482,7 @@ describe('estimate operation', () => {
       referenceClipId: 'a',
     });
     expect(kept.curves).toBeUndefined();
+    expect(kept.hsl).toBeUndefined();
     expect(kept.commands).toEqual([{ type: 'color-patch', clipIds: ['b'], settings: kept.correction }]);
   });
 

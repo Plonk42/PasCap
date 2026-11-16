@@ -1,4 +1,4 @@
-import type { ColorCurves } from '../../shared/advanced-color.js';
+import type { ColorCurves, HslSettings } from '../../shared/advanced-color.js';
 import {
   analyzeAutoAdjust,
   AUTO_ADJUST,
@@ -11,6 +11,7 @@ import {
   autoAdjustCommand,
   captureCommands,
   keyframeLimitReason,
+  matchedHslBands,
   matchValuesCommand,
   trackSamples,
   whiteBalanceCommands,
@@ -25,6 +26,7 @@ import { gradeColorAt, gradeKeyAsLayerKey } from '../../shared/grade.js';
 import { hasLayerKeys } from '../../shared/keyframes.js';
 import {
   curvesTowardsMatch,
+  hslTowardsMatch,
   identityCurves,
   matchFrame,
   matchStyle,
@@ -419,14 +421,17 @@ function estimateMatch(aim: MatchAim): Estimator {
     let match: FrameMatch | null;
     if ('look' in aim) {
       const correction = matchStyle(aim.look, graded);
-      match = correction && { correction, curves: null, likeness: 0 };
+      match = correction && { correction, curves: null, hsl: null, likeness: 0 };
     } else match = matchFrame(aim.frame, graded);
     if (!match) throw tooUniform();
     const intensity = (input.intensity ?? 100) / 100;
     const values = towardsMatch(graded.color, match.correction, intensity);
     const curves = match.curves && !identityCurves(match.curves) ? curvesTowardsMatch(match.curves, intensity) : null;
+    const hsl = match.hsl && hslTowardsMatch(match.hsl, intensity);
+    const bands = matchedHslBands(hsl);
     const fields = {
       correction: values,
+      ...(bands && { hsl: bands }),
       ...(curves && { curves }),
       ...('look' in aim ? {} : { likeness: Number(match.likeness.toFixed(2)) }),
     };
@@ -434,7 +439,7 @@ function estimateMatch(aim: MatchAim): Estimator {
     if (!grade) return { fields, commands: [], unchanged: [] };
     if (input.applyAs === 'keyframe')
       return { fields, commands: captureCommands(grade.keyFrame!, values, grade.owner), unchanged: [] };
-    const command = matchValuesCommand(grade.values, values, curves, target.clip!.clip.id);
+    const command = matchValuesCommand(grade.values, values, { curves, hsl }, target.clip!.clip.id);
     return { fields, commands: command ? [command] : [], unchanged: animatedSettings(grade.values) };
   };
 }
@@ -447,24 +452,37 @@ const estimators = {
 } satisfies Record<Exclude<Input['kind'], 'match'>, Estimator>;
 
 type ShotValues = Partial<Record<ScalarColorSetting, number>>;
+/** A shot's values, and what a match sets beside them. */
+interface Shot {
+  clip: PlacedClip;
+  values: ShotValues;
+  curves?: ColorCurves;
+  hsl?: Partial<HslSettings>;
+}
 
 /**
  * Each shot's values written into its clip's grade, which applies before any adjustment and stays with the
- * clip; settings the grade animates follow their keyframes and are left out. A match's curves go with them. A
+ * clip; settings the grade animates follow their keyframes and are left out. A match's HSL and curves go with them. A
  * cross-dissolve then blends the two clips' grades.
  */
-export function shotCommands(
-  shots: readonly { clip: PlacedClip; values: ShotValues; curves?: ColorCurves }[],
-): EditCommand[] {
-  return shots.flatMap(({ clip, values, curves }) => {
+export function shotCommands(shots: readonly Shot[]): EditCommand[] {
+  return shots.flatMap(({ clip, values, curves, hsl }) => {
     const { keyframes } = clip.clip.grade;
     const settings = Object.fromEntries(
       Object.entries(values).filter(([setting]) =>
         keyframes.every((key) => key.values[setting as ScalarColorSetting] === null),
       ),
     );
-    if (!Object.keys(settings).length && !curves) return [];
-    return [{ type: 'color-patch' as const, clipIds: [clip.clip.id], settings, ...(curves && { curves }) }];
+    if (!Object.keys(settings).length && !curves && !hsl) return [];
+    return [
+      {
+        type: 'color-patch' as const,
+        clipIds: [clip.clip.id],
+        settings,
+        ...(hsl && { hsl }),
+        ...(curves && { curves }),
+      },
+    ];
   });
 }
 
@@ -477,7 +495,7 @@ async function estimateClips(
 ) {
   const results: { clipId: string; frames: number }[] = [];
   const commands: EditCommand[] = [];
-  const shots: { clip: PlacedClip; values: ShotValues; curves?: ColorCurves }[] = [];
+  const shots: Shot[] = [];
   let frames = 0;
   await forEachSerial(clips, async (clip) => {
     const { mediaId, sourceIn, sourceOut } = clip.clip;
@@ -495,12 +513,18 @@ async function estimateClips(
     frames += count;
     results.push({ clipId: clip.clip.id, frames: count, ...estimated.fields });
     commands.push(...estimated.commands);
-    const values = estimated.fields as { correction?: ShotValues; whiteBalance?: ShotValues; curves?: ColorCurves };
+    const values = estimated.fields as {
+      correction?: ShotValues;
+      whiteBalance?: ShotValues;
+      curves?: ColorCurves;
+      hsl?: Partial<HslSettings>;
+    };
     if (input.applyAs === 'shots')
       shots.push({
         clip,
         values: (values.correction ?? values.whiteBalance)!,
         ...(values.curves && { curves: values.curves }),
+        ...(values.hsl && { hsl: values.hsl }),
       });
   });
   commands.push(...shotCommands(shots));

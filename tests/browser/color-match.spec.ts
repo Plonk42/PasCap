@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import path from 'node:path';
-import { createColorCurves, type ColorCurves } from '../../src/shared/advanced-color.js';
+import { createColorCurves, createHslSettings, type ColorCurves } from '../../src/shared/advanced-color.js';
 import { AUTO_ADJUST_SETTINGS, type AutoCorrection } from '../../src/shared/auto-adjust.js';
 import type { ColorSettings } from '../../src/shared/color.js';
 import { matchFrame, matchStyle, measureLook, towardsMatch } from '../../src/shared/look-match.js';
@@ -218,7 +218,7 @@ test('matches several selected clips, each at the playhead or its middle frame, 
   await expect.poll(async () => (await current(page)).clips).toEqual(before.clips);
 });
 
-test('sets the curves of a clip without any with the match, never in a keyframe', async ({ page }) => {
+test('sets HSL and curves of a clip without any with the match, never in a keyframe', async ({ page }) => {
   const split: ColorCurves = {
     ...createColorCurves(),
     red: [
@@ -232,11 +232,14 @@ test('sets the curves of a clip without any with the match, never in a keyframe'
       { x: 1, y: 0.96 },
     ],
   };
+  const hsl = { ...createHslSettings(), blue: { hue: 0, saturation: -0.45, lightness: -0.085 } };
   const start = await current(page);
   await page.evaluate((next) => window.pascapLab!.setDocument(next), {
     ...start,
     clips: start.clips.map((clip) =>
-      clip.id === 'hero' ? { ...clip, grade: { ...clip.grade, color: { ...clip.grade.color, curves: split } } } : clip,
+      clip.id === 'hero'
+        ? { ...clip, grade: { ...clip.grade, color: { ...clip.grade.color, curves: split, hsl } } }
+        : clip,
     ),
   });
   await seek(page, 10);
@@ -246,7 +249,7 @@ test('sets the curves of a clip without any with the match, never in a keyframe'
   const before = await current(page);
   await matchButton(page).click();
   await expect(apply(page)).toBeVisible({ timeout: 30_000 });
-  await expect(section(page)).toContainText('Also sets the curves, where they were identity.');
+  await expect(section(page)).toContainText('Also sets HSL and curves, where they were neutral.');
   expect(await current(page)).toEqual(before);
 
   const shotColor = gradeOf(before, 'shot').color;
@@ -255,18 +258,20 @@ test('sets the curves of a clip without any with the match, never in a keyframe'
     { frame: await pageFrame(page, assets[1]!.id, 10), color: shotColor },
   )!;
   expect(matched.curves).not.toEqual(createColorCurves());
+  expect(matched.hsl).toEqual(hsl);
   await apply(page).click();
   await expect.poll(async () => gradeOf(await current(page), 'shot').color.curves).toEqual(matched.curves);
+  expect(gradeOf(await current(page), 'shot').color.hsl).toEqual(hsl);
   expect(eleven(gradeOf(await current(page), 'shot').color)).toEqual(towardsMatch(shotColor, matched.correction, 1));
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect.poll(async () => gradeOf(await current(page), 'shot')).toEqual(gradeOf(before, 'shot'));
 
-  // A keyframe leaves them identity.
+  // A keyframe leaves them neutral.
   await matchButton(page).click();
   await section(page)
     .getByRole('radio', { name: /Keyframe at playhead/ })
     .check();
-  await expect(section(page)).toContainText('Keyframes leave the curves unchanged: Grade values sets them.');
+  await expect(section(page)).toContainText('Keyframes leave HSL and curves unchanged: Grade values sets them.');
   await apply(page).click();
   await expect.poll(async () => gradeOf(await current(page), 'shot').keyframes).toHaveLength(1);
   expect(gradeOf(await current(page), 'shot').color).toEqual(shotColor);
