@@ -11,6 +11,7 @@ import type { EditCommand } from './commands.js';
 import type { ColorSettings } from './color.js';
 import { MAX_GRADE_KEYFRAMES } from './grade.js';
 import { hasLayerKeys, type KeyframeSetting, type LayerKeyframe } from './keyframes.js';
+import type { MatchEffects } from './look-match.js';
 import type { PlacedClip } from './timeline.js';
 import type { WhiteBalance } from './white-balance.js';
 
@@ -74,10 +75,11 @@ export function autoAdjustCommand(
     : { type: 'color-patch', adjustmentId: owner.adjustmentId, settings: values };
 }
 
-/** What a match sets beside the eleven settings, on a clip that had none: null leaves it as it is. */
+/** What a match sets beside the eleven settings, on a clip that had none: null or absent leaves it as it is. */
 export interface MatchedLook {
   curves: ColorCurves | null;
   hsl: HslSettings | null;
+  effects: MatchEffects;
 }
 
 /** The HSL ranges a match sets: those not neutral, or null when none. */
@@ -89,23 +91,27 @@ export function matchedHslBands(hsl: Readonly<HslSettings> | null): Partial<HslS
 
 /**
  * Match's Grade values edit of a clip grade: the eleven settings as Auto writes them, with the curves when they are not
- * identity and the HSL ranges that are not neutral. Null when nothing is left to change.
+ * identity, the HSL ranges that are not neutral and HDR and Local contrast when not 0; animated settings are left out.
+ * Null when nothing is left to change.
  */
 export function matchValuesCommand(
   grade: GradeValues,
   values: Readonly<AutoCorrection>,
-  { curves, hsl }: MatchedLook,
+  { curves, hsl, effects }: MatchedLook,
   clipId: string,
 ): EditCommand | null {
   const edit = autoAdjustCommand(grade, values, AUTO_ADJUST.balancedIntensity, { kind: 'clip', clipId });
   const setCurves = curves && !Object.values(curves).every((points) => isIdentityCurve(points)) ? curves : null;
   const setHsl = matchedHslBands(hsl);
-  if (!setCurves && !setHsl) return edit;
-  const settings = edit?.type === 'color-patch' ? edit.settings : undefined;
+  const setEffects = Object.fromEntries(
+    Object.entries(effects).filter(([key, value]) => value !== 0 && !hasLayerKeys(grade, key as KeyframeSetting)),
+  );
+  if (!setCurves && !setHsl && !Object.keys(setEffects).length) return edit;
+  const settings = { ...(edit?.type === 'color-patch' ? edit.settings : {}), ...setEffects };
   return {
     type: 'color-patch',
     clipIds: [clipId],
-    ...(settings && { settings }),
+    ...(Object.keys(settings).length ? { settings } : {}),
     ...(setHsl && { hsl: setHsl }),
     ...(setCurves && { curves: setCurves }),
   };

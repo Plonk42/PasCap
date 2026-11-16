@@ -9,6 +9,7 @@ import { analyzeAutoAdjust, AUTO_ADJUST_SETTINGS, type AutoCorrection } from '..
 import { createColorSettings, type ColorSettings } from '../../src/shared/color.js';
 import {
   curvesTowardsMatch,
+  effectsTowardsMatch,
   frameSimilarity,
   hslTowardsMatch,
   matchFrame,
@@ -248,6 +249,28 @@ describe('Match HSL', () => {
     expect(half.saturation).toBe(-0.225);
     expect(half.lightness).toBeCloseTo(-0.0425, 2);
     expect(() => hslTowardsMatch(HSL, 2)).toThrow(/Intensity/);
+  });
+});
+
+describe('Match HDR and Local contrast', () => {
+  const hero = frame(scene(1));
+  const shot = frame(scene(1, { gain: 0.6 }));
+  const EFFECTS_LOOK = { ...LOOK, hdr: 0.4, localContrast: 0.2 };
+
+  it('takes the reference’s where the clip has none, whatever the scene', () => {
+    expect(match(hero, EFFECTS_LOOK, shot).effects).toEqual({ hdr: 0.4, localContrast: 0.2 });
+    expect(match(hero, EFFECTS_LOOK, frame(scene(50))).effects).toEqual({ hdr: 0.4, localContrast: 0.2 });
+    expect(match(hero, LOOK, shot).effects).toEqual({});
+    const own = { ...createColorSettings(), hdr: 0.1 };
+    expect(matchFrame({ frame: hero, color: EFFECTS_LOOK }, { frame: shot, color: own })!.effects).toEqual({
+      localContrast: 0.2,
+    });
+  });
+
+  it('scales them with Intensity', () => {
+    expect(effectsTowardsMatch({ hdr: 0.4, localContrast: -0.3 }, 0.5)).toEqual({ hdr: 0.2, localContrast: -0.15 });
+    expect(effectsTowardsMatch({ hdr: 0.4 }, 0)).toEqual({ hdr: 0 });
+    expect(() => effectsTowardsMatch({}, 1.1)).toThrow(/Intensity/);
   });
 });
 

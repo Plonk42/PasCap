@@ -5,6 +5,7 @@ import type { EditCommand } from '../shared/commands.js';
 import { gradeColorAt } from '../shared/grade.js';
 import {
   curvesTowardsMatch,
+  effectsTowardsMatch,
   hslTowardsMatch,
   identityCurves,
   matchFrame,
@@ -291,7 +292,7 @@ export async function analyzeMatch(
     const { look } = reference.style;
     fit = (target) => {
       const correction = matchStyle(look, target);
-      return correction && { correction, curves: null, hsl: null, likeness: 0 };
+      return correction && { correction, curves: null, hsl: null, effects: {}, likeness: 0 };
     };
   } else {
     const graded = { frame: await referenceFrame(reference, signal), color: reference.color };
@@ -345,19 +346,23 @@ export function matchCommands(
     const look = {
       curves: match.curves && curvesTowardsMatch(match.curves, intensity),
       hsl: match.hsl && hslTowardsMatch(match.hsl, intensity),
+      effects: effectsTowardsMatch(match.effects, intensity),
     };
     const edit = matchValuesCommand(owner, values, look, clipId);
     return edit ? [edit] : [];
   });
 }
 
-/** What a match sets on some part beside the eleven settings, named for its note: "HSL" and "curves". */
-export function matchSetsLook(matched: MatchResults): string[] {
+/** What a match sets on some part beside the eleven settings, named for its note, as "HSL, curves and HDR". */
+export function matchSetsLook(matched: MatchResults): string {
   const matches = [...matched.values()];
-  return [
+  const names = [
     ...(matches.some((match) => match.hsl !== null) ? ['HSL'] : []),
     ...(matches.some((match) => match.curves !== null && !identityCurves(match.curves)) ? ['curves'] : []),
+    ...(matches.some((match) => match.effects.hdr !== undefined) ? ['HDR'] : []),
+    ...(matches.some((match) => match.effects.localContrast !== undefined) ? ['Local contrast'] : []),
   ];
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : (names[0] ?? '');
 }
 
 /** The settings a Grade values match leaves unchanged on some part, because its grade animates them. */

@@ -6,8 +6,9 @@ each looks like a **reference**, a timeline frame as its grade shows it, a recor
 shot, or a registered **style**, the look of the user's own finished edits. Like
 [Auto](AUTO_ADJUST.md) it chooses values of the eleven settings Auto sets in
 [clip grades](CLIP_GRADES_AND_ADJUSTMENTS.md), and for a clip without its own, its
-[HSL ranges and curves](HSL_AND_CURVES.md) ([#326](https://github.com/Plonk42/PasCap/issues/326)):
-no schema, render, export or decoder change.
+[HSL ranges and curves](HSL_AND_CURVES.md), HDR and Local contrast
+([#326](https://github.com/Plonk42/PasCap/issues/326)): no schema, render, export or decoder
+change.
 
 Implementation authorities: [matching](../../src/shared/look-match.ts) (pure, every constant in
 `LOOK_MATCH`), [editor helpers](../../src/web/color-match.ts), the
@@ -62,12 +63,12 @@ or save change) with:
   values at the matched frame to the match, Contrast and Saturation geometrically;
 - **Apply as** (one clip): **Grade values** replaces the grade's values of the eleven settings,
   leaving animated settings unchanged (listed as **Animated, not changed: …**), and sets the
-  match's HSL and curves (below); **Keyframe at playhead** keys the eleven at the matched source
-  frame like their diamonds (unavailable off the clip, or with 64 keyframes and none there),
-  initial once the grade animates any of them, and never sets HSL or curves;
-- when the match sets HSL or curves on any clip, the line **Also sets HSL and curves, where they
-  were neutral.** (with Grade values) or **Keyframes leave HSL and curves unchanged: Grade values
-  sets them.** (with Keyframe at playhead), naming only what it sets;
+  match's HSL, curves, HDR and Local contrast (below); **Keyframe at playhead** keys the eleven at
+  the matched source frame like their diamonds (unavailable off the clip, or with 64 keyframes and
+  none there), initial once the grade animates any of them, and never sets the others;
+- when the match sets any of those on a clip, the line **Also sets HSL, curves and HDR, where
+  they were neutral.** (with Grade values) or **Keyframes leave HSL, curves and HDR unchanged:
+  Grade values sets them.** (with Keyframe at playhead), naming only what it sets;
 - **Apply** (**Apply to N clips**): one Undo step, one `color-patch` per clip (settings, HSL
   ranges and curves) or one `layer-key-set`; **Cancel** restores the preview.
 
@@ -128,6 +129,15 @@ set is never changed. HSL is copied, not fitted: which hues a frame shows depend
 so one frame cannot tell a range's setting from its content. **Intensity** scales each range
 from neutral (0%) to the reference's (100%).
 
+**HDR and Local contrast.** A clip whose **HDR** is 0 takes the reference's, and likewise
+**Local contrast**, whatever the scenes; **Intensity** scales each from 0. Neither is measured:
+frames are measured on flat areas, where these local looks do nothing, so the reference is
+measured without them and the clip is fitted without them, then takes the same. Without them a
+reference with HDR 0.4 and Contrast 1.42 (HDR lifting the shadows the Contrast deepens) gave a
+frame of the same mountain a darker, harder picture than the reference's. A setting the clip
+animates is left out of the edit. Any nonzero HDR or Local contrast makes export use the
+composited path, as on the reference.
+
 **Curves.** A clip whose four curves are all identity takes curves too; curves the user drew are
 never changed (the match then sets the eleven settings only). They start from the **reference's
 curves**, copied whatever the scenes like the reference's eleven settings, and the fit above runs
@@ -178,15 +188,15 @@ runs the same functions on FFmpeg-decoded proxy frames: one reference (`referenc
 `referenceFrame`, or `referenceMediaId` with `referenceSourceFrame`, or `style`), one frame per
 target (`clipId` with `frame`, else the middle frame; each clip's middle frame with `clipIds` or
 `layerId` and `applyAs: shots`), `intensity` towards the match (100 % by default), the
-`likeness` of each frame match, and its `hsl` (the ranges that are not neutral) and `curves`
-when it sets some (with values and shots, never keyframes).
+`likeness` of each frame match, and its `effects` (HDR and Local contrast), `hsl` (the ranges
+that are not neutral) and `curves` when it sets some (with values and shots, never keyframes).
 
 ## Evaluation
 
 The previous match fitted all eleven settings to statistics with a negligible pull: on the
-owner's "Sitre test" project (31 clips of one flight) it pushed most clips to their bounds
+owner's "Sitre test 2" project (32 clips of one flight) it pushed most clips to their bounds
 (Contrast 2, Blacks −1, Saturation 2…). Measured read-only on the proxies of the owner's "Sitre
-test 2", as the mean absolute difference in 8-bit codes from the expected picture (flat-area
+test" (31 clips of that flight), as the mean absolute difference in 8-bit codes from the expected picture (flat-area
 renders), with the previous match given the same single frames:
 
 | Case                                                                                                 | Previous match | Match | Eleven neutral | Reference's settings copied |
@@ -197,15 +207,16 @@ renders), with the previous match given the same single frames:
 
 The known camera changes are Exposure ±0.6, Temperature ±0.35, Tint ±0.15, Contrast 0.75–1.2 and
 Saturation 0.8–1.25; the expected picture is the original frame through the reference's grade.
-"Sitre test 2" was graded as one look plus each clip's Auto Exposure, Temperature and Tint, so
+"Sitre test" was graded (by an assistant session) as one look plus each clip's Auto Exposure,
+Temperature and Tint, so
 against its grades copying the reference's settings is right by construction; the match stays
 close to it without copying. Unit tests cover the same scene under such changes (within 0.03 of
 the reference picture) and flat footage (within 0.035), a frame matched to itself (its settings
 exactly), another scene (the start), the reach, determinism, scene likeness, Intensity and
 styles.
 
-**HSL and curves.** Every clip of "Sitre test 2" has the look's HSL and master curve, which the
-cases above keep (so neither is set and the numbers are unchanged). The same cases with fresh
+**HSL and curves.** Every clip of "Sitre test" has the look's HSL, master curve and HDR, which the
+cases above keep (so none is set and the numbers are unchanged). The same cases with fresh
 clips (HSL neutral and curves identity), a split-toned look (the owner's look with red lowered
 and blue raised in the shadows, the reverse in the highlights) and references as shot (the
 reference's picture as finished footage, so only the picture can be matched), against Match
@@ -239,11 +250,11 @@ later shows more sky or ground, which such curves copy.
   under the result says which, and Intensity lowers the match.
 - Across scenes the match is only the reference's look plus Auto's difference of light: it is
   as good as Auto's balance of each frame.
-- Hue, HDR, Local contrast, Shadows and Highlights of the reference are part of what is
-  measured but never set on the clip; Brightness, Highlights and Shadows keep the start. HSL and
-  curves are set only on clips without their own, and styles set neither.
-- HSL and curves copy the reference's whatever the scenes: on another scene they shape a
-  different picture, as the reference's Contrast does.
+- Hue and Detail of the reference are never set on the clip, nor HSL, curves, HDR or Local
+  contrast on a clip that has its own; styles set none of these. Brightness, Highlights and
+  Shadows keep the start. HDR and Local contrast are copied, never measured.
+- HSL, curves, HDR and Local contrast copy the reference's whatever the scenes: on another scene
+  they shape a different picture, as the reference's Contrast does.
 - A style is aimed at as statistics of other scenes: lower Intensity, or register styles per
   kind of scene. PNG stills are not read: the qualified FFmpeg build decodes JPEG only.
 - Each clip's fit takes about half a second on the editor's main thread.

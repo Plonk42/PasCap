@@ -32,6 +32,7 @@ const detailResultSchema = z
   .strict();
 
 const matchedHslSchema = z.partialRecord(z.enum(HSL_BANDS), hslBandSchema);
+const matchedEffectsSchema = z.object({ hdr: z.number().optional(), localContrast: z.number().optional() }).strict();
 
 export const estimate = defineOperation({
   name: 'estimate',
@@ -119,6 +120,10 @@ export const estimate = defineOperation({
         correctionSchema.optional(),
         'auto-adjust and match: the eleven Color settings at the intensity asked.',
       ),
+      effects: described(
+        matchedEffectsSchema.optional(),
+        "match with a reference frame: the reference's HDR and Local contrast, each for a clip where it is 0 and the reference's is not, at the intensity asked; a setting the clip animates is left out of the commands. Keyframes never set them.",
+      ),
       hsl: described(
         matchedHslSchema.optional(),
         "match with a reference frame, for a clip whose HSL is neutral: the reference's HSL ranges that are not neutral, at the intensity asked; absent when the clip has HSL of its own, which a match keeps, or the reference none. Keyframes never set them.",
@@ -140,6 +145,10 @@ export const estimate = defineOperation({
                 clipId: described(idSchema, 'The clip.'),
                 frames: described(z.number().int().nonnegative(), 'Proxy frames analyzed.'),
                 correction: described(correctionSchema.optional(), 'auto-adjust and match: its correction.'),
+                effects: described(
+                  matchedEffectsSchema.optional(),
+                  'match: its HDR and Local contrast, as the top-level effects.',
+                ),
                 hsl: described(matchedHslSchema.optional(), 'match: its HSL ranges, as the top-level hsl.'),
                 curves: described(curvesSchema.optional(), 'match: its curves, as the top-level curves.'),
                 likeness: described(z.number().optional(), 'match with a reference frame: as the top-level likeness.'),

@@ -298,6 +298,10 @@ export interface GradedFrame {
   color: Readonly<ColorSettings>;
 }
 
+/** Local tone looks a match copies from the reference, like its HSL and curves. */
+export const MATCH_EFFECTS = ['hdr', 'localContrast'] as const;
+export type MatchEffects = Partial<Record<(typeof MATCH_EFFECTS)[number], number>>;
+
 /** A frame match: the eleven settings, and how far they follow the picture rather than its light and look. */
 export interface FrameMatch {
   correction: AutoCorrection;
@@ -308,6 +312,8 @@ export interface FrameMatch {
   curves: ColorCurves | null;
   /** The reference's HSL for a clip whose HSL is neutral; null when the clip has HSL of its own or the reference none. */
   hsl: HslSettings | null;
+  /** The reference's HDR and Local contrast, each for a clip where it is 0 and the reference's is not. */
+  effects: MatchEffects;
   /** 0 for different scenes (matched by light and look only) to 1 for the same scene (matched to the picture). */
   likeness: number;
 }
@@ -714,7 +720,8 @@ function matchCurves(
  * fitted picture as far as the scenes are alike: statistics of different scenes differ by what they show, which no
  * grade should copy. A target whose curves are all identity takes the reference's curves, fitted with them, and
  * per-channel curves for the levels left, which follow the picture more strictly still; one whose HSL is neutral takes
- * the reference's HSL, fitted with it. Null when either frame has no usable pixels.
+ * the reference's HSL, and one without HDR or Local contrast the reference's, all fitted with them. Null when either
+ * frame has no usable pixels.
  */
 export function matchFrame(reference: GradedFrame, target: GradedFrame): FrameMatch | null {
   const look = measureLook([reference.frame], reference.color);
@@ -725,19 +732,36 @@ export function matchFrame(reference: GradedFrame, target: GradedFrame): FrameMa
   const ownCurves = !identityCurves(target.color.curves);
   const hsl =
     isNeutralHsl(target.color.hsl) && !isNeutralHsl(reference.color.hsl) ? structuredClone(reference.color.hsl) : null;
+  const effects: MatchEffects = Object.fromEntries(
+    MATCH_EFFECTS.filter((key) => target.color[key] === 0 && reference.color[key] !== 0).map((key) => [
+      key,
+      reference.color[key],
+    ]),
+  );
   const base = {
     ...target.color,
     ...(ownCurves ? {} : { curves: reference.color.curves }),
     ...(hsl && { hsl }),
+    ...effects,
   };
   const fitted = fitLook(look, [target.frame], base, start, FRAME_BOUNDS, color);
   if (!fitted) return null;
   const likeness = sceneLikeness(frameSimilarity(reference.frame, target.frame));
   const correction = blended(start, fitted, likeness);
-  if (ownCurves) return { correction, curves: null, hsl, likeness };
+  if (ownCurves) return { correction, curves: null, hsl, effects, likeness };
   const [referenceOutput] = rendered([small], elevenOf(reference.color), reference.color);
   const [output] = rendered([reduced(target.frame)], correction, base);
-  return { correction, curves: matchCurves(referenceOutput!, output!, base.curves, likeness ** 2), hsl, likeness };
+  const curves = matchCurves(referenceOutput!, output!, base.curves, likeness ** 2);
+  return { correction, curves, hsl, effects, likeness };
+}
+
+/** HDR and Local contrast of a match moved `intensity` (0–1) of the way from 0, their value on the clip it is for. */
+export function effectsTowardsMatch(effects: Readonly<MatchEffects>, intensity: number): MatchEffects {
+  if (!Number.isFinite(intensity) || intensity < 0 || intensity > 1)
+    throw new Error('Intensity must be between 0 and 100%.');
+  return Object.fromEntries(
+    Object.entries(effects).map(([key, value]) => [key, Math.round(value * intensity * 1000) / 1000 || 0]),
+  );
 }
 
 /** HSL of a match moved `intensity` (0–1) of the way from neutral, the HSL of the clip it is for. */

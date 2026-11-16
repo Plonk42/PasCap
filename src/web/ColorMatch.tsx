@@ -268,11 +268,11 @@ function MatchResult({
           Animated, not changed: {animated.map((setting) => settingLabel(setting)).join(', ')}.
         </p>
       )}
-      {look.length > 0 && (
+      {look && (
         <p className="color-match-scope">
           {apply === 'keyframe'
-            ? `Keyframes leave ${look.join(' and ')} unchanged: Grade values sets them.`
-            : `Also sets ${look.join(' and ')}, where they were neutral.`}
+            ? `Keyframes leave ${look} unchanged: Grade values sets them.`
+            : `Also sets ${look}, where they were neutral.`}
         </p>
       )}
       <div className="color-match-actions" ref={actions}>

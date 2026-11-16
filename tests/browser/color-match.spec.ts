@@ -218,7 +218,7 @@ test('matches several selected clips, each at the playhead or its middle frame, 
   await expect.poll(async () => (await current(page)).clips).toEqual(before.clips);
 });
 
-test('sets HSL and curves of a clip without any with the match, never in a keyframe', async ({ page }) => {
+test('sets HSL, curves and HDR of a clip without any with the match, never in a keyframe', async ({ page }) => {
   const split: ColorCurves = {
     ...createColorCurves(),
     red: [
@@ -238,7 +238,7 @@ test('sets HSL and curves of a clip without any with the match, never in a keyfr
     ...start,
     clips: start.clips.map((clip) =>
       clip.id === 'hero'
-        ? { ...clip, grade: { ...clip.grade, color: { ...clip.grade.color, curves: split, hsl } } }
+        ? { ...clip, grade: { ...clip.grade, color: { ...clip.grade.color, curves: split, hsl, hdr: 0.3 } } }
         : clip,
     ),
   });
@@ -249,7 +249,7 @@ test('sets HSL and curves of a clip without any with the match, never in a keyfr
   const before = await current(page);
   await matchButton(page).click();
   await expect(apply(page)).toBeVisible({ timeout: 30_000 });
-  await expect(section(page)).toContainText('Also sets HSL and curves, where they were neutral.');
+  await expect(section(page)).toContainText('Also sets HSL, curves and HDR, where they were neutral.');
   expect(await current(page)).toEqual(before);
 
   const shotColor = gradeOf(before, 'shot').color;
@@ -259,9 +259,11 @@ test('sets HSL and curves of a clip without any with the match, never in a keyfr
   )!;
   expect(matched.curves).not.toEqual(createColorCurves());
   expect(matched.hsl).toEqual(hsl);
+  expect(matched.effects).toEqual({ hdr: 0.3 });
   await apply(page).click();
   await expect.poll(async () => gradeOf(await current(page), 'shot').color.curves).toEqual(matched.curves);
   expect(gradeOf(await current(page), 'shot').color.hsl).toEqual(hsl);
+  expect(gradeOf(await current(page), 'shot').color.hdr).toBe(0.3);
   expect(eleven(gradeOf(await current(page), 'shot').color)).toEqual(towardsMatch(shotColor, matched.correction, 1));
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect.poll(async () => gradeOf(await current(page), 'shot')).toEqual(gradeOf(before, 'shot'));
@@ -271,7 +273,7 @@ test('sets HSL and curves of a clip without any with the match, never in a keyfr
   await section(page)
     .getByRole('radio', { name: /Keyframe at playhead/ })
     .check();
-  await expect(section(page)).toContainText('Keyframes leave HSL and curves unchanged: Grade values sets them.');
+  await expect(section(page)).toContainText('Keyframes leave HSL, curves and HDR unchanged: Grade values sets them.');
   await apply(page).click();
   await expect.poll(async () => gradeOf(await current(page), 'shot').keyframes).toHaveLength(1);
   expect(gradeOf(await current(page), 'shot').color).toEqual(shotColor);

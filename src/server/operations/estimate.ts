@@ -26,6 +26,7 @@ import { gradeColorAt, gradeKeyAsLayerKey } from '../../shared/grade.js';
 import { hasLayerKeys } from '../../shared/keyframes.js';
 import {
   curvesTowardsMatch,
+  effectsTowardsMatch,
   hslTowardsMatch,
   identityCurves,
   matchFrame,
@@ -421,7 +422,7 @@ function estimateMatch(aim: MatchAim): Estimator {
     let match: FrameMatch | null;
     if ('look' in aim) {
       const correction = matchStyle(aim.look, graded);
-      match = correction && { correction, curves: null, hsl: null, likeness: 0 };
+      match = correction && { correction, curves: null, hsl: null, effects: {}, likeness: 0 };
     } else match = matchFrame(aim.frame, graded);
     if (!match) throw tooUniform();
     const intensity = (input.intensity ?? 100) / 100;
@@ -429,8 +430,10 @@ function estimateMatch(aim: MatchAim): Estimator {
     const curves = match.curves && !identityCurves(match.curves) ? curvesTowardsMatch(match.curves, intensity) : null;
     const hsl = match.hsl && hslTowardsMatch(match.hsl, intensity);
     const bands = matchedHslBands(hsl);
+    const effects = effectsTowardsMatch(match.effects, intensity);
     const fields = {
       correction: values,
+      ...(Object.keys(effects).length ? { effects } : {}),
       ...(bands && { hsl: bands }),
       ...(curves && { curves }),
       ...('look' in aim ? {} : { likeness: Number(match.likeness.toFixed(2)) }),
@@ -439,7 +442,7 @@ function estimateMatch(aim: MatchAim): Estimator {
     if (!grade) return { fields, commands: [], unchanged: [] };
     if (input.applyAs === 'keyframe')
       return { fields, commands: captureCommands(grade.keyFrame!, values, grade.owner), unchanged: [] };
-    const command = matchValuesCommand(grade.values, values, { curves, hsl }, target.clip!.clip.id);
+    const command = matchValuesCommand(grade.values, values, { curves, hsl, effects }, target.clip!.clip.id);
     return { fields, commands: command ? [command] : [], unchanged: animatedSettings(grade.values) };
   };
 }
@@ -516,13 +519,14 @@ async function estimateClips(
     const values = estimated.fields as {
       correction?: ShotValues;
       whiteBalance?: ShotValues;
+      effects?: ShotValues;
       curves?: ColorCurves;
       hsl?: Partial<HslSettings>;
     };
     if (input.applyAs === 'shots')
       shots.push({
         clip,
-        values: (values.correction ?? values.whiteBalance)!,
+        values: { ...(values.correction ?? values.whiteBalance)!, ...values.effects },
         ...(values.curves && { curves: values.curves }),
         ...(values.hsl && { hsl: values.hsl }),
       });
