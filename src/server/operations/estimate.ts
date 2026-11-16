@@ -1,3 +1,4 @@
+import type { ColorCurves } from '../../shared/advanced-color.js';
 import {
   analyzeAutoAdjust,
   AUTO_ADJUST,
@@ -10,6 +11,7 @@ import {
   autoAdjustCommand,
   captureCommands,
   keyframeLimitReason,
+  matchValuesCommand,
   trackSamples,
   whiteBalanceCommands,
   windowSourceFrames,
@@ -22,6 +24,8 @@ import { createColorSettings, type ColorSettings, type ScalarColorSetting } from
 import { gradeColorAt, gradeKeyAsLayerKey } from '../../shared/grade.js';
 import { hasLayerKeys } from '../../shared/keyframes.js';
 import {
+  curvesTowardsMatch,
+  identityCurves,
   matchFrame,
   matchStyle,
   measureLook,
@@ -415,16 +419,22 @@ function estimateMatch(aim: MatchAim): Estimator {
     let match: FrameMatch | null;
     if ('look' in aim) {
       const correction = matchStyle(aim.look, graded);
-      match = correction && { correction, likeness: 0 };
+      match = correction && { correction, curves: null, likeness: 0 };
     } else match = matchFrame(aim.frame, graded);
     if (!match) throw tooUniform();
-    const values = towardsMatch(graded.color, match.correction, (input.intensity ?? 100) / 100);
-    const fields = { correction: values, ...('look' in aim ? {} : { likeness: Number(match.likeness.toFixed(2)) }) };
+    const intensity = (input.intensity ?? 100) / 100;
+    const values = towardsMatch(graded.color, match.correction, intensity);
+    const curves = match.curves && !identityCurves(match.curves) ? curvesTowardsMatch(match.curves, intensity) : null;
+    const fields = {
+      correction: values,
+      ...(curves && { curves }),
+      ...('look' in aim ? {} : { likeness: Number(match.likeness.toFixed(2)) }),
+    };
     const { grade } = target;
     if (!grade) return { fields, commands: [], unchanged: [] };
     if (input.applyAs === 'keyframe')
       return { fields, commands: captureCommands(grade.keyFrame!, values, grade.owner), unchanged: [] };
-    const command = autoAdjustCommand(grade.values, values, AUTO_ADJUST.balancedIntensity, grade.owner);
+    const command = matchValuesCommand(grade.values, values, curves, target.clip!.clip.id);
     return { fields, commands: command ? [command] : [], unchanged: animatedSettings(grade.values) };
   };
 }
@@ -440,18 +450,21 @@ type ShotValues = Partial<Record<ScalarColorSetting, number>>;
 
 /**
  * Each shot's values written into its clip's grade, which applies before any adjustment and stays with the
- * clip; settings the grade animates follow their keyframes and are left out. A cross-dissolve then blends the
- * two clips' grades.
+ * clip; settings the grade animates follow their keyframes and are left out. A match's curves go with them. A
+ * cross-dissolve then blends the two clips' grades.
  */
-export function shotCommands(shots: readonly { clip: PlacedClip; values: ShotValues }[]): EditCommand[] {
-  return shots.flatMap(({ clip, values }) => {
+export function shotCommands(
+  shots: readonly { clip: PlacedClip; values: ShotValues; curves?: ColorCurves }[],
+): EditCommand[] {
+  return shots.flatMap(({ clip, values, curves }) => {
     const { keyframes } = clip.clip.grade;
     const settings = Object.fromEntries(
       Object.entries(values).filter(([setting]) =>
         keyframes.every((key) => key.values[setting as ScalarColorSetting] === null),
       ),
     );
-    return Object.keys(settings).length ? [{ type: 'color-patch' as const, clipIds: [clip.clip.id], settings }] : [];
+    if (!Object.keys(settings).length && !curves) return [];
+    return [{ type: 'color-patch' as const, clipIds: [clip.clip.id], settings, ...(curves && { curves }) }];
   });
 }
 
@@ -464,7 +477,7 @@ async function estimateClips(
 ) {
   const results: { clipId: string; frames: number }[] = [];
   const commands: EditCommand[] = [];
-  const shots: { clip: PlacedClip; values: ShotValues }[] = [];
+  const shots: { clip: PlacedClip; values: ShotValues; curves?: ColorCurves }[] = [];
   let frames = 0;
   await forEachSerial(clips, async (clip) => {
     const { mediaId, sourceIn, sourceOut } = clip.clip;
@@ -482,8 +495,13 @@ async function estimateClips(
     frames += count;
     results.push({ clipId: clip.clip.id, frames: count, ...estimated.fields });
     commands.push(...estimated.commands);
-    const values = estimated.fields as { correction?: ShotValues; whiteBalance?: ShotValues };
-    if (input.applyAs === 'shots') shots.push({ clip, values: (values.correction ?? values.whiteBalance)! });
+    const values = estimated.fields as { correction?: ShotValues; whiteBalance?: ShotValues; curves?: ColorCurves };
+    if (input.applyAs === 'shots')
+      shots.push({
+        clip,
+        values: (values.correction ?? values.whiteBalance)!,
+        ...(values.curves && { curves: values.curves }),
+      });
   });
   commands.push(...shotCommands(shots));
   const clipsWord = clips.length === 1 ? `clip ${clips[0]!.clip.id}` : `${clips.length} clips`;

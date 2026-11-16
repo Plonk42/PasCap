@@ -4,8 +4,10 @@ Current contract for [#315](https://github.com/Plonk42/PasCap/issues/315) and
 [#314](https://github.com/Plonk42/PasCap/issues/314): **Match** grades clips so that a frame of
 each looks like a **reference**, a timeline frame as its grade shows it, a recording frame as
 shot, or a registered **style**, the look of the user's own finished edits. Like
-[Auto](AUTO_ADJUST.md) it only chooses values of the eleven settings Auto sets in
-[clip grades](CLIP_GRADES_AND_ADJUSTMENTS.md): no schema, render, export or decoder change.
+[Auto](AUTO_ADJUST.md) it chooses values of the eleven settings Auto sets in
+[clip grades](CLIP_GRADES_AND_ADJUSTMENTS.md), and for a clip whose curves are all identity its
+[curves](HSL_AND_CURVES.md) ([#326](https://github.com/Plonk42/PasCap/issues/326)): no schema,
+render, export or decoder change.
 
 Implementation authorities: [matching](../../src/shared/look-match.ts) (pure, every constant in
 `LOOK_MATCH`), [editor helpers](../../src/web/color-match.ts), the
@@ -59,11 +61,15 @@ or save change) with:
 - **Intensity** (0–100%, initially 100%): each clip's eleven settings move that far from their
   values at the matched frame to the match, Contrast and Saturation geometrically;
 - **Apply as** (one clip): **Grade values** replaces the grade's values of the eleven settings,
-  leaving animated settings unchanged (listed as **Animated, not changed: …**); **Keyframe at
-  playhead** keys the eleven at the matched source frame like their diamonds (unavailable off
-  the clip, or with 64 keyframes and none there), initial once the grade animates any of them;
-- **Apply** (**Apply to N clips**): one Undo step, one `color-patch` per clip or one
-  `layer-key-set`; **Cancel** restores the preview.
+  leaving animated settings unchanged (listed as **Animated, not changed: …**), and sets the
+  match's curves (below); **Keyframe at playhead** keys the eleven at the matched source frame
+  like their diamonds (unavailable off the clip, or with 64 keyframes and none there), initial
+  once the grade animates any of them, and never sets curves;
+- when the match sets curves on any clip, the line **Also sets the curves, where they were
+  identity.** (with Grade values) or **Keyframes leave the curves unchanged: Grade values sets
+  them.** (with Keyframe at playhead);
+- **Apply** (**Apply to N clips**): one Undo step, one `color-patch` per clip (settings and
+  curves) or one `layer-key-set`; **Cancel** restores the preview.
 
 The result scrolls into view, down to Apply, and the keyboard focus moves to Apply when it had
 left with the Match button.
@@ -116,6 +122,23 @@ different shots. The match follows the fit as far as the scenes are alike: from 
 similarity of 0.5 or less to the fit at 0.9 or more, linearly between (`likeness`), Contrast and
 Saturation geometrically.
 
+**Curves.** A clip whose four curves are all identity takes curves too; curves the user drew are
+never changed (the match then sets the eleven settings only). They start from the **reference's
+curves**, copied whatever the scenes like the reference's eleven settings, and the fit above runs
+with them. Then the clip's output with the matched settings and the reference's output are
+compared per channel, as 8-bit histograms of each picture: the red, green and blue values at the
+5th, 25th, 50th, 75th and 95th percentiles (nodes less than 0.03 apart in input, or within 0.03
+of black or white, left out). Each node moves its channel by the difference, robustly: below 0.004
+none, and differences well past 0.04 (what a scene shows rather than how it is graded) count less
+and less, as $d / (1 + (d/0.04)^2)$, so no node moves a channel by more than 0.02. Black and
+white move by the nearest node's shift, keeping 0 and 1 in range, and outputs never decrease.
+These follow the picture as far as the **square** of the likeness: none across scenes. Each
+channel's curve is this curve after the reference's (sampled at the nodes of both, at most 16);
+the master curve stays the reference's. They give a clip what the eleven settings cannot, such as
+cool shadows under warm highlights or a lift of only the lower midtones. **Intensity** moves each
+curve node from identity (0%) to the match (100%); styles set no curves (a style's look has no
+per-channel levels).
+
 ## Registered styles
 
 A **style** is the look of the user's finished edits. Implementation: [styles](../../src/shared/styles.ts),
@@ -147,8 +170,9 @@ less colorful footage takes a shot at least a quarter closer to its look than Au
 runs the same functions on FFmpeg-decoded proxy frames: one reference (`referenceClipId` and/or
 `referenceFrame`, or `referenceMediaId` with `referenceSourceFrame`, or `style`), one frame per
 target (`clipId` with `frame`, else the middle frame; each clip's middle frame with `clipIds` or
-`layerId` and `applyAs: shots`), `intensity` towards the match (100 % by default), and the
-`likeness` of each frame match.
+`layerId` and `applyAs: shots`), `intensity` towards the match (100 % by default), the
+`likeness` of each frame match, and its `curves` when it sets some (with values and shots, never
+keyframes).
 
 ## Evaluation
 
@@ -173,6 +197,30 @@ the reference picture) and flat footage (within 0.035), a frame matched to itsel
 exactly), another scene (the start), the reach, determinism, scene likeness, Intensity and
 styles.
 
+**Curves.** Every clip of "Sitre test 2" has the look's master curve, which the cases above keep
+(so curves are never set and the numbers are unchanged). The same cases with the clips' curves
+identity (as fresh clips are), a split-toned look (the owner's look with red lowered and blue
+raised in the shadows, the reverse in the highlights) and references as shot (the reference's
+picture as finished footage, so only the picture can be matched), against Match without curves:
+
+| Case                                            | Without curves | With curves | Worse cases |
+| ----------------------------------------------- | -------------- | ----------- | ----------- |
+| Same scene, camera changes, curves identity     | 2.34           | 1.93        | 5 / 30      |
+| Same scene, split-toned look                    | 7.68           | 1.90        | 0 / 30      |
+| Other scenes, curves identity                   | 6.17           | 6.01        | 9 / 30      |
+| Similar pairs, curves identity                  | 3.28           | 2.96        | 2 / 6       |
+| Same scene, reference as shot                   | 4.42           | 3.35        | 0 / 30      |
+| Same scene, split-toned look, reference as shot | 7.33           | 5.28        | 0 / 30      |
+| Other scenes, reference as shot                 | 9.82           | 9.82        | 0 / 30      |
+| Similar pairs, reference as shot                | 7.16           | 6.70        | 1 / 6       |
+
+"Worse cases" are those more than 0.05 worse. Across scenes only the reference's curves are
+copied: the cases that get worse were already far from their grades (9–35), where the look's
+S-curve widens a difference of exposure; with the clips' own master curve, as above, they are as
+far. Fitting a master curve to luma levels as well, or matching each channel's whole histogram
+without the robust loss, made the same scene and the pairs worse: a frame half a second later
+shows more sky or ground, which such curves copy.
+
 ## Limits
 
 - One frame per clip: light that changes within a clip needs a match keyed at several frames.
@@ -181,8 +229,11 @@ styles.
   under the result says which, and Intensity lowers the match.
 - Across scenes the match is only the reference's look plus Auto's difference of light: it is
   as good as Auto's balance of each frame.
-- Hue, HSL, curves, HDR, Local contrast, Shadows and Highlights of the reference are part of
-  what is measured but never set on the clip; Brightness, Highlights and Shadows keep the start.
+- Hue, HSL, HDR, Local contrast, Shadows and Highlights of the reference are part of what is
+  measured but never set on the clip; Brightness, Highlights and Shadows keep the start. Curves
+  are set only on clips whose curves are all identity.
+- Curves copy the reference's whatever the scenes: on another scene they shape a different
+  picture, as the reference's Contrast does.
 - A style is aimed at as statistics of other scenes: lower Intensity, or register styles per
   kind of scene. PNG stills are not read: the qualified FFmpeg build decodes JPEG only.
 - Each clip's fit takes about half a second on the editor's main thread.

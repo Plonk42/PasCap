@@ -15,6 +15,13 @@ import {
   type AutoCorrection,
   type ToneStatistics,
 } from './auto-adjust.js';
+import {
+  compileColorCurve,
+  isIdentityCurve,
+  type ColorCurvePoint,
+  type ColorCurves,
+  type CurveChannel,
+} from './advanced-color.js';
 import { createColorSettings, encode709, isNeutralColor, temperatureTintGains, type ColorSettings } from './color.js';
 import {
   contentBox,
@@ -74,6 +81,13 @@ export const LOOK_MATCH = Object.freeze({
   /** Scene likeness: the coarse grid compared, and the similarities between which the fit is trusted from not to fully. */
   grid: { columns: 16, rows: 9 },
   similar: { low: 0.5, high: 0.9 },
+  /**
+   * Red, green and blue curves (#326): nodes at these quantiles of each channel move it towards the reference's; nodes
+   * closer than `gap` in input are left out; a difference below `minimum` is none, and differences well past
+   * `robust` count less and less (a scene's content, not its grade); the curves follow the picture as far as the
+   * scene likeness squared.
+   */
+  curves: { quantiles: [0.05, 0.25, 0.5, 0.75, 0.95], gap: 0.03, minimum: 0.004, robust: 0.04 },
 });
 
 /**
@@ -285,6 +299,11 @@ export interface GradedFrame {
 /** A frame match: the eleven settings, and how far they follow the picture rather than its light and look. */
 export interface FrameMatch {
   correction: AutoCorrection;
+  /**
+   * The curves for a clip whose curves are all identity: the reference's, then each channel's remaining levels;
+   * null when the clip has curves of its own, which a match never changes.
+   */
+  curves: ColorCurves | null;
   /** 0 for different scenes (matched by light and look only) to 1 for the same scene (matched to the picture). */
   likeness: number;
 }
@@ -587,11 +606,111 @@ export function towardsMatch(
   return blended(elevenOf(current), matched, intensity);
 }
 
+export const identityCurves = (curves: Readonly<ColorCurves>): boolean =>
+  Object.values(curves).every((points) => isIdentityCurve(points));
+
+const CHANNELS = ['red', 'green', 'blue'] as const satisfies readonly CurveChannel[];
+const roundedCode = (value: number): number => Math.round(Math.min(1, Math.max(0, value)) * 1000) / 1000;
+
+/** Each channel's histogram of codes over the frame's picture, letterbox left out; null for a uniform frame. */
+function channelHistograms(frame: AnalysisFrame): Float64Array[] | null {
+  const box = contentBox(frame);
+  if (!box) return null;
+  const histograms = CHANNELS.map(() => new Float64Array(256));
+  for (let y = box.top; y <= box.bottom; y++)
+    for (let x = box.left; x <= box.right; x++) {
+      const index = (y * frame.width + x) * 4;
+      histograms.forEach((histogram, channel) => {
+        histogram[frame.data[index + channel]!]! += 1;
+      });
+    }
+  return histograms;
+}
+
+function histogramQuantile(histogram: Float64Array, q: number): number {
+  const target = q * histogram.reduce((sum, count) => sum + count, 0);
+  let cumulative = 0;
+  for (let code = 0; code < 256; code++) {
+    cumulative += histogram[code]!;
+    if (cumulative >= target) return code / 255;
+  }
+  return 1;
+}
+
+/**
+ * A monotone curve moving one channel's levels (`ours`) `share` of the way towards the reference's (`theirs`) at the
+ * curve quantiles, robustly, and continued to black and white at the same offsets.
+ */
+function channelCurve(ours: Float64Array, theirs: Float64Array, share: number): ColorCurvePoint[] {
+  const { quantiles, gap, minimum, robust } = LOOK_MATCH.curves;
+  const nodes: { x: number; shift: number }[] = [];
+  for (const q of quantiles) {
+    const x = histogramQuantile(ours, q);
+    if (x < gap || x > 1 - gap || (nodes.length && x - nodes.at(-1)!.x < gap)) continue;
+    const difference = histogramQuantile(theirs, q) - x;
+    const shift = Math.abs(difference) < minimum ? 0 : (share * difference) / (1 + (difference / robust) ** 2);
+    nodes.push({ x, shift });
+  }
+  if (!nodes.length)
+    return [
+      { x: 0, y: 0 },
+      { x: 1, y: 1 },
+    ];
+  const ends = [
+    { x: 0, shift: Math.max(0, nodes[0]!.shift) },
+    ...nodes,
+    { x: 1, shift: Math.min(0, nodes.at(-1)!.shift) },
+  ];
+  let floor = 0;
+  return ends.map(({ x, shift }) => {
+    floor = Math.max(floor, roundedCode(x + shift));
+    return { x: roundedCode(x), y: floor };
+  });
+}
+
+/**
+ * `outer` after `inner`, through the nodes of `inner` and those of `outer` at least the curve gap away from them while
+ * a curve can hold them.
+ */
+function composed(outer: readonly ColorCurvePoint[], inner: readonly ColorCurvePoint[]): ColorCurvePoint[] {
+  if (isIdentityCurve(outer)) return inner.map((point) => ({ ...point }));
+  if (isIdentityCurve(inner)) return outer.map((point) => ({ ...point }));
+  const after = compileColorCurve(outer);
+  const before = compileColorCurve(inner);
+  const inputs = inner.map((point) => point.x);
+  for (const { x } of outer)
+    if (inputs.length < 16 && inputs.every((input) => Math.abs(input - x) >= LOOK_MATCH.curves.gap)) inputs.push(x);
+  inputs.sort((left, right) => left - right);
+  return inputs.map((x) => ({ x, y: roundedCode(after(before(x))) }));
+}
+
+/**
+ * The curves of a match: `start` (the reference's), followed by red, green and blue curves bringing each channel of the
+ * target's output at the curve quantiles towards the reference output's, as far as `share`.
+ */
+function matchCurves(
+  reference: AnalysisFrame,
+  output: AnalysisFrame,
+  start: Readonly<ColorCurves>,
+  share: number,
+): ColorCurves {
+  const theirs = channelHistograms(reference);
+  const ours = channelHistograms(output);
+  const curves = structuredClone(start) as ColorCurves;
+  if (!theirs || !ours || share <= 0) return curves;
+  CHANNELS.forEach((channel, index) => {
+    curves[channel] = composed(channelCurve(ours[index]!, theirs[index]!, share), start[channel]);
+  });
+  return curves;
+}
+
 /**
  * The eleven settings that make `target`, with its grade's other settings, look like `reference` as its grade shows
  * it. They start from the reference's settings with the frames' difference of light (see frameStart), then follow the
  * fitted picture as far as the scenes are alike: statistics of different scenes differ by what they show, which no
- * grade should copy. Null when either frame has no usable pixels.
+ * grade should copy. A target whose curves are all identity takes the reference's curves, fitted with them, and
+ * per-channel curves for the levels left, which follow the picture more strictly still. Null when either frame has no
+ * usable pixels.
  */
 export function matchFrame(reference: GradedFrame, target: GradedFrame): FrameMatch | null {
   const look = measureLook([reference.frame], reference.color);
@@ -599,10 +718,28 @@ export function matchFrame(reference: GradedFrame, target: GradedFrame): FrameMa
   const small = reduced(reference.frame);
   const color = chromaBalance(rendered([small], unsaturated(elevenOf(reference.color)), reference.color));
   const start = frameStart(reference, target);
-  const fitted = fitLook(look, [target.frame], target.color, start, FRAME_BOUNDS, color);
+  const ownCurves = !identityCurves(target.color.curves);
+  const base = ownCurves ? target.color : { ...target.color, curves: reference.color.curves };
+  const fitted = fitLook(look, [target.frame], base, start, FRAME_BOUNDS, color);
   if (!fitted) return null;
   const likeness = sceneLikeness(frameSimilarity(reference.frame, target.frame));
-  return { correction: blended(start, fitted, likeness), likeness };
+  const correction = blended(start, fitted, likeness);
+  if (ownCurves) return { correction, curves: null, likeness };
+  const [referenceOutput] = rendered([small], elevenOf(reference.color), reference.color);
+  const [output] = rendered([reduced(target.frame)], correction, base);
+  return { correction, curves: matchCurves(referenceOutput!, output!, base.curves, likeness ** 2), likeness };
+}
+
+/** Curves of a match moved `intensity` (0–1) of the way from identity, the curves of the clip it is for. */
+export function curvesTowardsMatch(curves: Readonly<ColorCurves>, intensity: number): ColorCurves {
+  if (!Number.isFinite(intensity) || intensity < 0 || intensity > 1)
+    throw new Error('Intensity must be between 0 and 100%.');
+  return Object.fromEntries(
+    Object.entries(curves).map(([channel, points]) => [
+      channel,
+      points.map(({ x, y }) => ({ x, y: roundedCode(x + (y - x) * intensity) })),
+    ]),
+  ) as unknown as ColorCurves;
 }
 
 /**

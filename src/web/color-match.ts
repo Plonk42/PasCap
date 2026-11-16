@@ -1,9 +1,17 @@
-import { AUTO_ADJUST, AUTO_ADJUST_SETTINGS, type AutoAdjustSetting } from '../shared/auto-adjust.js';
-import { animatedSettings, autoAdjustCommand, captureCommands, keyframeLimitReason } from '../shared/auto-color.js';
+import { AUTO_ADJUST_SETTINGS, type AutoAdjustSetting } from '../shared/auto-adjust.js';
+import { animatedSettings, captureCommands, keyframeLimitReason, matchValuesCommand } from '../shared/auto-color.js';
 import { compilePixelGrade, createColorSettings, type ColorSettings } from '../shared/color.js';
 import type { EditCommand } from '../shared/commands.js';
 import { gradeColorAt } from '../shared/grade.js';
-import { matchFrame, matchStyle, towardsMatch, type FrameMatch, type GradedFrame } from '../shared/look-match.js';
+import {
+  curvesTowardsMatch,
+  identityCurves,
+  matchFrame,
+  matchStyle,
+  towardsMatch,
+  type FrameMatch,
+  type GradedFrame,
+} from '../shared/look-match.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
@@ -282,7 +290,7 @@ export async function analyzeMatch(
     const { look } = reference.style;
     fit = (target) => {
       const correction = matchStyle(look, target);
-      return correction && { correction, likeness: 0 };
+      return correction && { correction, curves: null, likeness: 0 };
     };
   } else {
     const graded = { frame: await referenceFrame(reference, signal), color: reference.color };
@@ -316,7 +324,8 @@ export function keyframeReason(project: ProjectDocument, parts: readonly MatchPa
 
 /**
  * The edit Match applies in one Undo step, each part moved `intensity` (0–1) of the way from its grade to its match:
- * each clip grade's values (animated settings left unchanged), or a keyframe of the eleven at the matched frame.
+ * each clip grade's values (animated settings left unchanged) and curves, or a keyframe of the eleven at the matched
+ * frame, curves left out.
  */
 export function matchCommands(
   project: ProjectDocument,
@@ -332,9 +341,15 @@ export function matchCommands(
     if (!owner || !match) return [];
     const values = towardsMatch(partColor(part), match.correction, intensity);
     if (apply === 'keyframe') return captureCommands(part.sourceFrame, values, { kind: 'clip', clipId });
-    const edit = autoAdjustCommand(owner, values, AUTO_ADJUST.balancedIntensity, { kind: 'clip', clipId });
+    const curves = match.curves && curvesTowardsMatch(match.curves, intensity);
+    const edit = matchValuesCommand(owner, values, curves, clipId);
     return edit ? [edit] : [];
   });
+}
+
+/** Whether a match sets curves on any part: clips whose curves were all identity, when the match needs some. */
+export function matchSetsCurves(matched: MatchResults): boolean {
+  return [...matched.values()].some((match) => match.curves !== null && !identityCurves(match.curves));
 }
 
 /** The settings a Grade values match leaves unchanged on some part, because its grade animates them. */

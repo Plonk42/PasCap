@@ -1,5 +1,11 @@
 import { renderFlat, type AutoCorrection } from '../../src/shared/auto-adjust.js';
-import { decode709, encode709, temperatureTintGains } from '../../src/shared/color.js';
+import {
+  createColorSettings,
+  decode709,
+  encode709,
+  temperatureTintGains,
+  type ColorSettings,
+} from '../../src/shared/color.js';
 import type { AnalysisFrame } from '../../src/shared/white-balance.js';
 
 /** Synthetic footage for the color estimators' tests. */
@@ -78,11 +84,15 @@ export function flat(pixel: Pixel): Pixel {
 export const frames = (count: number, pixel: (seed: number) => Pixel): AnalysisFrame[] =>
   Array.from({ length: count }, (_, index) => frame(pixel(index + 1)));
 
-/** The frame as PasCap renders it with the correction, for flat areas: Shadows/Highlights on itself. */
-export function apply(input: AnalysisFrame, correction: AutoCorrection): AnalysisFrame {
+/** The frame as PasCap renders it with the correction and `base`'s other settings, for flat areas: Shadows/Highlights on itself. */
+export function apply(
+  input: AnalysisFrame,
+  correction: AutoCorrection,
+  base: ColorSettings = createColorSettings(),
+): AnalysisFrame {
   const { temperature, tint, saturation, vibrance, ...tone } = correction;
   const gains = temperatureTintGains({ temperature, tint });
-  const render = renderFlat({ temperature, tint }, tone, { saturation, vibrance });
+  const render = renderFlat({ temperature, tint }, tone, { saturation, vibrance }, base);
   const data = new Uint8ClampedArray(input.data.length);
   for (let index = 0; index < data.length; index += 4) {
     const balanced = [0, 1, 2].map((channel) => decode709(input.data[index + channel]! / 255) * gains[channel]!);

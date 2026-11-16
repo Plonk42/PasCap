@@ -1,3 +1,4 @@
+import { isIdentityCurve, type ColorCurves } from './advanced-color.js';
 import {
   AUTO_ADJUST,
   AUTO_ADJUST_SETTINGS,
@@ -71,6 +72,22 @@ export function autoAdjustCommand(
   return owner.kind === 'clip'
     ? { type: 'color-patch', clipIds: [owner.clipId], settings: values }
     : { type: 'color-patch', adjustmentId: owner.adjustmentId, settings: values };
+}
+
+/**
+ * Match's Grade values edit of a clip grade: the eleven settings as Auto writes them, with `curves` when they are not
+ * identity. Null when nothing is left to change.
+ */
+export function matchValuesCommand(
+  grade: GradeValues,
+  values: Readonly<AutoCorrection>,
+  curves: ColorCurves | null,
+  clipId: string,
+): EditCommand | null {
+  const edit = autoAdjustCommand(grade, values, AUTO_ADJUST.balancedIntensity, { kind: 'clip', clipId });
+  if (!curves || Object.values(curves).every((points) => isIdentityCurve(points))) return edit;
+  const settings = edit?.type === 'color-patch' ? edit.settings : undefined;
+  return { type: 'color-patch', clipIds: [clipId], ...(settings && { settings }), curves };
 }
 
 /** Source frames shown at the project frames within 1 s of `frame` in `clip`, each once. */

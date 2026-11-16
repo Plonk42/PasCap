@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import path from 'node:path';
+import { createColorCurves, type ColorCurves } from '../../src/shared/advanced-color.js';
 import { AUTO_ADJUST_SETTINGS, type AutoCorrection } from '../../src/shared/auto-adjust.js';
 import type { ColorSettings } from '../../src/shared/color.js';
 import { matchFrame, matchStyle, measureLook, towardsMatch } from '../../src/shared/look-match.js';
@@ -215,6 +216,60 @@ test('matches several selected clips, each at the playhead or its middle frame, 
   expect(gradeOf(after, 'hero')).toEqual(gradeOf(before, 'hero'));
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect.poll(async () => (await current(page)).clips).toEqual(before.clips);
+});
+
+test('sets the curves of a clip without any with the match, never in a keyframe', async ({ page }) => {
+  const split: ColorCurves = {
+    ...createColorCurves(),
+    red: [
+      { x: 0, y: 0 },
+      { x: 0.25, y: 0.2 },
+      { x: 1, y: 1 },
+    ],
+    blue: [
+      { x: 0, y: 0.04 },
+      { x: 0.75, y: 0.7 },
+      { x: 1, y: 0.96 },
+    ],
+  };
+  const start = await current(page);
+  await page.evaluate((next) => window.pascapLab!.setDocument(next), {
+    ...start,
+    clips: start.clips.map((clip) =>
+      clip.id === 'hero' ? { ...clip, grade: { ...clip.grade, color: { ...clip.grade.color, curves: split } } } : clip,
+    ),
+  });
+  await seek(page, 10);
+  await inspectorTab(page, 'Clip grade');
+  await usePlayhead(page).click();
+  await selectClip(page, 'shot', 70);
+  const before = await current(page);
+  await matchButton(page).click();
+  await expect(apply(page)).toBeVisible({ timeout: 30_000 });
+  await expect(section(page)).toContainText('Also sets the curves, where they were identity.');
+  expect(await current(page)).toEqual(before);
+
+  const shotColor = gradeOf(before, 'shot').color;
+  const matched = matchFrame(
+    { frame: await pageFrame(page, assets[0]!.id, 10), color: gradeOf(before, 'hero').color },
+    { frame: await pageFrame(page, assets[1]!.id, 10), color: shotColor },
+  )!;
+  expect(matched.curves).not.toEqual(createColorCurves());
+  await apply(page).click();
+  await expect.poll(async () => gradeOf(await current(page), 'shot').color.curves).toEqual(matched.curves);
+  expect(eleven(gradeOf(await current(page), 'shot').color)).toEqual(towardsMatch(shotColor, matched.correction, 1));
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect.poll(async () => gradeOf(await current(page), 'shot')).toEqual(gradeOf(before, 'shot'));
+
+  // A keyframe leaves them identity.
+  await matchButton(page).click();
+  await section(page)
+    .getByRole('radio', { name: /Keyframe at playhead/ })
+    .check();
+  await expect(section(page)).toContainText('Keyframes leave the curves unchanged: Grade values sets them.');
+  await apply(page).click();
+  await expect.poll(async () => gradeOf(await current(page), 'shot').keyframes).toHaveLength(1);
+  expect(gradeOf(await current(page), 'shot').color).toEqual(shotColor);
 });
 
 test('keeps the reference per project from a clip menu, Source preview and styles', async ({ page }) => {

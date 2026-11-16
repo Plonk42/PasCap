@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { createColorCurves, evaluateColorCurve, type ColorCurves } from '../../src/shared/advanced-color.js';
 import { analyzeAutoAdjust, AUTO_ADJUST_SETTINGS, type AutoCorrection } from '../../src/shared/auto-adjust.js';
 import { createColorSettings, type ColorSettings } from '../../src/shared/color.js';
 import {
+  curvesTowardsMatch,
   frameSimilarity,
   matchFrame,
   matchStyle,
@@ -128,6 +130,76 @@ describe('Scene likeness', () => {
     expect(sceneLikeness(0.5)).toBe(0);
     expect(sceneLikeness(0.7)).toBeCloseTo(0.5, 5);
     expect(sceneLikeness(0.95)).toBe(1);
+  });
+});
+
+describe('Match curves', () => {
+  const hero = frame(scene(1));
+  /** Cool shadows and warm highlights over LOOK. */
+  const SPLIT: ColorCurves = {
+    ...createColorCurves(),
+    red: [
+      { x: 0, y: 0 },
+      { x: 0.25, y: 0.2 },
+      { x: 0.75, y: 0.8 },
+      { x: 1, y: 1 },
+    ],
+    blue: [
+      { x: 0, y: 0.04 },
+      { x: 0.25, y: 0.3 },
+      { x: 0.75, y: 0.7 },
+      { x: 1, y: 0.96 },
+    ],
+  };
+  const SPLIT_LOOK = { ...LOOK, curves: SPLIT };
+  const heroOutput = apply(hero, eleven(LOOK), SPLIT_LOOK);
+  const shot = frame(scene(1, { gain: 0.6, light: [1.15, 1, 0.85] }));
+  const withCurves = (curves: ColorCurves | null): ColorSettings => ({
+    ...createColorSettings(),
+    ...(curves && { curves }),
+  });
+
+  it('takes a graded reference’s curves on a clip without any', () => {
+    const result = match(hero, SPLIT_LOOK, shot);
+    expect(result.curves).not.toBeNull();
+    const after = difference(apply(shot, result.correction, withCurves(result.curves)), heroOutput);
+    expect(after).toBeLessThan(0.03);
+    expect(difference(apply(shot, result.correction), heroOutput)).toBeGreaterThan(after * 1.5);
+    // Another scene takes them too, like the reference's eleven settings.
+    expect(match(hero, SPLIT_LOOK, frame(scene(50))).curves).toEqual(SPLIT);
+  });
+
+  it('brings each channel towards a split-toned picture as shot', () => {
+    const result = match(heroOutput, createColorSettings(), shot);
+    const { red, blue } = result.curves!;
+    // Blue rises over red in the shadows and falls under it in the highlights.
+    expect(evaluateColorCurve(blue, 0.15) - evaluateColorCurve(red, 0.15)).toBeGreaterThan(0.01);
+    expect(evaluateColorCurve(red, 0.85) - evaluateColorCurve(blue, 0.85)).toBeGreaterThan(0.01);
+    const without = difference(apply(shot, result.correction), heroOutput);
+    expect(difference(apply(shot, result.correction, withCurves(result.curves)), heroOutput)).toBeLessThan(
+      without * 0.85,
+    );
+  });
+
+  it('leaves the curves identity when the picture needs none', () => {
+    expect(match(hero, createColorSettings(), hero).curves).toEqual(createColorCurves());
+    expect(match(hero, LOOK, hero).curves).toEqual(createColorCurves());
+  });
+
+  it('never changes curves the clip has', () => {
+    const own = { ...createColorSettings(), curves: { ...createColorCurves(), master: SPLIT.red } };
+    expect(matchFrame({ frame: hero, color: SPLIT_LOOK }, { frame: shot, color: own })!.curves).toBeNull();
+  });
+
+  it('scales the curves with Intensity and is deterministic', () => {
+    const curves = match(hero, SPLIT_LOOK, shot).curves!;
+    expect(match(hero, SPLIT_LOOK, shot).curves).toEqual(curves);
+    expect(curvesTowardsMatch(curves, 0)).toEqual(
+      Object.fromEntries(Object.entries(curves).map(([key, points]) => [key, points.map(({ x }) => ({ x, y: x }))])),
+    );
+    expect(curvesTowardsMatch(curves, 1)).toEqual(curves);
+    expect(curvesTowardsMatch(curves, 0.5).blue[0]!.y).toBeCloseTo(curves.blue[0]!.y / 2, 3);
+    expect(() => curvesTowardsMatch(curves, -0.1)).toThrow(/Intensity/);
   });
 });
 

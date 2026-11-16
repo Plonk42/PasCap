@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { curvesSchema } from '../advanced-color.js';
 import { AUTO_ADJUST, AUTO_ADJUST_SETTINGS } from '../auto-adjust.js';
 import { editCommandSchema } from '../command-schema.js';
 import { described } from '../described.js';
@@ -116,6 +117,10 @@ export const estimate = defineOperation({
         correctionSchema.optional(),
         'auto-adjust and match: the eleven Color settings at the intensity asked.',
       ),
+      curves: described(
+        curvesSchema.optional(),
+        "match with a reference frame, for a clip whose curves are all identity: the reference's curves with each channel brought towards its levels, at the intensity asked; absent when the clip has curves of its own, which a match keeps, or needs none. Keyframes never set them.",
+      ),
       whiteBalance: described(whiteBalanceSchema.optional(), 'white-balance: Temperature and Tint.'),
       detail: described(
         detailResultSchema.optional(),
@@ -129,6 +134,7 @@ export const estimate = defineOperation({
                 clipId: described(idSchema, 'The clip.'),
                 frames: described(z.number().int().nonnegative(), 'Proxy frames analyzed.'),
                 correction: described(correctionSchema.optional(), 'auto-adjust and match: its correction.'),
+                curves: described(curvesSchema.optional(), 'match: its curves, as the top-level curves.'),
                 likeness: described(z.number().optional(), 'match with a reference frame: as the top-level likeness.'),
                 whiteBalance: described(whiteBalanceSchema.optional(), 'white-balance: its Temperature and Tint.'),
                 detail: described(detailResultSchema.optional(), 'detail: its measurements and suggestion.'),

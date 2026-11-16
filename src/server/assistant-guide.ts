@@ -99,7 +99,8 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   correction into its clip grade in one call; dissolves blend the two grades. To make shots look
   alike, estimate kind match with a reference frame (referenceClipId and referenceFrame, as the
   hero's grade shows it) gives each other clip its light and look, frame to frame, leaving the hero
-  unchanged; kind match with style aims at a registered style. Keep adjustments
+  unchanged, and the hero's curves to clips without curves of their own; kind match with style aims
+  at a registered style. Keep adjustments
   for the look shared by every shot of a stretch.
 - Every edit command follows one rule: a listed setting takes its value, null returns it to
   neutral, and what it leaves out keeps its value. color-patch changes Color settings of clips
