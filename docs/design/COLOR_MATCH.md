@@ -23,9 +23,14 @@ Implementation authorities: [matching](../../src/shared/look-match.ts) (pure, ev
 adjustment) are selected, above Color; adjustments have no Match. It is expanded by default
 (preference `pascap-section-match`).
 
-**The reference** is shown at the top of the section: the reference frame with its grade's
-settings applied on the CPU (Shadows, Highlights, HDR, Local contrast and Detail left out, which
-need the whole image), its recording's name and what it is (**Timeline frame, as graded**,
+**The reference** is shown at the top of the section: the reference frame alone through its
+grade's Color and its clip's Detail (HDR, Local contrast and Detail included), rendered by the
+service like an export (editor operation `reference_still`, 1280 × 720); while the service cannot
+render, during an export, the editor grades the analysis frame itself without the local looks.
+**Holding the image** (pointer or Space/Enter) shows it over the preview, fitted like the timeline,
+with the badge **Reference · <name>**, to compare at full size with the matched clip; release,
+pointer cancel or leaving the window restores the preview. Beside it are its recording's name and
+what it is (**Timeline frame, as graded**,
 **Recording frame, as shot**, **Registered style**). It is set by:
 
 - **Use playhead frame**: the clip the timeline shows on top at the playhead, at the source

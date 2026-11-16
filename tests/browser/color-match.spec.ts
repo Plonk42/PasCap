@@ -195,6 +195,35 @@ test('matches a clip frame to the timeline frame at the playhead, previewing bef
   expect(styleRequests).toBe(0);
 });
 
+test('shows the reference over the preview while its image is held, rendered like an export', async ({ page }) => {
+  await seek(page, 10);
+  await inspectorTab(page, 'Clip grade');
+  await usePlayhead(page).click();
+  const thumbnail = page.getByRole('button', { name: 'Hold to show the reference in the preview', exact: true });
+  const image = thumbnail.locator('img');
+  await expect(image).toBeVisible();
+  // The service's still at the composition size, not the frame graded here at the analysis size.
+  await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.naturalWidth)).toBe(1280);
+  const overlay = page.locator('.preview-reference-overlay');
+  await expect(overlay).toHaveCount(0);
+  const box = (await thumbnail.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(overlay).toBeVisible();
+  await expect(page.locator('.preview-comparison-overlay')).toHaveText('Reference · pattern-a');
+  await expect(thumbnail).toHaveAttribute('aria-pressed', 'true');
+  await page.mouse.up();
+  await expect(overlay).toHaveCount(0);
+  await expect(thumbnail).toHaveAttribute('aria-pressed', 'false');
+  // The keyboard holds it too.
+  await thumbnail.focus();
+  await page.keyboard.down('Space');
+  await expect(overlay).toBeVisible();
+  await page.keyboard.up('Space');
+  await expect(overlay).toHaveCount(0);
+  expect(memory.saves).toBe(0);
+});
+
 test('matches several selected clips, each at the playhead or its middle frame, in one Undo step', async ({ page }) => {
   await seek(page, 10);
   await inspectorTab(page, 'Clip grade');

@@ -4,6 +4,7 @@ import { formatTimecode } from '../shared/timing.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
 import './preview-comparison.css';
+import { useShownReference } from './reference-preview.js';
 import { useBypassedSetting } from './setting-bypass.js';
 import { TimecodeField } from './TimecodeField.js';
 import { useDelayedFlag } from './use-delayed-flag.js';
@@ -164,6 +165,7 @@ export function PreviewPanel({
   };
   const original = diagnostics?.ungraded ? (diagnostics.original ?? 'all') : null;
   const bypassed = useBypassedSetting();
+  const reference = useShownReference();
   return (
     <section className="preview-panel" aria-label="Preview">
       <div className="preview-heading preview-comparison-heading">
@@ -229,8 +231,10 @@ export function PreviewPanel({
             {diagnostics?.message}
           </div>
         )}
-        {original && <span className="preview-comparison-overlay">{ORIGINAL_BADGES[original]}</span>}
-        {!original && bypassed && <span className="preview-comparison-overlay">Without {bypassed}</span>}
+        {reference && <img className="preview-reference-overlay" src={reference.url} alt="" />}
+        {reference && <span className="preview-comparison-overlay">Reference · {reference.label}</span>}
+        {!reference && original && <span className="preview-comparison-overlay">{ORIGINAL_BADGES[original]}</span>}
+        {!reference && !original && bypassed && <span className="preview-comparison-overlay">Without {bypassed}</span>}
       </div>
       <div className="transport">
         <span className="transport-note">

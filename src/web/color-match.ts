@@ -2,6 +2,7 @@ import { AUTO_ADJUST_SETTINGS, type AutoAdjustSetting } from '../shared/auto-adj
 import { animatedSettings, captureCommands, keyframeLimitReason, matchValuesCommand } from '../shared/auto-color.js';
 import { compilePixelGrade, createColorSettings, type ColorSettings } from '../shared/color.js';
 import type { EditCommand } from '../shared/commands.js';
+import { NEUTRAL_DETAIL, type DetailSettings } from '../shared/detail.js';
 import { gradeColorAt } from '../shared/grade.js';
 import {
   curvesTowardsMatch,
@@ -25,6 +26,7 @@ import { readyAsset } from './auto-white-balance.js';
 import { gradeOwnerOf, sourceFrameAt } from './color-owner.js';
 import type { ColorReference } from './color-reference.js';
 import { shortName } from './display.js';
+import { callOperation } from './operations.js';
 
 /** Where Color → Match runs: the selected clips, at the playhead. */
 export interface MatchContext {
@@ -59,6 +61,8 @@ export type ResolvedReference =
       asset: MediaAsset;
       sourceFrame: number;
       color: ColorSettings;
+      /** The reference clip's Detail, neutral for a recording as shot. */
+      filters: DetailSettings;
       /** "DJI_0277 · timeline frame, as graded". */
       label: string;
       detail: string;
@@ -99,11 +103,12 @@ export function resolveReference(
     return {
       value: {
         kind: 'clip',
-        key: `clip:${clip.id}:${asset.id}:${preparedAt(asset)}:${reference.sourceFrame}:${JSON.stringify(color)}`,
+        key: `clip:${clip.id}:${asset.id}:${preparedAt(asset)}:${reference.sourceFrame}:${JSON.stringify(color)}:${JSON.stringify(clip.detail)}`,
         clipId: clip.id,
         asset,
         sourceFrame: reference.sourceFrame,
         color,
+        filters: clip.detail,
         label: shortName(asset.name),
         detail: 'Timeline frame, as graded',
       },
@@ -120,6 +125,7 @@ export function resolveReference(
       asset,
       sourceFrame: reference.sourceFrame,
       color: createColorSettings(),
+      filters: { ...NEUTRAL_DETAIL },
       label: shortName(asset.name),
       detail: 'Recording frame, as shot',
     },
@@ -251,15 +257,40 @@ const TOO_UNIFORM = 'This frame is too dark or too uniform to match.';
 
 const thumbnails = new Map<string, string>();
 /**
- * The reference frame as its grade shows it (Shadows, Highlights, HDR and Detail aside, which need the whole image), as
- * an image URL for the Match section.
+ * The reference frame as its grade shows it, as an image URL: rendered by the service like an export (HDR, Local
+ * contrast and Detail included), else, while it cannot render (during an export), graded here without them.
  */
-export async function referenceThumbnail(
+export async function referenceImage(
   reference: ResolvedReference & { kind: 'clip' | 'recording' },
   signal: AbortSignal,
 ): Promise<string> {
   const known = thumbnails.get(reference.key);
   if (known) return known;
+  const url = await callOperation(
+    'reference_still',
+    {
+      mediaId: reference.asset.id,
+      sourceFrame: reference.sourceFrame,
+      color: reference.color,
+      detail: reference.filters,
+    },
+    { signal },
+  ).then(
+    ({ image }) => `data:${image.mimeType};base64,${image.data}`,
+    (cause: unknown) => {
+      if (signal.aborted) throw cause;
+      return gradedHere(reference, signal);
+    },
+  );
+  thumbnails.set(reference.key, url);
+  if (thumbnails.size > KEPT_REFERENCE_FRAMES) thumbnails.delete(thumbnails.keys().next().value!);
+  return url;
+}
+
+async function gradedHere(
+  reference: ResolvedReference & { kind: 'clip' | 'recording' },
+  signal: AbortSignal,
+): Promise<string> {
   const frame = await referenceFrame(reference, signal);
   const grade = compilePixelGrade(reference.color);
   const pixels = new ImageData(frame.width, frame.height);
@@ -272,10 +303,7 @@ export async function referenceThumbnail(
   canvas.width = frame.width;
   canvas.height = frame.height;
   canvas.getContext('2d')?.putImageData(pixels, 0, 0);
-  const url = canvas.toDataURL('image/jpeg', 0.85);
-  thumbnails.set(reference.key, url);
-  if (thumbnails.size > KEPT_REFERENCE_FRAMES) thumbnails.delete(thumbnails.keys().next().value!);
-  return url;
+  return canvas.toDataURL('image/jpeg', 0.85);
 }
 
 /** Decodes the reference frame and each part's frame from their proxies, one at a time, and matches each part. */

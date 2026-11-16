@@ -16,7 +16,7 @@ import {
   matchParts,
   matchSetsLook,
   referenceAtPlayhead,
-  referenceThumbnail,
+  referenceImage,
   rememberMatch,
   resolveReference,
   type MatchApply,
@@ -26,6 +26,7 @@ import {
   type ResolvedReference,
 } from './color-match.js';
 import { sameReference, setColorReference, useColorReference, type ColorReference } from './color-reference.js';
+import { showReference } from './reference-preview.js';
 import { settingLabel } from './auto-adjust.js';
 import { HelpPopover } from './HelpPopover.js';
 import { Icon } from './icons.js';
@@ -517,13 +518,14 @@ function ReferenceCard({
   );
 }
 
-/** The reference frame as graded, or a style's swatch. */
+/** The reference frame as graded, held to show it over the preview; or a style's swatch. */
 function ReferenceImage({ resolved }: Readonly<{ resolved: ResolvedReference | null }>) {
   const [image, setImage] = useState<{ key: string; url: string } | null>(null);
+  const [held, setHeld] = useState(false);
   useEffect(() => {
     if (!resolved || resolved.kind === 'style') return;
     const abort = new AbortController();
-    referenceThumbnail(resolved, abort.signal).then(
+    referenceImage(resolved, abort.signal).then(
       (url) => {
         if (!abort.signal.aborted) setImage({ key: resolved.key, url });
       },
@@ -531,6 +533,17 @@ function ReferenceImage({ resolved }: Readonly<{ resolved: ResolvedReference | n
     );
     return () => abort.abort();
   }, [resolved?.key]);
+  const release = useRef(() => {
+    showReference(null);
+    setHeld(false);
+  }).current;
+  useEffect(() => {
+    window.addEventListener('blur', release);
+    return () => {
+      window.removeEventListener('blur', release);
+      release();
+    };
+  }, [release]);
   if (!resolved) return <span className="color-match-thumbnail" aria-hidden="true" />;
   if (resolved.kind === 'style')
     return (
@@ -538,9 +551,45 @@ function ReferenceImage({ resolved }: Readonly<{ resolved: ResolvedReference | n
         <Icon name="star" size={18} />
       </span>
     );
+  const url = image?.key === resolved.key ? image.url : null;
+  const hold = (): void => {
+    if (!url) return;
+    showReference({ url, label: resolved.label });
+    setHeld(true);
+  };
   return (
-    <span className="color-match-thumbnail">
-      {image?.key === resolved.key && <img src={image.url} alt={`Reference frame of ${resolved.label}`} />}
-    </span>
+    <button
+      type="button"
+      className="color-match-thumbnail"
+      aria-label="Hold to show the reference in the preview"
+      aria-pressed={held}
+      aria-disabled={!url || undefined}
+      title="Hold to show the reference frame in the preview, as large as the timeline"
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        hold();
+      }}
+      onPointerUp={release}
+      onPointerCancel={release}
+      onLostPointerCapture={release}
+      onKeyDown={(event) => {
+        if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) {
+          event.preventDefault();
+          hold();
+        }
+      }}
+      onKeyUp={(event) => {
+        if (event.key === ' ' || event.key === 'Enter') release();
+      }}
+      onBlur={release}
+    >
+      {url && <img src={url} alt="" />}
+      {url && (
+        <span className="color-match-thumbnail-eye" aria-hidden="true">
+          <Icon name="eye" size={11} />
+        </span>
+      )}
+    </button>
   );
 }

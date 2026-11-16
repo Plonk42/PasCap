@@ -547,7 +547,9 @@ or reorder clips. Adjustments have no Auto: set their sliders yourself. See
   the footage folders (read where they are, never copied or changed) or delete one.
 
 The section shows the reference with its image and remembers it for the project in this
-browser, while you select other clips. Then select the clip to match, put the playhead on the
+browser, while you select other clips. Hold the image to see the reference in the preview at
+full size, as the export renders it, and release to see your clip again. Then select the clip to
+match, put the playhead on the
 frame that should look like the reference, and choose **Match**. With several clips selected
 (Ctrl-click), **Match N clips** matches each one, at the playhead when it is over the clip,
 otherwise at its middle frame. A clip is never matched at the reference frame itself.

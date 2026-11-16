@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { colorSchema } from '../color.js';
 import { referencedEditCommandSchema } from '../command-schema.js';
 import { described } from '../described.js';
+import { detailSchema } from '../detail.js';
 import { frameSchema, idSchema } from '../model.js';
 import { MAX_EDIT_COMMANDS } from './edit.js';
 import { defineOperation, revisionReadSchema } from './spec.js';
@@ -103,6 +105,24 @@ export const timelineSheet = defineOperation({
   output: projectPicture,
   access: 'read',
   audience: ['editor', 'assistant'],
+});
+
+export const referenceStill = defineOperation({
+  name: 'reference_still',
+  title: 'Render reference frame',
+  description:
+    "Render one source frame of a prepared video recording alone, through a grade's Color and a clip's Detail, as the export composes them (HDR, Local contrast and Detail included), at the 1280 × 720 still size: Color → Match's reference.",
+  input: z
+    .object({
+      mediaId: described(idSchema, 'ID of a prepared video recording.'),
+      sourceFrame: described(frameSchema, 'Source frame of the recording.'),
+      color: described(colorSchema.optional(), 'The Color to render it through; neutral when absent.'),
+      detail: described(detailSchema.optional(), 'The Detail to render it through; neutral when absent.'),
+    })
+    .strict(),
+  output: z.object({ image: imageSchema }).strict(),
+  access: 'read',
+  audience: ['editor'],
 });
 
 export const recordingSheet = defineOperation({

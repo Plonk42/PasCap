@@ -8,7 +8,7 @@ import { handOffReadiness } from './hand-off.js';
 import { listProjects } from './list-projects.js';
 import { checkAlignment, musicAnalysis, snapCutsToBeats } from './music.js';
 import { musicWaveform } from './music-waveform.js';
-import { compareRecordings, recordingSheet, still, timelineSheet } from './pictures.js';
+import { compareRecordings, recordingSheet, referenceStill, still, timelineSheet } from './pictures.js';
 import {
   checkpoint,
   checkpointCopy,
@@ -42,6 +42,7 @@ export const operations = [
   still,
   timelineSheet,
   recordingSheet,
+  referenceStill,
   compareRecordings,
   estimate,
   listStyles,

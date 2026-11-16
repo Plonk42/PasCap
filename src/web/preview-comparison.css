@@ -91,3 +91,14 @@
   overflow-wrap: anywhere;
   pointer-events: none;
 }
+
+/* The held Match reference, fitted like the canvas: both are the 1280 × 720 composition. */
+.preview-reference-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #060a07;
+  pointer-events: none;
+}

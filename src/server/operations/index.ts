@@ -11,7 +11,7 @@ import { runHandOffReadiness } from './hand-off.js';
 import { runListProjects } from './list-projects.js';
 import { runCheckAlignment, runMusicAnalysis, runSnapCutsToBeats } from './music.js';
 import { runMusicWaveform } from './music-waveform.js';
-import { runCompareRecordings, runRecordingSheet, runStill, runTimelineSheet } from './pictures.js';
+import { runCompareRecordings, runRecordingSheet, runReferenceStill, runStill, runTimelineSheet } from './pictures.js';
 import {
   runCheckpoint,
   runCheckpointCopy,
@@ -44,6 +44,7 @@ export const runners: OperationRunners = {
   still: runStill,
   timeline_sheet: runTimelineSheet,
   recording_sheet: runRecordingSheet,
+  reference_still: runReferenceStill,
   compare_recordings: runCompareRecordings,
   estimate: runEstimate,
   list_styles: runListStyles,

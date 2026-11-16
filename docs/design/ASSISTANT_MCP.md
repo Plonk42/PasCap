@@ -506,6 +506,17 @@ Read; for editor and assistant. Render source frames of one video recording's ed
 | `mediaId` | string           | ID of a prepared video recording.                         |
 | `frames`  | array of integer | Source frames of the recording in the order to show them. |
 
+#### `reference_still`
+
+Read; for editor. Render one source frame of a prepared video recording alone, through a grade's Color and a clip's Detail, as the export composes them (HDR, Local contrast and Detail included), at the 1280 × 720 still size: Color → Match's reference.
+
+| Input         | Type    | Description                                           |
+| ------------- | ------- | ----------------------------------------------------- |
+| `mediaId`     | string  | ID of a prepared video recording.                     |
+| `sourceFrame` | integer | Source frame of the recording.                        |
+| `color`       | object  | The Color to render it through; neutral when absent.  |
+| `detail`      | object  | The Detail to render it through; neutral when absent. |
+
 #### `compare_recordings`
 
 Read; for assistant. Show candidate shots from several video recordings in one contact sheet, without any grade or Transform, to pick the best of similar takes before placing it. Each candidate takes `frames` cells in a row, spread across its range (frames 1 lays the candidates out row by row). A candidate without a range shows its recording's best steady range (rank 1) inside the kept ranges within the session's steady-range limits, as describe_recording lists them, else its first kept range or the whole recording. The number of cells is limited by the service's image budget.
