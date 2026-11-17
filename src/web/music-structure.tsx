@@ -39,7 +39,6 @@ const decibels = (value: number): string => {
   const rounded = Math.round(value);
   return `${rounded < 0 ? '−' : ''}${Math.abs(rounded)} dB`;
 };
-const signedDecibels = (value: number): string => `${value < 0 ? '−' : '+'}${Math.abs(Math.round(value))} dB`;
 
 function sampleAt(music: MusicTrack, frame: number): number | null {
   const source = musicSourceFrame(music, frame);
@@ -192,118 +191,5 @@ export function MusicStructure({
         </svg>
       )}
     </>
-  );
-}
-
-function sectionTone(analysis: MusicAnalysis, section: Stretch): number[] | undefined {
-  const seconds = analysis.tone.slice(
-    Math.floor(section.fromSample / MUSIC_SAMPLE_RATE),
-    Math.ceil(section.toSample / MUSIC_SAMPLE_RATE),
-  );
-  if (!seconds.length) return undefined;
-  return TONE_BANDS.map((_, band) => seconds.reduce((total, second) => total + second[band]!, 0) / seconds.length);
-}
-
-function StructureItem({
-  frame,
-  text,
-  onSeek,
-}: Readonly<{ frame: number; text: string; onSeek: (frame: number) => void }>) {
-  return (
-    <li>
-      <button
-        type="button"
-        className="text-button"
-        title={`Go to ${formatTimecode(frame)}`}
-        onClick={() => onSeek(frame)}
-      >
-        {formatTimecode(frame)}
-      </button>
-      <span>{text}</span>
-    </li>
-  );
-}
-
-/** The clip's sections, swells, silences and strong hits at their timeline positions, for reading and keyboard access. */
-export function MusicStructureList({
-  music,
-  analysis,
-  onSeek,
-}: Readonly<{ music: MusicTrack; analysis: MusicAnalysis; onSeek: (frame: number) => void }>) {
-  const sections = placeAll(music, analysis.sections);
-  const swells = placeAll(music, analysis.swells);
-  const silences = placeAll(music, analysis.silences);
-  const hits = musicHitFrames(music, analysis.hits).filter((hit) => hit.strong);
-  if (!sections.length && !swells.length && !silences.length && !hits.length) return null;
-  return (
-    <details className="music-structure">
-      <summary>Music structure</summary>
-      {sections.length > 0 && (
-        <section aria-label="Sections">
-          <h4>Sections</h4>
-          <ul>
-            {sections.map(({ item, span }) => (
-              <StructureItem
-                key={`section-${span.start}`}
-                frame={span.start}
-                onSeek={onSeek}
-                text={[
-                  `${item.kind} to ${formatTimecode(span.end)}`,
-                  decibels(item.loudnessDb),
-                  toneText(sectionTone(analysis, item)),
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              />
-            ))}
-          </ul>
-        </section>
-      )}
-      {swells.length > 0 && (
-        <section aria-label="Swells">
-          <h4>Swells</h4>
-          <ul>
-            {swells.map(({ item, span }) => (
-              <StructureItem
-                key={`swell-${span.start}`}
-                frame={span.start}
-                onSeek={onSeek}
-                text={`${item.sudden ? 'Sudden ' : ''}${item.kind} ${signedDecibels(item.changeDb)} to ${formatTimecode(span.end)}`}
-              />
-            ))}
-          </ul>
-        </section>
-      )}
-      {silences.length > 0 && (
-        <section aria-label="Silences">
-          <h4>Silences</h4>
-          <ul>
-            {silences.map(({ span }) => (
-              <StructureItem
-                key={`silence-${span.start}`}
-                frame={span.start}
-                onSeek={onSeek}
-                text={`Silence to ${formatTimecode(span.end)}`}
-              />
-            ))}
-          </ul>
-        </section>
-      )}
-      {hits.length > 0 && (
-        <section aria-label="Strong hits">
-          <h4>Strong hits</h4>
-          <ul>
-            {hits.map((hit) => (
-              <StructureItem
-                key={`hit-${hit.frame}`}
-                frame={hit.frame}
-                onSeek={onSeek}
-                text={`${hit.band[0]!.toUpperCase()}${hit.band.slice(1)} hit`}
-              />
-            ))}
-          </ul>
-        </section>
-      )}
-    </details>
   );
 }

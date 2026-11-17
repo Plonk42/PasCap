@@ -54,12 +54,12 @@ export function windowTrack(mediaId: string, window: DetailWindow): MusicTrack {
 export const musicMarkKinds = ['section', 'downbeat', 'hit'] as const;
 export type MusicMarkKind = (typeof musicMarkKinds)[number];
 
-/** The frames Source preview's Previous and Next buttons visit: section starts, downbeats and strong hits. */
+/** Where a music clip's section starts, downbeats and strong hits play, ascending: what Previous and Next visit. */
 export function musicMarks(whole: MusicTrack, analysis: MusicAnalysis): Record<MusicMarkKind, number[]> {
   return {
-    section: analysis.sections.flatMap((section) =>
-      musicSpans(whole, section.fromSample, section.toSample).map((span) => span.start),
-    ),
+    section: analysis.sections
+      .flatMap((section) => musicSpans(whole, section.fromSample, section.toSample).map((span) => span.start))
+      .sort((left, right) => left - right),
     downbeat: musicBeatFrames(whole, analysis.beats).flatMap((beat) => (beat.downbeat ? [beat.frame] : [])),
     hit: musicHitFrames(whole, analysis.hits).flatMap((hit) => (hit.strong ? [hit.frame] : [])),
   };

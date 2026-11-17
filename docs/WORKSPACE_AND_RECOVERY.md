@@ -240,7 +240,7 @@ exact behavior stays in [the user guide](USER_GUIDE.md), reached from a **Learn 
 link (opening in a new tab) on every help except startup details.
 Keyframe timing guidance is combined with **Animation help** beside Color's
 **Keyframes** heading; there is no separate Keyframe timing help button. Audio timing sits beside
-**Placement & fades**, and startup details beside **Preview needs attention**.
+**Range & placement**, and startup details beside **Preview needs attention**.
 These title-bar help targets remain available without expanding their settings;
 collapsing content does not hide its heading help. Hiding the owning tab/pane
 still dismisses help. **Animation help** sits inside the expanded Color section, above

@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
 import type { MediaJob } from '../shared/media.js';
-import type { MusicTrack } from '../shared/model.js';
 import { keyName, type MusicAnalysis } from '../shared/music-analysis.js';
 import { api } from './api.js';
 import { Icon } from './icons.js';
-import { MusicStructureList } from './music-structure.js';
 
 const POLL_MS = 1000;
 
@@ -157,12 +155,6 @@ function statusText(phase: MusicAnalysisPhase): string {
   return 'Tempo and beats not analyzed';
 }
 
-interface StatusProps {
-  asset: AudioAsset | undefined;
-  music: MusicTrack;
-  onSeek: (frame: number) => void;
-}
-
 /** The analysis summary, its progress or Analyze music. */
 export function MusicAnalysisLine({ asset }: Readonly<{ asset: AudioAsset }>) {
   const { phase, analyze } = useMusicAnalysis(asset);
@@ -181,18 +173,6 @@ export function MusicAnalysisLine({ asset }: Readonly<{ asset: AudioAsset }>) {
           Analyze music
         </button>
       )}
-    </div>
-  );
-}
-
-/** Under Recording: the analysis summary, its progress or Analyze music, then the music's structure. */
-export function MusicAnalysisStatus({ asset, music, onSeek }: Readonly<StatusProps>) {
-  const { phase } = useMusicAnalysis(asset);
-  if (asset?.status !== 'ready') return null;
-  return (
-    <div className="music-analysis">
-      <MusicAnalysisLine asset={asset} />
-      {phase.kind === 'ready' && <MusicStructureList music={music} analysis={phase.analysis} onSeek={onSeek} />}
     </div>
   );
 }

@@ -485,7 +485,7 @@ const HELP_CONTEXTS = [
     text: 'Fades and dissolves need the two clips to touch',
   },
   { label: 'Fade timing', tab: 'Sequence', text: '0 disables a fade.' },
-  { label: 'Audio timing', tab: 'Audio', text: 'Fade in and out apply at the start and end of the music track.' },
+  { label: 'Audio timing', tab: 'Audio', text: 'Start and Duration place it on the timeline.' },
 ] as const;
 
 const INSPECTOR_HELP_HEADINGS = [
@@ -642,9 +642,9 @@ test('numeric fields retain their descriptions even while the linked help popove
     /0 disables a fade/,
   );
   await inspectorTab(page, 'Audio');
-  await page.getByText('Placement & fades', { exact: true }).click();
+  await page.getByText('Range & placement', { exact: true }).click();
   await expect(page.getByRole('spinbutton', { name: 'Music duration', exact: true })).toHaveAccessibleDescription(
-    /Fade in and out apply at the start and end of the music track/,
+    /Start and Duration place it on the timeline/,
   );
   expect(memory.saves).toBe(0);
 });
@@ -770,7 +770,7 @@ test('direct point list keeps timing help available and nested drafts mounted ac
 });
 
 for (const context of [
-  { title: 'Placement & fades', toggle: 'Placement & fades', help: 'Audio timing', tab: 'Audio' },
+  { title: 'Range & placement', toggle: 'Range & placement', help: 'Audio timing', tab: 'Audio' },
 ] as const) {
   test(`${context.title} has independent title-level help before opening its editable fields`, async ({ page }) => {
     const before = await current(page);
@@ -926,8 +926,8 @@ test('functional music, source and export detail sections remain ordinary editab
 }) => {
   await expect(page.getByRole('textbox', { name: 'Source OUT frame', exact: true })).toBeVisible();
   await inspectorTab(page, 'Audio');
-  await page.getByText('Placement & fades', { exact: true }).click();
-  await expect(page.getByRole('spinbutton', { name: 'Music fade in', exact: true })).toBeVisible();
+  await page.getByText('Range & placement', { exact: true }).click();
+  await expect(page.getByRole('spinbutton', { name: 'Music source IN', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Export video', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Export video', exact: true });
   await dialog.getByText('Storage details', { exact: true }).click();

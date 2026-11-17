@@ -536,7 +536,7 @@ list, Animation help and enabled-setting chips.
 **Track** holds what the whole video track owns under an "Applies to all N clips on
 this track" header: Transform with Opacity (ending with its own keyframe list), Transitions (every
 boundary of the track, left to right, with the selected one expanded) and Fades.
-Music belongs to Audio, with detailed **Placement & fades**.
+Music belongs to Audio, with detailed **Range & placement**.
 Sections retain their expansion in local browser storage.
 New defaults collapse **Speed**, **Detail**, **Range**, **Placement**, **HSL ranges**,
 **Color curves** and **Transform**, while **Color**, **Transitions**, **Fades** and **Music**

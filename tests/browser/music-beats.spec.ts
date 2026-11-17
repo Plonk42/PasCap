@@ -18,6 +18,7 @@ import {
 } from '../../src/shared/music-analysis.js';
 import { MUSIC_SAMPLES_PER_FRAME } from '../../src/shared/music-format.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
+import { formatTimecode } from '../../src/shared/timing.js';
 import { singleClipLane } from '../music-lanes.js';
 import { inspectorTab } from './editor-helpers.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
@@ -202,6 +203,13 @@ async function frameX(page: Page, frame: number): Promise<number> {
 
 const playhead = (page: Page): Promise<number> => page.evaluate(() => window.pascapLab!.engine.diagnostics().frame);
 
+/** Clicks an Audio tab Previous/Next button and waits until the editor shows the frame it reached. */
+async function jump(page: Page, name: string, frame: number): Promise<void> {
+  await page.getByRole('button', { name, exact: true }).click();
+  await expect.poll(() => playhead(page)).toBe(frame);
+  await expect(page.getByRole('button', { name: 'Go to timecode', exact: true })).toHaveText(formatTimecode(frame));
+}
+
 /** Clicks the lower half of the time ruler at `frame` and expects the playhead at `landing`. */
 async function clickRuler(page: Page, frame: number, landing: number): Promise<void> {
   const ruler = (await page.locator('.timeline-ruler').boundingBox())!;
@@ -230,7 +238,8 @@ test('beat ticks follow the music track placement and loops', async ({ page }) =
   frames.forEach((frame, index) => expect(Math.abs(frame - expected(false)[index]!)).toBeLessThanOrEqual(1));
   // Without sections, swells, silences or tone, the clip shows none of them.
   await expect(clip.locator('.music-section, .music-silence, .music-swells, .music-tone')).toHaveCount(0);
-  await expect(page.getByText('Music structure', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Next section', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Next downbeat', exact: true })).toBeEnabled();
 });
 
 test('the waveform draws every 10 ms for each pixel of the clip, through loops, and refines when zoomed', async ({
@@ -392,14 +401,12 @@ test('the music clip and Audio tab show the key, sections, swells, silences and 
   await page.mouse.move(body.x + body.width / 2, body.y - 40);
   await expect(clip.locator('.music-readout')).toHaveCount(0);
 
-  // The same information is reachable by keyboard, and its timecodes seek.
-  await page.getByText('Music structure', { exact: true }).click();
-  const list = page.getByRole('region', { name: 'Sections' });
-  await expect(list.getByRole('listitem')).toHaveCount(4);
-  await expect(list.getByRole('listitem').nth(1)).toContainText('build to 00:05:00 · −12 dB · low −7 dB');
-  await page.getByRole('region', { name: 'Swells' }).getByRole('button', { name: '00:04:10', exact: true }).click();
-  await expect.poll(() => playhead(page)).toBe(130);
-  await expect(page.getByRole('region', { name: 'Silences' }).getByRole('listitem')).toHaveCount(2);
+  // The same marks are reachable by keyboard: Previous/Next visit the clip's sections where they play.
+  await expect(page.getByRole('button', { name: 'Previous section', exact: true })).toBeDisabled();
+  await jump(page, 'Next section', 30);
+  await jump(page, 'Next section', 90);
+  await jump(page, 'Next section', 150);
+  await jump(page, 'Previous section', 90);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
@@ -448,12 +455,10 @@ test('hits show as band marks where they play, in the readout and list, and Hits
   await expect(clip.locator('.music-readout')).toHaveText('00:02:05 · beat');
   await page.mouse.move(body.x + body.width / 2, body.y - 40);
 
-  await page.getByText('Music structure', { exact: true }).click();
-  const list = page.getByRole('region', { name: 'Strong hits' });
-  await expect(list.getByRole('listitem')).toHaveCount(strong.length);
-  await expect(list.getByRole('listitem').first()).toContainText('Low hit');
-  await list.getByRole('button', { name: '00:04:10', exact: true }).click();
-  await expect.poll(() => playhead(page)).toBe(130);
+  await jump(page, 'Next strong hit', strong[0]!.frame);
+  await expect(page.getByRole('button', { name: 'Previous strong hit', exact: true })).toBeDisabled();
+  await jump(page, 'Next strong hit', strong[1]!.frame);
+  await jump(page, 'Next downbeat', 95);
 
   const toggle = page.getByRole('button', { name: 'Snap to beats', exact: true });
   const rulerBeats = page.locator('.timeline-ruler-beats');
@@ -484,7 +489,7 @@ test('without an analysis there are no ticks, structure or beats to snap to', as
   await expect(page.getByRole('status').filter({ hasText: 'Tempo and beats not analyzed' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Analyze music', exact: true })).toBeVisible();
   await expect(page.locator('.music-beats, .music-section, .music-tone')).toHaveCount(0);
-  await expect(page.getByText('Music structure', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Next downbeat', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Snap to beats', exact: true }).click();
   await expect(page.locator('.timeline-ruler-beats')).toHaveCount(0);
   await clickRuler(page, 68, 68);

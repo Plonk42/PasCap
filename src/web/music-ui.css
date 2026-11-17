@@ -48,49 +48,21 @@
   color: #f2a7a7;
 }
 
-/* The analysis' sections, swells and silences, listed with their timeline positions. */
-:is(.music-controls, .music-review) .music-structure {
-  width: 100%;
+/* Previous/Next section, downbeat and strong hit of the selected clip, wrapping in a narrow panel. */
+.music-controls .music-clip-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
   font-size: 12px;
 }
 
-.music-structure > summary {
-  cursor: pointer;
+.music-controls .music-track-fades {
+  margin-bottom: 8px;
+}
+
+.music-controls .music-track-fades small {
   color: var(--muted);
-}
-
-.music-structure h4 {
-  margin: 8px 0 2px;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.music-structure ul {
-  display: grid;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.music-structure li {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.music-structure li > .text-button {
-  flex: none;
-  padding: 0;
   font-variant-numeric: tabular-nums;
-}
-
-.music-structure li > span {
-  min-width: 0;
-  color: #c9d1ec;
 }
 
 /* Beat ticks above the tone strip of a music clip; downbeats are taller and brighter. */
@@ -624,7 +596,7 @@
   margin-left: auto;
 }
 
-:is(.music-review-jump, .music-review-zoom) {
+:is(.music-mark-jump, .music-review-zoom) {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -635,7 +607,7 @@
   color: var(--muted);
 }
 
-:is(.music-review-jump, .music-review-zoom) .icon-button {
+:is(.music-mark-jump, .music-review-zoom) .icon-button {
   width: 24px;
   height: 24px;
 }

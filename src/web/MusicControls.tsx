@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AudioAsset } from '../shared/audio.js';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import {
@@ -6,6 +6,7 @@ import {
   MAX_MUSIC_TRACKS,
   type MusicClip,
   type MusicLane,
+  type MusicTrack,
   type MusicTransition,
   type ProjectDocument,
 } from '../shared/model.js';
@@ -33,11 +34,16 @@ import {
   videoTimelineDuration,
   type MusicEdit,
 } from './music-ui.js';
-import { MusicAnalysisStatus } from './MusicAnalysis.js';
+import { MusicAnalysisLine, useMusicAnalysis } from './MusicAnalysis.js';
+import { MusicMarkJumps } from './music-marks.js';
+import { musicMarks } from './music-review-window.js';
 import { NumberField } from './NumberField.js';
 import { Popover } from './Popover.js';
 import { ResetButton, resetBlocked } from './SettingValueControl.js';
 import { ValueControl } from './ValueControl.js';
+
+/** The timeline playhead, provided apart so the memoized controls re-render only where they read it. */
+export const MusicPlayheadContext = createContext(0);
 
 /** A timeline boundary button's request to show the transition after one music clip. */
 export interface MusicBoundaryRequest {
@@ -91,8 +97,8 @@ function MusicTiming({ helpId, children }: Readonly<{ helpId: string; children: 
   return (
     <Disclosure
       className="music-timing"
-      title="Placement & fades"
-      label="Placement & fades"
+      title="Range & placement"
+      label="Range & placement"
       triggerId={`${helpId}-timing-title`}
       contentId={`${helpId}-timing-fields`}
       open={open}
@@ -100,8 +106,8 @@ function MusicTiming({ helpId, children }: Readonly<{ helpId: string; children: 
       help={
         <HelpPopover label="Audio timing" guide="add-music-and-export">
           <p id={helpId}>
-            IN and OUT pick the part of the recording; Start and Duration place the selected clip. Fade in and out apply
-            at the start and end of the music track.
+            IN and OUT pick the part of the recording the selected clip plays; Start and Duration place it on the
+            timeline.
           </p>
           <p className="editor-help-tip">Tip: Loop repeats the chosen part, and music can play on over black.</p>
         </HelpPopover>
@@ -354,6 +360,38 @@ function MusicLaneControls(props: Readonly<LaneProps>) {
           onCommit={(gainDb) => commit((current) => ({ ...current, gainDb }))}
         />
       </div>
+      <div className="range-fields music-track-fades">
+        <label>
+          Fade in <small>frames · {sourceSeconds(lane.openingFade)}</small>
+          <NumberField
+            aria-label="Music fade in"
+            min={0}
+            max={first.duration - first.fadeOut}
+            integer
+            step={1}
+            value={lane.openingFade}
+            disabled={drafting}
+            resetKey={inputContext}
+            validate={(openingFade) => laneError((current) => ({ ...current, openingFade }))}
+            onCommit={(openingFade) => commit((current) => ({ ...current, openingFade }))}
+          />
+        </label>
+        <label>
+          Fade out <small>frames · {sourceSeconds(lane.closingFade)}</small>
+          <NumberField
+            aria-label="Music fade out"
+            min={0}
+            max={last.duration - last.fadeIn}
+            integer
+            step={1}
+            value={lane.closingFade}
+            disabled={drafting}
+            resetKey={inputContext}
+            validate={(closingFade) => laneError((current) => ({ ...current, closingFade }))}
+            onCommit={(closingFade) => commit((current) => ({ ...current, closingFade }))}
+          />
+        </label>
+      </div>
       <label
         className="music-loop"
         title="Ripple on: the clips play one after another from the first one. Off: each clip keeps its own start."
@@ -398,40 +436,6 @@ function MusicLaneControls(props: Readonly<LaneProps>) {
             onEdit={onEdit}
           />
         ))}
-        <div className="range-fields">
-          <label>
-            Track fade in · frames
-            <NumberField
-              aria-label="Music fade in"
-              aria-describedby={helpId}
-              min={0}
-              max={first.duration - first.fadeOut}
-              integer
-              step={1}
-              value={lane.openingFade}
-              disabled={drafting}
-              resetKey={inputContext}
-              validate={(openingFade) => laneError((current) => ({ ...current, openingFade }))}
-              onCommit={(openingFade) => commit((current) => ({ ...current, openingFade }))}
-            />
-          </label>
-          <label>
-            Track fade out · frames
-            <NumberField
-              aria-label="Music fade out"
-              aria-describedby={helpId}
-              min={0}
-              max={last.duration - last.fadeIn}
-              integer
-              step={1}
-              value={lane.closingFade}
-              disabled={drafting}
-              resetKey={inputContext}
-              validate={(closingFade) => laneError((current) => ({ ...current, closingFade }))}
-              onCommit={(closingFade) => commit((current) => ({ ...current, closingFade }))}
-            />
-          </label>
-        </div>
       </MusicTiming>
       {lane.transitions.length > 0 && (
         <fieldset className="music-transitions">
@@ -592,7 +596,7 @@ function MusicClipSettings({
           ))}
         </select>
       </label>
-      <MusicAnalysisStatus asset={asset} music={source} onSeek={onSeek} />
+      <MusicClipAnalysis asset={asset} source={source} onSeek={onSeek} />
       <div className="music-track-overview">
         <span>{sourceSeconds(clip.duration)} on timeline</span>
         {lane.clips.length === 1 && (
@@ -625,6 +629,29 @@ function MusicClipSettings({
         />
         <span>Loop selected range</span>
       </label>
+    </div>
+  );
+}
+
+/** The clip's analysis line and, once analyzed, Previous/Next marks of the clip around the playhead. */
+function MusicClipAnalysis({
+  asset,
+  source,
+  onSeek,
+}: Readonly<{ asset: AudioAsset | undefined; source: MusicTrack; onSeek: Props['onSeek'] }>) {
+  const { phase } = useMusicAnalysis(asset);
+  const frame = useContext(MusicPlayheadContext);
+  const analysis = phase.kind === 'ready' ? phase.analysis : null;
+  const marks = useMemo(() => (analysis ? musicMarks(source, analysis) : null), [source, analysis]);
+  if (asset?.status !== 'ready') return null;
+  return (
+    <div className="music-analysis">
+      <MusicAnalysisLine asset={asset} />
+      {marks && (
+        <div className="music-clip-marks">
+          <MusicMarkJumps marks={marks} frame={frame} where="playhead" onSeek={onSeek} />
+        </div>
+      )}
     </div>
   );
 }

@@ -363,7 +363,7 @@ test('music commits preserve source/timeline units and validate range, duration,
   const asset = audio.assets.find((item) => item.status === 'ready');
   if (!asset) throw new Error('Expected prepared synthetic music.');
   await addMusicTrack(page, asset.name);
-  await page.getByText('Placement & fades', { exact: true }).click();
+  await page.getByText('Range & placement', { exact: true }).click();
   const out = page.getByRole('spinbutton', { name: 'Music source OUT', exact: true });
   await out.fill('90');
   await out.press('Enter');

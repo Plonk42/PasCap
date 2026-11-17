@@ -101,12 +101,13 @@ lists ready files and creates a track holding one clip of the chosen recording, 
 the eight-track limit. Imports only populate the bin and prepare media; placement is
 deliberate and separate. Project-level removal lives in Media.
 
-The selected track's settings follow: **Gain dB**, **Ripple**, then the **Clip** selector
+The selected track's settings follow: **Gain dB**, the track's **Fade in** and **Fade out**,
+**Ripple**, then the **Clip** selector
 with **Delete selected music clip** (unavailable, with its reason, for a track's only
 clip) and **+ Clip** (**Add music clip**), which appends a clip of a ready recording after
-the last one, up to eight. The selected clip's **Recording**, beats, length and **Loop**
-follow, then **Placement & fades**: the clip's source IN/OUT, timeline start and duration,
-and the track's fade in and out. A track with several clips ends with its
+the last one, up to eight. The selected clip's **Recording**, analysis, length and **Loop**
+follow, then **Range & placement**: the clip's source IN/OUT, timeline start and duration.
+A track with several clips ends with its
 **Transitions**: one Cut / Crossfade / Fade through silence / Fade through silence with pause selector per boundary, with
 its duration. The timeline draws each boundary as a button that selects the clip before
 it and focuses that transition. Dragging a ready file from Media → Music onto a music

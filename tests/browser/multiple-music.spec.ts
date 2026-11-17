@@ -397,7 +397,7 @@ test('a music track holds clips joined by Cut, Crossfade or Fade through silence
 
   // Without Ripple a clip keeps its own start; Ripple plays the clips one after another.
   await clipSelect.selectOption(second.id);
-  await controls.getByRole('button', { name: 'Placement & fades', exact: true }).click();
+  await controls.getByRole('button', { name: 'Range & placement', exact: true }).click();
   await number(controls, 'Music timeline start', '100');
   expect(await starts()).toEqual([0, 100]);
   await controls.getByRole('checkbox', { name: 'Ripple on music track 1', exact: true }).check();
@@ -444,7 +444,7 @@ test('invalid per-instance numeric drafts survive selection without save, clampi
   await expect(gain).toHaveValue('13');
   await expect(gain).toHaveAttribute('aria-invalid', 'true');
   await gain.press('Escape');
-  await controls.getByRole('button', { name: 'Placement & fades', exact: true }).click();
+  await controls.getByRole('button', { name: 'Range & placement', exact: true }).click();
   const start = controls.getByRole('spinbutton', { name: 'Music timeline start', exact: true });
   await start.fill('2147483647');
   await start.press('Enter');

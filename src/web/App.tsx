@@ -80,7 +80,7 @@ import { previewCommands, registerLivePreview } from './live-preview.js';
 import { MediaLibrary, type ReviewTarget } from './MediaLibrary.js';
 import { nextLayerName } from './move-to-track.js';
 import type { ImportActions, ImportKind, ImportResult, RelinkTarget } from './ImportDialog.js';
-import { MusicControls, type MusicBoundaryRequest } from './MusicControls.js';
+import { MusicControls, MusicPlayheadContext, type MusicBoundaryRequest } from './MusicControls.js';
 import { addMusicRangeEdit, musicAddTarget, nextMusicSelection } from './music-ui.js';
 import { Popover } from './Popover.js';
 import { readPreference, writePreference } from './preferences.js';
@@ -2485,7 +2485,7 @@ export function App() {
                     onCollapse={togglePanel}
                     collapseDisabled={draft !== null}
                   >
-                    {musicControls}
+                    <MusicPlayheadContext value={inspectorFrame}>{musicControls}</MusicPlayheadContext>
                   </Inspector>
                 </KeyframeNavigationContext.Provider>
               )}

@@ -492,7 +492,7 @@ test('each Ramp up preset easing saves and restores along with the clip grade', 
 test('music waveform, placement, looping, gain, fades and audio-clock preview work', async ({ page }) => {
   await inspectorTab(page, 'Audio');
   await addMusicTrack(page);
-  await page.getByText('Placement & fades', { exact: true }).click();
+  await page.getByText('Range & placement', { exact: true }).click();
   await page.getByRole('spinbutton', { name: 'Music timeline start' }).fill('10');
   await page.getByRole('spinbutton', { name: 'Music timeline start' }).press('Enter');
   await page.getByRole('checkbox', { name: 'Loop music' }).check();

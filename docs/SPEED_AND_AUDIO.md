@@ -654,10 +654,9 @@ Hovering a music clip shows a readout at the pointer: the timecode, any beat (**
 any swell and the three tone levels
 there. Under **Recording**, the analysis line adds the key and the hit count (**128 BPM ·
 4/4 · C minor · 290 beats · 120 hits**, or **No steady beat found · C minor · 80 hits**),
-and a **Music structure** disclosure lists the selected clip's sections (with their loudness
-and average tone), swells (with their change in dB), silences and strong hits (with their
-band), each with its timeline position as a button that moves the playhead there: the
-keyboard and screen-reader route to the same information. Unanalyzed music shows only the
+and Previous/Next **Section**, **Downbeat** and **Strong hit** buttons move the playhead to
+the selected clip's section starts, downbeats and strong hits where they play (disabled
+when there is none before or after the playhead). Unanalyzed music shows only the
 analysis line.
 
 ### Music waveform

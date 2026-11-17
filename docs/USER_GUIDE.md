@@ -325,7 +325,8 @@ are placed, and the ruler shows those beats as ticks. Its arrow chooses **Beats*
 also in music without a steady beat) or **Beats and hits**. Analyzed music clips also show
 their hits as marks colored by band (low, mid, high; strong ones taller), sections (quiet,
 build, peak, release), swells, silences and a low/mid/high tone strip; hover one for a
-readout, or open **Audio → Music structure** for a list with the key and the strong hits.
+readout, or use the **Section**, **Downbeat** and **Strong hit** arrows in **Audio** to move the
+playhead to the previous or next one of the selected clip.
 Details: [snap to beats](TIMELINE_EDITING.md#snap-to-beats) and
 [music analysis](SPEED_AND_AUDIO.md#music-analysis).
 
@@ -1013,7 +1014,7 @@ A narrow Media panel drops the tenths of that pair; its tooltip keeps them.
 Inline help is a small **? button**, not an expandable text section. Find it
 beside the relevant title—**Speed**, **Range**, **Placement**,
 **Color**, **Transitions**, **Fades**
-or **Placement & fades**—even when that section is collapsed. Help and expansion
+or **Range & placement**—even when that section is collapsed. Help and expansion
 are separate buttons; no scrolling to the end of a section is needed. Startup
 details are next to **Preview needs attention**.
 

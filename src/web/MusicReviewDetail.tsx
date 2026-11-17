@@ -6,14 +6,8 @@ import type { MusicAnalysis } from '../shared/music-analysis.js';
 import { formatTimecode } from '../shared/timing.js';
 import { Icon } from './icons.js';
 import { MusicGraphics } from './music-graphics.js';
-import {
-  adjacentMark,
-  DETAIL_SECONDS,
-  musicMarks,
-  windowTrack,
-  type DetailWindow,
-  type MusicMarkKind,
-} from './music-review-window.js';
+import { MusicMarkJumps } from './music-marks.js';
+import { DETAIL_SECONDS, musicMarks, windowTrack, type DetailWindow } from './music-review-window.js';
 
 interface DetailProps {
   asset: AudioAsset;
@@ -109,12 +103,6 @@ export function MusicReviewDetail({ asset, view, frame, range, onSeek, onKeyDown
   );
 }
 
-const MARK_NAMES: Readonly<Record<MusicMarkKind, { label: string; plural: string }>> = {
-  section: { label: 'Section', plural: 'sections' },
-  downbeat: { label: 'Downbeat', plural: 'downbeats' },
-  hit: { label: 'Strong hit', plural: 'strong hits' },
-};
-
 interface MarksProps {
   whole: MusicTrack;
   analysis: MusicAnalysis | null;
@@ -131,46 +119,9 @@ export function MusicReviewMarks({ whole, analysis, frame, seconds, onSeek, onZo
   const zoom = DETAIL_SECONDS.indexOf(seconds as (typeof DETAIL_SECONDS)[number]);
   return (
     <div className="music-review-marks">
-      {marks &&
-        (Object.keys(MARK_NAMES) as MusicMarkKind[]).map((kind) => {
-          const { label, plural } = MARK_NAMES[kind];
-          const previous = adjacentMark(marks[kind], frame, -1);
-          const next = adjacentMark(marks[kind], frame, 1);
-          return (
-            <fieldset key={kind} className="music-review-jump" disabled={marks[kind].length === 0}>
-              <legend className="sr-only">{`${label}s`}</legend>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label={`Previous ${label.toLowerCase()}`}
-                title={
-                  previous === undefined
-                    ? `No ${plural} before the play position`
-                    : `Go to the previous ${label.toLowerCase()}`
-                }
-                disabled={previous === undefined}
-                onKeyDown={onKeyDown}
-                onClick={() => previous !== undefined && onSeek(previous)}
-              >
-                <Icon name="back" size={13} />
-              </button>
-              <span title={`${marks[kind].length} ${plural}`}>{label}</span>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label={`Next ${label.toLowerCase()}`}
-                title={
-                  next === undefined ? `No ${plural} after the play position` : `Go to the next ${label.toLowerCase()}`
-                }
-                disabled={next === undefined}
-                onKeyDown={onKeyDown}
-                onClick={() => next !== undefined && onSeek(next)}
-              >
-                <Icon name="forward" size={13} />
-              </button>
-            </fieldset>
-          );
-        })}
+      {marks && (
+        <MusicMarkJumps marks={marks} frame={frame} where="play position" onSeek={onSeek} onKeyDown={onKeyDown} />
+      )}
       <fieldset className="music-review-zoom">
         <legend className="sr-only">Zoom</legend>
         <button
