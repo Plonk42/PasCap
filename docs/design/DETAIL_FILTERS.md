@@ -220,7 +220,7 @@ Color and Detail, never geometry, Opacity, fades, stacking or music.
 ## Preview, export and resources
 
 The WebGL shader generates its tap tables from the same constants as the CPU kernel.
-The kernel lives only in three separate detail variants of the fixed programs, compiled
+The kernel lives only in three separate detail variants of the fixed programs, prepared
 when a loaded or edited project first contains nonneutral detail or nonzero
 Shadows, Highlights, HDR or Local contrast in a clip grade or adjustment, as a base or keyframe value (including a live slider draft),
 before any draw uses them; uniforms are two `vec4` per source (settings; stride and the

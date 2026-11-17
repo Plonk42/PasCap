@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
-import type { CompositeGroup } from '../../src/preview/compositor.js';
+import type { CompositeGroup, GradePath } from '../../src/preview/compositor.js';
 import { PreviewEngine } from '../../src/preview/engine.js';
 import { NEUTRAL_COLOR, type RGB } from '../../src/shared/color.js';
 import { compositePixel } from '../../src/shared/composition.js';
@@ -73,10 +73,15 @@ interface CompositorDouble {
   visible: (CompositeGroup['clips'][number] & { sourceFrame: number; url: string })[][] | null;
   textures: Map<number, { sourceFrame: number; url: string }>;
   setDecoderCount: Mock<(count: number) => void>;
-  prepareDetail: Mock<() => void>;
-  prepareStaged: Mock<(detail: boolean) => void>;
+  prepareDetail: Mock<(paths?: readonly GradePath[]) => void>;
+  prepareStaged: Mock<(detail: boolean, paths?: readonly GradePath[]) => void>;
+  /** While true, draws are refused and `settled` waits, like programs linking in the driver. */
+  linking: boolean;
+  settled: Mock<(signal?: AbortSignal) => Promise<void>>;
+  prewarm: Mock<() => boolean>;
+  link(): void;
   uploadFrame: Mock<(slot: number, frame: FakeFrame) => void>;
-  drawFrame: Mock<(groups: readonly CompositeGroup[]) => void>;
+  drawFrame: Mock<(groups: readonly CompositeGroup[], wait?: boolean) => boolean>;
   clear: Mock<() => void>;
 }
 interface MusicDouble {
@@ -280,11 +285,22 @@ vi.mock('../../src/preview/compositor.js', () => ({
     });
     prepareDetail = vi.fn();
     prepareStaged = vi.fn();
+    linking = false;
+    readonly #waiting: (() => void)[] = [];
+    settled = vi.fn((): Promise<void> =>
+      this.linking ? new Promise((resolve) => this.#waiting.push(resolve)) : Promise.resolve(),
+    );
+    prewarm = vi.fn((): boolean => this.linking);
+    link(): void {
+      this.linking = false;
+      this.#waiting.splice(0).forEach((resolve) => resolve());
+    }
     uploadFrame = vi.fn((slot: number, frame: FakeFrame): void => {
       if (frame.closed || slot >= this.count) throw new Error('Cannot upload a closed or unassigned frame.');
       this.textures.set(slot, { sourceFrame: frame.sourceFrame, url: frame.url });
     });
-    drawFrame = vi.fn((groups: readonly CompositeGroup[]): void => {
+    drawFrame = vi.fn((groups: readonly CompositeGroup[], wait = false): boolean => {
+      if (this.linking && !wait) return false;
       this.visible = groups.map((group) =>
         group.clips.map((clip) => {
           const texture = this.textures.get(clip.slot);
@@ -292,6 +308,7 @@ vi.mock('../../src/preview/compositor.js', () => ({
           return { ...structuredClone(clip), ...texture };
         }),
       );
+      return true;
     });
     clear = vi.fn((): void => {
       this.visible = null;
@@ -952,8 +969,9 @@ describe('playback on one clock', () => {
     const { engine, anchor } = await playing(project, 8);
     const draw = compositor().drawFrame.getMockImplementation()!;
     compositor().drawFrame.mockImplementation((groups) => {
-      draw(groups);
+      const drawn = draw(groups);
       state.now += framesToSeconds(2) * 1000;
+      return drawn;
     });
     tick(anchor, 1);
     expect(engine.diagnostics()).toMatchObject({
@@ -1220,12 +1238,94 @@ describe('appearance without reloading timing', () => {
     draft.adjustments[0]!.color.hdr = 0.7;
     engine.updateProjectAppearance(draft);
     expect(compositor().prepareDetail).toHaveBeenCalledOnce();
+    expect(compositor().prepareDetail).toHaveBeenLastCalledWith(['scalar']);
     expect(compositor().visible![0]![0]!.settings.hdr).toBe(0.7);
     expect(compositor().prepareStaged).not.toHaveBeenCalled();
     draft.clips[0]!.grade.color.saturation = 0.5;
     engine.updateProjectAppearance(draft);
-    expect(compositor().prepareStaged).toHaveBeenCalledWith(true);
+    expect(compositor().prepareStaged).toHaveBeenCalledWith(true, ['scalar']);
     expect(compositor().visible![0]![0]!.grade!.saturation).toBe(0.5);
+  });
+
+  it('prepares clip grades before adjustments only when both exist, and advanced paths only when used', async () => {
+    const project = layeredProject(1, true);
+    project.clips[0]!.detail = { sharpen: 0.5, clarity: 0, denoise: 0 };
+    project.clips[0]!.grade.color.saturation = 0.5;
+    const engine = await paused(project, 10);
+    expect(compositor().prepareDetail).toHaveBeenLastCalledWith(['scalar']);
+    expect(compositor().prepareStaged).not.toHaveBeenCalled();
+    const draft = structuredClone(project);
+    draft.clips[1]!.grade.color.hsl.blue.saturation = -0.4;
+    engine.updateProjectAppearance(draft);
+    expect(compositor().prepareDetail).toHaveBeenLastCalledWith(['scalar', 'single', 'full']);
+    draft.layers[0]!.transitions[0] = { leftId: 'base', rightId: 'next', type: 'cut', duration: 0 };
+    draft.adjustments = [createAdjustment('look', 0, 60)];
+    await engine.loadProject(draft, proxyUrl, originalDimensions, 10);
+    expect(compositor().prepareDetail).toHaveBeenLastCalledWith(['scalar', 'single']);
+    expect(compositor().prepareStaged).toHaveBeenLastCalledWith(true, ['scalar', 'single']);
+  });
+
+  it('keeps the last image while a program an edit needs links, then draws the edit exactly', async () => {
+    const project = singleProject();
+    const engine = await paused(project, 8);
+    const shown = compositor().visible;
+    const draft = structuredClone(project);
+    draft.clips[0]!.detail = { sharpen: 0.6, clarity: 0, denoise: 0 };
+    compositor().linking = true;
+    engine.updateProjectAppearance(draft);
+    await Promise.resolve();
+    // Nothing waits on the main thread: the image stays and the frame is not reported shown yet.
+    expect(compositor().visible).toBe(shown);
+    expect(engine.diagnostics()).toMatchObject({ status: 'seeking', frame: 8 });
+    compositor().link();
+    await vi.waitFor(() => expect(engine.diagnostics()).toMatchObject({ status: 'paused', frame: 8 }));
+    expect(compositor().visible![0]![0]!.detail).toEqual(draft.clips[0]!.detail);
+    expect(compositor().drawFrame.mock.calls.every(([, wait]) => !wait)).toBe(true);
+  });
+
+  it('starts the clock only once the programs of the first frames have linked', async () => {
+    const project = singleProject();
+    const engine = await paused(project, 8);
+    compositor().linking = true;
+    const started = engine.play();
+    await vi.waitFor(() => expect(compositor().settled).toHaveBeenCalled());
+    expect(music().start).not.toHaveBeenCalled();
+    compositor().link();
+    await started;
+    await vi.waitFor(() => expect(music().start).toHaveBeenCalledOnce());
+  });
+
+  it('waits for linking programs during a pixel readback, so it reads the exact image', async () => {
+    const project = singleProject();
+    const engine = await paused(project, 8);
+    compositor().linking = true;
+    expect(engine.capturePixels()).toEqual(new Uint8Array([0, 0, 0, 255]));
+    expect(compositor().drawFrame).toHaveBeenLastCalledWith(expect.anything(), true);
+  });
+
+  it('prewarms the programs a document may need once the paused preview is idle, never while playing', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const project = singleProject();
+      const engine = await paused(project, 8);
+      expect(compositor().prewarm).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(999);
+      expect(compositor().prewarm).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(compositor().prewarm).toHaveBeenCalledOnce();
+      // An edit restarts the wait: links never start under an ongoing gesture.
+      engine.updateProjectAppearance(structuredClone(project));
+      await vi.advanceTimersByTimeAsync(500);
+      expect(compositor().prewarm).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(500);
+      expect(compositor().prewarm).toHaveBeenCalledTimes(2);
+      engine.updateProjectAppearance(structuredClone(project));
+      await engine.play();
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(compositor().prewarm).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('rejects timing changes rather than silently keeping old timing', async () => {

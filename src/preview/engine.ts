@@ -1,4 +1,4 @@
-import { NEUTRAL_COLOR } from '../shared/color.js';
+import { isNeutralAdvancedColor, NEUTRAL_COLOR } from '../shared/color.js';
 import { isNeutralDetail, NEUTRAL_DETAIL } from '../shared/detail.js';
 import { gradeUsesLocalTone, isNeutralClipGrade } from '../shared/grade.js';
 import { PROXY_GOP_FRAMES } from '../shared/media.js';
@@ -14,7 +14,7 @@ import {
   type TimelineLayout,
 } from '../shared/timeline.js';
 import { PROJECT_FPS, sameRate, secondsToFrames } from '../shared/timing.js';
-import { Compositor, MAX_VIDEO_DECODERS, type CompositeGroup } from './compositor.js';
+import { Compositor, MAX_VIDEO_DECODERS, type CompositeGroup, type GradePath } from './compositor.js';
 import { MusicPlayback } from './music.js';
 import { VideoStreams } from './video-streams.js';
 
@@ -69,6 +69,8 @@ const PREFILL_FRAMES = 3;
 const STALL_DEADLINE_MS = 5_000;
 /** Scrub requests closer than this are one moving gesture; after it, the pointer has settled. */
 const SCRUB_MOVING_MS = 100;
+/** How long the paused preview stays idle before a document's remaining program variants start linking. */
+const PREWARM_IDLE_MS = 1_000;
 /** Presenting a frame slower than this blocks input: the next scrub frame waits for newer requests. */
 const SLOW_PRESENT_MS = 100;
 
@@ -177,6 +179,8 @@ export class PreviewEngine {
   #clockHeld = false;
   #lastDrawnFrame = -1;
   #surfaceKey: string | null = null;
+  #prewarming = false;
+  #prewarmTimer: ReturnType<typeof setTimeout> | undefined;
   #dirty = true;
   #lastEmit = 0;
   #ticking = false;
@@ -197,7 +201,7 @@ export class PreviewEngine {
     try {
       if (typeof VideoDecoder !== 'function' || typeof VideoFrame !== 'function')
         throw new Error('Timeline preview requires WebCodecs video decoding. Use a current Chrome or Firefox.');
-      this.#compositor = new Compositor(canvas);
+      this.#compositor = new Compositor(canvas, { linkInBackground: true });
     } catch (error) {
       this.#music.dispose();
       throw error;
@@ -267,11 +271,29 @@ export class PreviewEngine {
     for (const listener of this.#listeners) listener(diagnostics);
   }
   #setStatus(status: PreviewStatus, message: string): void {
+    if (status === 'paused') this.#prewarm();
     if (this.#status === status && this.#message === message) return;
     this.#status = status;
     this.#message = message;
     this.#emit(true);
   }
+  /**
+   * While the paused preview stays idle this long, the variants this document may need link one at a time ahead of
+   * their first draw. A link keeps the GPU busy, so seeks just after an edit or another seek never wait for one.
+   */
+  #prewarm(): void {
+    clearTimeout(this.#prewarmTimer);
+    this.#prewarmTimer = setTimeout(this.#prewarmNow, PREWARM_IDLE_MS);
+  }
+  readonly #prewarmNow = (): void => {
+    if (this.#prewarming || this.#playing || this.#busy || this.#status !== 'paused') return;
+    if (!this.#compositor.available || !this.#compositor.prewarm()) return;
+    this.#prewarming = true;
+    void this.#compositor.settled().then(() => {
+      this.#prewarming = false;
+      if (this.#status === 'paused') this.#prewarm();
+    });
+  };
   #beginStall(boundary: boolean, now: number): void {
     if (!this.#stallStart) {
       this.#stallStart = now;
@@ -467,18 +489,34 @@ export class PreviewEngine {
     // An appearance update during the decode can make other sources visible.
     if (this.#drawFrame(frame)) return;
     if (!this.#compositor.available) throw new Error('WebGL context is unavailable.');
+    // A program this frame needs may still be linking: wait for it without blocking the page.
+    await this.#compositor.settled(signal);
+    if (!this.#isCurrent(signal)) return;
     await this.#showFrame(frame, signal);
   }
 
-  /** Detail and clip grade shader variants compile when a document first needs them, before any draw uses them. */
+  /**
+   * The detail and clip grade program variants a document can use, ahead of any draw: the grade paths its HSL ranges,
+   * curves and two-source transitions need, and a clip grade before an adjustment only when both exist.
+   */
   #prepareDetail(): void {
     const document = this.#document;
     if (!this.#compositor.available || !document) return;
     const detail =
       document.clips.some((clip) => !isNeutralDetail(clip.detail) || gradeUsesLocalTone(clip.grade)) ||
       document.adjustments.some(gradeUsesLocalTone);
-    if (detail) this.#compositor.prepareDetail();
-    if (document.clips.some((clip) => !isNeutralClipGrade(clip.grade))) this.#compositor.prepareStaged(detail);
+    const advanced = [...document.clips.map((clip) => clip.grade), ...document.adjustments].some(
+      ({ color }) => !isNeutralAdvancedColor(color),
+    );
+    const twoSources = document.layers.some((layer) =>
+      layer.transitions.some((transition) => transition.type !== 'cut'),
+    );
+    const paths: GradePath[] = ['scalar'];
+    if (advanced) paths.push('single');
+    if (advanced && twoSources) paths.push('full');
+    if (detail) this.#compositor.prepareDetail(paths);
+    if (document.adjustments.length && document.clips.some((clip) => !isNeutralClipGrade(clip.grade)))
+      this.#compositor.prepareStaged(detail, paths);
   }
   async loadProject(
     document: ProjectDocument,
@@ -688,6 +726,7 @@ export class PreviewEngine {
     }
     // Playback schedules newly visible sources on its next frame.
     this.#redrawPaused();
+    if (this.#status === 'paused') this.#prewarm();
   }
   /** With a range (OUT exclusive), start inside it, or at IN, and stop on its last frame. */
   async play(range?: { inFrame: number; outFrame: number }): Promise<void> {
@@ -732,6 +771,9 @@ export class PreviewEngine {
         }),
       );
       if (!this.#isCurrent(signal) || !this.#playing) return;
+      // The clock never starts before the programs its frames need have linked.
+      await this.#compositor.settled(signal);
+      if (!this.#isCurrent(signal) || !this.#playing) return;
       await this.#music.start(frame, signal);
       if (!this.#isCurrent(signal) || !this.#playing) return;
       this.#clockFrame = frame;
@@ -756,7 +798,7 @@ export class PreviewEngine {
     this.#surfaceKey = null;
     this.#compositor.clear();
   }
-  #drawFrame(frame: number): boolean {
+  #drawFrame(frame: number, wait = false): boolean {
     if (!this.#document || !this.#compositor.available) return false;
     const layers = sampleTimeline(this.#document, frame, this.#layout);
     if (layers.some((layer) => !this.#shows(this.#laneOf(layer.clipId), layer))) return false;
@@ -803,7 +845,7 @@ export class PreviewEngine {
         }),
       });
     }
-    this.#renderSurface(frame, layers, groups);
+    if (!this.#renderSurface(frame, layers, groups, wait)) return false;
     this.#dirty = false;
     this.#frame = frame;
     if (this.#colorRequested) {
@@ -818,7 +860,13 @@ export class PreviewEngine {
     }
     return true;
   }
-  #renderSurface(frame: number, layers: readonly PreviewLayer[], groups: readonly CompositeGroup[]): void {
+  /** False when a program the frame needs is still linking: nothing is drawn and the last image stays. */
+  #renderSurface(
+    frame: number,
+    layers: readonly PreviewLayer[],
+    groups: readonly CompositeGroup[],
+    wait: boolean,
+  ): boolean {
     // A held source with identical evaluated appearance is the same image,
     // even at a later project frame: skip the redundant grade. Include every
     // composed value and source identity, not inverse source time.
@@ -830,7 +878,7 @@ export class PreviewEngine {
     });
     const redraw = this.#dirty || this.#surfaceKey !== surfaceKey;
     if (redraw) {
-      this.#compositor.drawFrame(groups);
+      if (!this.#compositor.drawFrame(groups, wait)) return false;
       this.#surfaceKey = surfaceKey;
     }
     if (redraw && (frame !== this.#lastDrawnFrame || this.#dirty)) {
@@ -841,6 +889,7 @@ export class PreviewEngine {
       }
       this.#lastDrawnFrame = frame;
     }
+    return true;
   }
   readonly #tick = (now: number): void => {
     if (this.#disposed) return;
@@ -905,7 +954,11 @@ export class PreviewEngine {
       this.#clockTime = now;
       this.#clockHeld = false;
     }
-    this.#drawFrame(frame);
+    // A program an appearance edit needs is still linking: keep the last image until it can draw this one.
+    if (!this.#drawFrame(frame)) {
+      this.#setStatus('buffering', 'Preparing the preview');
+      return;
+    }
     this.#endStall(now);
     // A draw can outlast a frame on a slow renderer: Playing promises an image
     // within one frame of the clock, so a late image is reported as catching up.
@@ -928,7 +981,9 @@ export class PreviewEngine {
     // The presented image can be retained, but WebGL's non-preserved drawing
     // buffer may be discarded after presentation. Readback always needs a draw.
     this.#surfaceKey = null;
-    if (!this.#drawFrame(this.#frame)) throw new Error('Cannot capture pixels without all required decoded frames.');
+    // A diagnostic readback: waiting for the links here is the only way to read the exact image now.
+    if (!this.#drawFrame(this.#frame, true))
+      throw new Error('Cannot capture pixels without all required decoded frames.');
     return this.#compositor.readPixels();
   }
   readonly #onContextLost = (event: Event): void => {
@@ -942,7 +997,7 @@ export class PreviewEngine {
     if (this.#disposed) return;
     try {
       this.#compositor.dispose();
-      this.#compositor = new Compositor(this.canvas);
+      this.#compositor = new Compositor(this.canvas, { linkInBackground: true });
       this.#prepareDetail();
       this.#resizeLanes();
       this.#dirty = true;
@@ -957,6 +1012,7 @@ export class PreviewEngine {
     this.pause();
     this.#disposed = true;
     clearTimeout(this.#settleTimer);
+    clearTimeout(this.#prewarmTimer);
     this.#original = null;
     cancelAnimationFrame(this.#raf);
     this.canvas.removeEventListener('webglcontextlost', this.#onContextLost);
