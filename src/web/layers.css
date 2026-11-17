@@ -189,7 +189,7 @@
   user-select: none;
 }
 
-.inspector-section .disclosure-trigger {
+.inspector-section > .disclosure-heading .disclosure-trigger {
   padding: 10px 13px;
 }
 

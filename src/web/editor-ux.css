@@ -87,7 +87,7 @@
   white-space: nowrap;
 }
 
-.product-workspace .inspector-section .disclosure-trigger {
+.product-workspace .inspector-section > .disclosure-heading .disclosure-trigger {
   min-height: 42px;
   padding: 8px 14px;
   background: transparent;

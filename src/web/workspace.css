@@ -593,7 +593,7 @@ body {
   font-size: 10px;
 }
 
-.product-workspace .inspector-section .disclosure-trigger {
+.product-workspace .inspector-section > .disclosure-heading .disclosure-trigger {
   padding: 12px 14px;
   font-size: 13px;
   background: #212e25;

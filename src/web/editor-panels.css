@@ -132,7 +132,7 @@
   display: none;
 }
 
-.inspector-panel.editor-inspector .inspector-section .disclosure-trigger {
+.inspector-panel.editor-inspector .inspector-section > .disclosure-heading .disclosure-trigger {
   padding: 8px 14px;
   background: #1f2a23;
 }
