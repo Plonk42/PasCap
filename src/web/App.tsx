@@ -23,6 +23,7 @@ import {
   type MediaSelections,
 } from '../shared/media-selection.js';
 import type { MediaAsset, MediaJob } from '../shared/media.js';
+import type { ImageAsset, ImageRegistration } from '../shared/images.js';
 import {
   createClip,
   createLayer,
@@ -79,7 +80,8 @@ import {
 import { previewCommands, registerLivePreview } from './live-preview.js';
 import { MediaLibrary, type ReviewTarget } from './MediaLibrary.js';
 import { nextLayerName } from './move-to-track.js';
-import type { ImportActions, ImportKind, ImportResult, RelinkTarget } from './ImportDialog.js';
+import type { ImageImportResult, ImportActions, ImportKind, ImportResult, RelinkTarget } from './ImportDialog.js';
+import { useProjectImages } from './images.js';
 import { MusicControls, MusicPlayheadContext, type MusicBoundaryRequest } from './MusicControls.js';
 import { addMusicRangeEdit, musicAddTarget, nextMusicSelection } from './music-ui.js';
 import { Popover } from './Popover.js';
@@ -280,6 +282,23 @@ function splitAdjustmentAt(
   }
 }
 
+const FAILED_IMAGE_IMPORT: ImageImportResult = { ok: false, added: 0, rejected: [], rejectedPaths: [] };
+
+function imageImportResult({ images, errors }: ImageRegistration): ImageImportResult {
+  return {
+    ok: true,
+    added: images.length,
+    rejected: errors.map((issue) => `${issue.path.split('/').at(-1)}: ${issue.message}`),
+    rejectedPaths: errors.map((issue) => issue.path),
+  };
+}
+
+/** The project with these registered images in its library. */
+function withImages(project: ProjectDocument, images: readonly ImageAsset[]): ProjectDocument {
+  const imageIds = [...new Set([...project.media.imageIds, ...images.map((image) => image.id)])];
+  return { ...project, media: { ...project.media, imageIds } };
+}
+
 function handOffBlocked(save: SaveState, drafting: boolean): string | null {
   if (save.state === 'error') return 'Resolve the save error first: the assistant edits the saved project.';
   return drafting ? 'Finish the current gesture first.' : null;
@@ -294,6 +313,7 @@ export function App() {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [jobs, setJobs] = useState<MediaJob[]>([]);
   const [audioAssets, setAudioAssets] = useState<AudioAsset[]>([]);
+  const projectImages = useProjectImages(project?.media.imageIds);
   const [missingOriginals, setMissingOriginals] = useState<ReadonlySet<string>>(new Set());
   const [relinking, setRelinking] = useState<{ target: RelinkTarget | null } | null>(null);
   const [projectList, setProjectList] = useState<ProjectSummary[]>([]);
@@ -561,6 +581,7 @@ export function App() {
               [...projectAudioIds(next), ...(previous ? projectAudioIds(previous) : [])],
               removed?.audioIds,
             ),
+            imageIds: bin([...next.media.imageIds, ...(previous?.media.imageIds ?? [])], removed?.imageIds),
           },
         },
         (id) => latestAssets.current.find((asset) => asset.id === id)?.metadata.frameRate,
@@ -1695,9 +1716,21 @@ export function App() {
     });
     return result.ok && result.value;
   };
+  const importImages = async (operation: () => Promise<ImageRegistration>): Promise<ImageImportResult> => {
+    if (!current.current) {
+      setActionError('Create or open a project before importing images.');
+      return FAILED_IMAGE_IMPORT;
+    }
+    const result = await act(operation);
+    if (!result.ok) return FAILED_IMAGE_IMPORT;
+    projectImages.add(result.value.images);
+    if (result.value.images.length && current.current) commit(withImages(current.current, result.value.images));
+    return imageImportResult(result.value);
+  };
   const importActions: ImportActions = {
     registerVideos: (paths) => importOriginals(() => api.registerPaths(paths)),
     registerMusic: (path) => importMusic(() => api.importSelectedAudio(path)),
+    registerImages: (paths) => importImages(() => api.registerImagePaths(paths)),
     importFolder: (directory) => importOriginals(() => api.importFolder(directory)),
     importVideoPath: (path) =>
       importOriginals(async () => {
@@ -1713,6 +1746,7 @@ export function App() {
         };
       }),
     importMusicPath: (path) => importMusic(() => api.importAudio(path)),
+    importImagePath: (path) => importImages(() => api.registerImage(path)),
   };
   const openMedia = (): void => {
     workspace.update({ mediaOpen: true, ...(workspace.viewport.width < 980 ? { inspectorOpen: false } : {}) });
@@ -2221,8 +2255,11 @@ export function App() {
               onPrepareMusic={prepareAudio}
               missing={missingOriginals}
               onRelink={requestRelink}
-              onRemove={(videoIds) => removeMedia({ videoIds, audioIds: [] })}
-              onRemoveMusic={(audioIds) => removeMedia({ videoIds: [], audioIds })}
+              onRemove={(videoIds) => removeMedia({ videoIds, audioIds: [], imageIds: [] })}
+              onRemoveMusic={(audioIds) => removeMedia({ videoIds: [], audioIds, imageIds: [] })}
+              images={projectImages.images}
+              missingImages={projectImages.missing}
+              onRemoveImages={(imageIds) => removeMedia({ videoIds: [], audioIds: [], imageIds })}
               onKeepBestRanges={keepBestRanges}
               onSelectionDone={(mediaId, done) => edit({ type: 'select-done', mediaId, done }, true)}
               onImport={() => requestImport()}
@@ -2468,6 +2505,7 @@ export function App() {
                   <Inspector
                     project={visible}
                     assets={assets}
+                    images={projectImages.images}
                     selectedClipId={selectedId}
                     selectedClipIds={clipGroup.group}
                     selectedAdjustmentIds={adjustmentGroup.group}

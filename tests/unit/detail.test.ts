@@ -690,7 +690,7 @@ describe('local Shadows and Highlights', () => {
 function project(detail: DetailSettings): ProjectDocument {
   const base = createProject('detail', 'Detail');
   const clip = { ...createClip('clip', 'media', 0, 30), detail };
-  return projectSchema.parse({ ...base, media: { videoIds: ['media'], audioIds: [] }, clips: [clip] });
+  return projectSchema.parse({ ...base, media: { videoIds: ['media'], audioIds: [], imageIds: [] }, clips: [clip] });
 }
 
 describe('clip detail editing and export routing', () => {

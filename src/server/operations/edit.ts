@@ -87,7 +87,7 @@ const unlessEmpty = <K extends string, T>(key: K, list: readonly T[]) =>
 export function editChanges(
   current: ProjectDocument,
   next: ProjectDocument,
-  media: Pick<ServiceContext, 'library' | 'audio'>,
+  media: Pick<ServiceContext, 'library' | 'audio' | 'imageLibrary'>,
 ): EditChanges {
   const before = describeDocument(current, media);
   const after = describeDocument(next, media);
@@ -144,7 +144,7 @@ export function editChanges(
 
 /** The batch applied in memory with every check of a save, plus the session rules for an assistant. */
 export async function prepareBatch(
-  { caller, library, audio }: ServiceContext,
+  { caller, library, audio, imageLibrary }: ServiceContext,
   current: ProjectDocument,
   commands: readonly EditCommand[],
   consequence: string,
@@ -161,6 +161,6 @@ export async function prepareBatch(
     const violation = sessionViolation(current, next, name);
     if (violation) throw new ServiceError(`${violation} ${consequence}`, 422);
   }
-  await assertProjectSources(next, library, audio);
+  await assertProjectSources(next, library, audio, imageLibrary);
   return next;
 }

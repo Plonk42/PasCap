@@ -43,6 +43,7 @@ export function withVideoRates(
 export interface MediaRemoval {
   videoIds: readonly string[];
   audioIds: readonly string[];
+  imageIds: readonly string[];
 }
 
 /** Timeline excerpts and music instances that leave the project with these recordings. */
@@ -62,8 +63,9 @@ export function removeProjectMedia(project: ProjectDocument, removal: MediaRemov
   const missing = [
     ...removal.videoIds.filter((id) => !bin.video.has(id)),
     ...removal.audioIds.filter((id) => !bin.audio.has(id)),
+    ...removal.imageIds.filter((id) => !project.media.imageIds.includes(id)),
   ];
-  if (missing.length || removal.videoIds.length + removal.audioIds.length === 0)
+  if (missing.length || removal.videoIds.length + removal.audioIds.length + removal.imageIds.length === 0)
     throw new Error('Choose recordings that belong to this project before removing them.');
   let next = project;
   for (const clip of project.clips.filter((item) => removal.videoIds.includes(item.mediaId)))
@@ -87,6 +89,7 @@ export function removeProjectMedia(project: ProjectDocument, removal: MediaRemov
     media: {
       videoIds: next.media.videoIds.filter((id) => !removal.videoIds.includes(id)),
       audioIds: next.media.audioIds.filter((id) => !removal.audioIds.includes(id)),
+      imageIds: next.media.imageIds.filter((id) => !removal.imageIds.includes(id)),
     },
   });
 }

@@ -31,7 +31,11 @@ describe.skipIf(!enabled)('current-schema storage/archive integration · generat
     const root = await temp();
     const store = new ProjectStore(root);
     const project = createProject('strict-current', 'Strict current document');
-    project.media = { videoIds: ['generated-original', 'unplaced-original'], audioIds: ['unplaced-music'] };
+    project.media = {
+      videoIds: ['generated-original', 'unplaced-original'],
+      audioIds: ['unplaced-music'],
+      imageIds: [],
+    };
     const clip = {
       ...createClip('current-clip', 'generated-original', 0, 4),
       speed: { mode: 'constant' as const, rate: 0.5 },

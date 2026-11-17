@@ -15,6 +15,7 @@ import {
   type FrameMatch,
   type GradedFrame,
 } from '../shared/look-match.js';
+import { imageFileUrl, type ImageAsset } from '../shared/images.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
@@ -36,6 +37,8 @@ export interface MatchContext {
   playhead: number;
   /** The selected clips, which take the match; the first is the one the Color tab shows. */
   clipIds: readonly string[];
+  /** The registered images of the project's library. */
+  images: readonly ImageAsset[];
 }
 
 /** One clip matched at one of its source frames. */
@@ -51,7 +54,7 @@ export interface MatchPart {
   name: string;
 }
 
-/** What a reference resolves to: a frame and how its grade shows it, or a registered style. */
+/** What a reference resolves to: a frame and how its grade shows it, a still image, or a registered style. */
 export type ResolvedReference =
   | {
       kind: 'clip' | 'recording';
@@ -67,19 +70,45 @@ export type ResolvedReference =
       label: string;
       detail: string;
     }
+  | { kind: 'image'; key: string; image: ImageAsset; url: string; color: ColorSettings; label: string; detail: string }
   | { kind: 'style'; key: string; style: StyleSummary; label: string; detail: string };
+
+/** A reference that is one picture: a frame or an image. */
+export type PictureReference = Exclude<ResolvedReference, { kind: 'style' }>;
 
 type Resolved<T> = { value: T; reason: null } | { value: null; reason: string };
 const unavailable = <T>(reason: string): Resolved<T> => ({ value: null, reason });
 const preparedAt = (asset: MediaAsset): string => asset.prepared?.verification.verifiedAt ?? '';
 
+/** An image of the project's library as a reference, as shot. */
+function resolveImage(imageId: string, context: Pick<MatchContext, 'project' | 'images'>): Resolved<ResolvedReference> {
+  if (!context.project.media.imageIds.includes(imageId))
+    return unavailable('The reference image was removed from the project: choose another reference.');
+  const image = context.images.find((item) => item.id === imageId);
+  if (!image) return unavailable('Reading the reference image…');
+  return {
+    value: {
+      kind: 'image',
+      key: `image:${image.id}:${image.fingerprint.digest}`,
+      image,
+      url: imageFileUrl(image),
+      color: createColorSettings(),
+      label: shortName(image.name),
+      detail: 'Image, as shot',
+    },
+    reason: null,
+  };
+}
+
 /** The reference as the project shows it now, or why it cannot be matched to. */
 export function resolveReference(
   reference: ColorReference | null,
-  context: Pick<MatchContext, 'project' | 'assets'>,
+  context: Pick<MatchContext, 'project' | 'assets' | 'images'>,
   styles: readonly StyleSummary[],
 ): Resolved<ResolvedReference> {
-  if (!reference) return unavailable('Choose a reference first: a timeline frame, a recording frame or a style.');
+  if (!reference)
+    return unavailable('Choose a reference first: a timeline frame, a recording frame, an image or a style.');
+  if (reference.kind === 'image') return resolveImage(reference.imageId, context);
   if (reference.kind === 'style') {
     const style = styles.find((item) => item.id === reference.styleId);
     if (!style) return unavailable('The reference style is no longer registered: choose another reference.');
@@ -239,31 +268,44 @@ async function decode(
 const referenceFrames = new Map<string, AnalysisFrame>();
 const KEPT_REFERENCE_FRAMES = 8;
 
-/** A reference's frame, decoded from its proxy unless it was recently. */
-export async function referenceFrame(
-  reference: ResolvedReference & { kind: 'clip' | 'recording' },
-  signal: AbortSignal,
-): Promise<AnalysisFrame> {
-  const key = `${reference.asset.id}:${preparedAt(reference.asset)}:${reference.sourceFrame}`;
+/** A reference's picture, decoded from its proxy or image unless it was recently. */
+export async function referenceFrame(reference: PictureReference, signal: AbortSignal): Promise<AnalysisFrame> {
+  const key =
+    reference.kind === 'image'
+      ? reference.key
+      : `${reference.asset.id}:${preparedAt(reference.asset)}:${reference.sourceFrame}`;
   const known = referenceFrames.get(key);
   if (known) return known;
-  const frame = await decode(reference.asset, reference.sourceFrame, signal, 'Reference');
+  const frame =
+    reference.kind === 'image'
+      ? await decodeImage(reference, signal)
+      : await decode(reference.asset, reference.sourceFrame, signal, 'Reference');
   referenceFrames.set(key, frame);
   if (referenceFrames.size > KEPT_REFERENCE_FRAMES) referenceFrames.delete(referenceFrames.keys().next().value!);
   return frame;
+}
+
+async function decodeImage(
+  reference: PictureReference & { kind: 'image' },
+  signal: AbortSignal,
+): Promise<AnalysisFrame> {
+  const { sampleImage } = await import('../preview/frame-sampler.js');
+  return sampleImage(reference.url, signal).catch((cause: unknown) => {
+    if (signal.aborted || !(cause instanceof Error)) throw cause;
+    throw new Error(`Reference: Could not read ${reference.image.name}: ${cause.message}`);
+  });
 }
 
 const TOO_UNIFORM = 'This frame is too dark or too uniform to match.';
 
 const thumbnails = new Map<string, string>();
 /**
- * The reference frame as its grade shows it, as an image URL: rendered by the service like an export (HDR, Local
- * contrast and Detail included), else, while it cannot render (during an export), graded here without them.
+ * The reference picture as its grade shows it, as an image URL: an image itself; a frame rendered by the service like an
+ * export (HDR, Local contrast and Detail included), else, while it cannot render (during an export), graded here
+ * without them.
  */
-export async function referenceImage(
-  reference: ResolvedReference & { kind: 'clip' | 'recording' },
-  signal: AbortSignal,
-): Promise<string> {
+export async function referenceImage(reference: PictureReference, signal: AbortSignal): Promise<string> {
+  if (reference.kind === 'image') return reference.url;
   const known = thumbnails.get(reference.key);
   if (known) return known;
   const url = await callOperation(

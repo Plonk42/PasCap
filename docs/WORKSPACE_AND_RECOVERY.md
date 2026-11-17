@@ -651,8 +651,8 @@ ignored files, probe rejections and queue admission problems. Accepted jobs appe
 in Activity immediately after the import response, even if a status refresh fails.
 
 The global content-deduplicated registry/proxy cache is shared, but project bins
-are not: import membership is saved explicitly in `media.videoIds` and
-`media.audioIds`. Standalone audio import populates the open project's music bin.
+are not: import membership is saved explicitly in `media.videoIds`,
+`media.audioIds` and `media.imageIds`. Standalone audio import populates the open project's music bin.
 The visible libraries include that explicit membership plus clip/music references,
 so imports remain visible with an empty timeline. New projects start with both
 arrays empty and never inherit all globally registered recordings/music. Deliberately
@@ -863,8 +863,10 @@ projects, receipts or finished videos. Proxy/current PCM formats are unchanged; 
 registries are `videos.json` version 3 and `music.json` version 2, with full-content checksums.
 Registered styles ([#314](https://github.com/Plonk42/PasCap/issues/314)) are in `styles.json`
 version 1 beside them: each style's name, the paths of its references (read in place, never
-copied) and the look measured on them. A registry this build cannot read is reported and left
-unchanged.
+copied) and the look measured on them. Imported still images are in `images.json` version 1: each
+image's path, format, size and source fingerprint, read in place and never copied; an image
+changed or moved since its import is reported missing until imported again. A registry this build
+cannot read is reported and left unchanged.
 Registered recordings and currently
 verified ready proxies are reusable.
 The live sample appearing incompatible is expected. No sample preparation or

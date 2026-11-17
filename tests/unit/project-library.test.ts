@@ -24,7 +24,7 @@ describe('project media membership', () => {
 
   it('includes imported unused sources and timeline references once, without changing the document', () => {
     const project = createProject('first', 'First');
-    project.media = { videoIds: ['unused', 'shared'], audioIds: ['unused-audio', 'music'] };
+    project.media = { videoIds: ['unused', 'shared'], audioIds: ['unused-audio', 'music'], imageIds: [] };
     project.clips = [createClip('one', 'shared', 0, 10), createClip('two', 'timeline', 0, 10)];
     const placement = {
       id: 'music-instance',
@@ -67,7 +67,7 @@ describe('removing recordings from the project bin', () => {
   function binProject(ripple = true): ProjectDocument {
     let project = createProject('bin', 'Bin');
     project.layers[0] = { ...project.layers[0]!, ripple };
-    project.media = { videoIds: ['a', 'b', 'unused'], audioIds: ['song', 'other-song', 'quiet'] };
+    project.media = { videoIds: ['a', 'b', 'unused'], audioIds: ['song', 'other-song', 'quiet'], imageIds: [] };
     for (const [index, [id, mediaId]] of [
       ['a1', 'a'],
       ['b1', 'b'],
@@ -89,18 +89,33 @@ describe('removing recordings from the project bin', () => {
   it('removes only an unused recording’s membership without changing placements or the input', () => {
     const project = binProject();
     const before = JSON.stringify(project);
-    const removal = { videoIds: ['unused'], audioIds: ['quiet'] };
+    const removal = { videoIds: ['unused'], audioIds: ['quiet'], imageIds: [] };
     expect(mediaRemovalUsage(project, removal)).toEqual({ clips: 0, music: 0 });
     const next = removeProjectMedia(project, removal);
-    expect(next.media).toEqual({ videoIds: ['a', 'b'], audioIds: ['song', 'other-song'] });
+    expect(next.media).toEqual({ videoIds: ['a', 'b'], audioIds: ['song', 'other-song'], imageIds: [] });
     expect(next.clips).toEqual(project.clips);
     expect(next.music).toEqual(project.music);
     expect(JSON.stringify(project)).toBe(before);
   });
 
+  it('removes images from the library, leaving clips and music unchanged', () => {
+    const project = projectSchema.parse({
+      ...binProject(),
+      media: { ...binProject().media, imageIds: ['look', 'sky'] },
+    });
+    const removal = { videoIds: [], audioIds: [], imageIds: ['look'] };
+    expect(mediaRemovalUsage(project, removal)).toEqual({ clips: 0, music: 0 });
+    const next = removeProjectMedia(project, removal);
+    expect(next.media.imageIds).toEqual(['sky']);
+    expect({ ...next, media: project.media }).toEqual(project);
+    expect(() => removeProjectMedia(project, { videoIds: [], audioIds: [], imageIds: ['elsewhere'] })).toThrow(
+      'belong to this project',
+    );
+  });
+
   it('removes a used recording with all of its excerpts and music instances atomically', () => {
     const project = binProject();
-    const removal = { videoIds: ['a'], audioIds: ['song'] };
+    const removal = { videoIds: ['a'], audioIds: ['song'], imageIds: [] };
     expect(mediaRemovalUsage(project, removal)).toEqual({ clips: 2, music: 2 });
     const next = removeProjectMedia(project, removal);
     expect(next.clips.map((clip) => clip.id)).toEqual(['b1']);
@@ -114,7 +129,7 @@ describe('removing recordings from the project bin', () => {
 
   it('keeps independent placements on a positioned row', () => {
     const project = binProject(false);
-    const next = removeProjectMedia(project, { videoIds: ['a'], audioIds: [] });
+    const next = removeProjectMedia(project, { videoIds: ['a'], audioIds: [], imageIds: [] });
     expect(next.clips.map((clip) => [clip.id, clip.start])).toEqual([['b1', 40]]);
     expect(next.music).toEqual(project.music);
   });
@@ -131,8 +146,11 @@ describe('removing recordings from the project bin', () => {
       true,
     );
     const withMix = projectSchema.parse({ ...project, music: [...project.music, mixed] });
-    expect(mediaRemovalUsage(withMix, { videoIds: [], audioIds: ['song'] })).toEqual({ clips: 0, music: 4 });
-    const next = removeProjectMedia(withMix, { videoIds: [], audioIds: ['song'] });
+    expect(mediaRemovalUsage(withMix, { videoIds: [], audioIds: ['song'], imageIds: [] })).toEqual({
+      clips: 0,
+      music: 4,
+    });
+    const next = removeProjectMedia(withMix, { videoIds: [], audioIds: ['song'], imageIds: [] });
     expect(next.music.map((track) => track.id)).toEqual(['m2-track', 'mix-track']);
     // A Ripple music track closes the gap from its first start, like a video track.
     expect(next.music[1]!.clips.map((clip) => [clip.id, clip.start])).toEqual([['mix-b', 0]]);
@@ -141,10 +159,14 @@ describe('removing recordings from the project bin', () => {
 
   it('rejects recordings outside the bin and empty removals without partial changes', () => {
     const project = binProject();
-    expect(() => removeProjectMedia(project, { videoIds: ['a', 'elsewhere'], audioIds: [] })).toThrow(
+    expect(() => removeProjectMedia(project, { videoIds: ['a', 'elsewhere'], audioIds: [], imageIds: [] })).toThrow(
       'belong to this project',
     );
-    expect(() => removeProjectMedia(project, { videoIds: [], audioIds: [] })).toThrow('belong to this project');
-    expect(() => removeProjectMedia(project, { videoIds: ['song'], audioIds: [] })).toThrow('belong to this project');
+    expect(() => removeProjectMedia(project, { videoIds: [], audioIds: [], imageIds: [] })).toThrow(
+      'belong to this project',
+    );
+    expect(() => removeProjectMedia(project, { videoIds: ['song'], audioIds: [], imageIds: [] })).toThrow(
+      'belong to this project',
+    );
   });
 });

@@ -7,7 +7,7 @@ import { createClip, createProject, projectSchema, type ProjectDocument } from '
 
 const base: ProjectDocument = projectSchema.parse({
   ...createProject('edited', 'Edited'),
-  media: { videoIds: ['rec'], audioIds: ['song'] },
+  media: { videoIds: ['rec'], audioIds: ['song'], imageIds: [] },
   clips: ['a', 'b', 'c'].map((id, index) => ({
     ...createClip(id, 'rec', index * 60, index * 60 + 60),
     start: index * 60,

@@ -20,7 +20,7 @@ for (const startFrame of [0, 40])
     expect(song).toBeDefined();
     const project = createProject('music-clock', 'Synthetic music clock');
     project.clips = [createClip('clock-clip', video.id, 0, 90)];
-    project.media = { videoIds: [video.id], audioIds: [song.id] };
+    project.media = { videoIds: [video.id], audioIds: [song.id], imageIds: [] };
     project.music = [
       singleClipLane({
         id: 'clock-music',
@@ -88,7 +88,7 @@ test('streamed PCM reaches the output with placement silence, real gain, selecte
   const song = audio.find((item) => item.name === 'test-music.wav' && item.status === 'ready')!;
   const project = createProject('music-signal', 'Synthetic PCM signal');
   project.clips = [createClip('signal-clip', video.id, 0, 90)];
-  project.media = { videoIds: [video.id], audioIds: [song.id] };
+  project.media = { videoIds: [video.id], audioIds: [song.id], imageIds: [] };
   project.music = [
     singleClipLane({
       id: 'signal-music',

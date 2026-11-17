@@ -542,6 +542,10 @@ or reorder clips. Adjustments have no Auto: set their sliders yourself. See
   playhead, or its middle frame when the playhead is elsewhere);
 - a **recording frame**, as shot: in **Source preview**, choose **Use as reference** at the
   frame shown;
+- an **image**, as shot: import JPEG or PNG stills with **Import** (the **Images** filter of the
+  Import dialog), then choose one in the **Images** section of the Media library, or under
+  **Styles**. Images stay where they are, are never copied or changed, and never go on the
+  timeline; **Remove from project** takes one out of the library;
 - one of your **styles**, the look of your own finished edits: open **Styles**, choose one, or
   **Manage styles…** to register a style from up to 8 of your finished videos or JPEG stills in
   the footage folders (read where they are, never copied or changed) or delete one.

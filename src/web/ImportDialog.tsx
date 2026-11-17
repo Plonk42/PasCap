@@ -1,5 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { isAudioFilename, isVideoFilename, MAX_FOOTAGE_FILES, type FootageRoot } from '../shared/footage.js';
+import {
+  isAudioFilename,
+  isImageFilename,
+  isVideoFilename,
+  MAX_FOOTAGE_FILES,
+  type FootageRoot,
+} from '../shared/footage.js';
 import { forEachSerial } from '../shared/serial.js';
 import { api } from './api.js';
 import { Icon } from './icons.js';
@@ -8,7 +14,7 @@ import './media-import.css';
 import { Modal } from './Modal.js';
 import { readPreference, writePreference } from './preferences.js';
 
-export type ImportKind = 'all' | 'video' | 'audio';
+export type ImportKind = 'all' | 'video' | 'audio' | 'image';
 
 export interface ImportResult {
   ok: boolean;
@@ -21,15 +27,26 @@ export interface ImportResult {
   queueErrors: string[];
 }
 
+/** Images registered in place; those rejected stay selected for another attempt. */
+export interface ImageImportResult {
+  ok: boolean;
+  added: number;
+  rejected: string[];
+  rejectedPaths: string[];
+}
+
 export interface ImportActions {
   /** Root-scoped video files chosen in the browser. */
   registerVideos: (paths: readonly string[]) => Promise<ImportResult>;
   /** Root-scoped music file chosen in the browser. */
   registerMusic: (path: string) => Promise<boolean>;
-  /** Typed path: a folder (videos, recursively), a video file or a music file, anywhere on this machine. */
+  /** Root-scoped images chosen in the browser. */
+  registerImages: (paths: readonly string[]) => Promise<ImageImportResult>;
+  /** Typed path: a folder (videos, recursively), a video, music or image file, anywhere on this machine. */
   importFolder: (directory: string) => Promise<ImportResult>;
   importVideoPath: (path: string) => Promise<ImportResult>;
   importMusicPath: (path: string) => Promise<boolean>;
+  importImagePath: (path: string) => Promise<ImageImportResult>;
 }
 
 interface Props {
@@ -58,10 +75,10 @@ interface RelinkMode {
 interface Entry {
   name: string;
   path: string;
-  kind: 'directory' | 'video' | 'audio';
+  kind: 'directory' | 'video' | 'audio' | 'image';
   size: number | null;
 }
-type FileEntry = Entry & { kind: 'video' | 'audio' };
+type FileEntry = Entry & { kind: 'video' | 'audio' | 'image' };
 interface Listing {
   directory: string;
   parent: string | null;
@@ -72,12 +89,13 @@ interface Listing {
 interface Report {
   videos: number;
   music: number;
+  images: number;
   queued: number;
   problems: string[];
 }
 
 const LOCATION_PREFERENCE = 'pascap-import-location';
-const KIND_LABEL = { video: 'Video', audio: 'Music', directory: 'Folder' } as const;
+const KIND_LABEL = { video: 'Video', audio: 'Music', image: 'Image', directory: 'Folder' } as const;
 const naturalNames = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 function message(cause: unknown): string {
@@ -91,7 +109,7 @@ function compareEntries(left: Entry, right: Entry): number {
   return naturalNames.compare(left.name, right.name);
 }
 
-/** One folder view holding both videos and music, from the two metadata-only listings. */
+/** One folder view holding videos, images and music, from the two metadata-only listings. */
 async function readFolder(rootId: string, directory: string | undefined, signal: AbortSignal): Promise<Listing> {
   const [videos, music] = await Promise.all([
     api.browseFootage(rootId, directory, { signal }),
@@ -115,13 +133,13 @@ function count(value: number, singular: string, plural: string): string {
   return `${value} ${value === 1 ? singular : plural}`;
 }
 
-function mediaSummary(videos: number, music: number): string {
-  return [
+function mediaSummary(videos: number, music: number, images = 0): string {
+  const parts = [
     videos && count(videos, 'video recording', 'video recordings'),
     music && count(music, 'music recording', 'music recordings'),
-  ]
-    .filter(Boolean)
-    .join(' and ');
+    images && count(images, 'image', 'images'),
+  ].filter(Boolean);
+  return parts.length > 2 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts.join(' and ');
 }
 
 const FOLDER_SEARCH =
@@ -140,7 +158,7 @@ function dialogText(relink: RelinkMode | undefined, chosen: readonly FileEntry[]
       placeholder: '/media/footage/Flight',
       pathAction: 'Import path',
       pathHint:
-        'A video or music recording, or a folder: a folder imports every video recording in it and its subfolders.',
+        'A video or music recording, an image, or a folder: a folder imports every video recording in it and its subfolders.',
     };
   const target = relink.target;
   if (!target)
@@ -219,7 +237,7 @@ function RecordingPreview({ loader, entry }: Readonly<{ loader: PreviewLoader; e
 }
 
 function ImportReport({ report }: Readonly<{ report: Report }>) {
-  const imported = mediaSummary(report.videos, report.music);
+  const imported = mediaSummary(report.videos, report.music, report.images);
   return (
     <section className="import-report" aria-label="Import results" aria-live="polite">
       <strong>{imported ? `Imported ${imported}` : 'Nothing was imported'}</strong>
@@ -360,6 +378,8 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
   const visible = (listing?.entries ?? []).filter(
     (entry) =>
       (kind === 'all' || entry.kind === 'directory' || entry.kind === kind) &&
+      // Relinking finds recordings only.
+      !(relink && entry.kind === 'image') &&
       entry.name.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
   );
   const files = visible.filter((entry): entry is FileEntry => entry.kind !== 'directory');
@@ -403,13 +423,13 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
   const run = (task: (report: Report) => Promise<string[]>): Promise<void> =>
     whileBusy(async () => {
       setReport(null);
-      const result: Report = { videos: 0, music: 0, queued: 0, problems: [] };
+      const result: Report = { videos: 0, music: 0, images: 0, queued: 0, problems: [] };
       const done = await task(result);
       if (!mounted.current) return;
       const next = new Map(selected);
       done.forEach((path) => next.delete(path));
       setSelected(next);
-      if (result.videos + result.music > 0 && !result.problems.length) onClose(true);
+      if (result.videos + result.music + result.images > 0 && !result.problems.length) onClose(true);
       else setReport(result);
     });
   // The dialog closes once the relink is queued; its full check runs in Activity.
@@ -423,6 +443,10 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
     report.problems.push(...outcome.rejected, ...outcome.queueErrors.map((issue) => `Not queued: ${issue}`));
     return outcome.ok || outcome.added + outcome.existing > 0;
   };
+  const addImages = (report: Report, outcome: ImageImportResult): void => {
+    report.images += outcome.added;
+    report.problems.push(...outcome.rejected);
+  };
   const importFiles = (items: readonly FileEntry[]): Promise<void> =>
     run(async (report) => {
       const done: string[] = [];
@@ -432,6 +456,13 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
         if (addVideos(report, outcome)) done.push(...videos.filter((path) => !outcome.rejectedPaths.includes(path)));
         else
           report.problems.push(`${count(videos.length, 'video recording was', 'video recordings were')} not imported.`);
+      }
+      const images = items.filter((item) => item.kind === 'image').map((item) => item.path);
+      if (images.length) {
+        const outcome = await actions.registerImages(images);
+        addImages(report, outcome);
+        if (outcome.ok) done.push(...images.filter((path) => !outcome.rejectedPaths.includes(path)));
+        else report.problems.push(`${count(images.length, 'image was', 'images were')} not imported.`);
       }
       // Each music file is probed and registered on its own, one at a time.
       await forEachSerial(
@@ -449,7 +480,11 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
   const importPath = (): Promise<void> =>
     run(async (report) => {
       const path = manualPath.trim();
-      if (isAudioFilename(path)) {
+      if (isImageFilename(path)) {
+        const outcome = await actions.importImagePath(path);
+        addImages(report, outcome);
+        if (!outcome.ok) report.problems.push(`${path} was not imported.`);
+      } else if (isAudioFilename(path)) {
         if (await actions.importMusicPath(path)) report.music++;
         else report.problems.push(`${path} was not imported.`);
       } else {
@@ -478,7 +513,12 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
     folderMode ? searchFolder(listing?.directory ?? '') : submitFiles(chosen);
 
   const chosenVideos = chosen.filter((entry) => entry.kind === 'video').length;
-  const text = dialogText(relink, chosen, mediaSummary(chosenVideos, chosen.length - chosenVideos));
+  const chosenImages = chosen.filter((entry) => entry.kind === 'image').length;
+  const text = dialogText(
+    relink,
+    chosen,
+    mediaSummary(chosenVideos, chosen.length - chosenVideos - chosenImages, chosenImages),
+  );
   const availableRoots = roots.filter((item) => item.available);
   const chooseFile: (file: FileEntry, shift: boolean) => void = relink ? pick : toggleFile;
   return (
@@ -628,6 +668,7 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
                     ['all', 'All'],
                     ['video', 'Video'],
                     ['audio', 'Music'],
+                    ['image', 'Images'],
                   ] as const
                 ).map(([value, label]) => (
                   <button
@@ -714,11 +755,9 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
                           )
                         }
                       />
-                      {entry.kind === 'video' ? (
-                        <RecordingPreview loader={previews} entry={entry as FileEntry} />
-                      ) : (
-                        <Icon name="music" size={16} />
-                      )}
+                      {entry.kind === 'video' && <RecordingPreview loader={previews} entry={entry as FileEntry} />}
+                      {entry.kind === 'audio' && <Icon name="music" size={16} />}
+                      {entry.kind === 'image' && <Icon name="mountain" size={16} />}
                       <span>{entry.name}</span>
                       <span>{KIND_LABEL[entry.kind]}</span>
                       <small>{fileSize(entry.size ?? 0)}</small>
@@ -732,7 +771,7 @@ export function ImportDialog({ initialKind, busy, error, actions, relink, onClos
               <p className="import-empty">
                 {query || kind !== 'all'
                   ? 'Nothing here matches this filter.'
-                  : 'No video (MP4, MOV, M4V) or music recordings in this folder.'}
+                  : 'No video (MP4, MOV, M4V), music or image (JPEG, PNG) files in this folder.'}
               </p>
             )}
             {!loadingRoots && !availableRoots.length && (

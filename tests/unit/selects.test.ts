@@ -100,10 +100,10 @@ describe('project selects', () => {
       ranges: [range(0, 9)],
     });
     const both = applyCommand(document, { type: 'select-set', mediaId: 'recording', ranges: [range(0, 9)] });
-    expect(removeProjectMedia(both, { videoIds: ['other'], audioIds: [] }).selects).toEqual({
+    expect(removeProjectMedia(both, { videoIds: ['other'], audioIds: [], imageIds: [] }).selects).toEqual({
       recording: [range(0, 9)],
     });
-    expect(removeProjectMedia(both, { videoIds: ['recording'], audioIds: [] }).selects).toEqual({
+    expect(removeProjectMedia(both, { videoIds: ['recording'], audioIds: [], imageIds: [] }).selects).toEqual({
       other: [range(0, 9)],
     });
   });
@@ -159,7 +159,9 @@ describe('range selection done marks', () => {
   it('leave with the recording when it is removed from the project', () => {
     const document = applyCommand(project(), { type: 'select-done', mediaId: 'other', done: true });
     const both = applyCommand(document, { type: 'select-done', mediaId: 'recording', done: true });
-    expect(removeProjectMedia(both, { videoIds: ['other'], audioIds: [] }).selectsDone).toEqual(['recording']);
+    expect(removeProjectMedia(both, { videoIds: ['other'], audioIds: [], imageIds: [] }).selectsDone).toEqual([
+      'recording',
+    ]);
   });
 });
 

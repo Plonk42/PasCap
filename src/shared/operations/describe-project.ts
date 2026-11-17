@@ -138,6 +138,10 @@ export const projectDescriptionSchema = z
     musicTracks: z.array(musicTrackDescriptionSchema).optional(),
     recordings: described(z.array(recordingDescriptionSchema).optional(), 'Video recordings of the project.'),
     musicRecordings: z.array(z.object({ id: idSchema, name: z.string().nullable() }).strict()).optional(),
+    images: described(
+      z.array(z.object({ id: idSchema, name: z.string().nullable() }).strict()).optional(),
+      'Still images of the project, which estimate kind match can take as referenceImageId; they never render.',
+    ),
     bookmarks: described(z.array(frameSchema).optional(), 'Bookmarked project frames.'),
   })
   .strict();

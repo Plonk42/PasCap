@@ -122,7 +122,7 @@ export const runDescribeProject: OperationRunner<typeof describeProject> = async
 /** The describe_project summary of a project document, for its parts (and one video track). */
 export function describeDocument(
   project: ProjectDocument,
-  { library, audio }: Pick<ServiceContext, 'library' | 'audio'>,
+  { library, audio, imageLibrary }: Pick<ServiceContext, 'library' | 'audio' | 'imageLibrary'>,
   include: readonly (typeof projectParts)[number][] = projectParts,
   layerId?: string,
 ): ProjectDescription {
@@ -154,6 +154,9 @@ export function describeDocument(
     ...(parts.has('recordings') && {
       recordings: project.media.videoIds.map((id) => describeRecording(project, id, library)),
       musicRecordings: project.media.audioIds.map((id) => ({ id, name: musicName(id) })),
+      ...(project.media.imageIds.length > 0 && {
+        images: project.media.imageIds.map((id) => ({ id, name: known(() => imageLibrary.get(id).name) })),
+      }),
     }),
     ...(parts.has('bookmarks') && { bookmarks: project.bookmarks }),
   };

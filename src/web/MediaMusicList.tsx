@@ -74,7 +74,7 @@ export function MediaMusicList({
   };
   const requestRemove = (id: string): void => {
     if (!project || busy) return;
-    if (mediaRemovalUsage(project, { videoIds: [], audioIds: [id] }).music > 0) setRemoving(id);
+    if (mediaRemovalUsage(project, { videoIds: [], audioIds: [id], imageIds: [] }).music > 0) setRemoving(id);
     else remove(id);
   };
   return (
@@ -171,7 +171,7 @@ export function MediaMusicList({
         <RemoveMediaDialog
           names={[music.find((asset) => asset.id === removing)?.name ?? removing]}
           clips={0}
-          music={mediaRemovalUsage(project, { videoIds: [], audioIds: [removing] }).music}
+          music={mediaRemovalUsage(project, { videoIds: [], audioIds: [removing], imageIds: [] }).music}
           busy={busy}
           onCancel={() => setRemoving(null)}
           onConfirm={() => remove(removing)}

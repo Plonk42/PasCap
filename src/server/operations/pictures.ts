@@ -24,14 +24,14 @@ type CompareOutput = Awaited<ReturnType<OperationRunner<typeof compareRecordings
 
 /** The saved project, with candidate commands applied in memory and validated like a save. */
 async function renderedProject(
-  { projects, library, audio }: ServiceContext,
+  { projects, library, audio, imageLibrary }: ServiceContext,
   projectId: string,
   commands?: EditCommand[],
 ) {
   const saved = await projects.load(projectId);
   if (!commands) return { saved, document: saved };
   const document = applyBatch(saved, commands, 'Nothing was rendered.');
-  assertSourceRanges(document, library, audio);
+  assertSourceRanges(document, library, audio, imageLibrary);
   return { saved, document };
 }
 

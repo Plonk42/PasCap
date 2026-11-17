@@ -199,14 +199,17 @@ function checkChoice(input: Input): void {
   const references = [
     input.referenceClipId !== undefined || input.referenceFrame !== undefined,
     input.referenceMediaId !== undefined,
+    input.referenceImageId !== undefined,
     input.style !== undefined,
   ].filter(Boolean).length;
   if (input.kind === 'match' && references !== 1)
     throw invalid(
-      'A match needs one reference: a hero frame (referenceClipId and/or referenceFrame), a recording frame (referenceMediaId with referenceSourceFrame) or a style.',
+      'A match needs one reference: a hero frame (referenceClipId and/or referenceFrame), a recording frame (referenceMediaId with referenceSourceFrame), an image (referenceImageId) or a style.',
     );
   if (input.kind !== 'match' && references > 0)
-    throw invalid('referenceClipId, referenceFrame, referenceMediaId and style belong to kind match.');
+    throw invalid(
+      'referenceClipId, referenceFrame, referenceMediaId, referenceImageId and style belong to kind match.',
+    );
   if ((input.referenceMediaId === undefined) !== (input.referenceSourceFrame === undefined))
     throw invalid('A recording reference needs both referenceMediaId and referenceSourceFrame.');
 }
@@ -222,7 +225,9 @@ type MatchAim =
   | {
       frame: GradedFrame;
       hero: Hero | null;
-      fields: { reference: { clipId?: string; mediaId: string; sourceFrame: number } };
+      fields:
+        | { reference: { clipId?: string; mediaId: string; sourceFrame: number } }
+        | { image: { id: string; name: string } };
     }
   | { look: LookProfile; hero: null; fields: { style: { id: string; name: string } } };
 
@@ -256,6 +261,16 @@ async function matchAim(context: ServiceContext, project: ProjectDocument, input
   if (input.style !== undefined) {
     const style = await context.styles.get(input.style);
     return { look: style.look, hero: null, fields: { style: { id: style.id, name: style.name } } };
+  }
+  if (input.referenceImageId !== undefined) {
+    const id = input.referenceImageId;
+    if (!project.media.imageIds.includes(id))
+      throw new ServiceError(`The project has no image ${id}; read describe_project.`, 404);
+    const image = context.imageLibrary.get(id);
+    const frame = await context.imageLibrary.analysisFrame(id);
+    const color = createColorSettings();
+    if (!measureLook([frame], color)) throw noReference(`image ${image.name}`);
+    return { frame: { frame, color }, hero: null, fields: { image: { id, name: image.name } } };
   }
   if (input.referenceMediaId !== undefined) {
     const mediaId = input.referenceMediaId;

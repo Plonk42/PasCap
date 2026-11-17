@@ -1,0 +1,72 @@
+.media-images {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+
+.media-images > h3 {
+  margin: 4px 5px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.media-image-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 4px 5px;
+  border-radius: 5px;
+}
+
+.media-image-item:hover {
+  background: #243029;
+}
+
+.media-image-item.reference {
+  background: #243029;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.media-image-item > .media-image-main {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+.media-image-thumb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 27px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: #141a17;
+  color: #b9c6ee;
+}
+
+.media-image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-image-item > .media-remove {
+  width: 28px;
+  height: 28px;
+  opacity: 0;
+}
+
+.media-image-item:is(:hover, :focus-within) > .media-remove {
+  opacity: 1;
+}

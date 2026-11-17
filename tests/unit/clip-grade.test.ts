@@ -42,7 +42,7 @@ function project(): ProjectDocument {
   const document = createProject('grades', 'Grades');
   return projectSchema.parse({
     ...document,
-    media: { videoIds: ['rec'], audioIds: [] },
+    media: { videoIds: ['rec'], audioIds: [], imageIds: [] },
     layers: [
       { ...document.layers[0]!, transitions: [{ leftId: 'a', rightId: 'b', type: 'cut', duration: 0 }] },
       createLayer('video-2', 'Track 2'),

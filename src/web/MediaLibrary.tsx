@@ -7,6 +7,7 @@ import {
   type MediaSelections,
 } from '../shared/media-selection.js';
 import { damageLabel, type MediaAsset } from '../shared/media.js';
+import type { ImageAsset } from '../shared/images.js';
 import { MAX_VIDEO_LAYERS, type ProjectDocument } from '../shared/model.js';
 import { mediaRemovalUsage } from '../shared/projects.js';
 import { framesToSeconds } from '../shared/timing.js';
@@ -25,6 +26,7 @@ import type { RelinkTarget } from './ImportDialog.js';
 import './media-review.css';
 import './media-import.css';
 import { MediaMusicList, musicMatchesFilter } from './MediaMusicList.js';
+import { imageMatchesFilter, MediaImageList } from './MediaImageList.js';
 import './rush-source.css';
 import { PanelCollapseButton, type SidePanel } from './PanelToggle.js';
 import { readPreference, writePreference } from './preferences.js';
@@ -46,6 +48,10 @@ interface Props {
   onRelink: (target: RelinkTarget | null) => void;
   onRemove: (mediaIds: string[]) => boolean;
   onRemoveMusic: (ids: string[]) => boolean;
+  /** The registered images of the project's library, and those whose original is no longer in place. */
+  images: readonly ImageAsset[];
+  missingImages: ReadonlySet<string>;
+  onRemoveImages: (ids: string[]) => boolean;
   /** Keeps each recording's best steady range as its only kept range, in one Undo step. */
   onKeepBestRanges: (changes: readonly BestRangeChange[]) => boolean;
   /** Marks a recording's range selection done, or still to review, in one Undo step. */
@@ -328,6 +334,9 @@ export function MediaLibrary({
   onRelink,
   onRemove,
   onRemoveMusic,
+  images,
+  missingImages,
+  onRemoveImages,
   onKeepBestRanges,
   onSelectionDone,
   onImport,
@@ -481,6 +490,7 @@ export function MediaLibrary({
   const [bestConfirm, setBestConfirm] = useState<string | null>(null);
   const [bestReport, setBestReport] = useState<{ key: string; text: string } | null>(null);
   const visibleMusic = music.filter((asset) => musicMatchesFilter(asset, project, search, filter));
+  const visibleImages = images.filter((image) => imageMatchesFilter(image, missingImages, search, filter));
   // Damaged recordings need their own explicit choice to show the damage black.
   const prepareIds = selectedAssets
     .filter((asset) => !mediaReady(asset) && !['queued', 'preparing'].includes(asset.status) && !asset.damage.length)
@@ -564,10 +574,11 @@ export function MediaLibrary({
   };
   const requestRemove = (ids: readonly string[]): void => {
     if (!project || busy || !ids.length) return;
-    if (mediaRemovalUsage(project, { videoIds: ids, audioIds: [] }).clips > 0) setRemoving(ids);
+    if (mediaRemovalUsage(project, { videoIds: ids, audioIds: [], imageIds: [] }).clips > 0) setRemoving(ids);
     else remove(ids);
   };
-  const removingUsage = removing && project ? mediaRemovalUsage(project, { videoIds: removing, audioIds: [] }) : null;
+  const removingUsage =
+    removing && project ? mediaRemovalUsage(project, { videoIds: removing, audioIds: [], imageIds: [] }) : null;
 
   return (
     <aside className="media-panel panel editor-media" aria-label="Media library">
@@ -589,7 +600,7 @@ export function MediaLibrary({
           <button
             className="secondary-button small"
             aria-label="Import media"
-            title="Import video and music recordings; originals stay in place"
+            title="Import video and music recordings and images; originals stay in place"
             disabled={busy}
             onClick={onImport}
           >
@@ -985,12 +996,14 @@ export function MediaLibrary({
             </article>
           );
         })}
-        {!visible.length && !visibleMusic.length && (
+        {!visible.length && !visibleMusic.length && !visibleImages.length && (
           <div className="empty-library">
             <Icon name="folder" size={30} />
-            <strong>{assets.length || music.length ? 'No matching media' : 'Your media library is empty'}</strong>
+            <strong>
+              {assets.length || music.length || images.length ? 'No matching media' : 'Your media library is empty'}
+            </strong>
             <p>
-              {assets.length || music.length
+              {assets.length || music.length || images.length
                 ? 'Try another search or filter.'
                 : 'Import video and music recordings. Originals stay in place; PasCap prepares light editing copies.'}
             </p>
@@ -1022,6 +1035,13 @@ export function MediaLibrary({
           onPrepare={onPrepareMusic}
           onRelink={onRelink}
           onRemove={onRemoveMusic}
+        />
+        <MediaImageList
+          images={visibleImages}
+          projectId={projectId}
+          busy={busy}
+          missing={missingImages}
+          onRemove={onRemoveImages}
         />
       </div>
       {removing && removingUsage && (

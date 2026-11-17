@@ -5,12 +5,13 @@ import { readPreference, writePreference } from './preferences.js';
 
 const frameSchema = z.number().int().nonnegative();
 /**
- * What Color → Match aims at: a clip's source frame as its grade shows it, a recording's frame as shot, or a
- * registered style. Remembered per project in this browser, never saved with the project.
+ * What Color → Match aims at: a clip's source frame as its grade shows it, a recording's frame or a still image of the
+ * project as shot, or a registered style. Remembered per project in this browser, never saved with the project.
  */
 export const colorReferenceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('clip'), clipId: z.string().min(1), sourceFrame: frameSchema }).strict(),
   z.object({ kind: z.literal('recording'), mediaId: z.string().min(1), sourceFrame: frameSchema }).strict(),
+  z.object({ kind: z.literal('image'), imageId: z.string().min(1) }).strict(),
   z.object({ kind: z.literal('style'), styleId: z.string().min(1) }).strict(),
 ]);
 export type ColorReference = z.infer<typeof colorReferenceSchema>;

@@ -251,7 +251,7 @@ test('one folder view lists folders, video and music recordings; filters and sel
     { pathname: '/api/audio/register-selected', body: { path: '/approved/Theme.mp3' } },
   ]);
   await page.evaluate(() => window.pascapLab!.flush());
-  expect(memory.snapshot().media).toEqual({ videoIds: [ready.id], audioIds: [song.id] });
+  expect(memory.snapshot().media).toEqual({ videoIds: [ready.id], audioIds: [song.id], imageIds: [] });
   expect(memory.snapshot().music).toEqual([]);
 });
 

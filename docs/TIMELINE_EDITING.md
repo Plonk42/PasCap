@@ -15,7 +15,9 @@ HSL/curves remain static. See [Temperature and Tint](design/TEMPERATURE_AND_TINT
 
 The media library describes complete recordings belonging to the open project's
 bin, not every globally registered source. Projects require unique
-`media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each). Imports add
+`media.videoIds` and `media.audioIds` arrays (10,000 IDs maximum each) and
+`media.imageIds` (1,000 at most: registered JPEG and PNG stills, which only Color → Match reads
+as references; they never render or export). Imports add
 membership even without timeline placement; clip/music references also remain
 visible. New projects start with both arrays empty. **Remove from project** (the
 trash on a Media card or music file, or on the selection header for a selection)

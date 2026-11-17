@@ -13,6 +13,7 @@ import {
   type Style,
 } from '../shared/styles.js';
 import { analysisSize, type AnalysisFrame } from '../shared/white-balance.js';
+import { readAnalysisFrame } from './analysis-frame.js';
 import type { ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { assertNoSymlinks } from './files.js';
@@ -133,12 +134,13 @@ export class StyleLibrary {
       const stream = probe.streams[0];
       if (!stream) throw new ServiceError(`${name} has no picture.`, 422);
       const size = analysisSize(stream.width, stream.height);
-      if (isStillFilename(name)) return { kind: 'still', frames: [await this.#frame(filename, size, null)] };
+      if (isStillFilename(name))
+        return { kind: 'still', frames: [await readAnalysisFrame(this.config, filename, size, null)] };
       const duration = Number(probe.format.duration);
       if (!Number.isFinite(duration) || duration <= 0) throw new ServiceError(`${name} has no duration.`, 422);
       const frames: AnalysisFrame[] = [];
       await forEachSerial(referenceTimes(duration), async (time) => {
-        frames.push(await this.#frame(filename, size, time));
+        frames.push(await readAnalysisFrame(this.config, filename, size, time));
       });
       return { kind: 'video', frames };
     } catch (error) {
@@ -146,35 +148,5 @@ export class StyleLibrary {
       if (error instanceof ServiceError) throw error;
       throw new ServiceError(`Cannot read ${name}: ${errorMessage(error)}`, 422);
     }
-  }
-
-  async #frame(filename: string, size: { width: number; height: number }, time: number | null): Promise<AnalysisFrame> {
-    const bytes = size.width * size.height * 4;
-    const seek = time === null ? [] : ['-ss', time.toFixed(6)];
-    const data = await runProcess(
-      this.config.ffmpeg,
-      [
-        '-hide_banner',
-        '-loglevel',
-        'error',
-        '-nostdin',
-        '-threads',
-        '2',
-        ...seek,
-        '-i',
-        filename,
-        '-frames:v',
-        '1',
-        '-vf',
-        `scale=${size.width}:${size.height}:flags=area+accurate_rnd+full_chroma_int:out_range=pc,format=rgba`,
-        '-f',
-        'rawvideo',
-        'pipe:1',
-      ],
-      { maxBytes: bytes },
-    );
-    if (data.length !== bytes)
-      throw new ServiceError(`${path.basename(filename)} gave no frame at ${time ?? 0} s.`, 422);
-    return { ...size, data: new Uint8Array(data) };
   }
 }

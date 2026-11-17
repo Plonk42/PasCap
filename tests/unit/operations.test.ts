@@ -214,7 +214,7 @@ describe('operation routes', () => {
     const before: ProjectDocument = projectSchema.parse({
       ...project,
       layers: [{ ...project.layers[0], transitions: [cut('a', 'b'), cut('b', 'c'), cut('c', 'd')] }],
-      media: { videoIds: ['rec-1'], audioIds: [] },
+      media: { videoIds: ['rec-1'], audioIds: [], imageIds: [] },
       clips: [clip('a', 0), clip('b', 30), clip('c', 60), clip('d', 90)],
     });
     const after = [
@@ -251,7 +251,7 @@ describe('operation routes', () => {
   it('describes clips with their recording, timecodes and kept ranges', async () => {
     const project: ProjectDocument = projectSchema.parse({
       ...createProject('clips', 'Clips'),
-      media: { videoIds: ['rec-1'], audioIds: [] },
+      media: { videoIds: ['rec-1'], audioIds: [], imageIds: [] },
       clips: [
         {
           id: 'clip-1',
@@ -516,7 +516,7 @@ describe('operation routes', () => {
   it('reports what an assistant can use: caches, analyses and a running export', async () => {
     const project: ProjectDocument = projectSchema.parse({
       ...createProject('ready', 'Ready'),
-      media: { videoIds: ['rec-1', 'rec-2', 'rec-3'], audioIds: ['song-1'] },
+      media: { videoIds: ['rec-1', 'rec-2', 'rec-3'], audioIds: ['song-1'], imageIds: [] },
     });
     const videos: Record<string, { name: string; status: string }> = {
       'rec-1': { name: 'A.MP4', status: 'ready' },
@@ -566,7 +566,7 @@ describe('operation routes', () => {
     const zero = pan.map((value) => (value === null ? null : 0));
     const project: ProjectDocument = projectSchema.parse({
       ...createProject('shots', 'Shots'),
-      media: { videoIds: ['rec-1'], audioIds: [] },
+      media: { videoIds: ['rec-1'], audioIds: [], imageIds: [] },
       selects: { 'rec-1': [{ sourceIn: 30, sourceOut: 570 }] },
     });
     const sheets: number[][] = [];
@@ -651,7 +651,7 @@ describe('operation routes', () => {
     const zero = pan.map((value) => (value === null ? null : 0));
     const project: ProjectDocument = projectSchema.parse({
       ...createProject('compare', 'Compare'),
-      media: { videoIds: ['rec-1', 'rec-2', 'rec-3'], audioIds: [] },
+      media: { videoIds: ['rec-1', 'rec-2', 'rec-3'], audioIds: [], imageIds: [] },
       selects: { 'rec-1': [{ sourceIn: 30, sourceOut: 570 }] },
     });
     const assets: Record<string, object> = {
@@ -755,7 +755,7 @@ describe('operation routes', () => {
     const base = createProject('music', 'Music');
     const project: ProjectDocument = projectSchema.parse({
       ...base,
-      media: { videoIds: ['rec-1'], audioIds: ['song-1'] },
+      media: { videoIds: ['rec-1'], audioIds: ['song-1'], imageIds: [] },
       clips: ['a', 'b'].map((id, index) => ({
         id,
         mediaId: 'rec-1',
