@@ -398,13 +398,19 @@ test('the music clip and Audio tab show the key, sections, swells, silences and 
   await expect(clip.locator('.music-readout')).toContainText('00:03:10 · build · −12 dB');
   await page.mouse.move(await frameX(page, 82), body.y + body.height / 2);
   await expect(clip.locator('.music-readout')).toContainText('silence');
+  await page.mouse.move(await frameX(page, 60), body.y + body.height / 2);
+  await expect(clip.locator('.music-readout')).toContainText('quiet · −24 dB · crescendo +9 dB');
   await page.mouse.move(body.x + body.width / 2, body.y - 40);
   await expect(clip.locator('.music-readout')).toHaveCount(0);
 
-  // The same marks are reachable by keyboard: Previous/Next visit the clip's sections where they play.
+  // The same marks are reachable by keyboard: Previous/Next visit the clip's sections where they play,
+  // and the Audio tab reads the music at the playhead once it is inside the clip.
+  const moment = page.locator('.music-clip-moment');
+  await expect(moment).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Previous section', exact: true })).toBeDisabled();
   await jump(page, 'Next section', 30);
   await jump(page, 'Next section', 90);
+  await expect(moment).toHaveText('build · −12 dB · low −8 dB · mid −18 dB · high −36 dB');
   await jump(page, 'Next section', 150);
   await jump(page, 'Previous section', 90);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();

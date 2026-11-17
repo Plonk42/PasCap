@@ -37,6 +37,7 @@ import {
 import { MusicAnalysisLine, useMusicAnalysis } from './MusicAnalysis.js';
 import { MusicMarkJumps } from './music-marks.js';
 import { musicMarks } from './music-review-window.js';
+import { musicMoment } from './music-structure.js';
 import { NumberField } from './NumberField.js';
 import { Popover } from './Popover.js';
 import { ResetButton, resetBlocked } from './SettingValueControl.js';
@@ -644,6 +645,7 @@ function MusicClipAnalysis({
   const analysis = phase.kind === 'ready' ? phase.analysis : null;
   const marks = useMemo(() => (analysis ? musicMarks(source, analysis) : null), [source, analysis]);
   if (asset?.status !== 'ready') return null;
+  const moment = analysis ? musicMoment(source, analysis, frame, 1).join(' · ') : '';
   return (
     <div className="music-analysis">
       <MusicAnalysisLine asset={asset} />
@@ -651,6 +653,11 @@ function MusicClipAnalysis({
         <div className="music-clip-marks">
           <MusicMarkJumps marks={marks} frame={frame} where="playhead" onSeek={onSeek} />
         </div>
+      )}
+      {moment && (
+        <output className="music-clip-moment" title={moment}>
+          {moment}
+        </output>
       )}
     </div>
   );

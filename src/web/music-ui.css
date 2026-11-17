@@ -60,6 +60,17 @@
   margin-bottom: 8px;
 }
 
+/* What plays at the playhead in the selected clip; the full text is in the title when cut. */
+.music-controls .music-clip-moment {
+  width: 100%;
+  overflow: hidden;
+  color: #c9d1ec;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .music-controls .music-track-fades small {
   color: var(--muted);
   font-variant-numeric: tabular-nums;

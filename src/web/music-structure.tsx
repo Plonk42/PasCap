@@ -39,6 +39,7 @@ const decibels = (value: number): string => {
   const rounded = Math.round(value);
   return `${rounded < 0 ? '−' : ''}${Math.abs(rounded)} dB`;
 };
+const signedDecibels = (value: number): string => `${value < 0 ? '−' : '+'}${Math.abs(Math.round(value))} dB`;
 
 function sampleAt(music: MusicTrack, frame: number): number | null {
   const source = musicSourceFrame(music, frame);
@@ -87,7 +88,7 @@ export function musicMoment(music: MusicTrack, analysis: MusicAnalysis, frame: n
   if (silent) parts.push('silence');
   else if (loudness !== undefined) parts.push(decibels(loudness));
   const swell = analysis.swells.find(inside);
-  if (swell) parts.push(`${swell.sudden ? 'sudden ' : ''}${swell.kind}`);
+  if (swell) parts.push(`${swell.sudden ? 'sudden ' : ''}${swell.kind} ${signedDecibels(swell.changeDb)}`);
   const tone = toneText(analysis.tone[Math.floor(sample / MUSIC_SAMPLE_RATE)]);
   if (tone && !silent) parts.push(tone);
   return parts;

@@ -651,13 +651,14 @@ its placement, source range and loops:
 
 Hovering a music clip shows a readout at the pointer: the timecode, any beat (**beat** or
 **downbeat**) and hit (**strong low hit**) within 4 pixels, section, loudness (or silence),
-any swell and the three tone levels
+any swell with its change (**sudden decrescendo −9 dB**) and the three tone levels
 there. Under **Recording**, the analysis line adds the key and the hit count (**128 BPM ·
 4/4 · C minor · 290 beats · 120 hits**, or **No steady beat found · C minor · 80 hits**),
 and Previous/Next **Section**, **Downbeat** and **Strong hit** buttons move the playhead to
 the selected clip's section starts, downbeats and strong hits where they play (disabled
-when there is none before or after the playhead). Unanalyzed music shows only the
-analysis line.
+when there is none before or after the playhead); below them, while the playhead is inside
+the clip, one line reads the music there like the hover readout, without the timecode (beat
+or hit within one frame). Unanalyzed music shows only the analysis line.
 
 ### Music waveform
 
