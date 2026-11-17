@@ -116,6 +116,16 @@ or dissolve can start from prefilled frames.
   While playing, status snapshots are published only by the display tick right
   after it draws, so holding Original or a new subscriber never receives an image
   drawn before the clock moved on.
+- **Shader programs** link in the background when the browser supports parallel
+  shader compilation (`KHR_parallel_shader_compile`), so a link never freezes the
+  page. A draw whose program is still linking draws nothing and the previous image
+  stays: a paused seek or edit shows its frame once the link finishes, Play starts
+  its clock only after its first frames' programs have linked, and during playback
+  the status is **Preparing the preview** while the clock continues. The variants a
+  document can use (its detail, HSL/curves, two-source transitions and clip grades
+  under adjustments) link one at a time after one second of paused idle, never
+  while seeks or playback need the GPU. Without the extension, they link
+  synchronously when an edit first needs them. Pixel capture waits for its links.
 - Pause, seek, timing edits, project changes and disposal stop the affected
   streams; their in-flight frames are discarded by generation.
 

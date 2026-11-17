@@ -42,8 +42,12 @@ const DETAIL_UNIFORMS = [
 export const STAGED_UNIFORM_VECTORS = 330;
 /** Two timeline video decoders per track: both dissolve sources, or the active and next clip. */
 export const MAX_VIDEO_DECODERS = 2 * MAX_VIDEO_LAYERS;
+/** How often a waiting draw asks whether its programs finished linking. */
+const LINK_POLL_MS = 16;
 
-type GradePath = 'full' | 'single' | 'scalar';
+/** `full` grades two sources with HSL ranges or curves, `single` one, `scalar` one or two without them. */
+export type GradePath = 'full' | 'single' | 'scalar';
+const GRADE_PATHS: readonly GradePath[] = ['full', 'single', 'scalar'];
 interface ProgramVariant {
   path: GradePath;
   detail: boolean;
@@ -118,41 +122,63 @@ function compile(gl: WebGL2RenderingContext, kind: number, source: string): WebG
   if (!shader) throw new Error('Cannot allocate a WebGL shader.');
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
-  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    const error = gl.getShaderInfoLog(shader);
-    gl.deleteShader(shader);
-    throw new Error(`Preview shader compilation failed: ${error}`);
-  }
   return shader;
 }
 
-function createProgram(gl: WebGL2RenderingContext, source = fragmentShader): WebGLProgram {
-  const vertex = compile(gl, gl.VERTEX_SHADER, vertexShader);
-  let fragment: WebGLShader | null = null;
-  let program: WebGLProgram | null = null;
+/** A program whose shaders compile and link in the driver; nothing waits for them until `finishProgram`. */
+interface LinkingProgram {
+  program: WebGLProgram;
+  shaders: WebGLShader[];
+}
+
+function startProgram(gl: WebGL2RenderingContext, source: string): LinkingProgram {
+  const shaders: WebGLShader[] = [];
   try {
-    fragment = compile(gl, gl.FRAGMENT_SHADER, source);
-    program = gl.createProgram();
+    shaders.push(compile(gl, gl.VERTEX_SHADER, vertexShader), compile(gl, gl.FRAGMENT_SHADER, source));
+    const program = gl.createProgram();
     if (!program) throw new Error('Cannot allocate the preview program.');
-    gl.attachShader(program, vertex);
-    gl.attachShader(program, fragment);
+    for (const shader of shaders) gl.attachShader(program, shader);
     gl.linkProgram(program);
-    if (!gl.getProgramParameter(program, gl.LINK_STATUS))
-      throw new Error(`Preview shader link failed: ${gl.getProgramInfoLog(program)}`);
-    return program;
+    return { program, shaders };
   } catch (error) {
-    if (program) gl.deleteProgram(program);
+    for (const shader of shaders) gl.deleteShader(shader);
+    throw error;
+  }
+}
+
+/** Waits for the link (blocking unless the driver already finished it) and reports a failed compile or link. */
+function finishProgram(gl: WebGL2RenderingContext, { program, shaders }: LinkingProgram): WebGLProgram {
+  try {
+    if (gl.getProgramParameter(program, gl.LINK_STATUS)) return program;
+    const failed = shaders.find((shader) => !gl.getShaderParameter(shader, gl.COMPILE_STATUS));
+    const error = failed
+      ? new Error(`Preview shader compilation failed: ${gl.getShaderInfoLog(failed)}`)
+      : new Error(`Preview shader link failed: ${gl.getProgramInfoLog(program)}`);
+    gl.deleteProgram(program);
     throw error;
   } finally {
-    gl.deleteShader(vertex);
-    if (fragment) gl.deleteShader(fragment);
+    for (const shader of shaders) gl.deleteShader(shader);
   }
+}
+
+function createProgram(gl: WebGL2RenderingContext, source = fragmentShader): WebGLProgram {
+  return finishProgram(gl, startProgram(gl, source));
 }
 
 /** What one source's two grades need from a program, and what to upload as each stage. */
 function sourceStages(source: CompositeClip): { stages: ColorSettings[]; tone: LocalTone } {
   const { stages, tone } = sourceGrades(source.grade ?? NEUTRAL_COLOR, source.settings);
   return { stages, tone };
+}
+/** A group's two sources (the second possibly empty), their grade stages and the program variant drawing them. */
+interface GroupPlan {
+  variant: ProgramVariant;
+  sources: CompositeClip[];
+  graded: { stages: ColorSettings[]; tone: LocalTone }[];
+  last: ColorSettings[];
+  first: ColorSettings[];
+  staged: boolean;
+  detailed: boolean;
 }
 const isAdvancedStage = (settings: ColorSettings): boolean =>
   !isNeutralHsl(settings.hsl) || CURVE_CHANNELS.some((channel) => !isIdentityCurve(settings.curves[channel]));
@@ -164,6 +190,14 @@ export class Compositor {
   /** The capacity a two-grade advanced program needs; checked before compiling one. */
   readonly fragmentUniformVectors: number;
   readonly #programs = new Map<string, CompiledProgram>();
+  /** Variants linking in the driver's threads, needed by a draw or prewarmed. */
+  readonly #linking = new Map<string, LinkingProgram & { variant: ProgramVariant }>();
+  /** Variants a document may need, linked one at a time by `prewarm` while the preview is idle. */
+  readonly #wanted = new Map<string, ProgramVariant>();
+  /** A started variant whose link failed: its first draw reports it. */
+  readonly #failed = new Map<string, Error>();
+  /** KHR_parallel_shader_compile's completion query when linking in the background, else null: every link blocks. */
+  readonly #completionStatus: number | null;
   #current: CompiledProgram;
   #advanced = true;
   readonly #vao: WebGLVertexArrayObject;
@@ -172,7 +206,14 @@ export class Compositor {
   readonly #hslUniform = new Float32Array(32);
   readonly #curveUniform = new Float32Array(192);
   #disposed = false;
-  constructor(readonly canvas: HTMLCanvasElement) {
+  /**
+   * `linkInBackground` (the editor preview) links programs without blocking the page when the browser supports
+   * parallel shader compilation; otherwise every link blocks, ahead of the draw that needs it (export, checks).
+   */
+  constructor(
+    readonly canvas: HTMLCanvasElement,
+    { linkInBackground = false }: { linkInBackground?: boolean } = {},
+  ) {
     const gl = canvas.getContext('webgl2', {
       alpha: false,
       antialias: false,
@@ -187,6 +228,10 @@ export class Compositor {
       ? String(gl.getParameter(extension.UNMASKED_RENDERER_WEBGL))
       : String(gl.getParameter(gl.RENDERER));
     this.fragmentUniformVectors = Number(gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS));
+    const parallel = linkInBackground
+      ? (gl.getExtension('KHR_parallel_shader_compile') as { COMPLETION_STATUS_KHR: number } | null)
+      : null;
+    this.#completionStatus = parallel?.COMPLETION_STATUS_KHR ?? null;
     const program = createProgram(gl);
     const vao = gl.createVertexArray();
     if (!vao) {
@@ -240,25 +285,95 @@ export class Compositor {
     return this.#current.uniforms.get(name) ?? null;
   }
 
-  /** Compile the detail variants ahead of a draw that needs them, never against a running clock. */
-  prepareDetail(): void {
+  /** The detail variants of `paths` a document may need: linked now, or prewarmed when linking in the background. */
+  prepareDetail(paths: readonly GradePath[] = GRADE_PATHS): void {
     if (this.#disposed) return;
-    for (const path of ['full', 'single', 'scalar'] as const) this.#compiled({ path, detail: true, staged: false });
+    for (const path of paths) this.#want({ path, detail: true, staged: false });
   }
-  /** Compile the variants grading a clip before its track, ahead of a draw that needs them. */
-  prepareStaged(detail: boolean): void {
+  /** The variants of `paths` grading a clip before its track: linked now, or prewarmed when linking in the background. */
+  prepareStaged(detail: boolean, paths: readonly GradePath[] = GRADE_PATHS): void {
     if (this.#disposed) return;
-    for (const path of ['full', 'single', 'scalar'] as const) {
-      this.#compiled({ path, detail: false, staged: true });
-      if (detail) this.#compiled({ path, detail: true, staged: true });
+    for (const path of paths) {
+      this.#want({ path, detail: false, staged: true });
+      if (detail) this.#want({ path, detail: true, staged: true });
     }
+  }
+  /**
+   * Without background linking, a link blocks: it happens now, ahead of any draw and never against a running clock.
+   * In the background, a draw links what it needs, and `prewarm` the rest.
+   */
+  #want(variant: ProgramVariant): void {
+    const key = variantKey(variant);
+    if (this.#completionStatus === null) this.#compiled(variant);
+    else if (!this.#programs.has(key) && !this.#failed.has(key)) this.#wanted.set(key, variant);
+  }
+  /**
+   * Starts linking the next wanted variant when none is linking, so the driver works on one program at a time.
+   * Whether a link is now running.
+   */
+  prewarm(): boolean {
+    if (this.#disposed || this.linking) return this.#linking.size > 0;
+    for (const [key, variant] of this.#wanted) {
+      this.#wanted.delete(key);
+      if (this.#programs.has(key) || this.#failed.has(key)) continue;
+      this.#start(variant);
+      return true;
+    }
+    return false;
+  }
+  /** Whether started variants are still linking; finished ones become usable. */
+  get linking(): boolean {
+    for (const key of this.#linking.keys()) this.#linked(key);
+    return this.#linking.size > 0;
+  }
+  /** Resolves once no started variant is linking, or when `signal` aborts. */
+  settled(signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve) => {
+      const check = (): void => {
+        if (this.#disposed || signal?.aborted || !this.linking) resolve();
+        else setTimeout(check, LINK_POLL_MS);
+      };
+      check();
+    });
+  }
+  /** Starts linking a variant in the driver's threads; only when linking in the background. */
+  #start(variant: ProgramVariant): void {
+    const key = variantKey(variant);
+    if (this.#programs.has(key) || this.#linking.has(key) || this.#failed.has(key)) return;
+    this.#wanted.delete(key);
+    this.#linking.set(key, {
+      ...startProgram(this.gl, fragmentShaderFor({ ...SHADER_SOURCES[variant.path], ...variant })),
+      variant,
+    });
+  }
+  /** Whether a variant can draw without waiting: linked, failed or never started. */
+  #linked(key: string): boolean {
+    const linking = this.#linking.get(key);
+    if (!linking) return true;
+    if (!this.gl.getProgramParameter(linking.program, this.#completionStatus!)) return false;
+    this.#linking.delete(key);
+    try {
+      this.#register(linking.variant, finishProgram(this.gl, linking));
+    } catch (error) {
+      this.#failed.set(key, error instanceof Error ? error : new Error(String(error)));
+    }
+    return true;
   }
   #compiled(variant: ProgramVariant): CompiledProgram {
     const key = variantKey(variant);
     const existing = this.#programs.get(key);
     if (existing) return existing;
+    const failed = this.#failed.get(key);
+    if (failed) throw failed;
+    const linking = this.#linking.get(key);
+    this.#linking.delete(key);
+    const program = linking
+      ? finishProgram(this.gl, linking)
+      : createProgram(this.gl, fragmentShaderFor({ ...SHADER_SOURCES[variant.path], ...variant }));
+    return this.#register(variant, program);
+  }
+  #register(variant: ProgramVariant, program: WebGLProgram): CompiledProgram {
     const gl = this.gl;
-    const program = createProgram(gl, fragmentShaderFor({ ...SHADER_SOURCES[variant.path], ...variant }));
     const uniforms = new Map<string, WebGLUniformLocation>();
     const names = [
       ...BASE_UNIFORMS,
@@ -270,7 +385,7 @@ export class Compositor {
       if (location !== null) uniforms.set(name, location);
     }
     const compiled = { program, uniforms };
-    this.#programs.set(key, compiled);
+    this.#programs.set(variantKey(variant), compiled);
     if (variant.path === 'full' && variant.detail && DETAIL_UNIFORMS.some((name) => !uniforms.has(name)))
       throw new Error('Missing compositor detail uniforms.');
     return compiled;
@@ -347,11 +462,20 @@ export class Compositor {
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.bindVertexArray(this.#vao);
-    this.#drawGroup(group);
+    this.#drawGroup(this.#plan(group));
   }
-  /** Groups are bottom-to-top; each track's dissolve is drawn exactly once. */
-  drawFrame(groups: readonly CompositeGroup[]): void {
-    if (this.#disposed || this.gl.isContextLost()) return;
+  /**
+   * Groups are bottom-to-top; each track's dissolve is drawn exactly once. When linking in the background, false,
+   * drawing nothing and keeping the image shown, while a program the groups need is linking; the draw starts that
+   * link. `wait` blocks until it is linked instead, for readbacks that must show the exact image at once.
+   */
+  drawFrame(groups: readonly CompositeGroup[], wait = false): boolean {
+    if (this.#disposed || this.gl.isContextLost()) return false;
+    const plans = groups.map((group) => this.#plan(group));
+    if (this.#completionStatus !== null && !wait) {
+      for (const { variant } of plans) this.#start(variant);
+      if (plans.some(({ variant }) => !this.#linked(variantKey(variant)))) return false;
+    }
     this.clear();
     const gl = this.gl;
     gl.useProgram(this.#current.program);
@@ -361,10 +485,11 @@ export class Compositor {
     gl.blendEquation(gl.FUNC_ADD);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     try {
-      for (const group of groups) this.#drawGroup(group);
+      plans.forEach((plan) => this.#drawGroup(plan));
     } finally {
       gl.disable(gl.BLEND);
     }
+    return true;
   }
   /** One stage's grade uniforms, `p` '' for the last (track) grade and 'first_' for the clip grade before it. */
   #uploadStage(p: string, index: number, settings: ColorSettings): void {
@@ -429,10 +554,9 @@ export class Compositor {
       Number(isNeutralHsl(grades[1]!.hsl)),
     );
   }
-  #drawGroup(group: CompositeGroup): void {
+  #plan(group: CompositeGroup): GroupPlan {
     if (group.clips.length < 1 || group.clips.length > 2)
       throw new Error('A composite group needs one or two sources.');
-    const gl = this.gl;
     const empty: CompositeClip = {
       slot: group.clips[0]!.slot,
       settings: { ...NEUTRAL_COLOR },
@@ -460,7 +584,12 @@ export class Compositor {
       throw new Error(
         `This GPU supports ${this.fragmentUniformVectors} fragment uniform vectors; grading a clip and an adjustment with HSL ranges or curves needs ${STAGED_UNIFORM_VECTORS}.`,
       );
-    this.#use({ path: advanced ? advancedPath : 'scalar', detail: detailed, staged });
+    const variant: ProgramVariant = { path: advanced ? advancedPath : 'scalar', detail: detailed, staged };
+    return { variant, sources, graded, last, first, staged, detailed };
+  }
+  #drawGroup({ variant, sources, graded, last, first, staged, detailed }: GroupPlan): void {
+    const gl = this.gl;
+    this.#use(variant);
     const mappings = sources.map((source) =>
       compileSpatialMapping(
         source.spatial,
@@ -526,6 +655,11 @@ export class Compositor {
     this.#sizes.length = 0;
     this.gl.deleteVertexArray(this.#vao);
     for (const { program } of this.#programs.values()) this.gl.deleteProgram(program);
+    for (const { program, shaders } of this.#linking.values()) {
+      this.gl.deleteProgram(program);
+      for (const shader of shaders) this.gl.deleteShader(shader);
+    }
+    this.#linking.clear();
   }
 }
 

@@ -107,7 +107,8 @@ grade and adjustment, plus counts/neutral flags. The compositor reads
 curves and the GPU has no room for them, preview fails with an explicit error naming both
 numbers. No extra LUT
 texture, decoder, full-frame buffer, per-track uniform multiplier or native child.
-The compositor owns three fixed shader programs, compiled before playback: the
+The compositor owns three fixed shader programs, each linked before a draw uses it (see
+WebCodecs preview, `docs/design/WEBCODECS_PREVIEW.md`): the
 complete grouped advanced program, its exact single-source specialization and
 the scalar-only fast path. They share geometry, grading equations, the existing
 decoder textures and vertex array. Single-source specialization eliminates unused
