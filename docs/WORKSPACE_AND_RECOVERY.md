@@ -689,10 +689,17 @@ existing entry, its music tracks and cache, use **Relink** instead.
 
 Clicking a music file in Media → Music (**Listen to** _name_, pressed while shown) opens it in
 **Source preview** instead of a recording; choosing a recording replaces it, while hovering
-recording cards does not. Its range strip, as tall as a timeline music clip, draws the whole
-file with its waveform and, once analyzed, beats, hits and sections; below it, the play
-position timecode, the IN → OUT readout with **Reset music range** and the analysis line
-with **Music structure**. The round Play, the **Range / Whole** toggle (the same
+recording cards does not. A zoomed view fills the space a recording's picture takes: 20 s of
+the file around the play position (**Zoom in/out music**: 5, 10, 20, 40 or 80 s, session only)
+with its waveform and, once analyzed, beats, hits and sections at a readable size, the IN/OUT
+boundaries and the play position. It keeps still while the play position stays inside it and
+turns a page (starting just before it) when it leaves; a click or drag on it (the **Zoomed music
+playhead** slider) moves the play position. Below it the range strip, as tall as a timeline
+music clip, draws the whole file with a frame around the zoomed stretch; then the play position
+timecode, what plays there (beat or downbeat, hit, section, loudness, swell, tone), the IN → OUT
+readout with **Reset music range**, Previous/Next **Section**, **Downbeat** and **Strong hit**
+(which move the play position; I/O still mark there) and the analysis line. The round Play, the
+**Range / Whole** toggle (the same
 `pascap-source-play-scope` preference) and Space play from the play position (else IN) to OUT
 or the end, without looping. A click or drag on the strip (the **Music playhead** slider)
 moves the play position and pauses; the **Trim music start/end** handles (arrows one frame,

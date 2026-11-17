@@ -3,6 +3,8 @@ import path from 'node:path';
 import type { AudioAsset } from '../../src/shared/audio.js';
 import type { MediaAsset } from '../../src/shared/media.js';
 import { createClip, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
+import { MUSIC_ANALYSIS_VERSION, type MusicAnalysis } from '../../src/shared/music-analysis.js';
+import { MUSIC_SAMPLES_PER_FRAME } from '../../src/shared/music-format.js';
 import { calculateLayout } from '../../src/shared/timeline.js';
 import { memoryProjects, type MemoryProjects } from './memory-projects.js';
 
@@ -12,10 +14,12 @@ let song: AudioAsset;
 let memory: MemoryProjects;
 let unexpected: string[];
 let missing: string[];
+let analysis: MusicAnalysis | null;
 
 test.beforeEach(async ({ page, request }) => {
   unexpected = [];
   missing = [];
+  analysis = null;
   const videos = ((await (await request.get('/api/media')).json()) as { assets: MediaAsset[] }).assets;
   const audio = ((await (await request.get('/api/audio')).json()) as { assets: AudioAsset[] }).assets;
   const video = videos.find((asset) => asset.name === 'pattern-a.mp4' && asset.status === 'ready');
@@ -45,6 +49,10 @@ test.beforeEach(async ({ page, request }) => {
     const method = route.request().method();
     if (method === 'GET' && reads[pathname]) {
       await route.fulfill({ json: reads[pathname]() });
+      return;
+    }
+    if (method === 'GET' && pathname === `/api/audio/${song.id}/analysis` && analysis) {
+      await route.fulfill({ json: { analysis, job: null } });
       return;
     }
     if (
@@ -178,6 +186,86 @@ test('I and O mark a range that Add music clip places in one Undo step', async (
     'aria-selected',
     'true',
   );
+});
+
+test('a zoomed view follows the play position, and Previous/Next visit sections, downbeats and strong hits', async ({
+  page,
+}) => {
+  const at = (frame: number): number => Math.round(frame * MUSIC_SAMPLES_PER_FRAME);
+  analysis = {
+    version: MUSIC_ANALYSIS_VERSION,
+    source: { content: 'a'.repeat(64), bytes: 4, mtimeMs: 0 },
+    sampleRate: 48_000,
+    hop: 480,
+    samples: Math.round(song.metadata.durationSeconds * 48_000),
+    tempo: { bpm: 120, confidence: 0.9, curve: [{ fromSample: 0, bpm: 120 }] },
+    meter: { beatsPerBar: 4, confidence: 0.8 },
+    // Beats every 15 frames from 5, a downbeat every fourth: downbeats at 5, 65 and 125.
+    beats: Array.from({ length: 12 }, (_, index) => ({
+      sample: at(5 + 15 * index),
+      strength: 0.8,
+      downbeat: index % 4 === 0,
+    })),
+    hits: [
+      { sample: at(12), strength: 0.9, band: 'low', strong: true },
+      { sample: at(40), strength: 0.3, band: 'mid', strong: false },
+      { sample: at(100), strength: 0.9, band: 'high', strong: true },
+    ],
+    loudness: [],
+    tone: [],
+    key: null,
+    silences: [],
+    swells: [],
+    sections: [
+      { fromSample: 0, toSample: at(90), kind: 'quiet', loudnessDb: -24 },
+      { fromSample: at(90), toSample: at(170), kind: 'build', loudnessDb: -12 },
+    ],
+  };
+  const count = song.metadata.frameCount;
+  const saves = memory.saves;
+  await openSong(page);
+  await expect(page.getByRole('img', { name: 'Waveform for test-music.wav, zoomed', exact: true })).toBeVisible();
+  const detail = review(page).locator('.music-review-detail');
+  // The default 20 s show the whole 6 s file; 5 s show part of it, around the play position.
+  await expect(detail).toHaveAttribute('data-window-end', String(count));
+  await expect(page.getByRole('button', { name: 'Zoom out music', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Zoom in music', exact: true }).click();
+  await page.getByRole('button', { name: 'Zoom in music', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Zoom in music', exact: true })).toBeDisabled();
+  await expect(detail).toHaveAttribute('data-window-start', '0');
+  await expect(detail).toHaveAttribute('data-window-end', '150');
+  await expect(detail.locator('.music-beats')).toHaveAttribute('data-downbeats', '3');
+
+  const go = (name: string) => page.getByRole('button', { name, exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Previous downbeat', exact: true })).toBeDisabled();
+  await go('Next downbeat');
+  await expect.poll(() => reviewFrame(page)).toBe(5);
+  await go('Next downbeat');
+  await go('Next downbeat');
+  await expect.poll(() => reviewFrame(page)).toBe(125);
+  await expect(page.getByRole('button', { name: 'Next downbeat', exact: true })).toBeDisabled();
+  await go('Previous strong hit');
+  await expect.poll(() => reviewFrame(page)).toBe(100);
+  await expect(review(page).locator('.music-review-moment')).toHaveText('strong high hit · build');
+  await expect(page.getByRole('button', { name: 'Next strong hit', exact: true })).toBeDisabled();
+  await go('Previous section');
+  await expect.poll(() => reviewFrame(page)).toBe(90);
+  await go('Previous section');
+  await expect.poll(() => reviewFrame(page)).toBe(0);
+
+  // Leaving the view turns the page, starting just before the play position.
+  await page.getByRole('slider', { name: 'Music playhead', exact: true }).fill(String(count - 5));
+  await expect(detail).toHaveAttribute('data-window-start', String(count - 150));
+  const zoomed = page.getByRole('slider', { name: 'Zoomed music playhead', exact: true });
+  await zoomed.fill('60');
+  await expect.poll(() => reviewFrame(page)).toBe(60);
+  await expect(detail).toHaveAttribute('data-window-start', String(count - 150));
+  await zoomed.press('i');
+  await expect(detail).toHaveAttribute('data-source-in', '60');
+  await expect(detail.locator('.music-review-edge.in')).toBeVisible();
+  await expect(detail.locator('.music-review-edge.out')).toBeVisible();
+  expect(memory.saves).toBe(saves);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
 });
 
 test('a recording that cannot play says why', async ({ page }) => {

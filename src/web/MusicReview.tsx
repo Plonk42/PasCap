@@ -22,11 +22,14 @@ import { formatTimecode } from '../shared/timing.js';
 import { sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
 import './media-review.css';
-import { MusicAnalysisStatus } from './MusicAnalysis.js';
+import { MusicAnalysisLine, useMusicAnalysis } from './MusicAnalysis.js';
 import { MusicGraphics } from './music-graphics.js';
 import { MusicReviewTransport, type MusicReviewState } from './music-review-transport.js';
+import { DEFAULT_DETAIL_SECONDS, followWindow, type DetailWindow } from './music-review-window.js';
+import { musicMoment } from './music-structure.js';
 import './music-ui.css';
 import type { MusicAddTarget } from './music-ui.js';
+import { MusicReviewDetail, MusicReviewMarks } from './MusicReviewDetail.js';
 import { readPreference, SOURCE_PLAY_SCOPE_PREFERENCE, writePreference } from './preferences.js';
 import './rush-source.css';
 
@@ -102,6 +105,12 @@ export function MusicReview({
     () => readPreference(SOURCE_PLAY_SCOPE_PREFERENCE) === 'recording',
   );
   const frame = Math.min(count - 1, state.frame);
+  const [seconds, setSeconds] = useState(DEFAULT_DETAIL_SECONDS);
+  const [view, setView] = useState<DetailWindow | null>(null);
+  const shown = followWindow(view, frame, seconds, count);
+  if (shown !== view) setView(shown);
+  const { phase } = useMusicAnalysis(reason ? undefined : asset);
+  const analysis = phase.kind === 'ready' ? phase.analysis : null;
   const whole = useMemo<MusicTrack>(
     () => ({
       id: 'music-review',
@@ -117,6 +126,7 @@ export function MusicReview({
     }),
     [asset.id, count],
   );
+  const moment = analysis ? musicMoment(whole, analysis, frame, 1).join(' · ') : '';
   const resourceKey = reason ? '' : `${asset.id}/${asset.content?.digest ?? ''}/${count}`;
 
   useLayoutEffect(() => {
@@ -290,6 +300,9 @@ export function MusicReview({
           <Icon name="x" size={13} />
         </button>
       </div>
+      {!reason && (
+        <MusicReviewDetail asset={asset} view={shown} frame={frame} range={range} onSeek={seek} onKeyDown={keyboard} />
+      )}
       <div className="source-range-editor">
         <div className="source-track">
           <div className="source-transport">
@@ -357,6 +370,13 @@ export function MusicReview({
                 style={{ left: percent(range.sourceIn), width: percent(length) }}
                 aria-hidden="true"
               />
+              {!reason && shown.length < count && (
+                <span
+                  className="music-review-window"
+                  style={{ left: percent(shown.start), width: percent(shown.length) }}
+                  aria-hidden="true"
+                />
+              )}
               {!reason && (
                 <>
                   <input
@@ -415,6 +435,11 @@ export function MusicReview({
             <span title={`Frame ${frame} of ${count - 1}`}>{formatTimecode(frame)}</span>
             <small>{statusLabel}</small>
           </div>
+          {moment && (
+            <output className="music-review-moment" title={moment}>
+              {moment}
+            </output>
+          )}
           <div className="music-review-range">
             <span title="Music IN → OUT, OUT exclusive">
               IN {formatTimecode(range.sourceIn)} → OUT {formatTimecode(range.sourceOut)}
@@ -443,7 +468,20 @@ export function MusicReview({
           {state.error}
         </div>
       )}
-      {!reason && <MusicAnalysisStatus asset={asset} music={whole} onSeek={seek} />}
+      {!reason && (
+        <>
+          <MusicReviewMarks
+            whole={whole}
+            analysis={analysis}
+            frame={frame}
+            seconds={seconds}
+            onSeek={seek}
+            onZoom={setSeconds}
+            onKeyDown={keyboard}
+          />
+          <MusicAnalysisLine asset={asset} />
+        </>
+      )}
       <output className="source-add-feedback" aria-live="polite" aria-atomic="true">
         {added}
       </output>

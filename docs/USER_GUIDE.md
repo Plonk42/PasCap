@@ -833,10 +833,13 @@ clips) from this project. No soundtrack is
 supplied; use music you own or have permission to use and keep private paths private.
 
 **Listen before placing.** Click a music file in **Media → Music** to open it in **Source preview** (it replaces a
-recording shown there; hovering a recording does not interrupt it). The strip shows its whole
-waveform with, once analyzed, its beats, hits and sections, like a music clip on the
-timeline. **Play / Pause** (or Space) plays it from the play position; click or drag on the
-strip to move that position, which pauses. Like for recordings, **Range** plays from IN to OUT
+recording shown there; hovering a recording does not interrupt it). The large view shows 20 s
+around the play position, its beats, hits and sections drawn large enough to read (**−**/**+**
+change it from 5 to 80 s); the strip below shows the whole file like a music clip on the
+timeline, framing the zoomed part. Under the strip, a line tells what plays at the play
+position, and **Section**, **Downbeat** and **Strong hit** arrows jump to the previous or next
+one. **Play / Pause** (or Space) plays it from the play position; click or drag on either view
+to move that position, which pauses. Like for recordings, **Range** plays from IN to OUT
 and **Whole** the whole file; playback stops at the end, without looping. Set **IN/OUT** with
 the handles or **I**/**O** at the play position (marking does not pause); the reset icon
 restores the whole file. This range is not saved: it only chooses what **Add music clip**

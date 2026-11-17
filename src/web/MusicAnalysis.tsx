@@ -163,27 +163,35 @@ interface StatusProps {
   onSeek: (frame: number) => void;
 }
 
-/** Under Recording: the analysis summary, its progress or Analyze music, then the music's structure. */
-export function MusicAnalysisStatus({ asset, music, onSeek }: Readonly<StatusProps>) {
+/** The analysis summary, its progress or Analyze music. */
+export function MusicAnalysisLine({ asset }: Readonly<{ asset: AudioAsset }>) {
   const { phase, analyze } = useMusicAnalysis(asset);
-  if (asset?.status !== 'ready') return null;
   const text = statusText(phase);
   return (
+    <div className={`music-analysis-status ${phase.kind}`} role="status" aria-live="polite">
+      <Icon name="music" size={14} />
+      <span title={text}>{text}</span>
+      {(phase.kind === 'idle' || phase.kind === 'error') && (
+        <button
+          type="button"
+          className="text-button"
+          title="Find the tempo, beats, hits and sections of this music in the background"
+          onClick={analyze}
+        >
+          Analyze music
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Under Recording: the analysis summary, its progress or Analyze music, then the music's structure. */
+export function MusicAnalysisStatus({ asset, music, onSeek }: Readonly<StatusProps>) {
+  const { phase } = useMusicAnalysis(asset);
+  if (asset?.status !== 'ready') return null;
+  return (
     <div className="music-analysis">
-      <div className={`music-analysis-status ${phase.kind}`} role="status" aria-live="polite">
-        <Icon name="music" size={14} />
-        <span title={text}>{text}</span>
-        {(phase.kind === 'idle' || phase.kind === 'error') && (
-          <button
-            type="button"
-            className="text-button"
-            title="Find the tempo, beats, hits and sections of this music in the background"
-            onClick={analyze}
-          >
-            Analyze music
-          </button>
-        )}
-      </div>
+      <MusicAnalysisLine asset={asset} />
       {phase.kind === 'ready' && <MusicStructureList music={music} analysis={phase.analysis} onSeek={onSeek} />}
     </div>
   );

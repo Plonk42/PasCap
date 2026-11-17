@@ -68,10 +68,15 @@ function nearest<T extends { frame: number }>(items: readonly T[], frame: number
 
 /** What plays at a project frame of the clip, with a beat or hit within `reach` frames: the hover readout. */
 export function describeMusicMoment(music: MusicTrack, analysis: MusicAnalysis, frame: number, reach = 0): string {
+  return [formatTimecode(frame), ...musicMoment(music, analysis, frame, reach)].join(' · ');
+}
+
+/** The beat or hit, section, loudness, swell and tone at a project frame of the clip. */
+export function musicMoment(music: MusicTrack, analysis: MusicAnalysis, frame: number, reach = 0): string[] {
   const sample = sampleAt(music, frame);
-  if (sample === null) return formatTimecode(frame);
+  if (sample === null) return [];
   const inside = (stretch: Stretch): boolean => sample >= stretch.fromSample && sample < stretch.toSample;
-  const parts = [formatTimecode(frame)];
+  const parts: string[] = [];
   const beat = nearest(musicBeatFrames(music, analysis.beats), frame, reach);
   if (beat) parts.push(beat.downbeat ? 'downbeat' : 'beat');
   const hit = nearest(musicHitFrames(music, analysis.hits), frame, reach);
@@ -86,7 +91,7 @@ export function describeMusicMoment(music: MusicTrack, analysis: MusicAnalysis, 
   if (swell) parts.push(`${swell.sudden ? 'sudden ' : ''}${swell.kind}`);
   const tone = toneText(analysis.tone[Math.floor(sample / MUSIC_SAMPLE_RATE)]);
   if (tone && !silent) parts.push(tone);
-  return parts.join(' · ');
+  return parts;
 }
 
 /** One path per band and step: columns across the clip, brighter where the band is louder. */
