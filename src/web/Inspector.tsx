@@ -61,8 +61,8 @@ interface Props {
   project: ProjectDocument;
   assets: MediaAsset[];
   selectedClipId: string | null;
-  /** Clips selected together (Ctrl/Cmd-click); one clip's grade is edited only on its own. */
-  selectedClipCount?: number;
+  /** Clips selected together (Ctrl/Cmd-click), empty with one; Detail edits them all, a grade only one alone. */
+  selectedClipIds?: readonly string[];
   /** The adjustments selected on the timeline; the Color tab edits one selected alone. */
   selectedAdjustmentIds?: readonly string[];
   selectedLayerId: string;
@@ -83,6 +83,7 @@ interface Props {
 }
 
 const NO_ADJUSTMENTS: readonly string[] = [];
+const NO_CLIPS: readonly string[] = [];
 
 const INSPECTOR_MODES: readonly { id: InspectorMode; label: string }[] = [
   { id: 'clip', label: 'Clip' },
@@ -998,7 +999,7 @@ function InspectorPanel({
   project,
   assets,
   selectedClipId,
-  selectedClipCount = 0,
+  selectedClipIds = NO_CLIPS,
   selectedAdjustmentIds = NO_ADJUSTMENTS,
   selectedLayerId,
   boundaryId,
@@ -1022,6 +1023,9 @@ function InspectorPanel({
   const { setOpen } = expansion;
   const layer = project.layers.find((item) => item.id === selectedLayerId);
   const clip = project.clips.find((item) => item.id === selectedClipId && item.layerId === selectedLayerId);
+  const detailClips = clip
+    ? project.clips.filter((item) => item.id === clip.id || selectedClipIds.includes(item.id))
+    : [];
   const asset = assets.find((item) => item.id === clip?.mediaId);
   const layout = calculateLayout(project);
   const placed = layout.clips.find((item) => item.clip.id === clip?.id);
@@ -1110,6 +1114,7 @@ function InspectorPanel({
                 key={`detail:${project.id}:${clip.id}`}
                 project={project}
                 clip={clip}
+                clips={detailClips}
                 disabled={drafting}
                 onEdit={onEdit}
               />
@@ -1218,7 +1223,7 @@ function InspectorPanel({
             asset={asset}
             clipLabel={`clip ${trackPosition + 1}`}
             clipPlace={`Clip ${trackPosition + 1} of ${trackClips.length} · ${layer?.name ?? ''}`}
-            selectedClipCount={selectedClipCount}
+            selectedClipCount={selectedClipIds.length}
             frame={frame}
             sourceFrame={sourceFrame}
             selectedAdjustmentIds={selectedAdjustmentIds}

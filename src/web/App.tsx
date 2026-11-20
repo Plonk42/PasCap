@@ -2468,7 +2468,7 @@ export function App() {
                     project={visible}
                     assets={assets}
                     selectedClipId={selectedId}
-                    selectedClipCount={clipGroup.group.length}
+                    selectedClipIds={clipGroup.group}
                     selectedAdjustmentIds={adjustmentGroup.group}
                     selectedLayerId={selectedLayerId}
                     boundaryId={boundaryId}

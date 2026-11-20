@@ -11,6 +11,16 @@
   gap: 4px;
   min-width: 0;
 }
+.detail-scope {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.detail-mixed {
+  margin-left: 6px;
+  color: var(--muted);
+  font-weight: 400;
+}
 .detail-tools {
   display: flex;
   justify-content: flex-end;

@@ -302,7 +302,8 @@ last one clicked is the clip **Clip** properties edit (solid outline). Drag any 
 clips from one track follow the pointer to another track, clips from several tracks only move
 in time. On a Ripple-on track they slot into the sequence instead of keeping their gaps. Every
 clip shows a ghost, and if any of them cannot go there all ghosts turn red and nothing moves.
-**Delete** removes all the selected clips and **Alt+←/→** nudges them, each in one Undo step.
+**Delete** removes all the selected clips and **Alt+←/→** nudges them, each in one Undo step;
+**Clip → Detail** edits all of them too.
 A plain click selects one clip again. Details: [timeline editing](TIMELINE_EDITING.md#insertion-reordering-and-history).
 
 **Bookmarks** mark times of interest, such as a beat, so edits snap to them. Press
@@ -708,6 +709,10 @@ Dragging a slider previews the result live in the image; releasing commits one U
 step, and Escape cancels. Double-click a setting's name to reset it, or use
 **Reset detail** for all three. Settings belong to this clip only, are not animated,
 follow it to another track and are copied by Split, Cut range and Duplicate.
+
+With several clips selected (Ctrl-click), **Clip → Detail** edits all of them: the controls show
+the outlined clip's values, **Mixed** marks a setting the selected clips differ on, and a change
+sets that setting on every selected clip in one Undo step, leaving their other settings as they were.
 
 The filters work on the recording before the clip's grade, scaled to the image
 height, so the 720p preview shows what both export profiles produce: a 4K export sharpens

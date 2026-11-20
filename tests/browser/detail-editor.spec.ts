@@ -197,6 +197,67 @@ test('each Detail slider has its own reset button: one Undo step, disabled at it
   expect(await panel.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 });
 
+test('with several clips selected, each Detail change sets that setting on all of them in one Undo step', async ({
+  page,
+}) => {
+  await openEditor(page, true);
+  const enter = async (name: string, value: string): Promise<void> => {
+    const field = page.getByRole('spinbutton', { name, exact: true });
+    await field.fill(value);
+    await field.press('Enter');
+  };
+  const details = async () => (await current(page)).clips.map((clip) => clip.detail);
+  const mixed = (name: string) => page.locator('.detail-field').filter({ hasText: name }).locator('.detail-mixed');
+  await enter('Clip Sharpen', '0.5');
+  await enter('Clip Denoise', '0.2');
+  await expect.poll(details).toEqual([{ sharpen: 0.5, clarity: 0, denoise: 0.2 }, NEUTRAL_DETAIL]);
+  await expect(page.locator('.detail-scope')).toHaveCount(0);
+
+  await page.getByRole('button', { name: /^Select pattern-a\.mp4, clip 2/ }).click({ modifiers: ['Control'] });
+  await expect(page.locator('.detail-scope')).toHaveText('Changes apply to the 2 selected clips');
+  await expect(page.getByRole('spinbutton', { name: 'Clip Sharpen', exact: true })).toHaveValue('0');
+  await expect(mixed('Sharpen')).toBeVisible();
+  await expect(mixed('Denoise')).toBeVisible();
+  await expect(mixed('Clarity')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Reset Clarity', exact: true })).toHaveAttribute(
+    'aria-disabled',
+    'true',
+  );
+
+  await enter('Clip Clarity', '-0.3');
+  await expect.poll(details).toEqual([
+    { sharpen: 0.5, clarity: -0.3, denoise: 0.2 },
+    { sharpen: 0, clarity: -0.3, denoise: 0 },
+  ]);
+  await enter('Clip Sharpen', '1');
+  await expect.poll(details).toEqual([
+    { sharpen: 1, clarity: -0.3, denoise: 0.2 },
+    { sharpen: 1, clarity: -0.3, denoise: 0 },
+  ]);
+  await expect(mixed('Sharpen')).toHaveCount(0);
+  await expect(mixed('Denoise')).toBeVisible();
+
+  await resetSetting(page, 'Clip Denoise');
+  await expect.poll(details).toEqual([
+    { sharpen: 1, clarity: -0.3, denoise: 0 },
+    { sharpen: 1, clarity: -0.3, denoise: 0 },
+  ]);
+  await page.getByRole('button', { name: 'Reset detail', exact: true }).click();
+  await expect.poll(details).toEqual([NEUTRAL_DETAIL, NEUTRAL_DETAIL]);
+  await expect(page.getByRole('button', { name: 'Reset detail', exact: true })).toBeDisabled();
+  await undo(page).click();
+  await expect.poll(details).toEqual([
+    { sharpen: 1, clarity: -0.3, denoise: 0 },
+    { sharpen: 1, clarity: -0.3, denoise: 0 },
+  ]);
+  await undo(page).click();
+  await undo(page).click();
+  await expect.poll(details).toEqual([
+    { sharpen: 0.5, clarity: -0.3, denoise: 0.2 },
+    { sharpen: 0, clarity: -0.3, denoise: 0 },
+  ]);
+});
+
 test('Detail is a Clip section, collapsed by default and included in Expand all', async ({ page }) => {
   await openEditor(page, false);
   const section = page.getByRole('button', { name: 'Detail section', exact: true });

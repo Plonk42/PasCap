@@ -324,6 +324,11 @@ precision, applies on Enter/blur and restores on Escape; out-of-range drafts sta
 editable with an inline error and never clamp. Double-clicking a setting's name resets
 only that setting; **Reset detail** restores all three in one Undo step.
 
+With several clips selected, every edit is one `detail-patch` on all of them: the controls show
+the primary clip's values, a setting the clips differ on is marked **Mixed**, and a change
+(drag, entry or reset) sets only that setting on each clip. Resets are unavailable once every
+selected clip is neutral.
+
 ## Detail estimate
 
 The assistant's `estimate` operation with `kind: detail`
