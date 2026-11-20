@@ -50,6 +50,7 @@ function describeBrief(brief: Brief): string {
   const parts = [
     brief.notes && `notes “${brief.notes}”`,
     brief.musicTrackId && `music track ${brief.musicTrackId}`,
+    brief.musicId && `music recording ${brief.musicId}`,
     brief.targetSeconds !== null && `target length ${brief.targetSeconds} s`,
     brief.maxJolts !== null && `jolts below ${brief.maxJolts}`,
     brief.minMovement !== null && `movement at least ${brief.minMovement} %/s`,

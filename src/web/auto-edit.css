@@ -1,0 +1,119 @@
+.app-dialog.activity-modal.auto-edit-dialog {
+  width: min(760px, calc(100vw - 48px));
+}
+
+.auto-edit-summary {
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.auto-edit-summary p {
+  margin: 0;
+}
+
+.auto-edit-summary p + p {
+  color: var(--muted);
+}
+
+.auto-edit-notes {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+}
+
+.auto-edit-notes li {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.auto-edit-notes svg {
+  flex: none;
+  color: #e7c26d;
+}
+
+.auto-edit-table {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.auto-edit-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.auto-edit-table th,
+.auto-edit-table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.auto-edit-table th {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.auto-edit-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.auto-edit-table td:first-child {
+  width: 1%;
+}
+
+.auto-edit-table td:nth-child(2),
+.auto-edit-table td:nth-child(3) {
+  white-space: nowrap;
+}
+
+.auto-edit-table td:first-child > button {
+  min-width: 30px;
+  justify-content: center;
+}
+
+.auto-edit-more {
+  font-size: 12px;
+}
+
+.auto-edit-more summary {
+  width: fit-content;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.auto-edit-more ul {
+  display: grid;
+  gap: 2px;
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+}
+
+.auto-edit-progress {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.auto-edit-progress > progress {
+  flex: 0 0 100px;
+  accent-color: var(--accent);
+}
+
+.auto-edit-progress > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

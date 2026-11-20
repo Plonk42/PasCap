@@ -37,7 +37,22 @@ many candidates rather than one sheet per shot, one timeline_sheet of the cut, a
 for the grade. If your client can start subagents with their own conversations, give each group
 of similar recordings to one that looks and returns the chosen ranges with reasons.
 
-## 3. Choose footage
+## 3. Start from auto edit
+- auto_edit with apply (inside your session, with the revision you read) builds a whole first cut
+  in a minute or two, without pictures of yours: every steady range inside the kept ranges, alike
+  takes of one subject grouped so the best is kept, shots in flight order with an establishing
+  shot first, cut on downbeats and strong hits with lengths following the music's sections,
+  dissolves in quiet sections and fades, then Auto per clip and a match to the brief's style or the
+  most representative clip. It goes on a new Ripple track named Auto edit, hiding the others and
+  turning adjustments off; music the brief names but the timeline lacks is placed. Its report
+  gives each clip's recording, section and reasons, the alike takes left out and the alignment.
+- PasCap cannot see subjects: judge the cut with one timeline_sheet (a cell per clip), then
+  replace the shots you disagree with using the steps below, or call auto_edit again with
+  variant 1, 2… for the next-best alternatives: each call adds its own track and hides the others,
+  so remove the tracks you do not keep (layer-remove). pace, order (flight or energy), transitions
+  and grade tune it.
+
+## 4. Choose footage
 - describe_recording for each recording, without its sheet: its steady ranges inside the kept
   ranges, with the camera move (pan, tilt, push in…), what it shows (orbit, reveal, approach…),
   its rank, picture speed and flight data.
@@ -49,7 +64,7 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   recording_sheet only for frames no other sheet shows.
 - Clips must stay inside the kept ranges; edits that leave them are refused.
 
-## 4. Structure
+## 5. Structure
 - Order the shots to tell the flight: chronologically or by place, a wide establishing shot at
   the start and at section starts, the most dramatic movement on the peak, calm shots in quiet
   sections.
@@ -61,7 +76,7 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   build with the movement (a rise, a push in), cut or reveal on a sudden swell, and place
   transitions through black, or the end of the cut, in silences.
 
-## 5. Build
+## 6. Build
 - One Ripple video track, filled with one edit batch of insert commands in timeline order.
   Use preview_edits to check a batch before saving it.
 - snap_cuts_to_beats (first without apply, then with apply) moves each cut onto the beat, or with
@@ -74,7 +89,7 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   do not move.
 - Use a second track only for an overlay; a clip that needs its own grade gets a clip grade.
 
-## 6. Grade
+## 7. Grade
 - Each clip has its own grade (a clipId on the color commands), applied first and kept with
   the clip when it moves. An adjustment grades every track over a stretch of the film, after the
   clip grades, for a shared look, such as one per music section: adjustment-add with its
@@ -121,7 +136,7 @@ of similar recordings to one that looks and returns the chosen ranges with reaso
   (original) in one picture: judge a grade there, not in small sheet cells. Judge Detail on a
   1:1 crop: no halos, no waxy smoothing.
 
-## 7. Finish
+## 8. Finish
 - Verify with a timeline_sheet across the cut, check_alignment and the duration against the
   target.
 - session_end with notes for the user: the structure, the choices you made and anything they

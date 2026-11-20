@@ -29,11 +29,12 @@ const INSTRUCTIONS = [
   `The playbook is the ${GUIDE_URI} resource and the rough_cut prompt; when your client cannot read them, follow these steps.`,
   '1. Read: list_projects, describe_project, session_status (a Hand off carries the brief) and music_analysis (detail summary first).',
   "2. Take the project with session_start and the user's brief, unless the user's Hand off already started a session for you: edit within it. The user then cannot save it until you call session_end with notes for them or they take it back.",
-  '3. Choose footage with describe_recording (without its sheet) and compare_recordings: whole camera movements inside the ranges the user kept; clips outside them are refused.',
-  '4. Structure: order the shots to tell the flight, longer clips on quiet music, cuts on downbeats or strong hits at peaks.',
-  '5. Build with edit: its commands apply together against the expectedRevision you last read, or not at all, and a rejected command returns its reason; it returns what changed, so no read is needed after it, and preview_edits checks a batch first. Then snap_cuts_to_beats (keep deliberate cuts, maxShift), check_alignment, and dissolves with keepCut so cuts stay on the music.',
-  '6. Grade: describe_track first, then estimate (applyAs shots for a grade per shot, keyed once the cut is final); color-patch changes several settings of several clips (null returns one to neutral, settings left out keep theirs), layer-key-set keys several settings at one frame, detail-patch sets Detail on several clips.',
-  '7. Finish: look with timeline_sheet or still, check the length, and call session_end with notes.',
+  '3. Start from auto_edit with apply: in a minute or two it builds a whole graded cut on the music, on a new track, from the analyses alone; judge it with one timeline_sheet, then replace the shots you disagree with (steps 4 to 6), or call it with variant 1, 2… for alternatives.',
+  '4. Choose footage with describe_recording (without its sheet) and compare_recordings: whole camera movements inside the ranges the user kept; clips outside them are refused.',
+  '5. Structure: order the shots to tell the flight, longer clips on quiet music, cuts on downbeats or strong hits at peaks.',
+  '6. Build with edit: its commands apply together against the expectedRevision you last read, or not at all, and a rejected command returns its reason; it returns what changed, so no read is needed after it, and preview_edits checks a batch first. Then snap_cuts_to_beats (keep deliberate cuts, maxShift), check_alignment, and dissolves with keepCut so cuts stay on the music.',
+  '7. Grade: describe_track first, then estimate (applyAs shots for a grade per shot, keyed once the cut is final); color-patch changes several settings of several clips (null returns one to neutral, settings left out keep theirs), layer-key-set keys several settings at one frame, detail-patch sets Detail on several clips.',
+  '8. Finish: look with timeline_sheet or still, check the length, and call session_end with notes.',
   'Every read reports the revision it used; read again when it is older than your last edit. Every picture stays in the conversation and many clients limit how many it may hold: put many cells in one sheet rather than looking at shots one by one.',
 ].join(' ');
 

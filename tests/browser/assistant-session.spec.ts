@@ -71,6 +71,7 @@ function session(edits: number): MemorySession {
       brief: {
         notes: 'A calm cut',
         musicTrackId: null,
+        musicId: null,
         targetSeconds: null,
         maxJolts: null,
         minMovement: null,
