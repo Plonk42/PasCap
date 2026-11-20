@@ -78,6 +78,7 @@ function session(edits: number): MemorySession {
         minFlightSpeed: null,
         maxFlightSpeed: null,
         maxClips: null,
+        style: null,
       },
       checkpointId: '2026-10-21T10-00-00-000Z-abcdef',
       edits: Array.from({ length: edits }, (_, index) => ({
@@ -302,6 +303,8 @@ test('hands off with a brief after showing what the assistant can use, then open
     minFlightSpeed: null,
     maxFlightSpeed: null,
     maxClips: null,
+    // No style is registered: the brief aims at Auto's generic balance.
+    style: null,
   });
 
   // The assistant edits, then finishes with notes.

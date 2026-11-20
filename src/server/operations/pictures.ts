@@ -1,6 +1,14 @@
+import { createColorSettings } from '../../shared/color.js';
 import type { EditCommand } from '../../shared/commands.js';
+import { NEUTRAL_DETAIL } from '../../shared/detail.js';
 import type { ProjectDocument } from '../../shared/model.js';
-import type { compareRecordings, recordingSheet, still, timelineSheet } from '../../shared/operations/pictures.js';
+import type {
+  compareRecordings,
+  recordingSheet,
+  referenceStill,
+  still,
+  timelineSheet,
+} from '../../shared/operations/pictures.js';
 import { projectVideoIds } from '../../shared/projects.js';
 import { recordingShots } from '../../shared/recording-shots.js';
 import { forEachSerial } from '../../shared/serial.js';
@@ -86,6 +94,18 @@ export const runTimelineSheet: OperationRunner<typeof timelineSheet> = async (
     legend: legend(document, frames),
   };
 };
+
+export const runReferenceStill: OperationRunner<typeof referenceStill> = async (
+  { stills },
+  { mediaId, sourceFrame, color, detail },
+) => ({
+  image: await stills.referenceFrame(
+    mediaId,
+    sourceFrame,
+    color ?? createColorSettings(),
+    detail ?? { ...NEUTRAL_DETAIL },
+  ),
+});
 
 export const runRecordingSheet: OperationRunner<typeof recordingSheet> = async (
   { stills, images, library },

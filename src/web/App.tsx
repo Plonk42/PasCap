@@ -2374,6 +2374,7 @@ export function App() {
                     targetLayer={targetLayer}
                     selectionDone={project?.selectsDone.includes(reviewAsset.id) ?? false}
                     onSelectionDone={(done) => edit({ type: 'select-done', mediaId: reviewAsset.id, done }, true)}
+                    projectId={project?.id ?? null}
                   />
                 )}
               </Suspense>

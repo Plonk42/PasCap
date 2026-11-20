@@ -12,6 +12,7 @@ import { TrackAnimationControls } from './AnimationControls.js';
 import { AutoAdjust } from './AutoAdjust.js';
 import { AutoWhiteBalance } from './AutoWhiteBalance.js';
 import { ClipSourceRange } from './ClipSourceRange.js';
+import { ColorMatchSection } from './ColorMatch.js';
 import { COLOR_GROUPS, colorGroupResetCommands, colorResetCommands } from './color-reset.js';
 import { DetailSection } from './DetailControls.js';
 import { shortName, sourceSeconds } from './display.js';
@@ -61,7 +62,7 @@ interface Props {
   project: ProjectDocument;
   assets: MediaAsset[];
   selectedClipId: string | null;
-  /** Clips selected together (Ctrl/Cmd-click), empty with one; Detail edits them all, a grade only one alone. */
+  /** Clips selected together (Ctrl/Cmd-click), empty with one; Detail and Color → Match edit them all, a grade only one alone. */
   selectedClipIds?: readonly string[];
   /** The adjustments selected on the timeline; the Color tab edits one selected alone. */
   selectedAdjustmentIds?: readonly string[];
@@ -809,6 +810,8 @@ interface ColorTabProps {
   /** "Clip 2 of 3 · Track 1": tells apart clips of one recording. */
   clipPlace: string;
   selectedClipCount: number;
+  /** The clips selected together, when several are. */
+  selectedClipIds: readonly string[];
   frame: number;
   /** The source frame the selected clip shows at the playhead, or null off the clip. */
   sourceFrame: number | null;
@@ -922,7 +925,26 @@ function ColorTab(props: Readonly<ColorTabProps>) {
     </div>
   );
   const empty = nothingToEdit(clip ? Math.max(1, props.selectedClipCount) : 0, items.length);
-  if (empty) return <div className="inspector-empty">{empty}</div>;
+  let matched: readonly string[] = [];
+  if (clip && !items.length) matched = props.selectedClipIds.length ? props.selectedClipIds : [clip.id];
+  const match = matched.length > 0 && (
+    <ColorMatchSection
+      project={project}
+      layout={props.layout}
+      assets={props.assets}
+      playhead={props.frame}
+      clipIds={matched}
+      disabled={drafting}
+      onEdit={onEdit}
+    />
+  );
+  if (empty)
+    return (
+      <>
+        {match}
+        <div className="inspector-empty">{empty}</div>
+      </>
+    );
   const clipName = asset ? shortName(asset.name) : 'Unavailable recording';
   let owner: ColorOwner;
   let frame: number;
@@ -953,6 +975,7 @@ function ColorTab(props: Readonly<ColorTabProps>) {
             <AdjustmentScope item={item!} />,
             <AdjustmentActions item={item!} disabled={drafting} onEdit={onEdit} />,
           )}
+      {match}
       <KeyframeNavigationContext.Provider value={ownerNavigation}>
         <ColorSection
           project={project}
@@ -1224,6 +1247,7 @@ function InspectorPanel({
             clipLabel={`clip ${trackPosition + 1}`}
             clipPlace={`Clip ${trackPosition + 1} of ${trackClips.length} · ${layer?.name ?? ''}`}
             selectedClipCount={selectedClipIds.length}
+            selectedClipIds={selectedClipIds}
             frame={frame}
             sourceFrame={sourceFrame}
             selectedAdjustmentIds={selectedAdjustmentIds}

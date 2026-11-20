@@ -1,11 +1,11 @@
 import type { MediaAsset } from '../shared/media.js';
-import { createColorSettings } from '../shared/color.js';
-import { NEUTRAL_DETAIL } from '../shared/detail.js';
+import { createColorSettings, type ColorSettings } from '../shared/color.js';
+import { NEUTRAL_DETAIL, type DetailSettings } from '../shared/detail.js';
 import type { LumaFrame } from '../shared/detail-estimate.js';
-import type { ProjectDocument } from '../shared/model.js';
+import { createClip, createProject, type ProjectDocument } from '../shared/model.js';
 import { forEachSerial } from '../shared/serial.js';
 import { calculateLayout, sampleSlots, sampleTimeline, type TimelineLayout } from '../shared/timeline.js';
-import { framesToSeconds, type FrameRate } from '../shared/timing.js';
+import { framesToSeconds, PROJECT_FPS, sameRate, sourceFrameRate, type FrameRate } from '../shared/timing.js';
 import { analysisSize, type AnalysisFrame } from '../shared/white-balance.js';
 import type { AssistantImageBudget, ServiceConfig } from './config.js';
 import { ServiceError } from './errors.js';
@@ -412,6 +412,28 @@ export class StillRenderer {
         pictures.push(await this.#decode(asset, frame, signal));
       });
       return this.#encode(pictures, STILL_SIZE, frames.length > 1 ? budget.sheetCellWidth : budget.stillWidth, signal);
+    });
+  }
+
+  /** One source frame of a recording alone, through `color` and `detail`, as the export composes a clip. */
+  referenceFrame(
+    mediaId: string,
+    sourceFrame: number,
+    color: ColorSettings,
+    detail: DetailSettings,
+  ): Promise<JpegImage> {
+    return this.#run(async (signal) => {
+      const asset = this.readyAsset(mediaId);
+      if (sourceFrame >= asset.metadata.frameCount)
+        throw new ServiceError(`Recording ${asset.name} has ${asset.metadata.frameCount} frames.`, 422);
+      const document = createProject('reference', 'Reference');
+      document.media.videoIds = [mediaId];
+      const rate = sourceFrameRate(asset.metadata.frameRate);
+      if (rate && !sameRate(rate, PROJECT_FPS)) document.videoRates = { [mediaId]: rate };
+      const clip = createClip('reference', mediaId, sourceFrame, asset.metadata.frameCount);
+      document.clips = [{ ...clip, detail: { ...detail }, grade: { color: structuredClone(color), keyframes: [] } }];
+      const [picture] = await this.#projectFrames(document, [0], signal);
+      return this.#encode([picture!], STILL_SIZE, STILL_SIZE.width, signal);
     });
   }
 

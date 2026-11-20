@@ -1,0 +1,145 @@
+.app-dialog.activity-modal.styles-dialog {
+  width: min(560px, calc(100vw - 48px));
+}
+
+.styles-intro,
+.styles-empty,
+.styles-count {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.styles-list,
+.styles-entries {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.styles-list > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.styles-list > li > span {
+  display: grid;
+  min-width: 0;
+}
+
+.styles-list strong,
+.styles-entries span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.styles-list small,
+.styles-entries small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.styles-new {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.styles-new legend {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.styles-field {
+  display: grid;
+  gap: 6px;
+}
+
+.styles-field > label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.styles-field > input,
+.styles-location > select {
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+}
+
+.styles-browser {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.styles-location {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.styles-directory {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+.styles-entries {
+  max-height: 220px;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.styles-entries label,
+.styles-folder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 3px 4px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.styles-entries label > span {
+  flex: 1;
+}
+
+.styles-entries label:hover,
+.styles-folder:hover {
+  background: var(--surface-raised, rgba(255, 255, 255, 0.05));
+}

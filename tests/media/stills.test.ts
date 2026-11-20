@@ -6,6 +6,7 @@ import { createApp } from '../../src/server/app.js';
 import { createConfig, type ServiceConfig } from '../../src/server/config.js';
 import { runProcess } from '../../src/server/process.js';
 import { proxyFrameArgs, STILL_SIZE } from '../../src/server/stills.js';
+import { createColorSettings } from '../../src/shared/color.js';
 import { createClip, projectSchema } from '../../src/shared/model.js';
 
 const enabled = process.env['PASCAP_MEDIA_TESTS'] === '1';
@@ -235,6 +236,31 @@ describe.skipIf(!enabled)('project stills · disposable native fixture', () => {
     });
     expect(recordingSheet.statusCode, recordingSheet.body).toBe(200);
     expect(recordingSheet.json<Picture>().image.width).toBe(2 * 240 + 4);
+
+    // Color → Match's reference: one source frame alone at the composition size, through a grade with HDR.
+    const reference = async (color?: Record<string, unknown>) => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/ops/reference_still',
+        headers,
+        payload: { mediaId: asset.id, sourceFrame: 20, ...(color && { color }) },
+      });
+      expect(response.statusCode, response.body).toBe(200);
+      const { image } = response.json<{ image: Picture['image'] }>();
+      expect([image.width, image.height]).toEqual([1280, 720]);
+      return rgbOf(config, Buffer.from(image.data, 'base64'));
+    };
+    const asShot = await reference();
+    expect(meanError(asShot, await runProcess(config.ffmpeg, proxyFrameArgs(proxy, asset, 20)))).toBeLessThan(4);
+    const withHdr = await reference({ ...createColorSettings(), hdr: 1 });
+    expect(meanError(withHdr, asShot)).toBeGreaterThan(1);
+    const missing = await app.inject({
+      method: 'POST',
+      url: '/api/ops/reference_still',
+      headers,
+      payload: { mediaId: asset.id, sourceFrame: 60 },
+    });
+    expect(missing.statusCode).toBe(422);
 
     const compared = await app.inject({
       method: 'POST',

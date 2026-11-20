@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeAutoAdjust, autoAdjustFrames, scaleCorrection } from '../../src/shared/auto-adjust.js';
 import { applyCommand } from '../../src/shared/commands.js';
+import { createColorSettings } from '../../src/shared/color.js';
+import {
+  curvesTowardsMatch,
+  hslTowardsMatch,
+  matchFrame,
+  matchStyle,
+  measureLook,
+  towardsMatch,
+} from '../../src/shared/look-match.js';
 import {
   DETAIL_ESTIMATE,
   detailFrames,
@@ -150,6 +159,8 @@ describe('estimate operation', () => {
     },
   } as unknown as Context;
   const input = { projectId: 'estimate', applyAs: 'values', intensity: 80, commands: true } as const;
+  /** A match's Intensity defaults to 100%, the match itself. */
+  const matchInput = { projectId: 'estimate', applyAs: 'values', commands: true } as const;
 
   it('fits Auto adjust to the frames the editor analyzes and returns the edit that applies it', async () => {
     reads.length = 0;
@@ -310,6 +321,226 @@ describe('estimate operation', () => {
     expect(track.commands).toEqual(listed.commands);
   });
 
+  it('matches a clip frame to a hero frame as its grade shows it, never changing the hero', async () => {
+    const graded = applyCommand(project, {
+      type: 'color-patch',
+      clipIds: ['a'],
+      settings: { exposure: 0.4, saturation: 1.2 },
+    });
+    const heroed = { ...context, projects: { load: async () => graded } } as unknown as Context;
+    reads.length = 0;
+    const result = await runners.estimate(heroed, { ...matchInput, kind: 'match', clipId: 'b', referenceClipId: 'a' });
+    // Each clip at its middle frame: clip a (0–300) at source frame 150, clip b (100–200) at 150 too.
+    expect(reads).toEqual([
+      { mediaId: 'rec-1', frames: [150] },
+      { mediaId: 'rec-2', frames: [150] },
+    ]);
+    const heroColor = graded.clips[0]!.grade.color;
+    const shotColor = graded.clips[1]!.grade.color;
+    const matched = matchFrame({ frame: patches(5), color: heroColor }, { frame: patches(5), color: shotColor })!;
+    const expected = towardsMatch(shotColor, matched.correction, 1);
+    expect(result).toMatchObject({
+      kind: 'match',
+      reference: { clipId: 'a', mediaId: 'rec-1', sourceFrame: 150 },
+      analyzed: { description: 'source frame 150 of clip b', frames: 1 },
+      correction: expected,
+      likeness: 1,
+      commands: [{ type: 'color-patch', clipIds: ['b'], settings: expected }],
+    });
+    // The same picture takes the hero's grade.
+    expect(result.correction!['exposure']).toBeCloseTo(0.4, 2);
+    expect(result.correction!['saturation']).toBeCloseTo(1.2, 2);
+    const half = await runners.estimate(heroed, {
+      ...matchInput,
+      kind: 'match',
+      clipId: 'b',
+      referenceClipId: 'a',
+      intensity: 50,
+    });
+    expect(half.correction).toEqual(towardsMatch(shotColor, matched.correction, 0.5));
+
+    // Every clip of the track but the hero, each at its middle frame.
+    reads.length = 0;
+    const track = await runners.estimate(heroed, {
+      ...matchInput,
+      kind: 'match',
+      layerId,
+      applyAs: 'shots',
+      referenceClipId: 'a',
+    });
+    expect(track.reference).toEqual({ clipId: 'a', mediaId: 'rec-1', sourceFrame: 150 });
+    expect(track.clips!.map((clip) => clip.clipId)).toEqual(['b']);
+    expect(track.clips![0]!).toMatchObject({ correction: expected, likeness: 1, frames: 1 });
+    expect(track.commands).toEqual([{ type: 'color-patch', clipIds: ['b'], settings: expected }]);
+
+    // The hero playing at a frame, and the clip at a frame.
+    reads.length = 0;
+    const framed = await runners.estimate(heroed, {
+      ...matchInput,
+      kind: 'match',
+      clipId: 'a',
+      frame: 100,
+      referenceFrame: 310,
+      commands: false,
+    });
+    expect(reads).toEqual([
+      { mediaId: 'rec-2', frames: [110] },
+      { mediaId: 'rec-1', frames: [100] },
+    ]);
+    expect(framed.reference).toEqual({ clipId: 'b', mediaId: 'rec-2', sourceFrame: 110 });
+
+    // A recording's frame as shot.
+    reads.length = 0;
+    const shot = await runners.estimate(heroed, {
+      ...matchInput,
+      kind: 'match',
+      clipId: 'b',
+      referenceMediaId: 'rec-1',
+      referenceSourceFrame: 300,
+    });
+    expect(reads[0]).toEqual({ mediaId: 'rec-1', frames: [300] });
+    expect(shot.reference).toEqual({ mediaId: 'rec-1', sourceFrame: 300 });
+    const asShot = matchFrame(
+      { frame: patches(10), color: createColorSettings() },
+      { frame: patches(5), color: shotColor },
+    )!;
+    expect(shot.correction).toEqual(towardsMatch(shotColor, asShot.correction, 1));
+  });
+
+  it('gives a clip without curves, HSL or HDR the hero’s, in values and shots but never in a keyframe', async () => {
+    const curves = {
+      red: [
+        { x: 0, y: 0 },
+        { x: 0.25, y: 0.2 },
+        { x: 1, y: 1 },
+      ],
+      blue: [
+        { x: 0, y: 0.04 },
+        { x: 0.75, y: 0.7 },
+        { x: 1, y: 0.96 },
+      ],
+    };
+    const hsl = { blue: { hue: 0, saturation: -0.45, lightness: -0.085 } };
+    const graded = applyCommand(project, {
+      type: 'color-patch',
+      clipIds: ['a'],
+      settings: { hdr: 0.4 },
+      curves,
+      hsl,
+    });
+    const heroed = { ...context, projects: { load: async () => graded } } as unknown as Context;
+    const result = await runners.estimate(heroed, { ...matchInput, kind: 'match', clipId: 'b', referenceClipId: 'a' });
+    const heroColor = graded.clips[0]!.grade.color;
+    const matched = matchFrame(
+      { frame: patches(5), color: heroColor },
+      { frame: patches(5), color: graded.clips[1]!.grade.color },
+    )!;
+    expect(matched.curves).toEqual(heroColor.curves);
+    expect(matched.hsl).toEqual(heroColor.hsl);
+    expect(result.curves).toEqual(heroColor.curves);
+    expect(result.hsl).toEqual(hsl);
+    expect(result.effects).toEqual({ hdr: 0.4 });
+    expect(result.commands).toEqual([
+      {
+        type: 'color-patch',
+        clipIds: ['b'],
+        settings: { ...result.correction, hdr: 0.4 },
+        hsl,
+        curves: heroColor.curves,
+      },
+    ]);
+    const half = await runners.estimate(heroed, {
+      ...matchInput,
+      kind: 'match',
+      clipId: 'b',
+      referenceClipId: 'a',
+      intensity: 50,
+    });
+    expect(half.curves).toEqual(curvesTowardsMatch(heroColor.curves, 0.5));
+    expect(half.hsl).toEqual({ blue: hslTowardsMatch(heroColor.hsl, 0.5).blue });
+    expect(half.effects).toEqual({ hdr: 0.2 });
+
+    const keyed = await runners.estimate(heroed, {
+      ...matchInput,
+      kind: 'match',
+      clipId: 'b',
+      frame: 350,
+      applyAs: 'keyframe',
+      referenceClipId: 'a',
+    });
+    expect(keyed.commands.map((command) => command.type)).toEqual(['layer-key-set']);
+
+    const track = await runners.estimate(heroed, {
+      ...matchInput,
+      kind: 'match',
+      layerId,
+      applyAs: 'shots',
+      referenceClipId: 'a',
+    });
+    expect(track.clips![0]!.curves).toEqual(heroColor.curves);
+    expect(track.commands).toEqual([
+      {
+        type: 'color-patch',
+        clipIds: ['b'],
+        settings: { ...track.clips![0]!.correction, hdr: 0.4 },
+        hsl,
+        curves: heroColor.curves,
+      },
+    ]);
+
+    // A clip with curves and HSL of its own keeps them, and HDR it animates follows its keyframes.
+    const own = applyCommand(
+      applyCommand(graded, {
+        type: 'color-patch',
+        clipIds: ['b'],
+        curves: { master: curves.red },
+        hsl: { green: { hue: 5, saturation: 0, lightness: 0 } },
+      }),
+      { type: 'layer-key-set', clipId: 'b', frame: 150, values: { hdr: 0 } },
+    );
+    const kept = await runners.estimate({ ...context, projects: { load: async () => own } } as unknown as Context, {
+      ...matchInput,
+      kind: 'match',
+      clipId: 'b',
+      referenceClipId: 'a',
+    });
+    expect(kept.curves).toBeUndefined();
+    expect(kept.hsl).toBeUndefined();
+    expect(kept.effects).toEqual({ hdr: 0.4 });
+    expect(kept.commands).toEqual([{ type: 'color-patch', clipIds: ['b'], settings: kept.correction }]);
+  });
+
+  it('matches a clip to a registered style', async () => {
+    const look = measureLook([patches(2), patches(4)])!;
+    const style = { id: 'bright', name: 'Bright edits', look };
+    const styled = {
+      ...context,
+      styles: {
+        get: async (id: string) => {
+          if (id !== style.id) throw Object.assign(new Error('No such style.'), { statusCode: 404 });
+          return style;
+        },
+      },
+    } as unknown as Context;
+    reads.length = 0;
+    const result = await runners.estimate(styled, { ...matchInput, kind: 'match', clipId: 'a', style: 'bright' });
+    expect(reads).toEqual([{ mediaId: 'rec-1', frames: [150] }]);
+    const color = project.clips[0]!.grade.color;
+    const expected = towardsMatch(color, matchStyle(look, { frame: patches(5), color })!, 1);
+    expect(result).toMatchObject({
+      style: { id: 'bright', name: 'Bright edits' },
+      correction: expected,
+      commands: [{ type: 'color-patch', clipIds: ['a'], settings: expected }],
+    });
+    expect(result.likeness).toBeUndefined();
+    await expect(
+      runners.estimate(styled, { ...matchInput, kind: 'auto-adjust', clipId: 'a', style: 'bright' }),
+    ).rejects.toMatchObject({ statusCode: 422 });
+    await expect(
+      runners.estimate(styled, { ...matchInput, kind: 'match', clipId: 'a', style: 'gone' }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
   it('rejects ambiguous, misplaced and unsupported targets', async () => {
     const rejects = (fields: Record<string, unknown>, statusCode: number) =>
       expect(
@@ -334,5 +565,18 @@ describe('estimate operation', () => {
     await rejects({ mediaId: 'rec-9', sourceIn: 0, sourceOut: 10 }, 404);
     await rejects({ mediaId: 'rec-1', sourceIn: 10, sourceOut: 10 }, 422);
     await rejects({ mediaId: 'rec-1', sourceIn: 0, sourceOut: 601 }, 422);
+    // A match needs one reference, which never changes.
+    await rejects({ kind: 'match', clipId: 'b' }, 422);
+    await rejects({ clipId: 'b', referenceClipId: 'a' }, 422);
+    await rejects({ kind: 'match', clipId: 'b', referenceClipId: 'a', referenceMediaId: 'rec-1' }, 422);
+    await rejects({ kind: 'match', clipId: 'a', referenceClipId: 'a' }, 422);
+    await rejects({ kind: 'match', clipIds: ['a', 'b'], applyAs: 'shots', referenceClipId: 'b' }, 422);
+    await rejects({ kind: 'match', clipId: 'b', referenceClipId: 'z' }, 404);
+    await rejects({ kind: 'match', clipId: 'b', referenceClipId: 'a', referenceFrame: 310 }, 422);
+    await rejects({ kind: 'match', clipId: 'b', referenceFrame: 9000 }, 422);
+    await rejects({ kind: 'match', clipId: 'b', referenceMediaId: 'rec-1' }, 422);
+    await rejects({ kind: 'match', clipId: 'b', referenceMediaId: 'rec-1', referenceSourceFrame: 600 }, 422);
+    await rejects({ kind: 'match', clipId: 'b', referenceMediaId: 'rec-9', referenceSourceFrame: 0 }, 404);
+    await rejects({ kind: 'match', layerId, referenceClipId: 'a', commands: false }, 422);
   });
 });

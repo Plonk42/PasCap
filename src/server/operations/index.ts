@@ -11,7 +11,7 @@ import { runHandOffReadiness } from './hand-off.js';
 import { runListProjects } from './list-projects.js';
 import { runCheckAlignment, runMusicAnalysis, runSnapCutsToBeats } from './music.js';
 import { runMusicWaveform } from './music-waveform.js';
-import { runCompareRecordings, runRecordingSheet, runStill, runTimelineSheet } from './pictures.js';
+import { runCompareRecordings, runRecordingSheet, runReferenceStill, runStill, runTimelineSheet } from './pictures.js';
 import {
   runCheckpoint,
   runCheckpointCopy,
@@ -21,6 +21,7 @@ import {
   runSessionStart,
   runSessionStatus,
 } from './sessions.js';
+import { runListStyles } from './styles.js';
 
 export const runners: OperationRunners = {
   list_projects: runListProjects,
@@ -43,8 +44,10 @@ export const runners: OperationRunners = {
   still: runStill,
   timeline_sheet: runTimelineSheet,
   recording_sheet: runRecordingSheet,
+  reference_still: runReferenceStill,
   compare_recordings: runCompareRecordings,
   estimate: runEstimate,
+  list_styles: runListStyles,
 };
 
 export async function runOperation(operation: Operation, context: ServiceContext, input: unknown): Promise<unknown> {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { curvesSchema, HSL_BANDS, hslBandSchema } from '../advanced-color.js';
 import { AUTO_ADJUST, AUTO_ADJUST_SETTINGS } from '../auto-adjust.js';
 import { editCommandSchema } from '../command-schema.js';
 import { described } from '../described.js';
@@ -6,7 +7,7 @@ import { detailSchema } from '../detail.js';
 import { frameSchema, idSchema } from '../model.js';
 import { defineOperation, revisionReadSchema } from './spec.js';
 
-export const estimateKinds = ['auto-adjust', 'white-balance', 'detail'] as const;
+export const estimateKinds = ['auto-adjust', 'white-balance', 'detail', 'match'] as const;
 /** Clips one estimate analyzes each on its own. */
 export const MAX_ESTIMATE_CLIPS = 64;
 
@@ -30,10 +31,13 @@ const detailResultSchema = z
   })
   .strict();
 
+const matchedHslSchema = z.partialRecord(z.enum(HSL_BANDS), hslBandSchema);
+const matchedEffectsSchema = z.object({ hdr: z.number().optional(), localContrast: z.number().optional() }).strict();
+
 export const estimate = defineOperation({
   name: 'estimate',
   title: 'Estimate corrections',
-  description: `Measure footage the way the editor's automatic tools do, from proxy frames, and return the values with the edit commands that apply them (pass them to edit; nothing changes until then). kind auto-adjust is Color → Auto: eleven Color settings balancing exposure, contrast, white balance and color. white-balance is Auto white balance: Temperature and Tint. detail measures noise and softness and suggests the clip's Denoise and Sharpen (never Clarity, a look). Analyze a clip (clipId: the whole clip, or with frame the second around that project frame, as at the playhead), several clips each on its own (clipIds, up to ${MAX_ESTIMATE_CLIPS}), a whole track (layerId: each clip on its own for detail or applyAs shots; all its clips by duration for one compromise, values only with commands false) or a recording range (mediaId, sourceIn, sourceOut: values only, no commands). Commands write clip grades, applied before any adjustment; for a grade per shot use applyAs shots. Estimates and pictures render one at a time: a call waits its turn, up to a few minutes. Judge the result with a still.`,
+  description: `Measure footage the way the editor's automatic tools do, from proxy frames, and return the values with the edit commands that apply them (pass them to edit; nothing changes until then). kind auto-adjust is Color → Auto: eleven Color settings balancing exposure, contrast, white balance and color. match is Color → Match: it sets the same eleven settings so a frame of the clip looks like a reference frame, a hero clip's as its grade shows it (referenceClipId and/or referenceFrame) or a recording's as shot (referenceMediaId, referenceSourceFrame), or like a registered style (style, from list_styles); the reference never changes. Frames of one scene are matched picture to picture; across scenes the clip takes the reference's light and look (likeness says which). white-balance is Auto white balance: Temperature and Tint. detail measures noise and softness and suggests the clip's Denoise and Sharpen (never Clarity, a look). Analyze a clip (clipId: the whole clip, or with frame the second around that project frame, as at the playhead; a match reads that frame, else the clip's middle frame), several clips each on its own (clipIds, up to ${MAX_ESTIMATE_CLIPS}), a whole track (layerId: each clip on its own for detail or applyAs shots; all its clips by duration for one compromise, values only with commands false) or a recording range (mediaId, sourceIn, sourceOut: values only, no commands). Commands write clip grades, applied before any adjustment; for a grade per shot use applyAs shots. Estimates and pictures render one at a time: a call waits its turn, up to a few minutes. Judge the result with a still.`,
   input: z
     .object({
       projectId: described(idSchema, 'ID of the saved project.'),
@@ -54,13 +58,30 @@ export const estimate = defineOperation({
       ),
       sourceIn: described(frameSchema.optional(), 'First source frame of the recording range.'),
       sourceOut: described(frameSchema.optional(), 'Source frame after the recording range (exclusive).'),
+      referenceClipId: described(
+        idSchema.optional(),
+        'match: the hero clip, measured through its grade at referenceFrame, else at its middle frame. It is never changed, and left out of layerId.',
+      ),
+      referenceFrame: described(
+        frameSchema.optional(),
+        'match: the project frame of the hero to match; without referenceClipId, the hero is the clip playing then (give referenceClipId when several tracks play one).',
+      ),
+      referenceMediaId: described(
+        idSchema.optional(),
+        'match: a prepared video recording of the project as reference instead, its frame referenceSourceFrame as shot.',
+      ),
+      referenceSourceFrame: described(frameSchema.optional(), 'match: the source frame of referenceMediaId.'),
+      style: described(
+        idSchema.optional(),
+        "match: aim at this registered style (list_styles), the user's own finished look, instead of a frame: Auto's balance moved towards the style, within Auto's bounds.",
+      ),
       applyAs: described(
         z.enum(['values', 'keyframe', 'shots']).default('values'),
         "Color kinds: values replaces the clip grade's values (clipId; leaving animated settings unchanged); keyframe keys the settings in the clip grade at the source frame shown at frame, which needs clipId and frame; shots writes each clip's own whole-clip correction (clipId, clipIds or every clip of layerId) into its clip grade. Clip grades apply before any adjustment and stay with the clip when it moves; a setting the grade animates follows its keyframes.",
       ),
       intensity: described(
-        z.number().min(0).max(100).default(balanced),
-        `auto-adjust: strength of the correction in %; ${balanced} is the correction as fitted, 100 exaggerates it by a quarter.`,
+        z.number().min(0).max(100).optional(),
+        `auto-adjust: strength of the correction in %, ${balanced} by default, the correction as fitted (100 exaggerates it by a quarter). match: how far each clip moves from its grade to the match, 100 by default.`,
       ),
       commands: described(
         z.boolean().default(true),
@@ -76,9 +97,40 @@ export const estimate = defineOperation({
         z.object({ description: z.string(), frames: z.number().int().nonnegative() }).strict(),
         'What was analyzed and how many proxy frames.',
       ),
+      reference: described(
+        z
+          .object({
+            clipId: idSchema.optional(),
+            mediaId: idSchema,
+            sourceFrame: frameSchema,
+          })
+          .strict()
+          .optional(),
+        'match: the reference frame, of the hero clip or of a recording.',
+      ),
+      style: described(
+        z.object({ id: idSchema, name: z.string() }).strict().optional(),
+        'match with style: the style aimed at.',
+      ),
+      likeness: described(
+        z.number().optional(),
+        'match with a reference frame: 0 when the scenes differ (the clip takes the reference light and look) to 1 for the same scene (matched picture to picture).',
+      ),
       correction: described(
         correctionSchema.optional(),
-        'auto-adjust: the eleven Color settings at the intensity asked.',
+        'auto-adjust and match: the eleven Color settings at the intensity asked.',
+      ),
+      effects: described(
+        matchedEffectsSchema.optional(),
+        "match with a reference frame: the reference's HDR and Local contrast, each for a clip where it is 0 and the reference's is not, at the intensity asked; a setting the clip animates is left out of the commands. Keyframes never set them.",
+      ),
+      hsl: described(
+        matchedHslSchema.optional(),
+        "match with a reference frame, for a clip whose HSL is neutral: the reference's HSL ranges that are not neutral, at the intensity asked; absent when the clip has HSL of its own, which a match keeps, or the reference none. Keyframes never set them.",
+      ),
+      curves: described(
+        curvesSchema.optional(),
+        "match with a reference frame, for a clip whose curves are all identity: the reference's curves with each channel brought towards its levels, at the intensity asked; absent when the clip has curves of its own, which a match keeps, or needs none. Keyframes never set them.",
       ),
       whiteBalance: described(whiteBalanceSchema.optional(), 'white-balance: Temperature and Tint.'),
       detail: described(
@@ -92,7 +144,14 @@ export const estimate = defineOperation({
               .object({
                 clipId: described(idSchema, 'The clip.'),
                 frames: described(z.number().int().nonnegative(), 'Proxy frames analyzed.'),
-                correction: described(correctionSchema.optional(), 'auto-adjust: its correction.'),
+                correction: described(correctionSchema.optional(), 'auto-adjust and match: its correction.'),
+                effects: described(
+                  matchedEffectsSchema.optional(),
+                  'match: its HDR and Local contrast, as the top-level effects.',
+                ),
+                hsl: described(matchedHslSchema.optional(), 'match: its HSL ranges, as the top-level hsl.'),
+                curves: described(curvesSchema.optional(), 'match: its curves, as the top-level curves.'),
+                likeness: described(z.number().optional(), 'match with a reference frame: as the top-level likeness.'),
                 whiteBalance: described(whiteBalanceSchema.optional(), 'white-balance: its Temperature and Tint.'),
                 detail: described(detailResultSchema.optional(), 'detail: its measurements and suggestion.'),
               })

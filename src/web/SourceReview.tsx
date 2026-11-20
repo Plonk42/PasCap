@@ -31,6 +31,7 @@ import {
   type FreeStretch,
 } from '../shared/selects.js';
 import { formatTimecode } from '../shared/timing.js';
+import { sameReference, setColorReference, useColorReference, type ColorReference } from './color-reference.js';
 import { DamageMarks } from './DamageMarks.js';
 import { mediaReady, sourceSeconds } from './display.js';
 import { Icon } from './icons.js';
@@ -79,6 +80,8 @@ interface Props {
   /** The user's own mark that this recording's range selection is done, toggled in one Undo step. */
   selectionDone: boolean;
   onSelectionDone: (done: boolean) => void;
+  /** The open project, whose Color → Match reference the shown frame can become. */
+  projectId: string | null;
   ref?: Ref<SourcePlayback>;
 }
 
@@ -155,6 +158,45 @@ function selectionDoneTitle(done: boolean): string {
   return done ? 'Range selection done. Click to mark it still to review' : 'Mark range selection done';
 }
 
+/** Makes the shown recording frame, as shot, the reference Color → Match grades clips to look like. */
+function ReferenceButton({
+  projectId,
+  mediaId,
+  frame,
+  disabled,
+  onKeyDown,
+}: Readonly<{
+  projectId: string | null;
+  mediaId: string;
+  frame: number | null;
+  disabled: boolean;
+  onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
+}>) {
+  const current = useColorReference(projectId);
+  const reference: ColorReference | null = frame === null ? null : { kind: 'recording', mediaId, sourceFrame: frame };
+  const chosen = reference !== null && sameReference(reference, current);
+  let title = 'Use this frame, as shot, as the reference Color → Match grades clips to look like';
+  if (chosen) title = 'This frame is the Color → Match reference';
+  else if (reference === null) title = 'Wait for the frame to show';
+  return (
+    <button
+      className="secondary-button small source-color-reference"
+      type="button"
+      aria-label="Use this frame as the color reference"
+      aria-pressed={chosen}
+      title={title}
+      disabled={disabled || projectId === null || reference === null}
+      onKeyDown={onKeyDown}
+      onClick={() => {
+        if (projectId !== null && reference) setColorReference(projectId, reference);
+      }}
+    >
+      <Icon name="wand" size={13} />
+      <span>Use as reference</span>
+    </button>
+  );
+}
+
 /** One video-only proxy decoder, independent of the project preview and transport. */
 export function SourceReview({
   asset,
@@ -174,6 +216,7 @@ export function SourceReview({
   targetLayer,
   selectionDone,
   onSelectionDone,
+  projectId,
   ref,
 }: Readonly<Props>) {
   const host = useRef<HTMLDivElement>(null);
@@ -398,6 +441,13 @@ export function SourceReview({
           <Icon name="check" size={13} />
           <span>Selection done</span>
         </button>
+        <ReferenceButton
+          projectId={projectId}
+          mediaId={asset.id}
+          frame={observedFrame}
+          disabled={disabled}
+          onKeyDown={keyboard}
+        />
         <button
           className="primary-button small"
           type="button"
