@@ -39,10 +39,9 @@ It is set by:
   frame shown there;
 - **Use as color reference** in a clip's context menu: that clip at the playhead when it is
   over the clip, else at its middle frame;
-- **Use as reference** in Source preview's heading: the recording's frame shown, as shot
-  (pressed while it is the reference);
-- an image of the Media library's **Images** section (pressed while it is the reference, with the
-  badge **Color reference**);
+- **Use as reference** in Source preview's heading: the recording's frame shown, as shot, or the
+  image shown (pressed while it is the reference; an image in the Media library's **Images**
+  section then has the badge **Color reference**);
 - **Styles** (a menu beside Use playhead frame): the project's images, each registered style,
   **Manage styles…** (the Styles dialog), a hint for recording frames and **Clear reference**.
 
@@ -209,8 +208,11 @@ refused with the reason.
 
 **The Images section** of the Media library, below Music, lists the project's images with their
 thumbnail (the original itself), size and format, filtered by the search (and hidden by filters
-other than All recordings and Ready). Choosing one makes it the reference; **Remove from project**
-takes it out of the library in one Undo step, never touching the original. Images never go on the
+other than All recordings and Ready). Choosing one shows it whole in **Source preview** (the
+original, contained in the view), where **Use as reference** makes it
+the reference and **Close** or Escape returns to Timeline preview; hovering a recording never
+replaces it there. **Remove from project** takes it out of the library in one Undo step (closing
+its Source preview), never touching the original. Images never go on the
 timeline, render or export. The editor reads an original through `/api/images/<id>/file`, only while
 it is unchanged since its import; one moved or changed shows **Original missing** until imported
 again.

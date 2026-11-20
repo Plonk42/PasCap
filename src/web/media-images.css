@@ -30,6 +30,12 @@
   box-shadow: inset 2px 0 0 var(--accent);
 }
 
+.media-image-item.reviewing {
+  background: #2b3a31;
+  outline: 1px solid #4f7a58;
+  outline-offset: -1px;
+}
+
 .media-image-item > .media-image-main {
   display: grid;
   grid-template-columns: 48px minmax(0, 1fr);
@@ -69,4 +75,12 @@
 
 .media-image-item:is(:hover, :focus-within) > .media-remove {
   opacity: 1;
+}
+
+.image-review-picture img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }

@@ -543,7 +543,8 @@ or reorder clips. Adjustments have no Auto: set their sliders yourself. See
 - a **recording frame**, as shot: in **Source preview**, choose **Use as reference** at the
   frame shown;
 - an **image**, as shot: import JPEG or PNG stills with **Import** (the **Images** filter of the
-  Import dialog), then choose one in the **Images** section of the Media library, or under
+  Import dialog), then choose one in the **Images** section of the Media library to see it in
+  **Source preview** and choose **Use as reference** there, or choose it under
   **Styles**. Images stay where they are, are never copied or changed, and never go on the
   timeline; **Remove from project** takes one out of the library;
 - one of your **styles**, the look of your own finished edits: open **Styles**, choose one, or

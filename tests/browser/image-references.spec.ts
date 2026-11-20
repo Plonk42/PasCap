@@ -202,8 +202,11 @@ const eleven = (color: ColorSettings): AutoCorrection =>
   Object.fromEntries(AUTO_ADJUST_SETTINGS.map((setting) => [setting, color[setting]])) as AutoCorrection;
 const gradeOf = (document: ProjectDocument, clipId: string) => document.clips.find((clip) => clip.id === clipId)!.grade;
 const images = (page: Page) => page.getByRole('region', { name: 'Images', exact: true });
+const showImage = (page: Page) =>
+  images(page).getByRole('button', { name: `Show ${IMAGE.name} in Source preview`, exact: true });
+const imageReview = (page: Page) => page.getByRole('region', { name: 'Image review', exact: true });
 const useImage = (page: Page) =>
-  page.getByRole('button', { name: `Use ${IMAGE.name} as the color reference`, exact: true });
+  imageReview(page).getByRole('button', { name: 'Use this image as the color reference', exact: true });
 const section = (page: Page) => page.locator('.color-match');
 
 test('imports an image into the Media library, read in place', async ({ page }) => {
@@ -230,9 +233,42 @@ test('imports an image into the Media library, read in place', async ({ page }) 
   await expect.poll(() => memory.snapshot().media.imageIds).toEqual([IMAGE.id]);
 });
 
+test('shows an image of the project whole in Source preview, until it leaves the project', async ({ page }) => {
+  await open(page, [IMAGE.id]);
+  const sourceTab = page.getByRole('tab', { name: 'Source preview', exact: true });
+  await expect(sourceTab).toBeDisabled();
+  await showImage(page).click();
+  await expect(showImage(page)).toHaveAttribute('aria-pressed', 'true');
+  await expect(sourceTab).toHaveAttribute('aria-selected', 'true');
+  await expect(imageReview(page)).toContainText(IMAGE.name);
+  const picture = imageReview(page).getByRole('img', { name: IMAGE.name, exact: true });
+  await expect.poll(() => picture.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(320);
+  const box = (await picture.boundingBox())!;
+  expect(box.width).toBeGreaterThan(320);
+  await expect(useImage(page)).toHaveAttribute('aria-pressed', 'false');
+
+  await useImage(page).press('Escape');
+  await expect(imageReview(page)).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Timeline preview', exact: true })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(showImage(page)).toHaveAttribute('aria-pressed', 'false');
+
+  await showImage(page).click();
+  await expect(imageReview(page)).toBeVisible();
+  await images(page)
+    .getByRole('button', { name: `Remove ${IMAGE.name} from project`, exact: true })
+    .click();
+  await expect(imageReview(page)).toHaveCount(0);
+  await expect(sourceTab).toBeDisabled();
+  await expect.poll(() => memory.snapshot().media.imageIds).toEqual([]);
+});
+
 test('matches clips to an image of the project, as shot, until it leaves the project', async ({ page }) => {
   await open(page, [IMAGE.id]);
   await expect(images(page)).toContainText(IMAGE.name);
+  await showImage(page).click();
   await useImage(page).click();
   await expect(useImage(page)).toHaveAttribute('aria-pressed', 'true');
   await expect(images(page)).toContainText('Color reference');

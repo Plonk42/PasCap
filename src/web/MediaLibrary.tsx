@@ -68,6 +68,9 @@ interface Props {
   /** The music recording shown in Source preview, and opening one there. */
   musicReview: string | null;
   onReviewMusic: (id: string) => void;
+  /** The image shown in Source preview, and opening one there. */
+  imageReview: string | null;
+  onReviewImage: (id: string) => void;
   targetLayer: string;
   onCollapse: (panel: SidePanel) => void;
   collapseDisabled: boolean;
@@ -347,6 +350,8 @@ export function MediaLibrary({
   onReviewHoverEnd,
   musicReview,
   onReviewMusic,
+  imageReview,
+  onReviewImage,
   targetLayer,
   onCollapse,
   collapseDisabled,
@@ -1041,6 +1046,8 @@ export function MediaLibrary({
           projectId={projectId}
           busy={busy}
           missing={missingImages}
+          reviewing={imageReview}
+          onReview={onReviewImage}
           onRemove={onRemoveImages}
         />
       </div>

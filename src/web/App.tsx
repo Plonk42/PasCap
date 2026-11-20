@@ -126,6 +126,7 @@ const SaveRecovery = lazy(() => import('./SaveRecovery.js').then((module) => ({ 
 const ShortcutHelp = lazy(() => import('./ShortcutHelp.js').then((module) => ({ default: module.ShortcutHelp })));
 const SourceReview = lazy(() => import('./SourceReview.js').then((module) => ({ default: module.SourceReview })));
 const MusicReview = lazy(() => import('./MusicReview.js').then((module) => ({ default: module.MusicReview })));
+const ImageReview = lazy(() => import('./ImageReview.js').then((module) => ({ default: module.ImageReview })));
 const ImportDialog = lazy(() => import('./ImportDialog.js').then((module) => ({ default: module.ImportDialog })));
 const HandOffDialog = lazy(() => import('./HandOff.js').then((module) => ({ default: module.HandOffDialog })));
 const CheckpointsDialog = lazy(() =>
@@ -356,8 +357,10 @@ export function App() {
   const [review, reviews] = useReviewTarget(sourcePlayback);
   // A music recording shown in Source preview instead of a video one, and its session-only ranges.
   const [musicReview, setMusicReview] = useState<string | null>(null);
-  const musicReviewOpen = useRef(false);
-  musicReviewOpen.current = musicReview !== null;
+  // An image shown in Source preview instead of a recording.
+  const [imageReview, setImageReview] = useState<string | null>(null);
+  const stillReviewOpen = useRef(false);
+  stillReviewOpen.current = musicReview !== null || imageReview !== null;
   const musicPlayback = useRef<MusicReviewPlayback | null>(null);
   const [musicRanges, setMusicRanges] = useState<MediaSelections>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -980,6 +983,7 @@ export function App() {
       setActiveSelects({});
       reviews.close();
       setMusicReview(null);
+      setImageReview(null);
       setMusicRanges({});
       setViewerMode('timeline');
       const first = calculateLayout(loaded).clips[0];
@@ -1051,6 +1055,7 @@ export function App() {
     setDraggedMediaIds(null);
     reviews.close();
     setMusicReview(null);
+    setImageReview(null);
     setMusicRanges({});
     setViewerMode('timeline');
     setSaveState({ state: 'saved', message: NO_PROJECT_LABEL, revision: 0, recovery: null });
@@ -1791,20 +1796,29 @@ export function App() {
       .catch((cause: unknown) => setError(message(cause, 'Preview could not be retried.')));
   };
   const reviewSource = (next: ReviewTarget, choose: boolean): void => {
-    // Hovering a video recording never interrupts the music shown in Source preview.
-    if (!choose && musicReviewOpen.current) return;
+    // Hovering a video recording never interrupts the music or image shown in Source preview.
+    if (!choose && stillReviewOpen.current) return;
     setMusicReview(null);
+    setImageReview(null);
     reviews.source(next, choose);
     if (viewer.current !== 'source') setViewerMode('source');
   };
   const reviewMusic = (id: string): void => {
     reviews.close();
+    setImageReview(null);
     setMusicReview(id);
+    setViewerMode('source');
+  };
+  const reviewImage = (id: string): void => {
+    reviews.close();
+    setMusicReview(null);
+    setImageReview(id);
     setViewerMode('source');
   };
   const closeReview = (): void => {
     reviews.close();
     setMusicReview(null);
+    setImageReview(null);
     setViewerMode('timeline');
     timelineTab.current?.focus({ preventScroll: true });
   };
@@ -1822,6 +1836,10 @@ export function App() {
     if (reviews.remove(removal.videoIds)) setViewerMode('timeline');
     if (musicReview !== null && removal.audioIds.includes(musicReview)) {
       setMusicReview(null);
+      setViewerMode('timeline');
+    }
+    if (imageReview !== null && removal.imageIds.includes(imageReview)) {
+      setImageReview(null);
       setViewerMode('timeline');
     }
     return true;
@@ -1933,7 +1951,11 @@ export function App() {
       layerName: visible.layers.find((layer) => layer.id === clip.layerId)!.name,
     }));
   const navigateViewerTabs = (event: ReactKeyboardEvent<HTMLButtonElement>): void => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || (!reviewAsset && !musicReview)) return;
+    if (
+      !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) ||
+      (!reviewAsset && !musicReview && !imageReview)
+    )
+      return;
     event.preventDefault();
     event.stopPropagation();
     const mode = event.key === 'Home' || (event.key !== 'End' && viewerMode === 'source') ? 'timeline' : 'source';
@@ -1948,6 +1970,7 @@ export function App() {
     return audioAssets.filter((asset) => ids.has(asset.id));
   }, [audioAssets, project]);
   const musicAsset = projectAudio.find((asset) => asset.id === musicReview);
+  const imageAsset = musicAsset ? undefined : projectImages.images.find((image) => image.id === imageReview);
   const addMusicRange = (range: MediaSelection): boolean => {
     const document = current.current;
     if (!document || drafting.current) return false;
@@ -2270,6 +2293,8 @@ export function App() {
               onReviewHoverEnd={reviews.endHover}
               musicReview={musicReview}
               onReviewMusic={reviewMusic}
+              imageReview={imageReview}
+              onReviewImage={reviewImage}
               targetLayer={targetLayer}
               onCollapse={togglePanel}
               collapseDisabled={draft !== null}
@@ -2310,7 +2335,7 @@ export function App() {
                 tabIndex={viewerMode === 'source' ? 0 : -1}
                 aria-selected={viewerMode === 'source'}
                 aria-controls="source-view"
-                disabled={!reviewAsset && !musicAsset}
+                disabled={!reviewAsset && !musicAsset && !imageAsset}
                 onKeyDown={navigateViewerTabs}
                 onClick={() => setViewerMode('source')}
               >
@@ -2385,7 +2410,16 @@ export function App() {
                     onClose={closeReview}
                   />
                 )}
-                {!musicAsset && reviewAsset && review && (
+                {imageAsset && (
+                  <ImageReview
+                    key={imageAsset.id}
+                    image={imageAsset}
+                    missing={projectImages.missing.has(imageAsset.id)}
+                    projectId={project?.id ?? null}
+                    onClose={closeReview}
+                  />
+                )}
+                {!musicAsset && !imageAsset && reviewAsset && review && (
                   <SourceReview
                     ref={sourcePlayback}
                     asset={reviewAsset}

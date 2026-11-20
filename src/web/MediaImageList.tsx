@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { imageFileUrl, type ImageAsset } from '../shared/images.js';
-import { setColorReference, useColorReference } from './color-reference.js';
+import { useColorReference } from './color-reference.js';
 import { Icon } from './icons.js';
 import './media-images.css';
 
@@ -30,18 +30,23 @@ function ImageThumbnail({ image, lost }: Readonly<{ image: ImageAsset; lost: boo
   );
 }
 
-/** Imported still images in the project bin, which Color → Match can take as its reference. */
+/** Imported still images in the project bin, shown in Source preview, where Color → Match can take one as its reference. */
 export function MediaImageList({
   images,
   projectId,
   busy,
   missing,
+  reviewing,
+  onReview,
   onRemove,
 }: Readonly<{
   images: readonly ImageAsset[];
   projectId: string | null;
   busy: boolean;
   missing: ReadonlySet<string>;
+  /** The image shown in Source preview, and showing one there. */
+  reviewing: string | null;
+  onReview: (id: string) => void;
   onRemove: (ids: string[]) => boolean;
 }>) {
   const reference = useColorReference(projectId);
@@ -65,18 +70,20 @@ export function MediaImageList({
       {images.map((image) => {
         const lost = missing.has(image.id);
         const chosen = reference?.kind === 'image' && reference.imageId === image.id;
+        const shown = reviewing === image.id;
         return (
-          <article key={image.id} className={`media-image-item ${chosen ? 'reference' : ''}`} data-image-id={image.id}>
+          <article
+            key={image.id}
+            className={`media-image-item ${chosen ? 'reference' : ''} ${shown ? 'reviewing' : ''}`}
+            data-image-id={image.id}
+          >
             <button
               type="button"
               className="media-image-main"
-              aria-label={`Use ${image.name} as the color reference`}
-              aria-pressed={chosen}
-              title={`${chosen ? 'The Color → Match reference' : 'Use as the Color → Match reference'} · ${image.sourcePath}`}
-              disabled={projectId === null}
-              onClick={() => {
-                if (projectId !== null) setColorReference(projectId, { kind: 'image', imageId: image.id });
-              }}
+              aria-label={`Show ${image.name} in Source preview`}
+              aria-pressed={shown}
+              title={`Show in Source preview${chosen ? ' · the Color → Match reference' : ''} · ${image.sourcePath}`}
+              onClick={() => onReview(image.id)}
             >
               <ImageThumbnail image={image} lost={lost} />
               <span className="media-item-info">

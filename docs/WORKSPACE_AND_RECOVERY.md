@@ -719,6 +719,16 @@ A file not prepared, queued, preparing, failed or with a missing original shows 
 on the strip and disables Play and Add; nothing prepares or relinks implicitly. Escape or
 the × closes Source preview; removing the file from the project closes it.
 
+### Images in Source preview
+
+Clicking an image in Media → Images (**Show** _name_ **in Source preview**, pressed while shown)
+opens it in **Source preview** instead of a recording or music file, like music: choosing one of
+those replaces it, while hovering recording cards does not. The original, read through
+`/api/images/<id>/file`, is contained whole in the space a recording's picture takes, under its
+name. **Use as reference** makes it the Color → Match reference (pressed while it
+is). There is nothing to play or trim; a missing or unreadable original shows the reason instead.
+Escape or the × closes Source preview; removing the image from the project closes it.
+
 ### Independent music tracks
 
 **Audio → Music → Music track** selects one of up to eight identified music tracks,
