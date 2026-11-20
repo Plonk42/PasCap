@@ -588,7 +588,13 @@ Every track owns its boundary list and opening/closing fades, edited in **Track*
 for the selected track. Track → Transitions lists every boundary left to right;
 the selected one (from a boundary button, the list, or the selected clip's incoming
 boundary, else its outgoing one) is expanded. No earlier choice sticks when the
-selection changes. Exactly one record joins each adjacent pair. Cut permits a
+selection changes. **Ctrl-click** (Cmd-click) on a boundary button or list row adds that
+transition of the same track to the selection or takes it out (a transition of another track
+starts a new selection), and **Select all transitions** selects the whole list. The last one
+added stays expanded and a change there gives every selected transition the same type and
+lengths, applied in order as one Undo step; if any of them is refused, none changes. A type
+they do not share reads **Mixed** and hides the length fields; a length they do not share
+reads **Mixed** beside its field. Exactly one record joins each adjacent pair. Cut permits a
 gap; non-cut transitions require touching clips or that pair's existing dissolve or pause.
 Gapped pairs explain the disabled non-cut choices: explicitly close the gap or
 enable that track's Ripple first. Cross-dissolve duration explicitly sets the right

@@ -265,6 +265,13 @@
   border-top: 0;
 }
 
+.boundary-tools {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -9px;
+  padding: 0 14px 10px;
+}
+
 .layer-inspector .color-control {
   display: block;
   margin-top: 11px;

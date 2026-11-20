@@ -54,6 +54,7 @@ import { api, proxyUrl, type RequestOptions } from './api.js';
 import { Autosave, type SaveState } from './autosave.js';
 import { AssistantEditingBanner, AssistantEndedBanner, useFollowAssistant } from './AssistantSession.js';
 import type { BestRangeChange } from './best-ranges.js';
+import { toggleBoundary } from './boundary-selection.js';
 import { callOperation } from './operations.js';
 import { waitForService } from './connection.js';
 import { DeferredPanel } from './DeferredPanel.js';
@@ -358,7 +359,7 @@ export function App() {
     () => appliedSelections(project?.selects ?? {}, activeSelects),
     [project?.selects, activeSelects],
   );
-  const [boundaryId, setBoundaryId] = useState<string | null>(null);
+  const [boundaryIds, setBoundaryIds] = useState<readonly string[]>([]);
   const pointerFocus = useRef<PointerFocus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -430,7 +431,7 @@ export function App() {
       // Follow the selection: the clip's incoming boundary, else its outgoing one.
       const boundary =
         transitions?.find((item) => item.rightId === id) ?? transitions?.find((item) => item.leftId === id);
-      setBoundaryId(boundary?.leftId ?? null);
+      setBoundaryIds(boundary ? [boundary.leftId] : []);
     },
     [clipGroup.set, adjustmentGroup.set],
   );
@@ -520,7 +521,7 @@ export function App() {
       if (!next.layers.some((layer) => layer.id === selectedLayer.current)) {
         selectedLayer.current = next.layers[0]!.id;
         setSelectedLayerId(selectedLayer.current);
-        setBoundaryId(null);
+        setBoundaryIds([]);
       }
       const selectedClip = next.clips.find((clip) => clip.id === selection.current);
       clipGroup.set(groupWithin(clipGroup.latest.current, next));
@@ -530,7 +531,7 @@ export function App() {
         else {
           selection.current = null;
           setSelectedId(null);
-          setBoundaryId(null);
+          setBoundaryIds([]);
         }
       } else if (
         selectedClip &&
@@ -946,7 +947,7 @@ export function App() {
       setTimeRange(null);
       setRevealRequest(0);
       setHistoryState({ canUndo: false, canRedo: false });
-      setBoundaryId(null);
+      setBoundaryIds([]);
       selection.current = null;
       setSelectedId(null);
       clipGroup.set([]);
@@ -1017,7 +1018,7 @@ export function App() {
     setTimeRange(null);
     setRevealRequest(0);
     setHistoryState({ canUndo: false, canRedo: false });
-    setBoundaryId(null);
+    setBoundaryIds([]);
     selection.current = null;
     setSelectedId(null);
     clipGroup.set([]);
@@ -1396,7 +1397,7 @@ export function App() {
       else {
         selection.current = null;
         setSelectedId(null);
-        setBoundaryId(null);
+        setBoundaryIds([]);
       }
     },
     [select],
@@ -1426,7 +1427,7 @@ export function App() {
       selection.current = null;
       setSelectedId(null);
       clipGroup.set([]);
-      setBoundaryId(null);
+      setBoundaryIds([]);
       setViewerMode('timeline');
       openInspectorSection('color');
     },
@@ -2471,13 +2472,13 @@ export function App() {
                     selectedClipIds={clipGroup.group}
                     selectedAdjustmentIds={adjustmentGroup.group}
                     selectedLayerId={selectedLayerId}
-                    boundaryId={boundaryId}
+                    boundaryIds={boundaryIds}
                     frame={inspectorFrame}
                     drafting={draft !== null || !project}
                     section={inspectorMode}
                     onSection={setInspectorMode}
                     sectionRequest={sectionRequest}
-                    onSelectBoundary={setBoundaryId}
+                    onSelectBoundaries={setBoundaryIds}
                     onEdit={edit}
                     onPreview={previewDraft}
                     onSeek={seek}
@@ -2523,12 +2524,14 @@ export function App() {
               selectMusic(leftId);
               setMusicBoundary((previous) => ({ leftId, serial: (previous?.serial ?? 0) + 1 }));
             }}
-            selectedBoundaryId={boundaryId}
+            selectedBoundaryIds={boundaryIds}
             frame={diagnostics?.frame ?? 0}
             onSelect={select}
-            onBoundary={(id) => {
-              select(id);
-              setBoundaryId(id);
+            onBoundary={(id, toggle) => {
+              const next = toggle && current.current ? toggleBoundary(current.current, boundaryIds, id) : [id];
+              // A new selection selects its left clip and track, as a plain click does.
+              if (next.length === 1) select(next[0]!);
+              setBoundaryIds(next);
               openInspectorSection('transition');
             }}
             onSeek={seek}

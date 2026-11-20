@@ -129,10 +129,11 @@ interface Props {
   onToggleAdjustment: (id: string) => void;
   /** Opens the transition after this music clip in Audio. */
   onMusicBoundary: (leftClipId: string) => void;
-  selectedBoundaryId: string | null;
+  selectedBoundaryIds: readonly string[];
   frame: number;
   onSelect: (id: string) => void;
-  onBoundary: (leftId: string) => void;
+  /** `toggle` (Ctrl/Cmd-click) adds the transition to the selection or removes it. */
+  onBoundary: (leftId: string, toggle: boolean) => void;
   onSeek: (frame: number) => void;
   onOpenSection: (section: InspectorSectionTarget) => void;
   onPause: () => void;
@@ -788,7 +789,7 @@ export function Timeline(props: Readonly<Props>) {
     selectedMusicId,
     onSelectMusic,
     onMusicBoundary,
-    selectedBoundaryId,
+    selectedBoundaryIds,
     frame,
     onSelect,
     onBoundary,
@@ -1998,13 +1999,13 @@ export function Timeline(props: Readonly<Props>) {
               return (
                 <button
                   key={`${region.transition.leftId}-${region.transition.rightId}`}
-                  className={`boundary-button ${selectedBoundaryId === region.transition.leftId ? 'selected' : ''}`}
+                  className={`boundary-button ${selectedBoundaryIds.includes(region.transition.leftId) ? 'selected' : ''}`}
                   data-transition-layer={region.layerId}
                   disabled={interactionBlocked}
                   style={{ top: rowTop(region.layerId) + 4, left: leading + position * scale }}
                   aria-label={`Transition after ${left}, clip ${index + 1} on ${layerName}`}
-                  title={`${label} on ${layerName} · edit this track’s boundary`}
-                  onClick={() => onBoundary(region.transition.leftId)}
+                  title={`${label} on ${layerName} · edit this track’s boundary · Ctrl-click to select several transitions`}
+                  onClick={(event) => onBoundary(region.transition.leftId, event.ctrlKey || event.metaKey)}
                 >
                   {label}
                 </button>

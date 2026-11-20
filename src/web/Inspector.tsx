@@ -1,4 +1,14 @@
-import { Fragment, memo, useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
+import {
+  Fragment,
+  memo,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from 'react';
 import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { COLOR_CONTROLS, NEUTRAL_COLOR, type ScalarColorSetting } from '../shared/color.js';
 import { gradeColorAt, type Adjustment } from '../shared/grade.js';
@@ -11,6 +21,7 @@ import { adjustmentLabel } from './adjustment-ui.js';
 import { TrackAnimationControls } from './AnimationControls.js';
 import { AutoAdjust } from './AutoAdjust.js';
 import { AutoWhiteBalance } from './AutoWhiteBalance.js';
+import { toggleBoundary } from './boundary-selection.js';
 import { ClipSourceRange } from './ClipSourceRange.js';
 import { COLOR_GROUPS, colorGroupResetCommands, colorResetCommands } from './color-reset.js';
 import { DetailSection } from './DetailControls.js';
@@ -66,13 +77,14 @@ interface Props {
   /** The adjustments selected on the timeline; the Color tab edits one selected alone. */
   selectedAdjustmentIds?: readonly string[];
   selectedLayerId: string;
-  boundaryId: string | null;
+  /** Selected transitions by left clip; the last is primary, and a change applies to all of them. */
+  boundaryIds: readonly string[];
   frame: number;
   drafting: boolean;
   section: InspectorMode;
   onSection: (section: InspectorMode) => void;
   sectionRequest?: InspectorSectionRequest | null;
-  onSelectBoundary: (leftId: string) => void;
+  onSelectBoundaries: (leftIds: readonly string[]) => void;
   onEdit: (command: EditCommand | readonly EditCommand[]) => void;
   children?: ReactNode;
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
@@ -132,9 +144,14 @@ function transitionOfType(boundary: Transition, type: Transition['type']): Trans
   return { ...pair, type, duration: type === 'fade-through-black' ? Math.max(2, span) : span };
 }
 
-function commandNumberError(project: ProjectDocument, command: EditCommand, recovery: string): string | null {
+function commandNumberError(
+  project: ProjectDocument,
+  command: EditCommand | readonly EditCommand[],
+  recovery: string,
+): string | null {
   try {
-    applyCommand(project, command);
+    let next = project;
+    for (const item of 'type' in command ? [command] : command) next = applyCommand(next, item);
     return null;
   } catch (cause) {
     return `${cause instanceof Error ? cause.message : 'This timing is not valid.'} ${recovery}`;
@@ -146,11 +163,24 @@ function trackScope(clips: number): string {
   return clips === 1 ? 'Applies to the clip on this track' : `Applies to all ${clips} clips on this track`;
 }
 
-function transitionHasGap(boundary: Transition | undefined, layout: TimelineLayout): boolean {
-  if (!boundary || transitionOffset(boundary) !== 0) return false;
+function transitionHasGap(boundary: Transition, layout: TimelineLayout): boolean {
+  if (transitionOffset(boundary) !== 0) return false;
   const left = layout.clips.find((item) => item.clip.id === boundary.leftId);
   const right = layout.clips.find((item) => item.clip.id === boundary.rightId);
   return !!left && !!right && left.end !== right.start;
+}
+
+/** A timing field's unit and seconds, or Mixed when the selected transitions differ. */
+function FieldTiming({ frames, mixed }: Readonly<{ frames: number; mixed: boolean }>) {
+  if (!mixed) return <small>frames · {sourceSeconds(frames)}</small>;
+  return (
+    <small
+      className="boundary-mixed"
+      title="The selected transitions differ: the field shows the outlined one's value, and a change sets all of them"
+    >
+      frames · Mixed
+    </small>
+  );
 }
 
 function InspectorTabs({
@@ -497,35 +527,57 @@ function SequenceControls({
   project,
   layer,
   assets,
-  boundaryId,
+  boundaryIds,
   layout,
   drafting,
   onEdit,
-  onSelectBoundary,
+  onSelectBoundaries,
   id,
 }: Readonly<
-  Pick<Props, 'project' | 'assets' | 'boundaryId' | 'drafting' | 'onEdit' | 'onSelectBoundary'> & {
+  Pick<Props, 'project' | 'assets' | 'boundaryIds' | 'drafting' | 'onEdit' | 'onSelectBoundaries'> & {
     layer: VideoLayer;
     layout: TimelineLayout;
     id: string;
   }
 >) {
-  const boundary = layer.transitions.find((item) => item.leftId === boundaryId);
+  const boundary = layer.transitions.find((item) => item.leftId === boundaryIds.at(-1));
+  const selected = boundary ? layer.transitions.filter((item) => boundaryIds.includes(item.leftId)) : [];
+  const several = selected.length > 1;
+  const mixedType = selected.some((item) => item.type !== boundary?.type);
   const trackClips = layout.clips.filter((item) => item.clip.layerId === layer.id);
-  const transitionGap = transitionHasGap(boundary, layout);
+  const transitionGap = selected.some((item) => transitionHasGap(item, layout));
   const clipName = (clipId: string): string =>
     shortName(assets.find((item) => item.id === project.clips.find((clip) => clip.id === clipId)?.mediaId)?.name ?? '');
   const [keepCutChosen, setKeepCutChosen] = useState(false);
   // Only a Ripple track moves its later clips when an overlap changes.
   const keepCut = layer.ripple && keepCutChosen;
-  const setTransition = (transition: Transition): void => onEdit({ type: 'transition', transition, keepCut });
+  // Every selected transition gets the same settings.
+  const configure = (transition: Transition): EditCommand[] =>
+    selected.map((item) => ({
+      type: 'transition',
+      transition: { ...transition, leftId: item.leftId, rightId: item.rightId },
+      keepCut,
+    }));
+  const setTransition = (transition: Transition): void => onEdit(configure(transition));
   const transitionError = (transition: Transition): string | null =>
     commandNumberError(
       project,
-      { type: 'transition', transition, keepCut },
-      'Shorten this transition or adjust conflicting fades/placements on this track.',
+      configure(transition),
+      several
+        ? 'Shorten these transitions or adjust conflicting fades/placements on this track.'
+        : 'Shorten this transition or adjust conflicting fades/placements on this track.',
     );
-  const resetKey = `${project.id}:${layer.id}:${boundary?.leftId}:${boundary?.rightId}:${boundary?.type}`;
+  const choose = (event: MouseEvent, leftId: string): void =>
+    onSelectBoundaries(event.ctrlKey || event.metaKey ? toggleBoundary(project, boundaryIds, leftId) : [leftId]);
+  const allIds = layer.transitions.map((item) => item.leftId);
+  // The primary transition stays primary, so its settings stay in view.
+  const selectAll = (): void =>
+    onSelectBoundaries(boundary ? [...allIds.filter((leftId) => leftId !== boundary.leftId), boundary.leftId] : allIds);
+  const resetKey = [
+    project.id,
+    layer.id,
+    ...selected.map((item) => [item.leftId, item.rightId, item.type].join(':')),
+  ].join(':');
   return (
     <>
       {layer.transitions.length > 0 && (
@@ -541,6 +593,10 @@ function SequenceControls({
                 A transition blends one clip into the next on this track. Fades and dissolves need the two clips to
                 touch, so close any gap or turn Ripple on first.
               </p>
+              <p>
+                Ctrl-click (Cmd-click) transitions here or on the timeline to select several: a change gives them all
+                the same settings.
+              </p>
               <p className="editor-help-tip">
                 Tip: if a change is refused, check the neighboring fades and transitions.
               </p>
@@ -549,13 +605,14 @@ function SequenceControls({
         >
           <ol className="boundary-list" aria-label={`Transitions on ${layer.name}`}>
             {layer.transitions.map((item) => (
-              <li key={`${item.leftId}:${item.rightId}`} data-selected={item === boundary}>
+              <li key={`${item.leftId}:${item.rightId}`} data-selected={selected.includes(item)}>
                 <button
                   type="button"
                   className="boundary-choice"
-                  aria-pressed={item === boundary}
+                  aria-pressed={selected.includes(item)}
                   disabled={drafting}
-                  onClick={() => onSelectBoundary(item.leftId)}
+                  title="Ctrl-click to select several transitions"
+                  onClick={(event) => choose(event, item.leftId)}
                 >
                   <span>
                     {clipName(item.leftId)} <Icon name="arrow" size={12} /> {clipName(item.rightId)}
@@ -567,17 +624,25 @@ function SequenceControls({
                 </button>
                 {item === boundary && (
                   <section className="boundary-inspector" aria-label="Boundary transition">
+                    {several && (
+                      <p className="boundary-scope">Changes apply to the {selected.length} selected transitions</p>
+                    )}
                     <label className="transition-type">
                       <span>Type</span>
                       <select
                         aria-label="Transition type"
                         aria-describedby={transitionGap ? `${id}-transition-gap` : `${id}-transition-help`}
                         disabled={drafting}
-                        value={boundary.type}
+                        value={mixedType ? '' : boundary.type}
                         onChange={(event) =>
                           setTransition(transitionOfType(boundary, event.target.value as Transition['type']))
                         }
                       >
+                        {mixedType && (
+                          <option value="" disabled>
+                            Mixed
+                          </option>
+                        )}
                         <option value="cut">Cut</option>
                         <option value="fade-through-black" disabled={transitionGap}>
                           Fade through black
@@ -604,10 +669,14 @@ function SequenceControls({
                         <span>Keep the cut in place</span>
                       </label>
                     )}
-                    {boundary.type === 'fade-black-pause' && (
+                    {!mixedType && boundary.type === 'fade-black-pause' && (
                       <div className="range-fields">
                         <label>
-                          Fade <small>frames · {sourceSeconds(boundary.fade)}</small>
+                          Fade{' '}
+                          <FieldTiming
+                            frames={boundary.fade}
+                            mixed={selected.some((item) => item.type === boundary.type && item.fade !== boundary.fade)}
+                          />
                           <NumberField
                             aria-label="Transition fade duration"
                             aria-describedby={`${id}-transition-help`}
@@ -623,7 +692,13 @@ function SequenceControls({
                           />
                         </label>
                         <label>
-                          Pause <small>frames · {sourceSeconds(boundary.pause)}</small>
+                          Pause{' '}
+                          <FieldTiming
+                            frames={boundary.pause}
+                            mixed={selected.some(
+                              (item) => item.type === boundary.type && item.pause !== boundary.pause,
+                            )}
+                          />
                           <NumberField
                             aria-label="Transition pause duration"
                             aria-describedby={`${id}-transition-help`}
@@ -640,10 +715,16 @@ function SequenceControls({
                         </label>
                       </div>
                     )}
-                    {(boundary.type === 'fade-through-black' || boundary.type === 'cross-dissolve') && (
+                    {!mixedType && (boundary.type === 'fade-through-black' || boundary.type === 'cross-dissolve') && (
                       <div className="range-fields">
                         <label>
-                          Duration <small>frames · {sourceSeconds(boundary.duration)}</small>
+                          Duration{' '}
+                          <FieldTiming
+                            frames={boundary.duration}
+                            mixed={selected.some(
+                              (item) => item.type === boundary.type && item.duration !== boundary.duration,
+                            )}
+                          />
                           <NumberField
                             aria-label="Transition duration"
                             aria-describedby={`${id}-transition-help`}
@@ -662,8 +743,8 @@ function SequenceControls({
                     )}
                     {transitionGap && (
                       <p className="control-hint" id={`${id}-transition-gap`}>
-                        These clips have a gap. Close it, or turn on Ripple for this track, before adding a fade or
-                        dissolve.
+                        {several ? 'Some of these clips have gaps. Close them' : 'These clips have a gap. Close it'}, or
+                        turn on Ripple for this track, before adding a fade or dissolve.
                       </p>
                     )}
                   </section>
@@ -671,6 +752,18 @@ function SequenceControls({
               </li>
             ))}
           </ol>
+          {layer.transitions.length > 1 && (
+            <div className="boundary-tools">
+              <button
+                type="button"
+                className="text-button"
+                disabled={drafting || selected.length === allIds.length}
+                onClick={selectAll}
+              >
+                Select all transitions
+              </button>
+            </div>
+          )}
         </InspectorSection>
       )}
       <InspectorSection
@@ -1002,13 +1095,13 @@ function InspectorPanel({
   selectedClipIds = NO_CLIPS,
   selectedAdjustmentIds = NO_ADJUSTMENTS,
   selectedLayerId,
-  boundaryId,
+  boundaryIds,
   frame,
   drafting,
   section,
   onSection,
   sectionRequest,
-  onSelectBoundary,
+  onSelectBoundaries,
   onEdit,
   onPreview,
   onSeek,
@@ -1051,7 +1144,7 @@ function InspectorPanel({
         return;
       }
       const element = title.closest('.inspector-section');
-      if (element) revealInPanel(element, element.querySelector('[data-selected="true"]'));
+      if (element) revealInPanel(element, element.querySelector('[data-selected="true"]:has(.boundary-inspector)'));
     };
     frameId = requestAnimationFrame(reveal);
     return () => cancelAnimationFrame(frameId);
@@ -1262,11 +1355,11 @@ function InspectorPanel({
                 project={project}
                 layer={layer}
                 assets={assets}
-                boundaryId={boundaryId}
+                boundaryIds={boundaryIds}
                 layout={layout}
                 drafting={drafting}
                 onEdit={onEdit}
-                onSelectBoundary={onSelectBoundary}
+                onSelectBoundaries={onSelectBoundaries}
                 id={colorControlId}
               />
             </>

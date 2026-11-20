@@ -625,6 +625,75 @@ test('Track transitions list every boundary and follow the selection instead of 
   await undoOnce(page, before);
 });
 
+test('Ctrl-clicked transitions on one track all get the same settings in one Undo step', async ({ page }) => {
+  const document = boundaries();
+  const layer = document.layers[0]!;
+  document.clips.push(
+    { ...createClip('third-0', assets[0]!.id, 0, 60, layer.id), start: 120 },
+    { ...createClip('fourth-0', assets[1]!.id, 0, 60, layer.id), start: 180 },
+  );
+  layer.transitions.push(
+    { leftId: 'right-0', rightId: 'third-0', type: 'cut', duration: 0 },
+    { leftId: 'third-0', rightId: 'fourth-0', type: 'cut', duration: 0 },
+  );
+  await fixture(page, projectSchema.parse(document));
+  const before = await current(page);
+  const list = page.getByRole('list', { name: `Transitions on ${layer.name}`, exact: true });
+  const choices = list.getByRole('button');
+  const buttons = page.locator(`.boundary-button[data-transition-layer="${layer.id}"]`);
+  const type = page.getByRole('combobox', { name: 'Transition type', exact: true });
+  const scope = page.locator('.boundary-scope');
+  const pressed = async (): Promise<string[]> =>
+    choices.evaluateAll((items) => items.map((item) => item.getAttribute('aria-pressed') ?? ''));
+  const transitions = async () => (await current(page)).layers[0]!.transitions;
+
+  await buttons.nth(0).click();
+  await buttons.nth(2).click({ modifiers: ['ControlOrMeta'] });
+  await expect.poll(pressed).toEqual(['true', 'false', 'true']);
+  await expect(buttons.nth(0)).toHaveClass(/selected/);
+  await expect(buttons.nth(1)).not.toHaveClass(/selected/);
+  await expect(buttons.nth(2)).toHaveClass(/selected/);
+  await expect(scope).toHaveText('Changes apply to the 2 selected transitions');
+  await expect(type).toHaveCount(1);
+  await choices.nth(1).click({ modifiers: ['ControlOrMeta'] });
+  await expect.poll(pressed).toEqual(['true', 'true', 'true']);
+  await expect(page.getByRole('button', { name: 'Select all transitions', exact: true })).toBeDisabled();
+
+  await type.selectOption('fade-through-black');
+  const faded = ['left-0', 'right-0', 'third-0'].map((leftId, index) => ({
+    leftId,
+    rightId: ['right-0', 'third-0', 'fourth-0'][index]!,
+    type: 'fade-through-black',
+    duration: 30,
+  }));
+  expect(await transitions()).toEqual(faded);
+  expect((await current(page)).clips).toEqual(before.clips);
+  await undoOnce(page, before);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  expect(await transitions()).toEqual(faded);
+
+  await commitNumber(page, 'Transition duration', 20);
+  expect(await transitions()).toEqual(faded.map((item) => ({ ...item, duration: 20 })));
+  await choices.nth(2).click({ modifiers: ['ControlOrMeta'] });
+  await expect.poll(pressed).toEqual(['true', 'true', 'false']);
+  await commitNumber(page, 'Transition duration', 12);
+  expect((await transitions()).map((item) => ('duration' in item ? item.duration : null))).toEqual([12, 12, 20]);
+  await page.getByRole('button', { name: 'Select all transitions', exact: true }).click();
+  await expect.poll(pressed).toEqual(['true', 'true', 'true']);
+  await expect(scope).toHaveText('Changes apply to the 3 selected transitions');
+  await expect(page.locator('.boundary-mixed')).toHaveText('frames · Mixed');
+
+  await choices.nth(0).click();
+  await expect.poll(pressed).toEqual(['true', 'false', 'false']);
+  await expect(scope).toHaveCount(0);
+  await type.selectOption('cut');
+  await page.getByRole('button', { name: 'Select all transitions', exact: true }).click();
+  await expect(type).toHaveValue('');
+  await expect(page.getByRole('spinbutton', { name: 'Transition duration', exact: true })).toHaveCount(0);
+  await type.selectOption('fade-through-black');
+  expect(await transitions()).toEqual(faded);
+});
+
 test('a positioned gap disables non-cut boundary choices until explicit Ripple packing closes that track only', async ({
   page,
 }) => {

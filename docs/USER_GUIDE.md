@@ -338,6 +338,10 @@ trims and loops. Details: [music waveform](SPEED_AND_AUDIO.md#music-waveform).
 Boundary **Cut / Fade / Pause / Dissolve** and **Fades** belong to the selected
 track in **Track**; clicking a boundary button opens that tab and scrolls to the
 boundary, expanded.
+To give several transitions of one track the same settings, **Ctrl-click** (Cmd-click) their
+boundary buttons or their rows in Track → Transitions, or use **Select all transitions**: the
+expanded transition then sets the type and length of all of them in one Undo step, and a
+length they do not share reads **Mixed**.
 Gapped pairs are Cut only: explicitly close the gap or enable Ripple before adding
 a fade/dissolve. A cross-dissolve explicitly adjusts the right clip to its overlap;
 with Ripple off, no other clip moves and conflicts reject it. With Ripple on, check
@@ -1043,6 +1047,7 @@ storage/render breakdowns remain their existing expandable controls, not help bu
 | Bookmarks                                   | M adds at the playhead; Shift+↑/↓ previous/next; focused: arrows move, Delete removes       |
 | Clip actions                                | Ctrl+D duplicate (or right-click the clip); Delete/Backspace remove                         |
 | Several clips                               | Ctrl-click adds/removes a clip; drag one to move all; Delete and Alt+←/→ act on all         |
+| Several transitions                         | Ctrl-click boundary buttons or Track → Transitions rows; a change sets all of them          |
 | Session history                             | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo                                                         |
 | Positioned clip / first Ripple anchor nudge | Alt+←/→ one frame; Alt+Shift+←/→ ten; later Ripple starts require Ripple off                |
 | Focused trim handle                         | Arrows one source frame; Shift ten; left Home/right End restore                             |
