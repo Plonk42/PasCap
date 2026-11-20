@@ -59,11 +59,15 @@ export function sourceLengthFor(frames: number, candidate: Pick<Candidate, 'rate
   return guess;
 }
 
+/** Where another variant moves a window, as shares of its free room away from the first choice. */
+const VARIANT_SHIFTS = [0, -1 / 3, 1 / 3, -2 / 3, 2 / 3];
+
 /**
  * The part of a candidate a slot shows: all of it when it fits; else the end of a reveal (its payoff), the start of
- * an approach, the middle of other movements, inside the movement's ramps where it can.
+ * an approach, the middle of other movements, inside the movement's ramps where it can. Another variant shifts it
+ * through the room the range leaves.
  */
-export function shotWindow(candidate: Candidate, frames: number): { sourceIn: number; sourceOut: number } {
+export function shotWindow(candidate: Candidate, frames: number, variant = 0): { sourceIn: number; sourceOut: number } {
   const { sourceIn: a, sourceOut: b, active } = candidate;
   const length = Math.min(b - a, sourceLengthFor(frames, candidate));
   const clamp = (start: number) => Math.min(b - length, Math.max(a, start));
@@ -71,6 +75,8 @@ export function shotWindow(candidate: Candidate, frames: number): { sourceIn: nu
   if (candidate.kind === 'reveal') start = clamp(Math.max(a + length, active.sourceOut) - length);
   else if (candidate.kind === 'approach') start = clamp(active.sourceIn);
   else start = clamp(Math.round((active.sourceIn + active.sourceOut - length) / 2));
+  const shift = VARIANT_SHIFTS[variant % VARIANT_SHIFTS.length]! * (b - a - length);
+  start = clamp(Math.round(start + shift));
   return { sourceIn: start, sourceOut: start + length };
 }
 
@@ -285,7 +291,7 @@ export function planAutoEdit(input: PlanInput): AutoEditPlan {
       candidate,
       cluster: clusters[index]!,
       slot,
-      ...shotWindow(candidate, slot.end - slot.start),
+      ...shotWindow(candidate, slot.end - slot.start, input.choices.variant),
       reasons,
     };
   });

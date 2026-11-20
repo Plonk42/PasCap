@@ -161,13 +161,15 @@ checks run inside the project store's write queue, so no save interleaves with a
 restore.
 
 The **brief** is what the user tells the assistant, in the chat or later in the Hand off
-dialog: notes (≤ 2,000 characters), music track, target length in seconds, the steady-range
+dialog: notes (≤ 2,000 characters), music track, or a music recording of the bin to place when no
+track plays it (`musicId`), target length in seconds, the steady-range
 limits of Source preview (`maxJolts`, `minMovement`, `maxMovement`, `minFlightSpeed`,
 `maxFlightSpeed`), the maximum number of clips and a registered **style**
 ([#314](https://github.com/Plonk42/PasCap/issues/314), `list_styles`) the grade should aim at, all
 optional. It carries no permissions:
 the assistant may use every operation. The service applies its limits to `describe_recording` and
-`compare_recordings` and otherwise only stores and returns it. A session saved before the
+`compare_recordings`, `auto_edit` follows the whole brief but its notes
+([AUTO_EDIT.md](AUTO_EDIT.md)), and otherwise it only stores and returns it. A session saved before the
 limits were named keeps its `allowedMovement` as `maxJolts`.
 
 ### Music analysis cache

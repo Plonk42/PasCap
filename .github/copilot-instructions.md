@@ -307,6 +307,11 @@ clarity −1–1, denoise 0–1 }`, neutral 0, with no keyframes or track channe
   and clamp once after the complete sum, with one bounded queue/output clock.
 - Heavy native work stays serial with bounded children/buffers, exact frame counts
   and source identity guards.
+- Auto edit builds a deterministic first cut from steady ranges, three pictures per range, alike-take
+  clusters and the music grid (`AUTO_EDIT` in `src/shared/auto-edit/constants.ts`): the editor runs it as
+  an `auto-edit` job into a copy of the project (Try again is one Undo step), the assistant as
+  `auto_edit` on a new track hiding the others. No schema change; the brief gained `musicId`. See
+  `docs/design/AUTO_EDIT.md`.
 - Read and update the relevant contract guide when behavior changes:
   `docs/TIMELINE_EDITING.md`, `docs/LAYERS_AND_KEYFRAMES.md` (with resources),
   `docs/SPEED_AND_AUDIO.md`, `docs/WORKSPACE_AND_RECOVERY.md`,

@@ -82,7 +82,7 @@ export const AUTO_EDIT = Object.freeze({
     span: 6,
   },
   /** Quality share left to a candidate chosen by each earlier variant. */
-  variantShare: 0.55,
+  variantShare: 0.35,
   /** Candidates below this share of the median quality fill the cut only when the others cannot. */
   weakShare: 0.35,
   dissolve: { beats: 1, minimum: 8, maximum: 15 },
@@ -98,7 +98,7 @@ export const AUTO_EDIT = Object.freeze({
    * asked to slower and faster ones, until the footage fills the cut.
    */
   strongPaces: [1, 0.8, 1.25, 1.5],
-  paceFallbacks: [1, 0.8, 1.25, 0.65, 1.5, 2, 3],
+  paceFallbacks: [1, 0.8, 1.25, 0.65, 1.5],
   /** Entries listed per report section. */
   reportItems: 40,
 });

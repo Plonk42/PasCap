@@ -341,7 +341,13 @@ export async function buildAutoEdit(
   }
   let cut;
   try {
-    cut = buildCut(project, plan, music.followed, placement);
+    cut = buildCut(
+      project,
+      plan,
+      music.followed,
+      placement,
+      (mediaId) => context.library.get(mediaId).metadata.frameCount,
+    );
   } catch (error) {
     throw new ServiceError(errorMessage(error), 409);
   }

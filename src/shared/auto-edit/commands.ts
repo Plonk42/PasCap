@@ -97,6 +97,24 @@ function clearingCommands(project: ProjectDocument, layerId: string, placement: 
   ];
 }
 
+/** Whether a clip of the cut plays frames its recording or kept ranges lack. */
+function outsideSources(
+  document: ProjectDocument,
+  clipIds: readonly string[],
+  frameCount: (mediaId: string) => number,
+): boolean {
+  return clipIds.some((id) => {
+    const clip = document.clips.find((item) => item.id === id)!;
+    const kept = document.selects[clip.mediaId];
+    return (
+      clip.sourceIn < 0 ||
+      clip.sourceOut > frameCount(clip.mediaId) ||
+      (kept !== undefined &&
+        !kept.some((range) => clip.sourceIn >= range.sourceIn && clip.sourceOut <= range.sourceOut))
+    );
+  });
+}
+
 /**
  * The edit commands building a planned cut on `project`, and the project they give: the track, the music, one clip
  * per planned clip at normal speed, the transitions (dissolves keeping the cut on the beat; one that the footage
@@ -107,6 +125,7 @@ export function buildCut(
   plan: AutoEditPlan,
   music: FollowedMusic,
   placement: AutoEditPlacement,
+  frameCount: (mediaId: string) => number,
 ): BuiltCut {
   const taken = new Set([...project.layers.map((layer) => layer.id), ...project.clips.map((clip) => clip.id)]);
   const layerId = unusedId('auto-edit', taken);
@@ -144,31 +163,40 @@ export function buildCut(
     document = applyCommand(document, command);
     commands.push(command);
   });
-  const tryCommand = (command: EditCommand, failure: string): void => {
+  const tryCommand = (command: EditCommand, clips: readonly string[] = []): boolean => {
     try {
-      document = applyCommand(document, command);
+      const next = applyCommand(document, command);
+      if (outsideSources(next, clips, frameCount)) return false;
+      document = next;
       commands.push(command);
-    } catch (error) {
-      notes.push(`${failure}: ${error instanceof Error ? error.message : 'refused'}`);
+      return true;
+    } catch {
+      return false;
     }
   };
+  const refused: number[] = [];
   plan.transitions.forEach((transition, index) => {
     if (transition.type === 'cut') return;
     const leftId = clipIds[index]!;
     const rightId = clipIds[index + 1]!;
-    tryCommand(
-      {
-        type: 'transition',
-        transition: { ...transition, leftId, rightId },
-        ...(transition.type === 'cross-dissolve' && { keepCut: true }),
-      },
-      `Clips ${index + 1} and ${index + 2} keep a cut instead of a ${transition.type === 'cross-dissolve' ? 'dissolve' : 'fade through black'}`,
-    );
+    const command: EditCommand = {
+      type: 'transition',
+      transition: { ...transition, leftId, rightId },
+      ...(transition.type === 'cross-dissolve' && { keepCut: true }),
+    };
+    if (!tryCommand(command, [leftId, rightId])) refused.push(index + 1);
   });
-  if (plan.openingFade || plan.closingFade)
-    tryCommand(
-      { type: 'fades', layerId, opening: plan.openingFade || null, closing: plan.closingFade || null },
-      'The track has no fades',
-    );
+  if (refused.length) {
+    const which =
+      refused.length === 1
+        ? `The boundary after clip ${refused[0]} stays a cut`
+        : `${refused.length} boundaries stay cuts (after clips ${refused.join(', ')})`;
+    notes.push(`${which}: a dissolve or fade there needs footage beyond the recording or the kept ranges.`);
+  }
+  if (
+    (plan.openingFade || plan.closingFade) &&
+    !tryCommand({ type: 'fades', layerId, opening: plan.openingFade || null, closing: plan.closingFade || null })
+  )
+    notes.push('The track has no opening or closing fade: its first or last clip is too short.');
   return { commands, document, layerId, clipIds, notes };
 }

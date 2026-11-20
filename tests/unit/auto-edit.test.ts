@@ -467,7 +467,7 @@ describe('auto edit plan and cut', () => {
   it('builds a copy of the project as the cut, with every boundary on the music', () => {
     const plan = planAutoEdit(input());
     const music = timeline();
-    const built = buildCut(project(), plan, { lane: lane(), placed: true }, 'replace');
+    const built = buildCut(project(), plan, { lane: lane(), placed: true }, 'replace', () => 2000);
     const document = projectSchema.parse(built.document);
     expect(document.layers).toEqual([expect.objectContaining({ id: built.layerId, name: 'Auto edit', ripple: true })]);
     expect(document.adjustments).toEqual([]);
@@ -488,7 +488,7 @@ describe('auto edit plan and cut', () => {
 
   it('adds the cut on a new track of the project, hiding the others and turning adjustments off', () => {
     const plan = planAutoEdit(input({ targetFrames: Math.round(30 * FPS) }));
-    const built = buildCut(project(), plan, { lane: lane(), placed: true }, 'track');
+    const built = buildCut(project(), plan, { lane: lane(), placed: true }, 'track', () => 2000);
     const document = built.document;
     expect(document.layers.map((layer) => [layer.id, layer.enabled])).toEqual([
       ['video-1', false],
@@ -504,6 +504,18 @@ describe('auto edit plan and cut', () => {
       ...document,
       layers: [...document.layers, ...['a', 'b', 'c', 'd', 'e'].map((id) => createLayer(id, id))],
     });
-    expect(() => buildCut(full, plan, null, 'track')).toThrow(/8 video tracks/);
+    expect(() => buildCut(full, plan, null, 'track', () => 2000)).toThrow(/8 video tracks/);
+  });
+
+  it('keeps a cut where a dissolve would need footage the recording or kept ranges lack', () => {
+    const plan = planAutoEdit(input());
+    const dissolves = plan.transitions.filter((transition) => transition.type === 'cross-dissolve').length;
+    // Each recording ends where its last clip ends: no frame after it for a dissolve.
+    const tight = (mediaId: string) =>
+      Math.max(...plan.clips.filter((clip) => clip.candidate.mediaId === mediaId).map((clip) => clip.sourceOut));
+    const built = buildCut(project(), plan, { lane: lane(), placed: true }, 'replace', tight);
+    const kept = built.document.layers[0]!.transitions.filter((transition) => transition.type === 'cross-dissolve');
+    expect(kept.length).toBeLessThan(dissolves);
+    expect(built.notes.some((note) => /(stays a cut|stay cuts).*beyond the recording/.test(note))).toBe(true);
   });
 });
