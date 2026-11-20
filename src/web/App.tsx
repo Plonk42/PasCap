@@ -96,6 +96,7 @@ import { adjacentBookmark, rangeBookmarkCommands } from './timeline-bookmarks.js
 import { Timeline, type DraftPreview } from './Timeline.js';
 import { ToolchainBanner } from './ToolchainBanner.js';
 import { useReviewTarget } from './use-review-target.js';
+import { useAutoEdit } from './use-auto-edit.js';
 import {
   DEFAULT_LAYOUT,
   defaultTimelineHeight,
@@ -129,6 +130,9 @@ const MusicReview = lazy(() => import('./MusicReview.js').then((module) => ({ de
 const ImageReview = lazy(() => import('./ImageReview.js').then((module) => ({ default: module.ImageReview })));
 const ImportDialog = lazy(() => import('./ImportDialog.js').then((module) => ({ default: module.ImportDialog })));
 const HandOffDialog = lazy(() => import('./HandOff.js').then((module) => ({ default: module.HandOffDialog })));
+const AutoEditReportDialog = lazy(() =>
+  import('./AutoEditReport.js').then((module) => ({ default: module.AutoEditReportDialog })),
+);
 const CheckpointsDialog = lazy(() =>
   import('./Checkpoints.js').then((module) => ({ default: module.CheckpointsDialog })),
 );
@@ -424,6 +428,7 @@ export function App() {
   const projectsTrigger = useRef<HTMLButtonElement>(null);
   const exportTrigger = useRef<HTMLButtonElement>(null);
   const handOffTrigger = useRef<HTMLButtonElement>(null);
+  const autoEditTrigger = useRef<HTMLButtonElement>(null);
   const checkpointsTrigger = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -1370,6 +1375,31 @@ export function App() {
         );
     });
   };
+  const savedForAutoEdit = async (): Promise<number> => {
+    if (drafting.current) throw new Error('Finish the current gesture first.');
+    await autosave.current?.flush();
+    if (!autosave.current || autosave.current.dirty)
+      throw new Error('Current changes could not be saved. Resolve the save error before an auto edit.');
+    return autosave.current.revision;
+  };
+  const autoEdit = useAutoEdit({
+    project,
+    jobs,
+    openProjectId: () => current.current?.id ?? null,
+    saved: savedForAutoEdit,
+    act: (action) => act(action),
+    receiveJob,
+    refreshJobs: refreshAfterAcceptance,
+    open: async (id) => {
+      await flushBeforeSwitch();
+      installProject((await api.load(id)).document);
+      refreshProjectList();
+    },
+    replace: (document) => {
+      const open = current.current;
+      return open !== null && commit({ ...document, id: open.id, title: open.title, revision: open.revision });
+    },
+  });
   const visible = draft?.document ?? project ?? EMPTY_PROJECT;
   const layout = useMemo(() => calculateLayout(visible), [visible]);
   const referenceBusy = jobs.some((job) => job.kind === 'reference' && ['running', 'queued'].includes(job.state));
@@ -2160,6 +2190,22 @@ export function App() {
             <Icon name="assistant" size={15} />
             Hand off
           </button>
+          {autoEdit.hasReport && (
+            <button
+              ref={autoEditTrigger}
+              className="secondary-button small"
+              aria-label="Auto edit report"
+              title="What Auto edit built and why, and Try again"
+              disabled={!project || busy || connection.state !== 'ready'}
+              onClick={() => {
+                setActionError('');
+                void autoEdit.showReport();
+              }}
+            >
+              <Icon name="wand" size={15} />
+              Report
+            </button>
+          )}
           <button
             ref={exportTrigger}
             className="primary-button small"
@@ -2637,6 +2683,10 @@ export function App() {
           busy={busy}
           error={activityError}
           onRefresh={refreshActivity}
+          onOpenAutoEdit={(jobId) => {
+            setShowActivity(false);
+            void autoEdit.open(jobId);
+          }}
           onCancel={async (id) => {
             const result = await act(() => api.cancel(id), 'activity');
             if (result.ok) receiveJob(result.value.job);
@@ -2679,12 +2729,43 @@ export function App() {
               error={actionError}
               blocked={handOffBlocked(saveState, draft !== null)}
               restoreFocusTo={handOffTrigger}
+              autoEditJob={autoEdit.job}
               onJobs={(accepted) => {
                 accepted.forEach(receiveJob);
                 refreshAfterAcceptance();
               }}
               onHandOff={handOff}
+              onAutoEdit={autoEdit.start}
+              onOpenAutoEdit={(jobId) => {
+                setShowHandOff(false);
+                void autoEdit.open(jobId);
+              }}
               onClose={() => setShowHandOff(false)}
+            />
+          )}
+          {autoEdit.result && project && (
+            <AutoEditReportDialog
+              result={autoEdit.result}
+              job={autoEdit.retryJob}
+              busy={busy}
+              error={actionError}
+              blocked={
+                assistant.following
+                  ? 'An assistant is editing this project.'
+                  : handOffBlocked(saveState, draft !== null)
+              }
+              restoreFocusTo={autoEditTrigger}
+              onTryAgain={() => {
+                void autoEdit.tryAgain();
+              }}
+              onShowClip={(clipId) => {
+                autoEdit.closeReport();
+                const placed = calculateLayout(project).clips.find((item) => item.clip.id === clipId);
+                if (!placed) return;
+                select(clipId);
+                seek(placed.start);
+              }}
+              onClose={autoEdit.closeReport}
             />
           )}
           {showCheckpoints && project && (

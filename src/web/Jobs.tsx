@@ -13,6 +13,8 @@ export interface JobsProps {
   busy: boolean;
   error: string;
   onRefresh: () => Promise<boolean>;
+  /** Opens a finished auto edit: its copy of the project, or its cut. */
+  onOpenAutoEdit?: (jobId: string) => void;
 }
 
 const KIND_LABELS: Readonly<Record<MediaJob['kind'], string>> = {
@@ -23,6 +25,7 @@ const KIND_LABELS: Readonly<Record<MediaJob['kind'], string>> = {
   relink: 'Recording relink',
   motion: 'Camera motion analysis',
   'music-analysis': 'Music analysis',
+  'auto-edit': 'Auto edit',
 };
 const STATE_LABELS: Readonly<Record<MediaJob['state'], string>> = {
   queued: 'Queued',
@@ -107,7 +110,17 @@ export function formatJobDuration(createdAt: string, finishedAt: string): string
   return `${rest} s`;
 }
 
-export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRefresh }: Readonly<JobsProps>) {
+export function Jobs({
+  jobs,
+  onCancel,
+  open,
+  onOpen,
+  onClose,
+  busy,
+  error,
+  onRefresh,
+  onOpenAutoEdit,
+}: Readonly<JobsProps>) {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const drawer = useRef<HTMLElement>(null);
@@ -242,7 +255,17 @@ export function Jobs({ jobs, onCancel, open, onOpen, onClose, busy, error, onRef
             {canceling.has(job.id) ? 'Canceling…' : 'Cancel'}
           </button>
         )}
-        {job.state === 'completed' && job.outputUrl && (
+        {job.state === 'completed' && job.kind === 'auto-edit' && onOpenAutoEdit && (
+          <button
+            className="secondary-button"
+            aria-label={`Open ${job.label}`}
+            disabled={busy}
+            onClick={() => onOpenAutoEdit(job.id)}
+          >
+            Open
+          </button>
+        )}
+        {job.state === 'completed' && job.kind !== 'auto-edit' && job.outputUrl && (
           <>
             <a href={job.outputUrl} target="_blank" rel="noreferrer" title={`Open ${job.label}`}>
               Open

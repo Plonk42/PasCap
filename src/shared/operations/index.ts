@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import { autoEdit, autoEditResult, autoEditStart } from './auto-edit.js';
 import { describeProject } from './describe-project.js';
 import { describeRecording } from './describe-recording.js';
 import { describeTrack } from './describe-track.js';
@@ -46,6 +47,9 @@ export const operations = [
   compareRecordings,
   estimate,
   listStyles,
+  autoEdit,
+  autoEditStart,
+  autoEditResult,
 ] as const;
 
 export type Operation = (typeof operations)[number];

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { operations, type Operation } from '../../shared/operations/index.js';
 import { ServiceError } from '../errors.js';
+import { runAutoEdit, runAutoEditResult, runAutoEditStart } from './auto-edit.js';
 import type { OperationRunner, OperationRunners, ServiceContext, ServiceResources } from './context.js';
 import { runDescribeProject } from './describe-project.js';
 import { runDescribeRecording } from './describe-recording.js';
@@ -48,6 +49,9 @@ export const runners: OperationRunners = {
   compare_recordings: runCompareRecordings,
   estimate: runEstimate,
   list_styles: runListStyles,
+  auto_edit: runAutoEdit,
+  auto_edit_start: runAutoEditStart,
+  auto_edit_result: runAutoEditResult,
 };
 
 export async function runOperation(operation: Operation, context: ServiceContext, input: unknown): Promise<unknown> {

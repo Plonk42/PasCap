@@ -2,6 +2,7 @@ import type { z } from 'zod';
 import type { Operation, OperationName, OperationNamed } from '../../shared/operations/index.js';
 import type { AssistantConnection } from '../assistant-connection.js';
 import type { AudioLibrary } from '../audio.js';
+import type { AutoEditResults } from '../auto-edit-results.js';
 import type { AssistantImageBudget } from '../config.js';
 import type { ImageLibrary } from '../images.js';
 import type { JobQueue } from '../jobs.js';
@@ -34,7 +35,7 @@ export interface ServiceContext {
   library: Pick<MediaLibrary, 'get' | 'motion' | 'motionJob'>;
   audio: Pick<AudioLibrary, 'get' | 'analysis' | 'analysisJob' | 'detailWaveform'>;
   imageLibrary: Pick<ImageLibrary, 'get' | 'analysisFrame'>;
-  jobs: Pick<JobQueue, 'list'>;
+  jobs: Pick<JobQueue, 'list' | 'submit' | 'setOutput'>;
   stills: Pick<
     StillRenderer,
     | 'still'
@@ -49,6 +50,7 @@ export interface ServiceContext {
   assistant: Pick<AssistantConnection, 'url' | 'tokenFile' | 'lastClient' | 'seen'>;
   images: AssistantImageBudget;
   styles: Pick<StyleLibrary, 'list' | 'get'>;
+  autoEdits: Pick<AutoEditResults, 'save' | 'get'>;
 }
 
 /** The service parts every surface shares; each surface adds its caller. */

@@ -541,8 +541,8 @@ function fitLook(
   return scaleCorrection(values, AUTO_ADJUST.balancedIntensity);
 }
 
-/** The log luma of a coarse grid over the frame's picture, letterbox left out. */
-function layout(frame: AnalysisFrame): number[] | null {
+/** The log luma of a coarse grid over the frame's picture, letterbox left out; null for a uniform frame. */
+export function frameLayout(frame: AnalysisFrame): number[] | null {
   const box = contentBox(frame);
   if (!box) return null;
   const { columns, rows } = LOOK_MATCH.grid;
@@ -569,8 +569,11 @@ function layout(frame: AnalysisFrame): number[] | null {
  * different scenes, and 0 when either frame is uniform.
  */
 export function frameSimilarity(left: AnalysisFrame, right: AnalysisFrame): number {
-  const a = layout(left);
-  const b = layout(right);
+  return layoutSimilarity(frameLayout(left), frameLayout(right));
+}
+
+/** frameSimilarity of two frames from their layouts, computed once per frame when many frames are compared. */
+export function layoutSimilarity(a: readonly number[] | null, b: readonly number[] | null): number {
   if (!a || !b) return 0;
   const meanA = a.reduce((sum, value) => sum + value, 0) / a.length;
   const meanB = b.reduce((sum, value) => sum + value, 0) / b.length;

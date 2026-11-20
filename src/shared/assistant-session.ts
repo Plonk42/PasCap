@@ -67,6 +67,10 @@ export const briefSchema = z
       'What the user wants, in their words: style, story, what to avoid.',
     ),
     musicTrackId: described(idSchema.nullable().default(null), 'Music track the cut follows; null for any.'),
+    musicId: described(
+      idSchema.nullable().default(null),
+      'Music recording of the project the cut follows when no music track is chosen; place it on a music track first if none plays it.',
+    ),
     targetSeconds: described(
       z.number().positive().max(86_400).nullable().default(null),
       'Target length of the cut in seconds; null follows the music.',

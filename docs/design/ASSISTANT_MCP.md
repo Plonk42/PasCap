@@ -161,13 +161,15 @@ checks run inside the project store's write queue, so no save interleaves with a
 restore.
 
 The **brief** is what the user tells the assistant, in the chat or later in the Hand off
-dialog: notes (≤ 2,000 characters), music track, target length in seconds, the steady-range
+dialog: notes (≤ 2,000 characters), music track, or a music recording of the bin to place when no
+track plays it (`musicId`), target length in seconds, the steady-range
 limits of Source preview (`maxJolts`, `minMovement`, `maxMovement`, `minFlightSpeed`,
 `maxFlightSpeed`), the maximum number of clips and a registered **style**
 ([#314](https://github.com/Plonk42/PasCap/issues/314), `list_styles`) the grade should aim at, all
 optional. It carries no permissions:
 the assistant may use every operation. The service applies its limits to `describe_recording` and
-`compare_recordings` and otherwise only stores and returns it. A session saved before the
+`compare_recordings`, `auto_edit` follows the whole brief but its notes
+([AUTO_EDIT.md](AUTO_EDIT.md)), and otherwise it only stores and returns it. A session saved before the
 limits were named keeps its `allowedMovement` as `maxJolts`.
 
 ### Music analysis cache
@@ -558,6 +560,42 @@ Read; for editor and assistant. List the styles the user registered from their o
 
 | Input | Type | Description |
 | ----- | ---- | ----------- |
+
+#### `auto_edit`
+
+Write; for assistant. Build a whole first cut without pictures of your own, in a minute or two: every steady range inside the kept ranges (camera motion analyzed), alike takes of one subject grouped so one is kept, shots ordered like the flight with an establishing shot first, cut on downbeats and strong hits with lengths following the music's sections, dissolves in quiet sections and fades, then Auto per clip and a match to the brief's style or the most representative clip. The cut goes on a new Ripple track named Auto edit above the others, which it hides, with the adjustments turned off; music named by the brief but not on the timeline is placed, and music longer than the cut ends with it. Returns a report: each clip with its recording, range, section and reasons, alike takes left out, alignment and notes. With apply (inside your session, expectedRevision) it saves the cut as one edit; without, it returns the commands, often more than edit takes at once. Then judge it with one timeline_sheet and replace the shots you disagree with; variant 1, 2… gives the next-best alternatives.
+
+| Input              | Type                                | Description                                                                                                                                                                                          |
+| ------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `projectId`        | string                              | ID of the saved project.                                                                                                                                                                             |
+| `brief`            | object                              | The brief: music, target length, steady-range limits, most clips and style; omitted uses your session's brief.                                                                                       |
+| `pace`             | "calm" or "balanced" or "energetic" | Clip lengths on the music: calm holds shots half as long again, energetic cuts in about half the beats.                                                                                              |
+| `order`            | "flight" or "energy"                | flight: shots in the order they were filmed (recording names), an establishing shot first; energy: any order, the liveliest shots on the loudest music.                                              |
+| `transitions`      | "auto" or "cuts" or "soft"          | auto: cuts, with dissolves in quiet sections and between alike shots and fades through black in silences; cuts: cuts only; soft: dissolves everywhere but at peaks, fades through black in silences. |
+| `grade`            | "match" or "auto" or "none"         | match: Auto per clip, then every clip matched to the brief's style, else to the clip most like the others; auto: Auto per clip; none: neutral clip grades.                                           |
+| `variant`          | integer                             | Which alternative: 0 is the best cut, 1, 2… choose other shots where they score nearly as well.                                                                                                      |
+| `apply`            | boolean                             | True saves the cut as one edit; false only proposes it.                                                                                                                                              |
+| `expectedRevision` | integer                             | Revision you last read, from describe_project; required with apply.                                                                                                                                  |
+
+#### `auto_edit_start`
+
+Read; for editor. Start an auto edit job of a project: into copy saves the cut as a new project and leaves this one unchanged; into project keeps the result for the editor to apply to the project as one Undo step. Activity shows its progress; auto_edit_result reads it once done.
+
+| Input              | Type                | Description                                                                                         |
+| ------------------ | ------------------- | --------------------------------------------------------------------------------------------------- |
+| `projectId`        | string              | ID of the saved project.                                                                            |
+| `expectedRevision` | integer             | The saved revision the editor shows.                                                                |
+| `into`             | "copy" or "project" | copy: a new project holding the cut; project: the cut kept for the editor to apply to this project. |
+| `brief`            | object              | The user's brief: music, target length, steady-range limits, most clips, style.                     |
+| `choices`          | object              | Pace, order, transitions, grade and variant.                                                        |
+
+#### `auto_edit_result`
+
+Read; for editor. The result of a finished auto edit job: the project holding the cut, its report and, into project, the cut.
+
+| Input      | Type   | Description           |
+| ---------- | ------ | --------------------- |
+| `resultId` | string | The auto edit job ID. |
 
 #### Edit commands
 

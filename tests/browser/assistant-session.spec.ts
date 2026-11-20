@@ -71,6 +71,7 @@ function session(edits: number): MemorySession {
       brief: {
         notes: 'A calm cut',
         musicTrackId: null,
+        musicId: null,
         targetSeconds: null,
         maxJolts: null,
         minMovement: null,
@@ -255,8 +256,8 @@ test('hands off with a brief after showing what the assistant can use, then open
   await page.goto(`/?project=${PROJECT_ID}`);
   await ready(page);
   await page.getByRole('button', { name: 'Hand off to an assistant' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Hand off to an assistant' });
-  const readiness = dialog.getByRole('region', { name: 'What the assistant can use' });
+  const dialog = page.getByRole('dialog', { name: 'Hand off' });
+  const readiness = dialog.getByRole('region', { name: 'What PasCap can use' });
   await expect(readiness).toContainText('2 video recordings prepared');
   await expect(readiness).toContainText('Camera motion not analyzed for 1 recording');
   await expect(readiness).toContainText('No music in this project');
@@ -296,6 +297,7 @@ test('hands off with a brief after showing what the assistant can use, then open
   expect(memory.session?.view?.brief).toEqual({
     notes: 'A calm cut of the lake',
     musicTrackId: null,
+    musicId: null,
     targetSeconds: 30,
     maxJolts: 3,
     minMovement: 1,

@@ -969,6 +969,40 @@ See [SPEED_AND_AUDIO.md](SPEED_AND_AUDIO.md) and
 The [multiple-music contract](design/MULTIPLE_MUSIC.md) specifies schema, mixing,
 resources and pending acceptance; this guide does not claim those tests passed.
 
+## Auto edit (experimental)
+
+**Auto edit** builds a first cut for you in a minute or two, without an AI model. Open **Hand off**
+in the header: its music, target length, number of clips, look and steady-range limits apply to
+Auto edit too. In its **Auto edit** section choose:
+
+- **Pace**: **Calm**, **Balanced** or **Energetic** clip lengths.
+- **Order**: **As filmed** (recordings in the order of their names, an establishing shot first) or
+  **By energy** (the liveliest shots on the loudest music).
+- **Transitions**: **Mixed** (cuts, dissolves in quiet sections and between takes of one subject,
+  fades through black in silences), **Cuts only**, or **Soft** (dissolves everywhere but at peaks).
+- **Grade**: **Auto + match** (Auto on each clip, then every clip matched to the chosen **Look**,
+  else to the clip most like the others), **Auto only**, or **None**.
+
+Then choose **Auto edit**. It uses prepared recordings whose camera motion is analyzed and, to cut
+on the music, analyzed music: **What PasCap can use** prepares and analyzes what is missing.
+
+Auto edit never changes your project. It makes a copy, “<title> · Auto edit”, with one Ripple
+track **Auto edit** and the music it follows (a music recording that is not on the timeline is
+placed from its start). It takes the steady stretches inside the ranges you kept, looks at three
+frames of each, groups takes of one subject so only the best is used, and fills the music: its
+sections, downbeats and strong hits set where the cuts fall, with clips of about 6 seconds on quiet
+music and 3 to 4 at a peak at **Balanced** pace. When your footage cannot fill the music, clips
+get a little longer, weaker shots fill in, and at last the cut ends sooner, with the music fading
+out with it.
+
+When it finishes, **Open the auto edit** (or **Open** in Activity) opens the copy with its report:
+each clip with its recording, music section and why it was chosen, the takes left out as
+duplicates, and notes such as a weaker shot to replace. **Show clip N** selects a clip on the
+timeline. **Try again** replaces the cut with the next-best alternative (other shots, or other parts
+of them); **Undo** brings the previous cut back. **Report** in the header shows the report again
+later in this browser. Auto edit cannot see what a shot shows: replace the shots you disagree with
+like any clip, or hand the copy to an assistant, which starts from an auto edit too.
+
 ## Edit with an assistant (experimental)
 
 An AI assistant in an MCP client such as VS Code can read a project, look at it through
@@ -981,7 +1015,7 @@ anything. Before editing, the assistant starts a session on the project: PasCap 
 checkpoint of the project as it was, and only the assistant can save it until it finishes or
 you take the project back. You can also start it yourself with **Hand off** in the header:
 write what you want, optionally pick the music track, length, allowed camera movement and
-number of clips, and check what the assistant can use (prepare or analyze missing
+number of clips, and check what PasCap can use (prepare or analyze missing
 recordings there). Meanwhile a banner says **An assistant is editing this project** and
 the editor follows its changes without letting you edit, moving the preview to what it just
 changed; **Take over** ends the session and

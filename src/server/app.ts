@@ -20,6 +20,7 @@ import { FootageBrowser } from './footage.js';
 import { ImageLibrary } from './images.js';
 import { JobQueue } from './jobs.js';
 import { registerOperations } from './operations/index.js';
+import { AutoEditResults } from './auto-edit-results.js';
 import { assertProjectSources } from './project-sources.js';
 import { submitFolderRelink } from './relink.js';
 import { MediaLibrary, MediaQueueError } from './library.js';
@@ -162,6 +163,7 @@ export async function createApp(config = createConfig(), toolchain: Toolchain | 
     assistant: new AssistantConnection(config.port, config.dataDir),
     images: config.assistantImages,
     styles,
+    autoEdits: new AutoEditResults(config.dataDir),
   };
   archiveWarnings.forEach((message) => app.log.warn({ message }, 'Skipped invalid export receipt'));
   app.addHook('onRequest', async (request, reply) => validateLocalRequest(request, reply, config));

@@ -75,7 +75,7 @@ export class JobQueue {
     if (!entry) throw new ServiceError('Job not found.', 404);
     if (['queued', 'running'].includes(entry.job.state)) entry.controller.abort();
   }
-  setOutput(id: string, outputUrl: string, receiptUrl: string): void {
+  setOutput(id: string, outputUrl: string, receiptUrl: string | null = null): void {
     const entry = this.#entries.get(id);
     if (entry) {
       entry.job.outputUrl = outputUrl;

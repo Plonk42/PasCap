@@ -82,6 +82,61 @@
   font-size: 13px;
 }
 
+.hand-off-auto {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.hand-off-auto-heading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hand-off-auto-heading h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.hand-off-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.hand-off-auto-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hand-off-auto-status {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 30px;
+  font-size: 13px;
+}
+
+.hand-off-auto-status > progress {
+  flex: 0 0 120px;
+  accent-color: var(--accent);
+}
+
+.hand-off-auto-status > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.hand-off-auto-status.done > svg {
+  color: #8fd19e;
+}
+
 .hand-off-readiness ul {
   display: grid;
   gap: 6px;

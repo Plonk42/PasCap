@@ -1,5 +1,13 @@
 import { useCallback, useEffect, useId, useRef, useState, type RefObject } from 'react';
 import { MAX_BRIEF_NOTES, type Brief } from '../shared/assistant-session.js';
+import {
+  AUTO_EDIT_GRADES,
+  AUTO_EDIT_ORDERS,
+  AUTO_EDIT_PACES,
+  AUTO_EDIT_TRANSITIONS,
+  DEFAULT_AUTO_EDIT_CHOICES,
+  type AutoEditChoices,
+} from '../shared/auto-edit/options.js';
 import type { MediaJob } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
 import {
@@ -11,6 +19,7 @@ import {
 import type { OperationOutput } from '../shared/operations/index.js';
 import { forEachSerial } from '../shared/serial.js';
 import { api } from './api.js';
+import { GRADE_LABELS, ORDER_LABELS, PACE_LABELS, TRANSITION_LABELS } from './auto-edit.js';
 import { Icon } from './icons.js';
 import { Modal } from './Modal.js';
 import { callOperation } from './operations.js';
@@ -23,6 +32,8 @@ type Readiness = OperationOutput<'hand_off_readiness'>;
 const POLL_MS = 2000;
 /** While nothing is preparing, the dialog still notices an MCP client connecting. */
 const IDLE_POLL_MS = 5000;
+/** A music choice naming a recording of the bin rather than a music track. */
+const RECORDING = 'recording:';
 
 interface Props {
   project: ProjectDocument;
@@ -32,8 +43,12 @@ interface Props {
   /** Why the project cannot be handed off now, or null. */
   blocked: string | null;
   restoreFocusTo: RefObject<HTMLElement | null>;
+  /** The auto edit this dialog started, as Activity last saw it, or null. */
+  autoEditJob: MediaJob | null;
   onJobs: (jobs: MediaJob[]) => void;
   onHandOff: (brief: Brief) => Promise<boolean>;
+  onAutoEdit: (brief: Brief, choices: AutoEditChoices) => Promise<boolean>;
+  onOpenAutoEdit: (jobId: string) => void;
   onClose: () => void;
 }
 
@@ -134,7 +149,7 @@ function recordingLines({ recordings }: Readiness): ReadinessLine[] {
       `${count(recordings.length, 'video recording')} prepared`,
       [
         unprepared.length + preparing > 0 && `${ready} of ${count(recordings.length, 'video recording')} prepared`,
-        unprepared.length > 0 && `the assistant cannot see the ${unprepared.length} others`,
+        unprepared.length > 0 && `the ${unprepared.length} others are left out`,
         preparing > 0 && `${preparing} preparing`,
       ],
       unprepared.length ? { label: `Prepare ${unprepared.length}`, run: queue(unprepared, api.prepare) } : null,
@@ -144,7 +159,7 @@ function recordingLines({ recordings }: Readiness): ReadinessLine[] {
     lines.push(
       line(
         'motion',
-        `Camera motion analyzed (${count(ready, 'prepared recording')}): the assistant can find steady ranges`,
+        `Camera motion analyzed (${count(ready, 'prepared recording')}): steady ranges can be found`,
         [
           motion.length > 0 && `Camera motion not analyzed for ${count(motion.length, 'recording')}`,
           analyzing > 0 && `${analyzing} analyzing`,
@@ -160,7 +175,7 @@ function musicLine({ music }: Readiness): ReadinessLine {
     return {
       key: 'music',
       ready: false,
-      text: 'No music in this project: the assistant cuts without a beat',
+      text: 'No music in this project: the cut has no beat to follow',
       action: null,
     };
   const unprepared = music.filter((item) => item.preparation === 'unprepared').map((item) => item.id);
@@ -183,6 +198,173 @@ function musicLine({ music }: Readiness): ReadinessLine {
 
 function readinessLines(readiness: Readiness): ReadinessLine[] {
   return [...recordingLines(readiness), musicLine(readiness)];
+}
+
+/** The music choice: a music track by ID, or a recording of the bin that no track plays. */
+function musicChoices(project: ProjectDocument, musicName: (mediaId: string) => string) {
+  const playing = new Set(project.music.flatMap((lane) => lane.clips.map((clip) => clip.mediaId)));
+  return [
+    ...project.music.map((track, index) => ({
+      value: track.id,
+      label: `Music track ${index + 1} · ${[...new Set(track.clips.map((clip) => musicName(clip.mediaId)))].join(', ')}`,
+    })),
+    ...project.media.audioIds
+      .filter((id) => !playing.has(id))
+      .map((id) => ({ value: `${RECORDING}${id}`, label: `${musicName(id)} · placed from its start` })),
+  ];
+}
+
+function initialMusic(project: ProjectDocument, choices: readonly { value: string }[]): string {
+  if (project.music.length === 1) return project.music[0]!.id;
+  return project.music.length === 0 && choices[0] ? choices[0].value : '';
+}
+
+function briefMusic(choice: string): Pick<Brief, 'musicTrackId' | 'musicId'> {
+  if (choice.startsWith(RECORDING)) return { musicTrackId: null, musicId: choice.slice(RECORDING.length) };
+  return { musicTrackId: choice || null, musicId: null };
+}
+
+function ChoiceSelect<K extends string>({
+  id,
+  label,
+  value,
+  values,
+  labels,
+  disabled,
+  onChange,
+}: Readonly<{
+  id: string;
+  label: string;
+  value: K;
+  values: readonly K[];
+  labels: Readonly<Record<K, string>>;
+  disabled: boolean;
+  onChange: (value: K) => void;
+}>) {
+  return (
+    <div className="hand-off-field">
+      <label htmlFor={id}>{label}</label>
+      <select id={id} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value as K)}>
+        {values.map((item) => (
+          <option key={item} value={item}>
+            {labels[item]}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/** Where the auto edit this dialog started stands, and how to open it once done. */
+function AutoEditStatus({ job, onOpen }: Readonly<{ job: MediaJob; onOpen: () => void }>) {
+  if (job.state === 'queued' || job.state === 'running')
+    return (
+      <div className="hand-off-auto-status">
+        <progress max={1} value={job.progress} aria-label="Auto edit progress" />
+        <span>{job.message}</span>
+      </div>
+    );
+  if (job.state === 'completed')
+    return (
+      <div className="hand-off-auto-status done">
+        <Icon name="check" size={15} />
+        <span>{job.message}</span>
+        <button className="primary-button small" onClick={onOpen}>
+          Open the auto edit
+        </button>
+      </div>
+    );
+  return (
+    <p className="hand-off-error" role="alert">
+      {job.state === 'canceled' ? 'The auto edit was canceled.' : job.message}
+    </p>
+  );
+}
+
+/** Auto edit's choices beside the brief, its button and its job. */
+function AutoEditSection({
+  title,
+  choices,
+  disabled,
+  job,
+  onChoices,
+  onStart,
+  onOpen,
+}: Readonly<{
+  title: string;
+  choices: AutoEditChoices;
+  disabled: boolean;
+  job: MediaJob | null;
+  onChoices: (choices: AutoEditChoices) => void;
+  onStart: () => void;
+  onOpen: (jobId: string) => void;
+}>) {
+  const id = useId();
+  const running = job?.state === 'queued' || job?.state === 'running';
+  const set =
+    <K extends keyof AutoEditChoices>(key: K) =>
+    (value: AutoEditChoices[K]) =>
+      onChoices({ ...choices, [key]: value });
+  const select = { disabled: disabled || running };
+  return (
+    <section className="hand-off-auto" aria-labelledby={`${id}-title`}>
+      <div className="hand-off-auto-heading">
+        <h3 id={`${id}-title`}>Auto edit</h3>
+        <button
+          className="secondary-button small"
+          disabled={disabled || running}
+          title="Build a first cut in a copy of this project"
+          onClick={onStart}
+        >
+          <Icon name="wand" size={14} />
+          Auto edit
+        </button>
+      </div>
+      <p className="hand-off-hint">
+        Builds a first cut in a copy, <strong>{title} · Auto edit</strong>: steady shots of your kept ranges, cut on the
+        music and graded, in a minute or two. This project stays as it is.
+      </p>
+      <div className="hand-off-auto-options">
+        <ChoiceSelect
+          id={`${id}-pace`}
+          label="Pace"
+          value={choices.pace}
+          values={AUTO_EDIT_PACES}
+          labels={PACE_LABELS}
+          onChange={set('pace')}
+          {...select}
+        />
+        <ChoiceSelect
+          id={`${id}-order`}
+          label="Order"
+          value={choices.order}
+          values={AUTO_EDIT_ORDERS}
+          labels={ORDER_LABELS}
+          onChange={set('order')}
+          {...select}
+        />
+        <ChoiceSelect
+          id={`${id}-transitions`}
+          label="Transitions"
+          value={choices.transitions}
+          values={AUTO_EDIT_TRANSITIONS}
+          labels={TRANSITION_LABELS}
+          onChange={set('transitions')}
+          {...select}
+        />
+        <ChoiceSelect
+          id={`${id}-grade`}
+          label="Grade"
+          value={choices.grade}
+          values={AUTO_EDIT_GRADES}
+          labels={GRADE_LABELS}
+          onChange={set('grade')}
+          {...select}
+        />
+      </div>
+      {job && <AutoEditStatus job={job} onOpen={() => onOpen(job.id)} />}
+    </section>
+  );
 }
 
 function ago(iso: string, now: number): string {
@@ -258,7 +440,9 @@ function Connection({ connection }: Readonly<{ connection: Readiness['connection
   );
 }
 
-/** Starts an assistant session with the user's brief, after showing what the assistant can use. */
+/**
+ * Starts an auto edit in a copy, or an assistant session, with the user's brief, after showing what both can use.
+ */
 export function HandOffDialog({
   project,
   musicName,
@@ -266,19 +450,24 @@ export function HandOffDialog({
   error,
   blocked,
   restoreFocusTo,
+  autoEditJob,
   onJobs,
   onHandOff,
+  onAutoEdit,
+  onOpenAutoEdit,
   onClose,
 }: Readonly<Props>) {
   const id = useId();
   const [notes, setNotes] = useState('');
-  const [musicTrackId, setMusicTrackId] = useState<string>(project.music.length === 1 ? project.music[0]!.id : '');
+  const music = musicChoices(project, musicName);
+  const [musicChoice, setMusicChoice] = useState<string>(() => initialMusic(project, music));
   const [target, setTarget] = useState('');
   const [useLimits, setUseLimits] = useState(true);
   const [limits] = useSteadyLimits();
   const [maxClips, setMaxClips] = useState('');
   const styles = useStyles();
   const [styleId, setStyleId] = useState('');
+  const [choices, setChoices] = useState<AutoEditChoices>({ ...DEFAULT_AUTO_EDIT_CHOICES });
   const [pending, setPending] = useState(false);
   const [queueError, setQueueError] = useState('');
   const submission = useRef(false);
@@ -300,20 +489,21 @@ export function HandOffDialog({
       refresh();
     }
   };
-  const handOff = async (): Promise<void> => {
+  const brief = (): Brief => ({
+    notes: notes.trim(),
+    ...briefMusic(musicChoice),
+    targetSeconds: targetSeconds.value,
+    ...briefLimits(useLimits ? limits : null),
+    maxClips: clips.value,
+    style: styles.some((style) => style.id === styleId) ? styleId : null,
+  });
+  const submit = async (action: () => Promise<boolean>, closes: boolean): Promise<void> => {
     if (submitting || submission.current || invalid || blocked) return;
     submission.current = true;
     setPending(true);
     try {
-      const ok = await onHandOff({
-        notes: notes.trim(),
-        musicTrackId: musicTrackId || null,
-        targetSeconds: targetSeconds.value,
-        ...briefLimits(useLimits ? limits : null),
-        maxClips: clips.value,
-        style: styles.some((style) => style.id === styleId) ? styleId : null,
-      });
-      if (ok) onClose();
+      const ok = await action();
+      if (ok && closes) onClose();
     } finally {
       submission.current = false;
       setPending(false);
@@ -369,7 +559,7 @@ export function HandOffDialog({
             className="primary-button"
             disabled={submitting || invalid || blocked !== null}
             onClick={() => {
-              void handOff();
+              void submit(() => onHandOff(brief()), true);
             }}
           >
             <Icon name="assistant" size={15} />
@@ -379,37 +569,38 @@ export function HandOffDialog({
       }
     >
       <div className="activity-dialog-heading">
-        <h2 id={`${id}-title`}>Hand off to an assistant</h2>
+        <h2 id={`${id}-title`}>Hand off</h2>
       </div>
       <p id={`${id}-intro`} className="hand-off-intro">
-        An assistant connected to PasCap edits <strong>{project.title}</strong> while you watch. You can take over at
-        any time, and the project as it is now is kept so you can restore it.
+        Let PasCap build a first cut of <strong>{project.title}</strong> with Auto edit, or hand it to an assistant
+        connected to PasCap, which edits it while you watch: you can take over at any time, and the project as it is now
+        is kept so you can restore it.
       </p>
       <div className="hand-off-field">
         <label htmlFor={`${id}-notes`}>What should it make?</label>
         <textarea
           id={`${id}-notes`}
-          rows={4}
+          rows={3}
           maxLength={MAX_BRIEF_NOTES}
           value={notes}
-          placeholder="Style, story, shots to favor or avoid…"
+          placeholder="Style, story, shots to favor or avoid… (for the assistant)"
           disabled={submitting}
           onChange={(event) => setNotes(event.target.value)}
         />
       </div>
       <div className="hand-off-options">
         <div className="hand-off-field">
-          <label htmlFor={`${id}-music`}>Music track</label>
+          <label htmlFor={`${id}-music`}>Music</label>
           <select
             id={`${id}-music`}
-            value={musicTrackId}
-            disabled={submitting || !project.music.length}
-            onChange={(event) => setMusicTrackId(event.target.value)}
+            value={musicChoice}
+            disabled={submitting || !music.length}
+            onChange={(event) => setMusicChoice(event.target.value)}
           >
-            <option value="">{project.music.length ? 'Any' : 'No music track'}</option>
-            {project.music.map((track, index) => (
-              <option key={track.id} value={track.id}>
-                {`Music track ${index + 1} · ${[...new Set(track.clips.map((clip) => musicName(clip.mediaId)))].join(', ')}`}
+            <option value="">{music.length ? 'Any music track' : 'No music'}</option>
+            {music.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
               </option>
             ))}
           </select>
@@ -447,8 +638,19 @@ export function HandOffDialog({
           <small id={`${id}-limits-text`}>{steadyLimitsText(useLimits ? limits : steadyLimits())}</small>
         </div>
       </div>
+      <AutoEditSection
+        title={project.title}
+        choices={choices}
+        disabled={submitting || invalid || blocked !== null}
+        job={autoEditJob}
+        onChoices={setChoices}
+        onStart={() => {
+          void submit(() => onAutoEdit(brief(), choices), false);
+        }}
+        onOpen={onOpenAutoEdit}
+      />
       <section className="hand-off-readiness" aria-labelledby={`${id}-ready`}>
-        <h3 id={`${id}-ready`}>What the assistant can use</h3>
+        <h3 id={`${id}-ready`}>What PasCap can use</h3>
         {readiness === null ? (
           <output className="activity-hint">
             <span className="spinner" aria-hidden="true" />
@@ -476,7 +678,7 @@ export function HandOffDialog({
             {readiness.exportRunning && (
               <li className="missing">
                 <Icon name="warning" size={15} />
-                <span>An export is running: the assistant cannot look at pictures until it finishes</span>
+                <span>An export is running: auto edit and the assistant&apos;s pictures wait until it finishes</span>
               </li>
             )}
           </ul>
