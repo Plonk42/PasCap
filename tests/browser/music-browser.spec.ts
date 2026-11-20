@@ -214,7 +214,7 @@ test('real explicit import persists only importing-project audio membership, sur
   await expect(modal).toHaveCount(0);
   await expect(trigger(page)).toBeFocused();
   await page.evaluate(() => window.pascapLab!.flush());
-  expect(memory.snapshot().media).toEqual({ videoIds: [], audioIds: [importedId] });
+  expect(memory.snapshot().media).toEqual({ videoIds: [], audioIds: [importedId], imageIds: [] });
   expect(memory.snapshot().music).toEqual([]);
   expect(memory.snapshot().clips).toEqual([]);
   expect({ ...memory.snapshot(), revision: beforeProject.revision, media: beforeProject.media }).toEqual(beforeProject);
@@ -285,7 +285,7 @@ test('importing moved music creates a new bin entry without relinking the old so
       async () => ((await (await request.get(`/api/jobs/${previous.job.id}`)).json()) as { job: MediaJob }).job.state,
     )
     .toBe('completed');
-  const before = { ...memory.snapshot(), media: { videoIds: [], audioIds: [previous.asset.id] } };
+  const before = { ...memory.snapshot(), media: { videoIds: [], audioIds: [previous.asset.id], imageIds: [] } };
   memory.seed(before);
   await rename(oldPath, movedPath);
   await page.reload();

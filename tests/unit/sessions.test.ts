@@ -70,7 +70,7 @@ async function setup(options: { ready?: boolean; checkpoints?: number; leaseMs?:
   const project = await projects.save(
     projectSchema.parse({
       ...createProject('flight', 'Flight'),
-      media: { videoIds: ['rec-1'], audioIds: [] },
+      media: { videoIds: ['rec-1'], audioIds: [], imageIds: [] },
       clips: [clip('user-clip', 500, 560)],
       selects: { 'rec-1': [{ sourceIn: 0, sourceOut: 300 }] },
     }),
@@ -369,7 +369,7 @@ describe('assistant sessions', () => {
 describe('session rules', () => {
   const base = projectSchema.parse({
     ...createProject('rules', 'Rules'),
-    media: { videoIds: ['rec-1'], audioIds: [] },
+    media: { videoIds: ['rec-1'], audioIds: [], imageIds: [] },
     clips: [clip('old', 500, 560)],
     selects: { 'rec-1': [{ sourceIn: 0, sourceOut: 300 }] },
   });
@@ -386,7 +386,11 @@ describe('session rules', () => {
     );
     expect(sessionViolation(base, change({ selects: {} }), name)).toMatch(/can only narrow/);
     expect(
-      sessionViolation(base, change({ media: { videoIds: [], audioIds: [] }, clips: [clip('new', 10, 20)] }), name),
+      sessionViolation(
+        base,
+        change({ media: { videoIds: [], audioIds: [], imageIds: [] }, clips: [clip('new', 10, 20)] }),
+        name,
+      ),
     ).toMatch(/not a recording of this project/);
   });
 });

@@ -146,7 +146,7 @@ describe('strict current-schema keyframes and independently enabled settings', (
     const project = createProject('strict', 'Strict');
     const clip = createClip('one', 'source', 0, 20);
     expect(project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-    expect(project.media).toEqual({ videoIds: [], audioIds: [] });
+    expect(project.media).toEqual({ videoIds: [], audioIds: [], imageIds: [] });
     expect(project.layers[0]).toEqual(row());
     expect(Object.keys(clip)).toEqual([
       'id',

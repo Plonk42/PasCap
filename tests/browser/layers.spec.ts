@@ -483,6 +483,7 @@ test('plays three simultaneous sources through rate, grade and opacity curves, a
   project.media = {
     videoIds: library.assets.map((asset) => asset.id),
     audioIds: music.assets.map((asset) => asset.id),
+    imageIds: [],
   };
   project.revision = await page.evaluate(() => window.pascapLab!.project()!.revision);
   project = applyCommand(project, { type: 'insert', clip: createClip('first', red, 0, 45), index: 0 });
@@ -673,7 +674,7 @@ test('source-range choices are per project and do not alter already inserted exc
   );
   const fresh = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
   expect(fresh.adjustments).toEqual([]);
-  expect(fresh.media).toEqual({ videoIds: [], audioIds: [] });
+  expect(fresh.media).toEqual({ videoIds: [], audioIds: [], imageIds: [] });
   // The memory-only source-choice fixture explicitly imports this rush into its new bin.
   fresh.media.videoIds = [keyed.clips[0]!.mediaId];
   await page.evaluate((document) => window.pascapLab!.setDocument(document), fresh);

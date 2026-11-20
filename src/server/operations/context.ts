@@ -3,6 +3,7 @@ import type { Operation, OperationName, OperationNamed } from '../../shared/oper
 import type { AssistantConnection } from '../assistant-connection.js';
 import type { AudioLibrary } from '../audio.js';
 import type { AssistantImageBudget } from '../config.js';
+import type { ImageLibrary } from '../images.js';
 import type { JobQueue } from '../jobs.js';
 import type { MediaLibrary } from '../library.js';
 import type { AssistantSessions } from '../sessions.js';
@@ -32,6 +33,7 @@ export interface ServiceContext {
   >;
   library: Pick<MediaLibrary, 'get' | 'motion' | 'motionJob'>;
   audio: Pick<AudioLibrary, 'get' | 'analysis' | 'analysisJob' | 'detailWaveform'>;
+  imageLibrary: Pick<ImageLibrary, 'get' | 'analysisFrame'>;
   jobs: Pick<JobQueue, 'list'>;
   stills: Pick<
     StillRenderer,

@@ -521,14 +521,14 @@ describe('multiple-project store', () => {
     const store = new ProjectStore(await temp());
     const first = await store.create('Imported sources');
     const second = await store.create('New empty edit');
-    expect(first.media).toEqual({ videoIds: [], audioIds: [] });
+    expect(first.media).toEqual({ videoIds: [], audioIds: [], imageIds: [] });
     expect(second.media).toEqual(first.media);
     const saved = await store.save(
-      { ...first, media: { videoIds: ['recording-one'], audioIds: ['music-one'] } },
+      { ...first, media: { videoIds: ['recording-one'], audioIds: ['music-one'], imageIds: [] } },
       first.revision,
     );
     expect((await store.load(first.id)).media).toEqual(saved.media);
-    expect((await store.load(second.id)).media).toEqual({ videoIds: [], audioIds: [] });
+    expect((await store.load(second.id)).media).toEqual({ videoIds: [], audioIds: [], imageIds: [] });
     const { media: _media, ...missingBin } = first;
     for (const invalid of [
       missingBin,
@@ -734,8 +734,8 @@ describe('multiple-project HTTP API', () => {
     const service = await serviceAt(directory);
     const document = createProject('new-bin', 'Import only');
     for (const media of [
-      { videoIds: ['missing-video'], audioIds: [] },
-      { videoIds: [], audioIds: ['missing-audio'] },
+      { videoIds: ['missing-video'], audioIds: [], imageIds: [] },
+      { videoIds: [], audioIds: ['missing-audio'], imageIds: [] },
     ]) {
       expect(
         (

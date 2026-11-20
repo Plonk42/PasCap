@@ -3,6 +3,7 @@ import { audioAssetSchema } from '../shared/audio.js';
 import { exportPreflightSchema } from '../shared/export-space.js';
 import type { ExportProfile } from '../shared/export.js';
 import { audioDirectorySchema, footageDirectorySchema, footageRootSchema } from '../shared/footage.js';
+import { imageAssetSchema, imageRegistrationSchema } from '../shared/images.js';
 import { jobSchema, mediaAssetSchema } from '../shared/media.js';
 import { motionAnalysisSchema } from '../shared/motion-analysis.js';
 import { idSchema, projectSchema, type ProjectDocument } from '../shared/model.js';
@@ -334,6 +335,20 @@ export const api = {
   prepareAudio: (id: string) => request(`/api/audio/${id}/prepare`, z.object({ job: jobSchema }), 'POST', {}),
   relinkAudio: (id: string, path: string) =>
     request(`/api/audio/${id}/relink`, z.object({ job: jobSchema }), 'POST', { path }),
+  images: (options?: RequestOptions) =>
+    request(
+      '/api/images',
+      z.object({ images: z.array(imageAssetSchema), missing: z.array(idSchema) }),
+      'GET',
+      undefined,
+      options,
+    ),
+  /** Root-scoped images chosen in the browser, read in place. */
+  registerImagePaths: (paths: readonly string[]) =>
+    request('/api/images/register-paths', imageRegistrationSchema, 'POST', { paths }, { timeoutMs: IMPORT_TIMEOUT_MS }),
+  /** A typed image path, anywhere on this machine. */
+  registerImage: (path: string) =>
+    request('/api/images/register', imageRegistrationSchema, 'POST', { path }, { timeoutMs: IMPORT_TIMEOUT_MS }),
   exportPreflight: (document: ProjectDocument, profile: ExportProfile, options?: RequestOptions) =>
     request(
       '/api/exports/preflight',

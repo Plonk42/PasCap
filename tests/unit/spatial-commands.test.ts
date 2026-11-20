@@ -72,7 +72,7 @@ function fixture(): ProjectDocument {
       loop: false,
     }),
   ];
-  document.media = { videoIds: ['original'], audioIds: ['audio'] };
+  document.media = { videoIds: ['original'], audioIds: ['audio'], imageIds: [] };
   return projectSchema.parse(document);
 }
 

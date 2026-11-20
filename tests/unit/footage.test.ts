@@ -300,14 +300,16 @@ describe('approved footage-root configuration', () => {
 });
 
 describe('metadata-only single-directory footage browsing', () => {
-  it('naturally sorts directories before videos, ignores other entries and never reads/probes/prepares originals', async () => {
+  it('naturally sorts directories before videos and images, ignores other entries and never reads/probes/prepares originals', async () => {
     const { sources, outside, config } = await setup();
     const directories = ['Flight 10', 'Flight 2'];
     await Promise.all(directories.map((name) => fs.mkdir(path.join(sources, name))));
     const names = ['Clip 10.MOV', 'Clip 2.mp4', 'Clip 1.m4v', 'Clip 20.MP4'];
     const originals = await Promise.all(names.map((name) => source(sources, name)));
     await source(path.join(sources, 'Flight 2'), 'Nested.mp4');
-    await Promise.all(['notes.txt', 'sound.wav', 'photo.JPG'].map((name) => source(sources, name)));
+    await Promise.all(
+      ['notes.txt', 'sound.wav', 'photo.JPG', 'still.png', 'scan.tiff'].map((name) => source(sources, name)),
+    );
     await fs.symlink(originals[0]!, path.join(sources, 'Linked.mp4'));
     await fs.symlink(outside, path.join(sources, 'Linked folder'));
     const read = vi.spyOn(fs, 'readFile');
@@ -329,6 +331,8 @@ describe('metadata-only single-directory footage browsing', () => {
       ['Clip 2.mp4', 'video'],
       ['Clip 10.MOV', 'video'],
       ['Clip 20.MP4', 'video'],
+      ['photo.JPG', 'image'],
+      ['still.png', 'image'],
     ]);
     expect(result.entries.filter((entry) => entry.kind === 'directory').every((entry) => entry.size === null)).toBe(
       true,

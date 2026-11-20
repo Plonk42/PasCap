@@ -196,7 +196,8 @@ request: read one only when the task touches its area.
   animated). Constants in `src/shared/auto-adjust.ts`, no schema/render change
   (`docs/design/AUTO_ADJUST.md`). #315/#314 **Match** (first Color tab section, clip grades only) matches each
   selected clip's frame (playhead, else middle) to a reference frame (timeline frame as graded, Source preview
-  recording frame as shot) or a registered style (`styles.json`); the reference lives in the browser per project
+  recording frame as shot), a Media library image as shot (JPEG/PNG in `images.json`, project `media.imageIds`; the
+  assistant reads JPEG only) or a registered style (`styles.json`); the reference lives in the browser per project
   (`pascap-color-reference-<id>`, never saved). It starts from the reference's settings plus the two frames' Auto
   difference and follows the fitted picture only as far as the scenes look alike (`src/shared/look-match.ts`,
   `estimate` kind `match`); Intensity moves current → match. See `docs/design/COLOR_MATCH.md`.

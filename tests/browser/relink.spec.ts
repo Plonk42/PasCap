@@ -93,7 +93,7 @@ async function missingProject(page: Page, request: APIRequestContext) {
   await memoryProjects(page, {
     ...project,
     revision: 1,
-    media: { videoIds: [video.id], audioIds: [music.id] },
+    media: { videoIds: [video.id], audioIds: [music.id], imageIds: [] },
   });
   const bodies = await mockMissing(page, video, music);
   await page.goto('/?project=relink-browser');

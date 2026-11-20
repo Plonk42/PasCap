@@ -17,6 +17,7 @@ import { requireExportReserve } from './export-space.js';
 import { preflightExport, startExport } from './export.js';
 import { assertNoSymlinks, assertSourceIdentity, parseByteRange } from './files.js';
 import { FootageBrowser } from './footage.js';
+import { ImageLibrary } from './images.js';
 import { JobQueue } from './jobs.js';
 import { registerOperations } from './operations/index.js';
 import { assertProjectSources } from './project-sources.js';
@@ -30,6 +31,7 @@ import { StillRenderer } from './stills.js';
 import { ensurePrivateDirectory, ProjectStore } from './storage.js';
 import { StyleLibrary } from './styles.js';
 import { MAX_STYLE_REFERENCES, styleNameSchema, styleSummary } from '../shared/styles.js';
+import { IMAGE_MIME } from '../shared/images.js';
 
 const idParams = z.object({ id: idSchema });
 const importSchema = z.object({ directory: z.string().min(1).max(4096) }).strict();
@@ -140,11 +142,13 @@ export async function createApp(config = createConfig(), toolchain: Toolchain | 
   const footage = new FootageBrowser(config);
   const previews = new BrowsePreviews(config);
   const audio = new AudioLibrary(config, jobs);
+  const imageLibrary = new ImageLibrary(config);
   const projects = new ProjectStore(config.dataDir);
   await ensurePrivateDirectory(config.dataDir);
   const mcp = await mcpToken(config.dataDir);
   await library.initialize();
   await audio.initialize();
+  await imageLibrary.initialize();
   const archiveWarnings = await restoreExports(config, jobs);
   const styles = new StyleLibrary(config, footage);
   const operationContext = {
@@ -152,6 +156,7 @@ export async function createApp(config = createConfig(), toolchain: Toolchain | 
     sessions: new AssistantSessions(config.dataDir, config.assistantSessions, projects),
     library,
     audio,
+    imageLibrary,
     jobs,
     stills: new StillRenderer(config, library, jobs),
     assistant: new AssistantConnection(config.port, config.dataDir),
@@ -296,6 +301,25 @@ export async function createApp(config = createConfig(), toolchain: Toolchain | 
     await styles.remove(idParams.parse(request.params).id);
     return { deleted: true };
   });
+  app.get('/api/images', async (_request, reply) =>
+    reply.send({ images: imageLibrary.list(), missing: await imageLibrary.missing() }),
+  );
+  app.post('/api/images/register-paths', async (request) => {
+    const { paths } = registerPathsSchema.parse(request.body);
+    return imageLibrary.register(paths.map((filename) => footage.validateImagePath(filename)));
+  });
+  app.post('/api/images/register', async (request) => {
+    const filename = footage.validateManualPath(registerSchema.parse(request.body).path);
+    return imageLibrary.register([filename]);
+  });
+  app.route({
+    method: ['GET', 'HEAD'],
+    url: '/api/images/:id/file',
+    handler: async (request, reply) => {
+      const image = await imageLibrary.original(idParams.parse(request.params).id);
+      await serveRegisteredFile(request, reply, image.sourcePath, IMAGE_MIME[image.format]);
+    },
+  });
   app.post('/api/audio/register-selected', async (request, reply) => {
     const selected = footage.validateAudioPath(registerSchema.parse(request.body).path);
     return reply.code(202).send(await audio.register(selected));
@@ -357,17 +381,17 @@ export async function createApp(config = createConfig(), toolchain: Toolchain | 
     const body = saveSchema.parse(request.body);
     if (body.document.id !== idParams.parse(request.params).id)
       throw new ServiceError('Project ID must match its route.');
-    await assertProjectSources(body.document, library, audio);
+    await assertProjectSources(body.document, library, audio, imageLibrary);
     return { document: await projects.save(body.document, body.expectedRevision) };
   });
   app.post('/api/projects/import', async (request, reply) => {
     const document = projects.decodeFile(importProjectSchema.parse(request.body).document);
     try {
-      await assertProjectSources(document, library, audio);
+      await assertProjectSources(document, library, audio, imageLibrary);
     } catch (error) {
       if (!(error instanceof ServiceError && error.statusCode === 404)) throw error;
       throw new ServiceError(
-        'This project file uses recordings or music that are not imported in this PasCap service. Nothing was created.',
+        'This project file uses recordings, music or images that are not imported in this PasCap service. Nothing was created.',
         422,
       );
     }

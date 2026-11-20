@@ -2,20 +2,21 @@
 
 Current contract for [#315](https://github.com/Plonk42/PasCap/issues/315) and
 [#314](https://github.com/Plonk42/PasCap/issues/314): **Match** grades clips so that a frame of
-each looks like a **reference**, a timeline frame as its grade shows it, a recording frame as
-shot, or a registered **style**, the look of the user's own finished edits. Like
+each looks like a **reference**, a timeline frame as its grade shows it, a recording frame or an
+imported **image** as shot, or a registered **style**, the look of the user's own finished edits. Like
 [Auto](AUTO_ADJUST.md) it chooses values of the eleven settings Auto sets in
 [clip grades](CLIP_GRADES_AND_ADJUSTMENTS.md), and for a clip without its own, its
 [HSL ranges and curves](HSL_AND_CURVES.md), HDR and Local contrast
-([#326](https://github.com/Plonk42/PasCap/issues/326)): no schema, render, export or decoder
-change.
+([#326](https://github.com/Plonk42/PasCap/issues/326)): no render, export or decoder change. The
+project's library holds the images (`media.imageIds`, see [Images](#images)).
 
 Implementation authorities: [matching](../../src/shared/look-match.ts) (pure, every constant in
 `LOOK_MATCH`), [editor helpers](../../src/web/color-match.ts), the
 [section](../../src/web/ColorMatch.tsx), the [reference store](../../src/web/color-reference.ts),
 [styles](../../src/shared/styles.ts) with their [registry](../../src/server/styles.ts) and
-[dialog](../../src/web/StylesDialog.tsx), and the assistant's
-[estimate](../../src/server/operations/estimate.ts).
+[dialog](../../src/web/StylesDialog.tsx), [images](../../src/shared/images.ts) with their
+[registry](../../src/server/images.ts) and [Media section](../../src/web/MediaImageList.tsx), and the
+assistant's [estimate](../../src/server/operations/estimate.ts).
 
 ## Editing
 
@@ -31,23 +32,26 @@ render, during an export, the editor grades the analysis frame itself without th
 with the badge **Reference · <name>**, to compare at full size with the matched clip; release,
 pointer cancel or leaving the window restores the preview. Beside it are its recording's name and
 what it is (**Timeline frame, as graded**,
-**Recording frame, as shot**, **Registered style**). It is set by:
+**Recording frame, as shot**, **Image, as shot**, **Registered style**). An image is shown itself.
+It is set by:
 
 - **Use playhead frame**: the clip the timeline shows on top at the playhead, at the source
   frame shown there;
 - **Use as color reference** in a clip's context menu: that clip at the playhead when it is
   over the clip, else at its middle frame;
-- **Use as reference** in Source preview's heading: the recording's frame shown, as shot
-  (pressed while it is the reference);
-- **Styles** (a menu beside Use playhead frame): each registered style, **Manage styles…**
-  (the Styles dialog), a hint for recording frames and **Clear reference**.
+- **Use as reference** in Source preview's heading: the recording's frame shown, as shot, or the
+  image shown (pressed while it is the reference; an image in the Media library's **Images**
+  section then has the badge **Color reference**);
+- **Styles** (a menu beside Use playhead frame): the project's images, each registered style,
+  **Manage styles…** (the Styles dialog), a hint for recording frames and **Clear reference**.
 
 The reference belongs to the project in this browser, never to the project file or history:
 preference `pascap-color-reference-<project id>`, `{kind: 'clip', clipId, sourceFrame}`,
-`{kind: 'recording', mediaId, sourceFrame}` or `{kind: 'style', styleId}`. A timeline reference
+`{kind: 'recording', mediaId, sourceFrame}`, `{kind: 'image', imageId}` or
+`{kind: 'style', styleId}`. A timeline reference
 follows its clip's grade (it is measured as graded when matching) and its source frame, wherever
 the clip moves; it is unavailable, with the reason in the section, once its clip is deleted, its
-recording no longer prepared, or its style deleted.
+recording no longer prepared, its image removed from the project, or its style deleted.
 
 **The clips matched** are the selected clips, each at one frame: the frame shown at the playhead
 when the playhead is over the clip, else its middle frame (named under the reference, **This
@@ -55,7 +59,9 @@ clip at the playhead (00:12:05)**). A clip is never matched at the reference fra
 one clip selected, Match explains it; among several, that clip is left out.
 
 **Match** (**Match N clips** for several) decodes the reference frame and each clip's frame from
-their verified proxies, one temporary reader at a time (the reference frame is kept for the
+their verified proxies (an image reference from its original, decoded by the browser like a proxy
+frame: JPEG or PNG, EXIF orientation and embedded color profiles applied, at the analysis size), one
+temporary reader at a time (the reference frame is kept for the
 next matches), and fits each clip on its own (see below), showing **Analyzing n/N frames…** and
 **Cancel**. Then the result is previewed through the live preview path (no document, history
 or save change) with:
@@ -186,11 +192,37 @@ muted and strong saturations, and at the cast of its light (the light Auto white
 estimates, undamped) instead of a mean color. On synthetic fixtures a style of brighter, softer,
 less colorful footage takes a shot at least a quarter closer to its look than Auto's balance.
 
+## Images
+
+An **image** is a JPEG or PNG still, such as a photo whose colors the film should take, matched
+like a recording frame as shot: one picture, neutral grade, the same fit and scene likeness.
+
+**Importing.** The Import dialog lists images (`.jpg`, `.jpeg`, `.png`) beside videos in the
+approved footage folders, under the **All** and **Images** filters (relinking lists recordings
+only), and **Other location** takes a typed image path. Importing reads each image's header (format
+and size) and fingerprints it, in place (never copied or modified), registers it in `images.json`
+beside the video and music registries (an image imported again at the same path keeps its id,
+with its size and fingerprint read again), and adds it to the project's library `media.imageIds`
+(1,000 at most; a schema upgrade gives earlier projects none). A file whose header is neither is
+refused with the reason.
+
+**The Images section** of the Media library, below Music, lists the project's images with their
+thumbnail (the original itself), size and format, filtered by the search (and hidden by filters
+other than All recordings and Ready). Choosing one shows it whole in **Source preview** (the
+original, contained in the view), where **Use as reference** makes it
+the reference and **Close** or Escape returns to Timeline preview; hovering a recording never
+replaces it there. **Remove from project** takes it out of the library in one Undo step (closing
+its Source preview), never touching the original. Images never go on the
+timeline, render or export. The editor reads an original through `/api/images/<id>/file`, only while
+it is unchanged since its import; one moved or changed shows **Original missing** until imported
+again.
+
 ## Assistant
 
 `estimate` kind `match` ([assistant operations](ASSISTANT_MCP.md#server-side-auto-adjust-white-balance-and-detail-measurement))
 runs the same functions on FFmpeg-decoded proxy frames: one reference (`referenceClipId` and/or
-`referenceFrame`, or `referenceMediaId` with `referenceSourceFrame`, or `style`), one frame per
+`referenceFrame`, or `referenceMediaId` with `referenceSourceFrame`, or `referenceImageId`, an image
+of the project listed by `describe_project` under `images`, or `style`), one frame per
 target (`clipId` with `frame`, else the middle frame; each clip's middle frame with `clipIds` or
 `layerId` and `applyAs: shots`), `intensity` towards the match (100 % by default), the
 `likeness` of each frame match, and its `effects` (HDR and Local contrast), `hsl` (the ranges
@@ -262,4 +294,6 @@ later shows more sky or ground, which such curves copy.
   they shape a different picture, as the reference's Contrast does.
 - A style is aimed at as statistics of other scenes: lower Intensity, or register styles per
   kind of scene. PNG stills are not read: the qualified FFmpeg build decodes JPEG only.
+- The assistant matches JPEG images only, for the same reason (the editor reads PNG too), and FFmpeg
+  reads a JPEG without converting an embedded color profile, which the editor's browser applies.
 - Each clip's fit takes about half a second on the editor's main thread.

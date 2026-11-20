@@ -21,6 +21,14 @@ const MIGRATIONS: Readonly<Partial<Record<number, Migration>>> = {
         )
       : document.adjustments,
   }),
+  // Schema 32 adds still images to the project's library: none yet.
+  31: (document) => ({
+    ...document,
+    media:
+      typeof document.media === 'object' && document.media !== null
+        ? { ...document.media, imageIds: [] }
+        : document.media,
+  }),
 };
 
 /**

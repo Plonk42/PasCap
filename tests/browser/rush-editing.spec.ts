@@ -2866,7 +2866,7 @@ test('removing a music recording removes its tracks after confirmation and keeps
   await expect(page.locator('[data-music-lane]')).toHaveCount(0);
   const removed = await current(page);
   expect(removed.music).toEqual([]);
-  expect(removed.media).toEqual({ videoIds: before.media.videoIds, audioIds: [] });
+  expect(removed.media).toEqual({ videoIds: before.media.videoIds, audioIds: [], imageIds: [] });
   expect(removed.clips).toEqual(before.clips);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   const { revision: _restored, ...restored } = await current(page);

@@ -121,13 +121,15 @@ describe('recordings at other constant frame rates', () => {
   it('records the registered rate of each recording in the bin, and forgets removed recordings', () => {
     const project = projectSchema.parse({
       ...createProject('bin', 'Bin'),
-      media: { videoIds: ['sixty', 'drone', 'gone'], audioIds: [] },
+      media: { videoIds: ['sixty', 'drone', 'gone'], audioIds: [], imageIds: [] },
       videoRates: { gone: FILM },
     });
     const registry: Record<string, FrameRate> = { sixty: SIXTY, drone: PROJECT_FPS };
     const recorded = projectSchema.parse(withVideoRates(project, (id) => registry[id]));
     expect(recorded.videoRates).toEqual({ sixty: SIXTY, gone: FILM });
-    expect(removeProjectMedia(recorded, { videoIds: ['sixty'], audioIds: [] }).videoRates).toEqual({ gone: FILM });
+    expect(removeProjectMedia(recorded, { videoIds: ['sixty'], audioIds: [], imageIds: [] }).videoRates).toEqual({
+      gone: FILM,
+    });
   });
 
   it('refuses to save a project whose recording rate differs from the registered one', () => {
@@ -136,11 +138,16 @@ describe('recordings at other constant frame rates', () => {
       get: (id: string) => ({ id, name: 'DJI_0001.MP4', metadata: { frameCount: 120, frameRate: rate } }) as MediaAsset,
     });
     const audio = { get: () => ({}) as AudioAsset };
-    expect(() => assertSourceRanges(project, library(SIXTY), audio)).not.toThrow();
-    expect(() => assertSourceRanges(project, library(PROJECT_FPS), audio)).toThrow(
+    const images = {
+      get: () => {
+        throw new Error('No image is registered.');
+      },
+    };
+    expect(() => assertSourceRanges(project, library(SIXTY), audio, images)).not.toThrow();
+    expect(() => assertSourceRanges(project, library(PROJECT_FPS), audio, images)).toThrow(
       'DJI_0001.MP4 is recorded at 29.97 fps, but the project plays it at 60 fps.',
     );
-    expect(() => assertSourceRanges({ ...project, videoRates: {} }, library(SIXTY), audio)).toThrow(
+    expect(() => assertSourceRanges({ ...project, videoRates: {} }, library(SIXTY), audio, images)).toThrow(
       'recorded at 60 fps, but the project plays it at 29.97 fps',
     );
   });

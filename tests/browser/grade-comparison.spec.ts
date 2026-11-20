@@ -228,7 +228,7 @@ const test = browserTest.extend<{ comparison: ComparisonFixture }>({
     const neutral = neutralProject(layered, 'comparison-neutral', 'Neutral color reference · memory-only');
     const other = singleProject('comparison-other', 'Other grade comparison · memory-only', videos[1]!);
     const playback = createProject('comparison-music', 'Music grade comparison · memory-only');
-    playback.media = { videoIds: [videos[0]!.id], audioIds: [song!.id] };
+    playback.media = { videoIds: [videos[0]!.id], audioIds: [song!.id], imageIds: [] };
     playback.clips = [
       {
         ...createClip('music-comparison-clip', videos[0]!.id, 0, 120, playback.layers[0]!.id),

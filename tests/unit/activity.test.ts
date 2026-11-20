@@ -242,7 +242,7 @@ describe('export snapshot summary', () => {
     });
     expect(summary.keys).toEqual({ points: 0, settings: 0, transform: 0 });
     expect(document.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
-    expect(document.media).toEqual({ videoIds: [], audioIds: [] });
+    expect(document.media).toEqual({ videoIds: [], audioIds: [], imageIds: [] });
     expect(document.layers[0]!.transform.keyframes).toEqual([]);
     expect(document.adjustments).toEqual([]);
   });

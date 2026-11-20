@@ -3,14 +3,34 @@ import { analysisSize, type AnalysisFrame } from '../shared/white-balance.js';
 import { VideoStreams } from './video-streams.js';
 
 /** The decoded frame as the compositor uploads it, downscaled, in encoded RGBA bytes. */
-function readPixels(frame: VideoFrame): AnalysisFrame {
-  const { width, height } = analysisSize(frame.displayWidth, frame.displayHeight);
+function readPixels(source: CanvasImageSource, sourceWidth: number, sourceHeight: number): AnalysisFrame {
+  const { width, height } = analysisSize(sourceWidth, sourceHeight);
   const context = new OffscreenCanvas(width, height).getContext('2d', { colorSpace: 'srgb', willReadFrequently: true });
   if (!context) throw new Error('This browser cannot read decoded frames back for analysis.');
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
-  context.drawImage(frame, 0, 0, width, height);
+  context.drawImage(source, 0, 0, width, height);
   return { width, height, data: context.getImageData(0, 0, width, height, { colorSpace: 'srgb' }).data };
+}
+
+/** A still image (JPEG or PNG) at the analysis size, decoded by the browser like a proxy frame. */
+export async function sampleImage(url: string, signal: AbortSignal): Promise<AnalysisFrame> {
+  const response = await fetch(url, { signal });
+  if (!response.ok) {
+    const body: unknown = await response.json().catch(() => null);
+    const reason =
+      typeof body === 'object' && body !== null && 'error' in body && typeof body.error === 'string'
+        ? body.error
+        : `HTTP ${response.status}`;
+    throw new Error(reason);
+  }
+  const bitmap = await createImageBitmap(await response.blob());
+  try {
+    signal.throwIfAborted();
+    return readPixels(bitmap, bitmap.width, bitmap.height);
+  } finally {
+    bitmap.close();
+  }
 }
 
 /**
@@ -36,7 +56,7 @@ export async function sampleProxyFrames(
       const decoded = streams.take(0, frame);
       if (!decoded) throw new Error(`Source frame ${frame} was not decoded.`);
       try {
-        sampled.set(frame, readPixels(decoded));
+        sampled.set(frame, readPixels(decoded, decoded.displayWidth, decoded.displayHeight));
       } finally {
         decoded.close();
       }

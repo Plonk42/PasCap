@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { EditCommand } from '../shared/commands.js';
+import type { ImageAsset } from '../shared/images.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument } from '../shared/model.js';
 import type { TimelineLayout } from '../shared/timeline.js';
@@ -43,6 +44,8 @@ interface Props {
   project: ProjectDocument;
   layout: TimelineLayout;
   assets: readonly MediaAsset[];
+  /** The registered images of the project's library. */
+  images: readonly ImageAsset[];
   playhead: number;
   /** The selected clips: each takes the match, at the playhead or at its middle frame. */
   clipIds: readonly string[];
@@ -61,7 +64,7 @@ export function ColorMatchSection(props: Readonly<Props>) {
         <HelpPopover label="Match" guide="match-colors-to-a-reference">
           <p>
             Grades the selected clips so they look like a reference: a timeline frame as its grade shows it, a recording
-            frame as shot (from Source preview), or one of your registered styles.
+            frame as shot (from Source preview), an image of the Media library, or one of your registered styles.
           </p>
           <p>
             Each clip is matched at the frame under the playhead, or at its middle frame. Frames of the same scene are
@@ -81,7 +84,7 @@ type Phase =
   | { kind: 'failed'; key: string; message: string }
   | { kind: 'ready'; key: string; results: MatchResults };
 
-function ColorMatch({ project, layout, assets, playhead, clipIds, disabled, onEdit }: Readonly<Props>) {
+function ColorMatch({ project, layout, assets, images, playhead, clipIds, disabled, onEdit }: Readonly<Props>) {
   const id = useId();
   const reference = useColorReference(project.id);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -89,7 +92,7 @@ function ColorMatch({ project, layout, assets, playhead, clipIds, disabled, onEd
   const styles = useStyles(menuOpen || reference?.kind === 'style');
   const [managing, setManaging] = useState(false);
   const [announcement, setAnnouncement] = useState('');
-  const context: MatchContext = { project, layout, assets, playhead, clipIds };
+  const context: MatchContext = { project, layout, assets, playhead, clipIds, images };
   const resolved = resolveReference(reference, context, styles);
   const parts = matchParts(context, resolved.value);
   const analysis = useMatchAnalysis(project.id, resolved.value, parts.value, setAnnouncement);
@@ -453,7 +456,7 @@ function ReferenceCard({
         </button>
         <Popover
           label="Styles and other references"
-          title="Match to one of your registered styles, or clear the reference"
+          title="Match to an image of the Media library or one of your registered styles, or clear the reference"
           className="color-match-more"
           onOpenChange={onMenu}
           trigger={
@@ -468,6 +471,14 @@ function ReferenceCard({
               <p className="color-match-hint">
                 A recording frame: open the recording in Source preview, then choose <b>Use as reference</b>.
               </p>
+              <ImageChoices
+                images={context.images.filter((image) => context.project.media.imageIds.includes(image.id))}
+                reference={reference}
+                onChoose={(next) => {
+                  choose(next);
+                  close();
+                }}
+              />
               <fieldset>
                 <legend>Styles</legend>
                 {styles.length === 0 && <p className="color-match-hint">No style registered yet.</p>}
@@ -514,6 +525,39 @@ function ReferenceCard({
           )}
         </Popover>
       </div>
+    </fieldset>
+  );
+}
+
+/** The project's images in the reference menu, or how to add some. */
+function ImageChoices({
+  images,
+  reference,
+  onChoose,
+}: Readonly<{
+  images: readonly ImageAsset[];
+  reference: ColorReference | null;
+  onChoose: (reference: ColorReference) => void;
+}>) {
+  return (
+    <fieldset>
+      <legend>Images</legend>
+      {images.length === 0 && <p className="color-match-hint">Import JPEG or PNG images in Media to match to them.</p>}
+      {images.map((image) => (
+        <button
+          key={image.id}
+          type="button"
+          className="text-button"
+          aria-pressed={reference?.kind === 'image' && reference.imageId === image.id}
+          title={`Match to ${image.name}, as shot`}
+          onClick={() => onChoose({ kind: 'image', imageId: image.id })}
+        >
+          {image.name}
+          <small>
+            {image.width} × {image.height}
+          </small>
+        </button>
+      ))}
     </fieldset>
   );
 }

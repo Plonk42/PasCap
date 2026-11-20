@@ -16,6 +16,11 @@ export function isStillFilename(filename: string): boolean {
   return /\.jpe?g$/i.test(filename);
 }
 
+/** Images the Media library imports, for Color → Match references. */
+export function isImageFilename(filename: string): boolean {
+  return /\.(jpe?g|png)$/i.test(filename);
+}
+
 const pathSchema = z
   .string()
   .min(1)
@@ -39,7 +44,7 @@ const footageEntrySchema = z.discriminatedUnion('kind', [
     .object({
       name: z.string().min(1),
       path: pathSchema,
-      kind: z.literal('video'),
+      kind: z.enum(['video', 'image']),
       size: z.number().int().nonnegative(),
     })
     .strict(),

@@ -257,7 +257,7 @@ export const selectsDoneSchema = z
   .refine((ids) => new Set(ids).size === ids.length, { message: 'Recordings marked done must be unique.' });
 
 /** The only accepted project schema; bump it for every incompatible change. */
-export const PROJECT_SCHEMA_VERSION = 31;
+export const PROJECT_SCHEMA_VERSION = 32;
 
 /**
  * Frame rate of each recording in the bin that is not recorded at the project rate; no entry means
@@ -285,6 +285,11 @@ const baseProjectSchema = z
           .array(idSchema)
           .max(10_000)
           .refine((ids) => new Set(ids).size === ids.length, { message: 'Audio library IDs must be unique.' }),
+        /** Still images, which Color → Match can take as references; they never render or export. */
+        imageIds: z
+          .array(idSchema)
+          .max(1_000)
+          .refine((ids) => new Set(ids).size === ids.length, { message: 'Image library IDs must be unique.' }),
       })
       .strict(),
     frameRate: rateSchema,
@@ -358,7 +363,7 @@ export function createProject(id: string, title: string): ProjectDocument {
     schemaVersion: PROJECT_SCHEMA_VERSION,
     id,
     title,
-    media: { videoIds: [], audioIds: [] },
+    media: { videoIds: [], audioIds: [], imageIds: [] },
     frameRate: { ...PROJECT_FPS },
     videoRates: {},
     colorProfile: 'bt709-sdr',

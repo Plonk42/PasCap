@@ -24,7 +24,7 @@ function project(ripple = true): ProjectDocument {
   const layer = { ...base.layers[0]!, ripple };
   return projectSchema.parse({
     ...base,
-    media: { videoIds: ['rec'], audioIds: [] },
+    media: { videoIds: ['rec'], audioIds: [], imageIds: [] },
     clips: ['a', 'b', 'c'].map((id, index) => ({ ...createClip(id, 'rec', 0, 60), start: index * 60 })),
     layers: [
       {

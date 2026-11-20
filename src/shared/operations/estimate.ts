@@ -37,7 +37,7 @@ const matchedEffectsSchema = z.object({ hdr: z.number().optional(), localContras
 export const estimate = defineOperation({
   name: 'estimate',
   title: 'Estimate corrections',
-  description: `Measure footage the way the editor's automatic tools do, from proxy frames, and return the values with the edit commands that apply them (pass them to edit; nothing changes until then). kind auto-adjust is Color → Auto: eleven Color settings balancing exposure, contrast, white balance and color. match is Color → Match: it sets the same eleven settings so a frame of the clip looks like a reference frame, a hero clip's as its grade shows it (referenceClipId and/or referenceFrame) or a recording's as shot (referenceMediaId, referenceSourceFrame), or like a registered style (style, from list_styles); the reference never changes. Frames of one scene are matched picture to picture; across scenes the clip takes the reference's light and look (likeness says which). white-balance is Auto white balance: Temperature and Tint. detail measures noise and softness and suggests the clip's Denoise and Sharpen (never Clarity, a look). Analyze a clip (clipId: the whole clip, or with frame the second around that project frame, as at the playhead; a match reads that frame, else the clip's middle frame), several clips each on its own (clipIds, up to ${MAX_ESTIMATE_CLIPS}), a whole track (layerId: each clip on its own for detail or applyAs shots; all its clips by duration for one compromise, values only with commands false) or a recording range (mediaId, sourceIn, sourceOut: values only, no commands). Commands write clip grades, applied before any adjustment; for a grade per shot use applyAs shots. Estimates and pictures render one at a time: a call waits its turn, up to a few minutes. Judge the result with a still.`,
+  description: `Measure footage the way the editor's automatic tools do, from proxy frames, and return the values with the edit commands that apply them (pass them to edit; nothing changes until then). kind auto-adjust is Color → Auto: eleven Color settings balancing exposure, contrast, white balance and color. match is Color → Match: it sets the same eleven settings so a frame of the clip looks like a reference frame, a hero clip's as its grade shows it (referenceClipId and/or referenceFrame) or a recording's as shot (referenceMediaId, referenceSourceFrame), or a still image of the project as shot (referenceImageId, JPEG only), or like a registered style (style, from list_styles); the reference never changes. Frames of one scene are matched picture to picture; across scenes the clip takes the reference's light and look (likeness says which). white-balance is Auto white balance: Temperature and Tint. detail measures noise and softness and suggests the clip's Denoise and Sharpen (never Clarity, a look). Analyze a clip (clipId: the whole clip, or with frame the second around that project frame, as at the playhead; a match reads that frame, else the clip's middle frame), several clips each on its own (clipIds, up to ${MAX_ESTIMATE_CLIPS}), a whole track (layerId: each clip on its own for detail or applyAs shots; all its clips by duration for one compromise, values only with commands false) or a recording range (mediaId, sourceIn, sourceOut: values only, no commands). Commands write clip grades, applied before any adjustment; for a grade per shot use applyAs shots. Estimates and pictures render one at a time: a call waits its turn, up to a few minutes. Judge the result with a still.`,
   input: z
     .object({
       projectId: described(idSchema, 'ID of the saved project.'),
@@ -71,6 +71,10 @@ export const estimate = defineOperation({
         'match: a prepared video recording of the project as reference instead, its frame referenceSourceFrame as shot.',
       ),
       referenceSourceFrame: described(frameSchema.optional(), 'match: the source frame of referenceMediaId.'),
+      referenceImageId: described(
+        idSchema.optional(),
+        "match: a still image of the project (describe_project images) as reference instead, as shot. The service reads JPEG images only; the editor's Match also reads PNG.",
+      ),
       style: described(
         idSchema.optional(),
         "match: aim at this registered style (list_styles), the user's own finished look, instead of a frame: Auto's balance moved towards the style, within Auto's bounds.",
@@ -107,6 +111,10 @@ export const estimate = defineOperation({
           .strict()
           .optional(),
         'match: the reference frame, of the hero clip or of a recording.',
+      ),
+      image: described(
+        z.object({ id: idSchema, name: z.string() }).strict().optional(),
+        'match with referenceImageId: the image matched to.',
       ),
       style: described(
         z.object({ id: idSchema, name: z.string() }).strict().optional(),

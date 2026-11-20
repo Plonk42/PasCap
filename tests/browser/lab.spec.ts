@@ -45,6 +45,7 @@ test.beforeEach(async ({ page, request }) => {
   project.media = {
     videoIds: videos.map((asset) => asset.id),
     audioIds: audio.assets.map((asset) => asset.id),
+    imageIds: [],
   };
   for (const [index, name] of ['pattern-a.mp4', 'pattern-b.mp4'].entries()) {
     const asset = registered.assets.find((item) => item.name === name)!;
@@ -398,7 +399,7 @@ test('creates, renames and reopens distinct projects without losing unsaved edit
   await page.getByRole('button', { name: 'Create project', exact: true }).click();
   await expect(page.getByRole('textbox', { name: 'Project title', exact: true })).toHaveValue('Second flight');
   const second = projectSchema.parse(await page.evaluate(() => window.pascapLab!.project()));
-  expect(second.media).toEqual({ videoIds: [], audioIds: [] });
+  expect(second.media).toEqual({ videoIds: [], audioIds: [], imageIds: [] });
   // Deliberately seed this editing fixture's bin; a new project does not inherit global media.
   const registered = (await (await request.get('/api/media')).json()) as { assets: { id: string; name: string }[] };
   second.media.videoIds = [registered.assets.find((asset) => asset.name === 'pattern-a.mp4')!.id];

@@ -137,7 +137,7 @@ describe('estimate operation', () => {
   const base = createProject('estimate', 'Estimate');
   const project: ProjectDocument = projectSchema.parse({
     ...base,
-    media: { videoIds: ['rec-1', 'rec-2'], audioIds: [] },
+    media: { videoIds: ['rec-1', 'rec-2'], audioIds: [], imageIds: [] },
     clips: [createClip('a', 'rec-1', 0, 300), { ...createClip('b', 'rec-2', 100, 200), start: 300 }],
     layers: [{ ...base.layers[0]!, transitions: [{ leftId: 'a', rightId: 'b', type: 'cut', duration: 0 }] }],
   });
@@ -405,6 +405,53 @@ describe('estimate operation', () => {
       { frame: patches(5), color: shotColor },
     )!;
     expect(shot.correction).toEqual(towardsMatch(shotColor, asShot.correction, 1));
+  });
+
+  it('matches a clip frame to a still image of the project as shot', async () => {
+    const withImage = projectSchema.parse({ ...project, media: { ...project.media, imageIds: ['look'] } });
+    const imageReads: string[] = [];
+    const imaged = {
+      ...context,
+      projects: { load: async () => withImage },
+      imageLibrary: {
+        get: (id: string) => ({ id, name: `${id}.jpg` }),
+        analysisFrame: async (id: string) => {
+          imageReads.push(id);
+          return patches(10);
+        },
+      },
+    } as unknown as Context;
+    reads.length = 0;
+    const result = await runners.estimate(imaged, {
+      ...matchInput,
+      kind: 'match',
+      clipId: 'b',
+      referenceImageId: 'look',
+    });
+    expect(imageReads).toEqual(['look']);
+    expect(reads).toEqual([{ mediaId: 'rec-2', frames: [150] }]);
+    const shotColor = project.clips[1]!.grade.color;
+    const matched = matchFrame(
+      { frame: patches(10), color: createColorSettings() },
+      { frame: patches(5), color: shotColor },
+    )!;
+    expect(result).toMatchObject({
+      image: { id: 'look', name: 'look.jpg' },
+      correction: towardsMatch(shotColor, matched.correction, 1),
+    });
+    expect(result.reference).toBeUndefined();
+    await expect(
+      runners.estimate(imaged, { ...matchInput, kind: 'match', clipId: 'b', referenceImageId: 'other' }),
+    ).rejects.toMatchObject({ statusCode: 404 });
+    await expect(
+      runners.estimate(imaged, {
+        ...matchInput,
+        kind: 'match',
+        clipId: 'b',
+        referenceImageId: 'look',
+        referenceClipId: 'a',
+      }),
+    ).rejects.toMatchObject({ statusCode: 422 });
   });
 
   it('gives a clip without curves, HSL or HDR the hero’s, in values and shots but never in a keyframe', async () => {

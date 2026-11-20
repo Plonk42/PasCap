@@ -52,21 +52,21 @@ export const runCheckpoint: OperationRunner<typeof checkpoint> = async ({ sessio
   sessions.checkpoint(projectId, label);
 
 export const runCheckpointRestore: OperationRunner<typeof checkpointRestore> = async (
-  { caller, sessions, library, audio },
+  { caller, sessions, library, audio, imageLibrary },
   { projectId, checkpointId, expectedRevision },
 ) => {
   const restored = await sessions.restore(projectId, checkpointId, expectedRevision, writerOf(caller), (document) =>
-    assertProjectSources(document, library, audio),
+    assertProjectSources(document, library, audio, imageLibrary),
   );
   return { revision: restored.revision, duration: durationOf(calculateLayout(restored).duration) };
 };
 
 export const runCheckpointCopy: OperationRunner<typeof checkpointCopy> = async (
-  { sessions, library, audio },
+  { sessions, library, audio, imageLibrary },
   { projectId, checkpointId, title },
 ) => {
   const copy = await sessions.copy(projectId, checkpointId, title, (document) =>
-    assertProjectSources(document, library, audio),
+    assertProjectSources(document, library, audio, imageLibrary),
   );
   return { projectId: copy.id, title: copy.title };
 };

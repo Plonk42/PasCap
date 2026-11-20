@@ -3,6 +3,7 @@ import { applyCommand, type EditCommand } from '../shared/commands.js';
 import { COLOR_CONTROLS, NEUTRAL_COLOR, type ScalarColorSetting } from '../shared/color.js';
 import { gradeColorAt, type Adjustment } from '../shared/grade.js';
 import { activeLayerSetting, hasLayerKeys, isKeyframeFrame } from '../shared/keyframes.js';
+import type { ImageAsset } from '../shared/images.js';
 import type { MediaAsset } from '../shared/media.js';
 import type { ProjectDocument, Transition, VideoClip, VideoLayer } from '../shared/model.js';
 import { calculateLayout, transitionOffset, type PlacedClip, type TimelineLayout } from '../shared/timeline.js';
@@ -61,6 +62,8 @@ export type { InspectorMode } from './InspectorSection.js';
 interface Props {
   project: ProjectDocument;
   assets: MediaAsset[];
+  /** The registered images of the project's library, which Color → Match can take as references. */
+  images?: readonly ImageAsset[];
   selectedClipId: string | null;
   /** Clips selected together (Ctrl/Cmd-click), empty with one; Detail and Color → Match edit them all, a grade only one alone. */
   selectedClipIds?: readonly string[];
@@ -85,6 +88,7 @@ interface Props {
 
 const NO_ADJUSTMENTS: readonly string[] = [];
 const NO_CLIPS: readonly string[] = [];
+const NO_IMAGES: readonly ImageAsset[] = [];
 
 const INSPECTOR_MODES: readonly { id: InspectorMode; label: string }[] = [
   { id: 'clip', label: 'Clip' },
@@ -802,6 +806,7 @@ function SourceRangeSection({
 interface ColorTabProps {
   project: ProjectDocument;
   assets: MediaAsset[];
+  images: readonly ImageAsset[];
   /** The selected clip, when it is placed. */
   clip: VideoClip | undefined;
   placed: PlacedClip | undefined;
@@ -932,6 +937,7 @@ function ColorTab(props: Readonly<ColorTabProps>) {
       project={project}
       layout={props.layout}
       assets={props.assets}
+      images={props.images}
       playhead={props.frame}
       clipIds={matched}
       disabled={drafting}
@@ -1021,6 +1027,7 @@ export const Inspector = memo(InspectorPanel);
 function InspectorPanel({
   project,
   assets,
+  images = NO_IMAGES,
   selectedClipId,
   selectedClipIds = NO_CLIPS,
   selectedAdjustmentIds = NO_ADJUSTMENTS,
@@ -1241,6 +1248,7 @@ function InspectorPanel({
           <ColorTab
             project={project}
             assets={assets}
+            images={images}
             clip={clip && placed ? clip : undefined}
             placed={placed}
             asset={asset}

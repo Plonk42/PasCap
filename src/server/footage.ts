@@ -3,6 +3,7 @@ import { access, lstat, opendir } from 'node:fs/promises';
 import path from 'node:path';
 import {
   isAudioFilename,
+  isImageFilename,
   isStillFilename,
   isVideoFilename,
   MAX_FOOTAGE_ENTRIES,
@@ -17,7 +18,7 @@ import type { ServiceConfig } from './config.js';
 import { errorMessage, isNotFound, ServiceError } from './errors.js';
 import { assertNoSymlinks } from './files.js';
 
-/** What a listing shows: recordings, music, or a style's references (videos and stills). */
+/** What a listing shows: recordings and images, music, or a style's references (videos and stills). */
 type MediaKind = 'video' | 'audio' | 'reference';
 type BrowserEntry =
   FootageDirectory['entries'][number] | AudioDirectory['entries'][number] | ReferenceDirectory['entries'][number];
@@ -43,7 +44,7 @@ function directoryError(error: unknown): unknown {
 }
 
 function compareEntries(a: BrowserEntry, b: BrowserEntry): number {
-  if (a.kind !== b.kind) return a.kind === 'directory' ? -1 : 1;
+  if ((a.kind === 'directory') !== (b.kind === 'directory')) return a.kind === 'directory' ? -1 : 1;
   return naturalNames.compare(a.name, b.name) || a.name.localeCompare(b.name);
 }
 
@@ -59,8 +60,11 @@ function entryKind(
     if (isVideoFilename(name)) return 'video';
     return isStillFilename(name) ? 'still' : null;
   }
-  const supported = mediaKind === 'audio' ? isAudioFilename(name) : isVideoFilename(name);
-  return supported ? mediaKind : null;
+  if (mediaKind === 'video') {
+    if (isVideoFilename(name)) return 'video';
+    return isImageFilename(name) ? 'image' : null;
+  }
+  return isAudioFilename(name) ? 'audio' : null;
 }
 
 function addWarning(warnings: string[], message: string): void {
@@ -208,6 +212,14 @@ export class FootageBrowser {
     const name = path.basename(selected);
     if (!isVideoFilename(name) && !isStillFilename(name))
       throw new ServiceError('Select references ending in .mp4, .mov, .m4v, .jpg or .jpeg.', 400);
+    return selected;
+  }
+
+  /** A root-scoped image; registration checks existence, symlinks and its header. */
+  validateImagePath(filename: string): string {
+    const selected = this.#scopedPath(filename);
+    if (!isImageFilename(path.basename(selected)))
+      throw new ServiceError('Select images ending in .jpg, .jpeg or .png.', 400);
     return selected;
   }
 

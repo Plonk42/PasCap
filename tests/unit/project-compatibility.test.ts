@@ -23,6 +23,11 @@ function turnedOn(saved: ProjectDocument): ProjectDocument['adjustments'] {
   return saved.adjustments.map((item) => ({ ...item, enabled: true }));
 }
 
+/** A saved project's library as an upgrade gives it: no images. */
+function withoutImages(saved: ProjectDocument): ProjectDocument['media'] {
+  return { ...saved.media, imageIds: [] };
+}
+
 afterEach(async () => {
   await Promise.all(temporary.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
 });
@@ -67,6 +72,7 @@ describe('project compatibility', () => {
     expect(loaded).toEqual({
       ...saved,
       schemaVersion: PROJECT_SCHEMA_VERSION,
+      media: withoutImages(saved),
       selectsDone: [],
       videoRates: {},
       adjustments: turnedOn(saved),
@@ -87,6 +93,7 @@ describe('project compatibility', () => {
     expect(projectSchema.parse(upgradeProject(marked))).toEqual({
       ...marked,
       schemaVersion: PROJECT_SCHEMA_VERSION,
+      media: withoutImages(marked),
       videoRates: {},
       adjustments: turnedOn(marked),
     });
@@ -102,6 +109,7 @@ describe('project compatibility', () => {
     expect(projectSchema.parse(upgradeProject(saved))).toEqual({
       ...saved,
       schemaVersion: PROJECT_SCHEMA_VERSION,
+      media: withoutImages(saved),
       adjustments: turnedOn(saved),
     });
     const duration = (project: ProjectDocument) =>
@@ -117,11 +125,21 @@ describe('project compatibility', () => {
     expect(upgraded.adjustments.every((item) => item.enabled)).toBe(true);
     const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-31.json'), 'utf8')) as ProjectDocument;
     const loaded = projectSchema.parse(upgradeProject(saved));
-    expect(loaded).toEqual(saved);
+    expect(loaded).toEqual({ ...saved, schemaVersion: PROJECT_SCHEMA_VERSION, media: withoutImages(saved) });
     const off = loaded.adjustments.find((item) => !item.enabled)!;
     expect(off).toEqual({ ...upgraded.adjustments.find((item) => item.id === off.id)!, enabled: false });
     expect(adjustmentColor(upgraded, off.start)).not.toEqual(createColorSettings());
     expect(adjustmentColor(loaded, off.start)).toEqual(createColorSettings());
+  });
+
+  it('opens schema-31 projects without images, and keeps the images of schema-32 projects', async () => {
+    const older = JSON.parse(await readFile(path.join(FIXTURES, 'schema-31.json'), 'utf8')) as Record<string, unknown>;
+    const before = structuredClone(older);
+    expect(projectSchema.parse(upgradeProject(older)).media.imageIds).toEqual([]);
+    expect(older).toEqual(before);
+    const saved = JSON.parse(await readFile(path.join(FIXTURES, 'schema-32.json'), 'utf8')) as ProjectDocument;
+    expect(saved.media.imageIds.length).toBeGreaterThan(0);
+    expect(projectSchema.parse(upgradeProject(saved))).toEqual(saved);
   });
 
   it('rejects projects saved with track Color or British field names, with the reason, and leaves their files unchanged', async () => {

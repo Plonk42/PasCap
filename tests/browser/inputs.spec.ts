@@ -26,6 +26,7 @@ test.beforeEach(async ({ page, request }) => {
   document.media = {
     videoIds: library.assets.map((asset) => asset.id),
     audioIds: audio.assets.map((asset) => asset.id),
+    imageIds: [],
   };
   for (const [index, name] of ['pattern-a.mp4', 'pattern-b.mp4'].entries()) {
     const asset = library.assets.find((item) => item.name === name && item.status === 'ready');

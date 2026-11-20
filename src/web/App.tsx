@@ -23,6 +23,7 @@ import {
   type MediaSelections,
 } from '../shared/media-selection.js';
 import type { MediaAsset, MediaJob } from '../shared/media.js';
+import type { ImageAsset, ImageRegistration } from '../shared/images.js';
 import {
   createClip,
   createLayer,
@@ -79,7 +80,8 @@ import {
 import { previewCommands, registerLivePreview } from './live-preview.js';
 import { MediaLibrary, type ReviewTarget } from './MediaLibrary.js';
 import { nextLayerName } from './move-to-track.js';
-import type { ImportActions, ImportKind, ImportResult, RelinkTarget } from './ImportDialog.js';
+import type { ImageImportResult, ImportActions, ImportKind, ImportResult, RelinkTarget } from './ImportDialog.js';
+import { useProjectImages } from './images.js';
 import { MusicControls, MusicPlayheadContext, type MusicBoundaryRequest } from './MusicControls.js';
 import { addMusicRangeEdit, musicAddTarget, nextMusicSelection } from './music-ui.js';
 import { Popover } from './Popover.js';
@@ -124,6 +126,7 @@ const SaveRecovery = lazy(() => import('./SaveRecovery.js').then((module) => ({ 
 const ShortcutHelp = lazy(() => import('./ShortcutHelp.js').then((module) => ({ default: module.ShortcutHelp })));
 const SourceReview = lazy(() => import('./SourceReview.js').then((module) => ({ default: module.SourceReview })));
 const MusicReview = lazy(() => import('./MusicReview.js').then((module) => ({ default: module.MusicReview })));
+const ImageReview = lazy(() => import('./ImageReview.js').then((module) => ({ default: module.ImageReview })));
 const ImportDialog = lazy(() => import('./ImportDialog.js').then((module) => ({ default: module.ImportDialog })));
 const HandOffDialog = lazy(() => import('./HandOff.js').then((module) => ({ default: module.HandOffDialog })));
 const CheckpointsDialog = lazy(() =>
@@ -280,6 +283,23 @@ function splitAdjustmentAt(
   }
 }
 
+const FAILED_IMAGE_IMPORT: ImageImportResult = { ok: false, added: 0, rejected: [], rejectedPaths: [] };
+
+function imageImportResult({ images, errors }: ImageRegistration): ImageImportResult {
+  return {
+    ok: true,
+    added: images.length,
+    rejected: errors.map((issue) => `${issue.path.split('/').at(-1)}: ${issue.message}`),
+    rejectedPaths: errors.map((issue) => issue.path),
+  };
+}
+
+/** The project with these registered images in its library. */
+function withImages(project: ProjectDocument, images: readonly ImageAsset[]): ProjectDocument {
+  const imageIds = [...new Set([...project.media.imageIds, ...images.map((image) => image.id)])];
+  return { ...project, media: { ...project.media, imageIds } };
+}
+
 function handOffBlocked(save: SaveState, drafting: boolean): string | null {
   if (save.state === 'error') return 'Resolve the save error first: the assistant edits the saved project.';
   return drafting ? 'Finish the current gesture first.' : null;
@@ -294,6 +314,7 @@ export function App() {
   const [assets, setAssets] = useState<MediaAsset[]>([]);
   const [jobs, setJobs] = useState<MediaJob[]>([]);
   const [audioAssets, setAudioAssets] = useState<AudioAsset[]>([]);
+  const projectImages = useProjectImages(project?.media.imageIds);
   const [missingOriginals, setMissingOriginals] = useState<ReadonlySet<string>>(new Set());
   const [relinking, setRelinking] = useState<{ target: RelinkTarget | null } | null>(null);
   const [projectList, setProjectList] = useState<ProjectSummary[]>([]);
@@ -336,8 +357,10 @@ export function App() {
   const [review, reviews] = useReviewTarget(sourcePlayback);
   // A music recording shown in Source preview instead of a video one, and its session-only ranges.
   const [musicReview, setMusicReview] = useState<string | null>(null);
-  const musicReviewOpen = useRef(false);
-  musicReviewOpen.current = musicReview !== null;
+  // An image shown in Source preview instead of a recording.
+  const [imageReview, setImageReview] = useState<string | null>(null);
+  const stillReviewOpen = useRef(false);
+  stillReviewOpen.current = musicReview !== null || imageReview !== null;
   const musicPlayback = useRef<MusicReviewPlayback | null>(null);
   const [musicRanges, setMusicRanges] = useState<MediaSelections>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -561,6 +584,7 @@ export function App() {
               [...projectAudioIds(next), ...(previous ? projectAudioIds(previous) : [])],
               removed?.audioIds,
             ),
+            imageIds: bin([...next.media.imageIds, ...(previous?.media.imageIds ?? [])], removed?.imageIds),
           },
         },
         (id) => latestAssets.current.find((asset) => asset.id === id)?.metadata.frameRate,
@@ -959,6 +983,7 @@ export function App() {
       setActiveSelects({});
       reviews.close();
       setMusicReview(null);
+      setImageReview(null);
       setMusicRanges({});
       setViewerMode('timeline');
       const first = calculateLayout(loaded).clips[0];
@@ -1030,6 +1055,7 @@ export function App() {
     setDraggedMediaIds(null);
     reviews.close();
     setMusicReview(null);
+    setImageReview(null);
     setMusicRanges({});
     setViewerMode('timeline');
     setSaveState({ state: 'saved', message: NO_PROJECT_LABEL, revision: 0, recovery: null });
@@ -1695,9 +1721,21 @@ export function App() {
     });
     return result.ok && result.value;
   };
+  const importImages = async (operation: () => Promise<ImageRegistration>): Promise<ImageImportResult> => {
+    if (!current.current) {
+      setActionError('Create or open a project before importing images.');
+      return FAILED_IMAGE_IMPORT;
+    }
+    const result = await act(operation);
+    if (!result.ok) return FAILED_IMAGE_IMPORT;
+    projectImages.add(result.value.images);
+    if (result.value.images.length && current.current) commit(withImages(current.current, result.value.images));
+    return imageImportResult(result.value);
+  };
   const importActions: ImportActions = {
     registerVideos: (paths) => importOriginals(() => api.registerPaths(paths)),
     registerMusic: (path) => importMusic(() => api.importSelectedAudio(path)),
+    registerImages: (paths) => importImages(() => api.registerImagePaths(paths)),
     importFolder: (directory) => importOriginals(() => api.importFolder(directory)),
     importVideoPath: (path) =>
       importOriginals(async () => {
@@ -1713,6 +1751,7 @@ export function App() {
         };
       }),
     importMusicPath: (path) => importMusic(() => api.importAudio(path)),
+    importImagePath: (path) => importImages(() => api.registerImage(path)),
   };
   const openMedia = (): void => {
     workspace.update({ mediaOpen: true, ...(workspace.viewport.width < 980 ? { inspectorOpen: false } : {}) });
@@ -1757,20 +1796,29 @@ export function App() {
       .catch((cause: unknown) => setError(message(cause, 'Preview could not be retried.')));
   };
   const reviewSource = (next: ReviewTarget, choose: boolean): void => {
-    // Hovering a video recording never interrupts the music shown in Source preview.
-    if (!choose && musicReviewOpen.current) return;
+    // Hovering a video recording never interrupts the music or image shown in Source preview.
+    if (!choose && stillReviewOpen.current) return;
     setMusicReview(null);
+    setImageReview(null);
     reviews.source(next, choose);
     if (viewer.current !== 'source') setViewerMode('source');
   };
   const reviewMusic = (id: string): void => {
     reviews.close();
+    setImageReview(null);
     setMusicReview(id);
+    setViewerMode('source');
+  };
+  const reviewImage = (id: string): void => {
+    reviews.close();
+    setMusicReview(null);
+    setImageReview(id);
     setViewerMode('source');
   };
   const closeReview = (): void => {
     reviews.close();
     setMusicReview(null);
+    setImageReview(null);
     setViewerMode('timeline');
     timelineTab.current?.focus({ preventScroll: true });
   };
@@ -1788,6 +1836,10 @@ export function App() {
     if (reviews.remove(removal.videoIds)) setViewerMode('timeline');
     if (musicReview !== null && removal.audioIds.includes(musicReview)) {
       setMusicReview(null);
+      setViewerMode('timeline');
+    }
+    if (imageReview !== null && removal.imageIds.includes(imageReview)) {
+      setImageReview(null);
       setViewerMode('timeline');
     }
     return true;
@@ -1899,7 +1951,11 @@ export function App() {
       layerName: visible.layers.find((layer) => layer.id === clip.layerId)!.name,
     }));
   const navigateViewerTabs = (event: ReactKeyboardEvent<HTMLButtonElement>): void => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || (!reviewAsset && !musicReview)) return;
+    if (
+      !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) ||
+      (!reviewAsset && !musicReview && !imageReview)
+    )
+      return;
     event.preventDefault();
     event.stopPropagation();
     const mode = event.key === 'Home' || (event.key !== 'End' && viewerMode === 'source') ? 'timeline' : 'source';
@@ -1914,6 +1970,7 @@ export function App() {
     return audioAssets.filter((asset) => ids.has(asset.id));
   }, [audioAssets, project]);
   const musicAsset = projectAudio.find((asset) => asset.id === musicReview);
+  const imageAsset = musicAsset ? undefined : projectImages.images.find((image) => image.id === imageReview);
   const addMusicRange = (range: MediaSelection): boolean => {
     const document = current.current;
     if (!document || drafting.current) return false;
@@ -2221,8 +2278,11 @@ export function App() {
               onPrepareMusic={prepareAudio}
               missing={missingOriginals}
               onRelink={requestRelink}
-              onRemove={(videoIds) => removeMedia({ videoIds, audioIds: [] })}
-              onRemoveMusic={(audioIds) => removeMedia({ videoIds: [], audioIds })}
+              onRemove={(videoIds) => removeMedia({ videoIds, audioIds: [], imageIds: [] })}
+              onRemoveMusic={(audioIds) => removeMedia({ videoIds: [], audioIds, imageIds: [] })}
+              images={projectImages.images}
+              missingImages={projectImages.missing}
+              onRemoveImages={(imageIds) => removeMedia({ videoIds: [], audioIds: [], imageIds })}
               onKeepBestRanges={keepBestRanges}
               onSelectionDone={(mediaId, done) => edit({ type: 'select-done', mediaId, done }, true)}
               onImport={() => requestImport()}
@@ -2233,6 +2293,8 @@ export function App() {
               onReviewHoverEnd={reviews.endHover}
               musicReview={musicReview}
               onReviewMusic={reviewMusic}
+              imageReview={imageReview}
+              onReviewImage={reviewImage}
               targetLayer={targetLayer}
               onCollapse={togglePanel}
               collapseDisabled={draft !== null}
@@ -2273,7 +2335,7 @@ export function App() {
                 tabIndex={viewerMode === 'source' ? 0 : -1}
                 aria-selected={viewerMode === 'source'}
                 aria-controls="source-view"
-                disabled={!reviewAsset && !musicAsset}
+                disabled={!reviewAsset && !musicAsset && !imageAsset}
                 onKeyDown={navigateViewerTabs}
                 onClick={() => setViewerMode('source')}
               >
@@ -2348,7 +2410,16 @@ export function App() {
                     onClose={closeReview}
                   />
                 )}
-                {!musicAsset && reviewAsset && review && (
+                {imageAsset && (
+                  <ImageReview
+                    key={imageAsset.id}
+                    image={imageAsset}
+                    missing={projectImages.missing.has(imageAsset.id)}
+                    projectId={project?.id ?? null}
+                    onClose={closeReview}
+                  />
+                )}
+                {!musicAsset && !imageAsset && reviewAsset && review && (
                   <SourceReview
                     ref={sourcePlayback}
                     asset={reviewAsset}
@@ -2468,6 +2539,7 @@ export function App() {
                   <Inspector
                     project={visible}
                     assets={assets}
+                    images={projectImages.images}
                     selectedClipId={selectedId}
                     selectedClipIds={clipGroup.group}
                     selectedAdjustmentIds={adjustmentGroup.group}

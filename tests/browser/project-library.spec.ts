@@ -21,7 +21,7 @@ test.beforeEach(async ({ page, request }) => {
   const project = {
     ...createProject(initialId, initialTitle),
     revision: 1,
-    media: { videoIds: [video.id], audioIds: [music.id] },
+    media: { videoIds: [video.id], audioIds: [music.id], imageIds: [] },
   };
   memory = await memoryProjects(page, project);
   await page.goto(`/?project=${initialId}`);
@@ -50,7 +50,7 @@ test('new projects have empty video/audio bins and no stale source review, searc
   await expect(page.locator('.source-preview')).toBeVisible();
   await page.getByRole('textbox', { name: 'Search media', exact: true }).fill('pattern-a');
   const id = await create(page);
-  expect(memory.snapshot(id).media).toEqual({ videoIds: [], audioIds: [] });
+  expect(memory.snapshot(id).media).toEqual({ videoIds: [], audioIds: [], imageIds: [] });
   await expect(page.locator('.media-item')).toHaveCount(0);
   await expect(page.locator('.source-preview')).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: 'Search media', exact: true })).toHaveValue('');

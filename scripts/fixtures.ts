@@ -173,6 +173,7 @@ if (process.argv.includes('--browser')) {
   fixture.document.media = {
     videoIds: fixture.library.list().map((asset) => asset.id),
     audioIds: [registeredMusic.asset.id],
+    imageIds: [],
   };
   const store = new ProjectStore(config.dataDir);
   fixture.document = await store.save(fixture.document, fixture.document.revision);

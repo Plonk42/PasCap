@@ -6,16 +6,19 @@ import { rateLabel, sameRate, videoRate } from '../shared/timing.js';
 import type { AudioLibrary } from './audio.js';
 import { errorMessage, ServiceError } from './errors.js';
 import { assertSourceIdentity } from './files.js';
+import type { ImageLibrary } from './images.js';
 import type { MediaLibrary } from './library.js';
 
-/** Clips, kept ranges and music fit their registered recordings; no file is read. */
+/** Clips, kept ranges and music fit their registered recordings, and images are registered; no file is read. */
 export function assertSourceRanges(
   document: ProjectDocument,
   library: Pick<MediaLibrary, 'get'>,
   audio: Pick<AudioLibrary, 'get'>,
+  images: Pick<ImageLibrary, 'get'>,
 ): void {
   document.media.videoIds.forEach((id) => library.get(id));
   document.media.audioIds.forEach((id) => audio.get(id));
+  document.media.imageIds.forEach((id) => images.get(id));
   for (const id of new Set([...document.media.videoIds, ...document.clips.map((clip) => clip.mediaId)])) {
     const { name, metadata } = library.get(id);
     if (!sameRate(videoRate(document, id), metadata.frameRate))
@@ -50,8 +53,9 @@ export async function assertProjectSources(
   document: ProjectDocument,
   library: Pick<MediaLibrary, 'get'>,
   audio: Pick<AudioLibrary, 'get'>,
+  images: Pick<ImageLibrary, 'get'>,
 ): Promise<void> {
-  assertSourceRanges(document, library, audio);
+  assertSourceRanges(document, library, audio, images);
   const sources = new Map<string, { sourcePath: string; fingerprint: SourceFingerprint }>();
   for (const clip of document.clips) {
     const asset = library.get(clip.mediaId);
