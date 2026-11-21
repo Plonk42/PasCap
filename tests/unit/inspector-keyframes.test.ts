@@ -37,6 +37,7 @@ describe('dedicated Inspector keyframe controls', () => {
             section: 'track',
             onSection: vi.fn(),
             onSelectBoundaries: vi.fn(),
+            onBoundaryClick: vi.fn(),
             onEdit: vi.fn(),
             onPreview: vi.fn(),
             onSeek: vi.fn(),

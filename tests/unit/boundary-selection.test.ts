@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { toggleBoundary } from '../../src/web/boundary-selection.js';
+import { followedBoundary, toggleBoundary, trackRange } from '../../src/web/boundary-selection.js';
 
 /** Track 1 joins a→b→c→d, Track 2 joins e→f. */
 function project(): ProjectDocument {
@@ -42,5 +42,36 @@ describe('selecting several transitions', () => {
     const document = project();
     expect(toggleBoundary(document, ['a', 'b'], 'e')).toEqual(['e']);
     expect(toggleBoundary(document, [], 'b')).toEqual(['b']);
+  });
+});
+
+describe('Shift-click ranges', () => {
+  const clip = (id: string) => ({ kind: 'clip' as const, id });
+  const transition = (id: string) => ({ kind: 'transition' as const, id });
+
+  it('selects the clips and transitions between the anchor and the target, nearest the target last', () => {
+    const document = project();
+    expect(trackRange(document, clip('a'), clip('c'))).toEqual({ clipIds: ['a', 'b', 'c'], boundaryIds: ['a', 'b'] });
+    expect(trackRange(document, clip('d'), transition('b'))).toEqual({ clipIds: ['d', 'c'], boundaryIds: ['c', 'b'] });
+    expect(trackRange(document, transition('a'), transition('c'))).toEqual({
+      clipIds: ['b', 'c'],
+      boundaryIds: ['a', 'b', 'c'],
+    });
+    expect(trackRange(document, transition('b'), transition('b'))).toEqual({ clipIds: [], boundaryIds: ['b'] });
+  });
+
+  it('works on one track only', () => {
+    const document = project();
+    expect(trackRange(document, clip('a'), clip('f'))).toBeNull();
+    expect(trackRange(document, transition('e'), clip('b'))).toBeNull();
+    expect(trackRange(document, null, clip('b'))).toBeNull();
+    expect(trackRange(document, clip('gone'), clip('b'))).toBeNull();
+  });
+
+  it('a lone clip opens its incoming transition, else its outgoing one', () => {
+    const [first, second] = project().layers;
+    expect(followedBoundary(first!, 'c')?.leftId).toBe('b');
+    expect(followedBoundary(first!, 'a')?.leftId).toBe('a');
+    expect(followedBoundary(second!, 'a')).toBeUndefined();
   });
 });

@@ -342,6 +342,10 @@ To give several transitions of one track the same settings, **Ctrl-click** (Cmd-
 boundary buttons or their rows in Track → Transitions, or use **Select all transitions**: the
 expanded transition then sets the type and length of all of them in one Undo step, and a
 length they do not share reads **Mixed**.
+Clips and transitions share one selection: a plain click selects only that clip or transition,
+Ctrl-click adds or removes one without losing the others, and **Shift-click** selects every clip
+and transition from the last one clicked to this one, on the same track only (on another track it
+selects just the item clicked).
 Gapped pairs are Cut only: explicitly close the gap or enable Ripple before adding
 a fade/dissolve. A cross-dissolve explicitly adjusts the right clip to its overlap;
 with Ripple off, no other clip moves and conflicts reject it. With Ripple on, check
@@ -1039,21 +1043,22 @@ the project. A deliberate click away from a number still applies a valid draft
 once, as usual. Settings, each keyframe's nested **Edit**, music placement and
 storage/render breakdowns remain their existing expandable controls, not help buttons.
 
-| Context                                     | Shortcut                                                                                    |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Timeline play/seek                          | Space; ←/→ one frame; Shift+←/→ ten; Home/End; F to fit                                     |
-| Split / quick trim                          | S / Q / W                                                                                   |
-| Unwanted timeline range                     | Drag on the ruler; Delete cuts; Escape clears the range                                     |
-| Bookmarks                                   | M adds at the playhead; Shift+↑/↓ previous/next; focused: arrows move, Delete removes       |
-| Clip actions                                | Ctrl+D duplicate (or right-click the clip); Delete/Backspace remove                         |
-| Several clips                               | Ctrl-click adds/removes a clip; drag one to move all; Delete and Alt+←/→ act on all         |
-| Several transitions                         | Ctrl-click boundary buttons or Track → Transitions rows; a change sets all of them          |
-| Session history                             | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo                                                         |
-| Positioned clip / first Ripple anchor nudge | Alt+←/→ one frame; Alt+Shift+←/→ ten; later Ripple starts require Ripple off                |
-| Focused trim handle                         | Arrows one source frame; Shift ten; left Home/right End restore                             |
-| Focused keyframe marker                     | Arrows one frame (clip grade: source frame); Shift ten; Enter selects/seeks; Delete removes |
-| Focused source review                       | I/O marks the source range, not the timeline range                                          |
-| Shortcut guide                              | ? outside form/modal/source controls                                                        |
+| Context                                     | Shortcut                                                                                      |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Timeline play/seek                          | Space; ←/→ one frame; Shift+←/→ ten; Home/End; F to fit                                       |
+| Split / quick trim                          | S / Q / W                                                                                     |
+| Unwanted timeline range                     | Drag on the ruler; Delete cuts; Escape clears the range                                       |
+| Bookmarks                                   | M adds at the playhead; Shift+↑/↓ previous/next; focused: arrows move, Delete removes         |
+| Clip actions                                | Ctrl+D duplicate (or right-click the clip); Delete/Backspace remove                           |
+| Several clips                               | Ctrl-click adds/removes a clip; drag one to move all; Delete and Alt+←/→ act on all           |
+| Several transitions                         | Ctrl-click boundary buttons or Track → Transitions rows; a change sets all of them            |
+| Range on one track                          | Shift-click a clip or transition: selects the clips and transitions from the last one clicked |
+| Session history                             | Ctrl+Z; Ctrl+Shift+Z or Ctrl+Y redo                                                           |
+| Positioned clip / first Ripple anchor nudge | Alt+←/→ one frame; Alt+Shift+←/→ ten; later Ripple starts require Ripple off                  |
+| Focused trim handle                         | Arrows one source frame; Shift ten; left Home/right End restore                               |
+| Focused keyframe marker                     | Arrows one frame (clip grade: source frame); Shift ten; Enter selects/seeks; Delete removes   |
+| Focused source review                       | I/O marks the source range, not the timeline range                                            |
+| Shortcut guide                              | ? outside form/modal/source controls                                                          |
 
 Keyboard actions respect text and number fields, source controls, dialogs and a control
 reached with Tab. After a click on a button, tab, checkbox or slider, Space still

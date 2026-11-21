@@ -361,7 +361,12 @@ and undoable, and never move music, other tracks, Transform keyframes or adjustm
   primary clip that Clip properties edit (solid outline; the others are dashed), or removes a
   selected one; the **Select all clips** icon in a track header adds that track's clips. A plain
   click, or selecting a track, returns to one selected clip. Adjustments join the same selection
-  ([adjustment track](#adjustment-track)). The selection is editor-only, never
+  ([adjustment track](#adjustment-track)), and so do transitions: Ctrl-click on a clip or a
+  transition keeps the other kind selected, and a plain click on a transition selects it alone.
+  **Shift-click** on a clip or transition (timeline or Track → Transitions row) selects every clip
+  and transition of that track from the anchor (the last clip or transition clicked without
+  Shift, else the primary clip) to it, the items nearest it becoming primary; across tracks it
+  acts as a plain click. The selection is editor-only, never
   saved. Dragging any selected clip moves them all by the same number of frames: clips from one
   track follow the pointer to its track, clips from several tracks stay on their own tracks. On
   a Ripple-off destination each keeps its offset from the others and any moved edge snaps; on a
@@ -586,8 +591,9 @@ semantics are in [LAYERS_AND_KEYFRAMES.md](LAYERS_AND_KEYFRAMES.md).
 
 Every track owns its boundary list and opening/closing fades, edited in **Track**
 for the selected track. Track → Transitions lists every boundary left to right;
-the selected one (from a boundary button, the list, or the selected clip's incoming
-boundary, else its outgoing one) is expanded. No earlier choice sticks when the
+the selected one (from a boundary button or the list, else the selected clip's incoming
+boundary, else its outgoing one) is expanded; only explicitly selected transitions are
+highlighted on the timeline. No earlier choice sticks when the
 selection changes. **Ctrl-click** (Cmd-click) on a boundary button or list row adds that
 transition of the same track to the selection or takes it out (a transition of another track
 starts a new selection), and **Select all transitions** selects the whole list. The last one

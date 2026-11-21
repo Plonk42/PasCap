@@ -41,6 +41,7 @@ import {
   adjustmentSpan,
   type AdjustmentKeyframeTarget,
 } from './adjustment-ui.js';
+import { selectionClick, type SelectionClick } from './boundary-selection.js';
 import { clipKeyframeMarkers, gradeKeyframeMarkers, type ClipKeyframeMarker } from './clip-keyframe-markers.js';
 import { clipKeyframeKind, clipKeyframeSlideTarget, type ClipKeyframeTarget } from './clip-keyframe-drag.js';
 import type { InspectorSectionTarget } from './InspectorSection.js';
@@ -132,8 +133,9 @@ interface Props {
   selectedBoundaryIds: readonly string[];
   frame: number;
   onSelect: (id: string) => void;
-  /** `toggle` (Ctrl/Cmd-click) adds the transition to the selection or removes it. */
-  onBoundary: (leftId: string, toggle: boolean) => void;
+  onBoundary: (leftId: string, click: SelectionClick) => void;
+  /** Shift-click on a clip selects the clips and transitions from the last clicked one on its track. */
+  onSelectRange: (clipId: string) => void;
   onSeek: (frame: number) => void;
   onOpenSection: (section: InspectorSectionTarget) => void;
   onPause: () => void;
@@ -793,6 +795,7 @@ export function Timeline(props: Readonly<Props>) {
     frame,
     onSelect,
     onBoundary,
+    onSelectRange,
     onSeek,
     onPause,
     onEdit,
@@ -1848,8 +1851,12 @@ export function Timeline(props: Readonly<Props>) {
                     aria-label={`Select ${name}, clip ${index + 1}`}
                     aria-pressed={isSelected || grouped}
                     disabled={interactionBlocked}
-                    title={`${name} · ${project.layers.find((layer) => layer.id === clip.layerId)?.name} · ${placed.duration} timeline frames · Ctrl-click to select several clips`}
+                    title={`${name} · ${project.layers.find((layer) => layer.id === clip.layerId)?.name} · ${placed.duration} timeline frames · Ctrl-click to add to the selection, Shift-click to select a range`}
                     onClick={(event) => {
+                      if (event.shiftKey) {
+                        onSelectRange(clip.id);
+                        return;
+                      }
                       if (event.ctrlKey || event.metaKey) {
                         onToggleClip(clip.id);
                         return;
@@ -2004,8 +2011,8 @@ export function Timeline(props: Readonly<Props>) {
                   disabled={interactionBlocked}
                   style={{ top: rowTop(region.layerId) + 4, left: leading + position * scale }}
                   aria-label={`Transition after ${left}, clip ${index + 1} on ${layerName}`}
-                  title={`${label} on ${layerName} · edit this track’s boundary · Ctrl-click to select several transitions`}
-                  onClick={(event) => onBoundary(region.transition.leftId, event.ctrlKey || event.metaKey)}
+                  title={`${label} on ${layerName} · edit this track’s boundary · Ctrl-click to add to the selection, Shift-click to select a range`}
+                  onClick={(event) => onBoundary(region.transition.leftId, selectionClick(event))}
                 >
                   {label}
                 </button>

@@ -694,6 +694,71 @@ test('Ctrl-clicked transitions on one track all get the same settings in one Und
   expect(await transitions()).toEqual(faded);
 });
 
+test('Shift-click selects the clips and transitions between two items of one track, in one selection', async ({
+  page,
+}) => {
+  const document = boundaries();
+  const layer = document.layers[0]!;
+  document.clips.push(
+    { ...createClip('third-0', assets[0]!.id, 0, 60, layer.id), start: 120 },
+    { ...createClip('fourth-0', assets[1]!.id, 0, 60, layer.id), start: 180 },
+  );
+  layer.transitions.push(
+    { leftId: 'right-0', rightId: 'third-0', type: 'cut', duration: 0 },
+    { leftId: 'third-0', rightId: 'fourth-0', type: 'cut', duration: 0 },
+  );
+  await fixture(page, projectSchema.parse(document));
+  const clipIds = ['left-0', 'right-0', 'third-0', 'fourth-0', 'left-1', 'right-1'];
+  const clip = (id: string) => page.locator(`[data-clip-id="${id}"] .timeline-clip-body`);
+  const clips = async (): Promise<string[]> => {
+    const states = await Promise.all(clipIds.map((id) => clip(id).getAttribute('aria-pressed')));
+    return clipIds.filter((_, index) => states[index] === 'true');
+  };
+  const buttons = page.locator(`.boundary-button[data-transition-layer="${layer.id}"]`);
+  const transitions = async (): Promise<boolean[]> =>
+    buttons.evaluateAll((items) => items.map((item) => item.classList.contains('selected')));
+  const choices = page.getByRole('list', { name: `Transitions on ${layer.name}`, exact: true }).getByRole('button');
+  const pressed = async (): Promise<string[]> =>
+    choices.evaluateAll((items) => items.map((item) => item.getAttribute('aria-pressed') ?? ''));
+
+  await clip('left-0').click();
+  await clip('third-0').click({ modifiers: ['Shift'] });
+  await expect.poll(clips).toEqual(['left-0', 'right-0', 'third-0']);
+  await expect.poll(transitions).toEqual([true, true, false]);
+  await page.getByRole('tab', { name: 'Track', exact: true }).click();
+  await expect.poll(pressed).toEqual(['true', 'true', 'false']);
+  await page.getByRole('combobox', { name: 'Transition type', exact: true }).selectOption('fade-through-black');
+  expect((await current(page)).layers[0]!.transitions.map((item) => item.type)).toEqual([
+    'fade-through-black',
+    'fade-through-black',
+    'cut',
+  ]);
+
+  // Another track's clip starts a new selection instead of a range.
+  await clip('right-1').click({ modifiers: ['Shift'] });
+  await expect.poll(clips).toEqual(['right-1']);
+  await expect.poll(transitions).toEqual([false, false, false]);
+
+  // A plain click on a transition selects it alone; a range from it reaches back to a clip.
+  await buttons.nth(2).click();
+  await expect.poll(clips).toEqual([]);
+  await expect.poll(transitions).toEqual([false, false, true]);
+  await clip('left-0').click({ modifiers: ['Shift'] });
+  await expect.poll(clips).toEqual(['left-0', 'right-0', 'third-0']);
+  await expect.poll(transitions).toEqual([true, true, true]);
+  await clip('fourth-0').click({ modifiers: ['ControlOrMeta'] });
+  await expect.poll(clips).toEqual(['left-0', 'right-0', 'third-0', 'fourth-0']);
+  await expect.poll(transitions).toEqual([true, true, true]);
+
+  // Transitions list rows select ranges too.
+  await page.getByRole('tab', { name: 'Track', exact: true }).click();
+  await choices.nth(0).click();
+  await expect.poll(clips).toEqual([]);
+  await choices.nth(2).click({ modifiers: ['Shift'] });
+  await expect.poll(pressed).toEqual(['true', 'true', 'true']);
+  await expect.poll(clips).toEqual(['right-0', 'third-0']);
+});
+
 test('a positioned gap disables non-cut boundary choices until explicit Ripple packing closes that track only', async ({
   page,
 }) => {

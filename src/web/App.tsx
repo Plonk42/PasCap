@@ -54,7 +54,7 @@ import { api, proxyUrl, type RequestOptions } from './api.js';
 import { Autosave, type SaveState } from './autosave.js';
 import { AssistantEditingBanner, AssistantEndedBanner, useFollowAssistant } from './AssistantSession.js';
 import type { BestRangeChange } from './best-ranges.js';
-import { toggleBoundary } from './boundary-selection.js';
+import { toggleBoundary, trackRange, type SelectionClick, type SelectionItem } from './boundary-selection.js';
 import { callOperation } from './operations.js';
 import { waitForService } from './connection.js';
 import { DeferredPanel } from './DeferredPanel.js';
@@ -383,6 +383,8 @@ export function App() {
   const latestAssets = useRef<MediaAsset[]>([]);
   const latestAudio = useRef<AudioAsset[]>([]);
   const selection = useRef<string | null>(null);
+  /** Where a Shift-click range starts: the last clip or transition clicked without Shift. */
+  const anchor = useRef<SelectionItem | null>(null);
   const musicSelection = useRef<string | null>(null);
   const selectedLayer = useRef(EMPTY_PROJECT.layers[0]!.id);
   const sourceRanges = useRef<MediaSelections>(ranges);
@@ -415,26 +417,76 @@ export function App() {
   const togglePanel = useCallback((panel: SidePanel) => toggleSidePanel(latestWorkspace.current, panel), []);
 
   const select = useCallback(
-    (id: string, keepAdjustments = false) => {
+    (id: string, extend = false) => {
       selection.current = id;
+      anchor.current = { kind: 'clip', id };
       setSelectedId(id);
       clipGroup.set([]);
-      if (!keepAdjustments) adjustmentGroup.set([]);
+      // Ctrl/Cmd-click keeps the selected adjustments and transitions.
+      if (!extend) {
+        adjustmentGroup.set([]);
+        setBoundaryIds([]);
+      }
       setViewerMode('timeline');
-      const document = current.current;
-      const layerId = document?.clips.find((clip) => clip.id === id)?.layerId;
+      const layerId = current.current?.clips.find((clip) => clip.id === id)?.layerId;
       if (layerId) {
         selectedLayer.current = layerId;
         setSelectedLayerId(layerId);
       }
-      const transitions = document?.layers.find((item) => item.id === layerId)?.transitions;
-      // Follow the selection: the clip's incoming boundary, else its outgoing one.
-      const boundary =
-        transitions?.find((item) => item.rightId === id) ?? transitions?.find((item) => item.leftId === id);
-      setBoundaryIds(boundary ? [boundary.leftId] : []);
     },
     [clipGroup.set, adjustmentGroup.set],
   );
+  /** Selects transitions (by left clip, the last primary) on their track; `extend` keeps the selected clips. */
+  const selectBoundaries = useCallback(
+    (ids: readonly string[], extend: boolean): void => {
+      const primary = ids.at(-1);
+      const layerId = current.current?.clips.find((clip) => clip.id === primary)?.layerId;
+      if (drafting.current || primary === undefined || !layerId) return;
+      if (!extend) {
+        selection.current = null;
+        setSelectedId(null);
+        clipGroup.set([]);
+        adjustmentGroup.set([]);
+      }
+      selectedLayer.current = layerId;
+      setSelectedLayerId(layerId);
+      anchor.current = { kind: 'transition', id: primary };
+      setBoundaryIds(ids);
+      setViewerMode('timeline');
+    },
+    [clipGroup.set, adjustmentGroup.set],
+  );
+  /** Shift-click: the clips and transitions between the anchor and the target on one track, else a plain click. */
+  const selectRange = useCallback(
+    (target: SelectionItem): void => {
+      const document = current.current;
+      if (drafting.current || !document) return;
+      const from = anchor.current ?? (selection.current === null ? null : { kind: 'clip', id: selection.current });
+      const range = trackRange(document, from, target);
+      if (!range) {
+        if (target.kind === 'clip') select(target.id);
+        else selectBoundaries([target.id], false);
+        return;
+      }
+      const primary = range.clipIds.at(-1);
+      if (primary === undefined) selectBoundaries(range.boundaryIds, false);
+      else select(primary);
+      anchor.current = from;
+      clipGroup.set(range.clipIds.length > 1 ? range.clipIds : []);
+      setBoundaryIds(range.boundaryIds);
+    },
+    [select, selectBoundaries, clipGroup.set],
+  );
+  const clickBoundary = useCallback(
+    (leftId: string, click: SelectionClick, selected: readonly string[]): void => {
+      if (click === 'range') selectRange({ kind: 'transition', id: leftId });
+      else if (click === 'toggle' && current.current)
+        selectBoundaries(toggleBoundary(current.current, selected, leftId), true);
+      else selectBoundaries([leftId], false);
+    },
+    [selectRange, selectBoundaries],
+  );
+  const selectClipRange = useCallback((id: string) => selectRange({ kind: 'clip', id }), [selectRange]);
   const toggleClipSelection = useCallback(
     (id: string): void => {
       if (drafting.current) return;
@@ -446,6 +498,7 @@ export function App() {
       }
       const next = toggleClip({ primary: selection.current, group: clipGroup.latest.current }, id);
       applyClipSelection(next, selection.current, (clipId) => select(clipId, true), clipGroup.set);
+      anchor.current = { kind: 'clip', id };
     },
     [select, clipGroup.set, clipGroup.latest, adjustmentGroup.latest],
   );
@@ -2478,7 +2531,8 @@ export function App() {
                     section={inspectorMode}
                     onSection={setInspectorMode}
                     sectionRequest={sectionRequest}
-                    onSelectBoundaries={setBoundaryIds}
+                    onSelectBoundaries={selectBoundaries}
+                    onBoundaryClick={clickBoundary}
                     onEdit={edit}
                     onPreview={previewDraft}
                     onSeek={seek}
@@ -2527,13 +2581,11 @@ export function App() {
             selectedBoundaryIds={boundaryIds}
             frame={diagnostics?.frame ?? 0}
             onSelect={select}
-            onBoundary={(id, toggle) => {
-              const next = toggle && current.current ? toggleBoundary(current.current, boundaryIds, id) : [id];
-              // A new selection selects its left clip and track, as a plain click does.
-              if (next.length === 1) select(next[0]!);
-              setBoundaryIds(next);
+            onBoundary={(id, click) => {
+              clickBoundary(id, click, boundaryIds);
               openInspectorSection('transition');
             }}
+            onSelectRange={selectClipRange}
             onSeek={seek}
             onOpenSection={openInspectorSection}
             onPause={() => engine.current?.pause()}

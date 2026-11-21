@@ -21,7 +21,7 @@ import { adjustmentLabel } from './adjustment-ui.js';
 import { TrackAnimationControls } from './AnimationControls.js';
 import { AutoAdjust } from './AutoAdjust.js';
 import { AutoWhiteBalance } from './AutoWhiteBalance.js';
-import { toggleBoundary } from './boundary-selection.js';
+import { followedBoundary, selectionClick, type SelectionClick } from './boundary-selection.js';
 import { ClipSourceRange } from './ClipSourceRange.js';
 import { COLOR_GROUPS, colorGroupResetCommands, colorResetCommands } from './color-reset.js';
 import { DetailSection } from './DetailControls.js';
@@ -84,7 +84,9 @@ interface Props {
   section: InspectorMode;
   onSection: (section: InspectorMode) => void;
   sectionRequest?: InspectorSectionRequest | null;
-  onSelectBoundaries: (leftIds: readonly string[]) => void;
+  onSelectBoundaries: (leftIds: readonly string[], extend: boolean) => void;
+  /** A click on a transition row; `selected` lists the transitions shown as selected. */
+  onBoundaryClick: (leftId: string, click: SelectionClick, selected: readonly string[]) => void;
   onEdit: (command: EditCommand | readonly EditCommand[]) => void;
   children?: ReactNode;
   onPreview: (draft: DraftPreview | null, restoreFrame?: number) => void;
@@ -528,20 +530,36 @@ function SequenceControls({
   layer,
   assets,
   boundaryIds,
+  selectedClipId,
   layout,
   drafting,
   onEdit,
   onSelectBoundaries,
+  onBoundaryClick,
   id,
 }: Readonly<
-  Pick<Props, 'project' | 'assets' | 'boundaryIds' | 'drafting' | 'onEdit' | 'onSelectBoundaries'> & {
+  Pick<
+    Props,
+    | 'project'
+    | 'assets'
+    | 'boundaryIds'
+    | 'selectedClipId'
+    | 'drafting'
+    | 'onEdit'
+    | 'onSelectBoundaries'
+    | 'onBoundaryClick'
+  > & {
     layer: VideoLayer;
     layout: TimelineLayout;
     id: string;
   }
 >) {
-  const boundary = layer.transitions.find((item) => item.leftId === boundaryIds.at(-1));
-  const selected = boundary ? layer.transitions.filter((item) => boundaryIds.includes(item.leftId)) : [];
+  const chosen = layer.transitions.filter((item) => boundaryIds.includes(item.leftId));
+  // Without selected transitions, the selected clip's own transition stays open to edit.
+  const boundary = chosen.length
+    ? (chosen.find((item) => item.leftId === boundaryIds.at(-1)) ?? chosen.at(-1))
+    : followedBoundary(layer, selectedClipId);
+  const selected = chosen.length || !boundary ? chosen : [boundary];
   const several = selected.length > 1;
   const mixedType = selected.some((item) => item.type !== boundary?.type);
   const trackClips = layout.clips.filter((item) => item.clip.layerId === layer.id);
@@ -568,11 +586,18 @@ function SequenceControls({
         : 'Shorten this transition or adjust conflicting fades/placements on this track.',
     );
   const choose = (event: MouseEvent, leftId: string): void =>
-    onSelectBoundaries(event.ctrlKey || event.metaKey ? toggleBoundary(project, boundaryIds, leftId) : [leftId]);
+    onBoundaryClick(
+      leftId,
+      selectionClick(event),
+      selected.map((item) => item.leftId),
+    );
   const allIds = layer.transitions.map((item) => item.leftId);
   // The primary transition stays primary, so its settings stay in view.
   const selectAll = (): void =>
-    onSelectBoundaries(boundary ? [...allIds.filter((leftId) => leftId !== boundary.leftId), boundary.leftId] : allIds);
+    onSelectBoundaries(
+      boundary ? [...allIds.filter((leftId) => leftId !== boundary.leftId), boundary.leftId] : allIds,
+      true,
+    );
   const resetKey = [
     project.id,
     layer.id,
@@ -611,7 +636,7 @@ function SequenceControls({
                   className="boundary-choice"
                   aria-pressed={selected.includes(item)}
                   disabled={drafting}
-                  title="Ctrl-click to select several transitions"
+                  title="Ctrl-click to add to the selection, Shift-click to select a range"
                   onClick={(event) => choose(event, item.leftId)}
                 >
                   <span>
@@ -1102,6 +1127,7 @@ function InspectorPanel({
   onSection,
   sectionRequest,
   onSelectBoundaries,
+  onBoundaryClick,
   onEdit,
   onPreview,
   onSeek,
@@ -1356,10 +1382,12 @@ function InspectorPanel({
                 layer={layer}
                 assets={assets}
                 boundaryIds={boundaryIds}
+                selectedClipId={selectedClipId}
                 layout={layout}
                 drafting={drafting}
                 onEdit={onEdit}
                 onSelectBoundaries={onSelectBoundaries}
+                onBoundaryClick={onBoundaryClick}
                 id={colorControlId}
               />
             </>
