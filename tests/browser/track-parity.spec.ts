@@ -725,8 +725,16 @@ test('Shift-click selects the clips and transitions between two items of one tra
   await clip('third-0').click({ modifiers: ['Shift'] });
   await expect.poll(clips).toEqual(['left-0', 'right-0', 'third-0']);
   await expect.poll(transitions).toEqual([true, true, false]);
+  // The primary items are solid, the others dashed (`grouped`).
+  await expect(buttons.nth(0)).toHaveClass(/grouped/);
+  await expect(buttons.nth(1)).not.toHaveClass(/grouped/);
+  await expect(page.locator('[data-clip-id="right-0"]')).toHaveClass(/grouped/);
+  await expect(page.locator('[data-clip-id="third-0"]')).toHaveClass(/selected/);
   await page.getByRole('tab', { name: 'Track', exact: true }).click();
   await expect.poll(pressed).toEqual(['true', 'true', 'false']);
+  const rows = page.locator('.boundary-list > li');
+  await expect(rows.nth(0)).toHaveAttribute('data-primary', 'false');
+  await expect(rows.nth(1)).toHaveAttribute('data-primary', 'true');
   await page.getByRole('combobox', { name: 'Transition type', exact: true }).selectOption('fade-through-black');
   expect((await current(page)).layers[0]!.transitions.map((item) => item.type)).toEqual([
     'fade-through-black',

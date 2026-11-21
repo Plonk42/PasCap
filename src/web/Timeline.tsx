@@ -41,7 +41,7 @@ import {
   adjustmentSpan,
   type AdjustmentKeyframeTarget,
 } from './adjustment-ui.js';
-import { selectionClick, type SelectionClick } from './boundary-selection.js';
+import { boundaryClass, selectionClick, type SelectionClick } from './boundary-selection.js';
 import { clipKeyframeMarkers, gradeKeyframeMarkers, type ClipKeyframeMarker } from './clip-keyframe-markers.js';
 import { clipKeyframeKind, clipKeyframeSlideTarget, type ClipKeyframeTarget } from './clip-keyframe-drag.js';
 import type { InspectorSectionTarget } from './InspectorSection.js';
@@ -2006,7 +2006,7 @@ export function Timeline(props: Readonly<Props>) {
               return (
                 <button
                   key={`${region.transition.leftId}-${region.transition.rightId}`}
-                  className={`boundary-button ${selectedBoundaryIds.includes(region.transition.leftId) ? 'selected' : ''}`}
+                  className={`boundary-button ${boundaryClass(selectedBoundaryIds, region.transition.leftId)}`}
                   data-transition-layer={region.layerId}
                   disabled={interactionBlocked}
                   style={{ top: rowTop(region.layerId) + 4, left: leading + position * scale }}

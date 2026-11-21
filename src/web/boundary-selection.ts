@@ -31,6 +31,12 @@ export function toggleBoundary(project: ProjectDocument, ids: readonly string[],
   return rest.length ? rest : kept;
 }
 
+/** A timeline transition button's selection classes: the primary (last) one is solid, the others `grouped`. */
+export function boundaryClass(ids: readonly string[], leftId: string): string {
+  if (!ids.includes(leftId)) return '';
+  return ids.at(-1) === leftId ? 'selected' : 'selected grouped';
+}
+
 /** The transition Track → Transitions opens for a clip when no transition is selected: its incoming one, else its outgoing one. */
 export function followedBoundary(layer: VideoLayer, clipId: string | null): Transition | undefined {
   return (

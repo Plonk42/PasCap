@@ -13,6 +13,8 @@
   --accent: #b7efbf;
   --accent-dim: #2b4130;
   --error: #f6b1a4;
+  /* Selected clips and transitions, in the time range selection's orange. */
+  --selection: #efb497;
 }
 
 * {
@@ -1144,17 +1146,20 @@ svg {
 }
 
 .timeline-clip.selected {
-  outline: 1px solid var(--accent);
-  border-color: var(--accent);
+  outline: 2px solid var(--selection);
+  border-color: var(--selection);
   z-index: 2;
 }
 
 /* Other clips of a multi-selection: dashed, so the solid primary clip stays the one Clip properties edit. */
 .timeline-clip.grouped {
-  outline: 1px dashed var(--accent);
-  outline-offset: 1px;
-  border-color: var(--accent);
+  outline: 2px dashed var(--selection);
+  border-color: var(--selection);
   z-index: 2;
+}
+
+.timeline-clip:is(.selected, .grouped) .timeline-clip-body::after {
+  background: linear-gradient(0deg, #4a2418b0, transparent 55%), #d89b7426;
 }
 
 .timeline-clip-body {
@@ -1271,7 +1276,7 @@ svg {
 }
 
 .invalid-trim .timeline-clip.selected {
-  outline-color: #e7ac9f;
+  outline-color: #ff6f61;
 }
 
 .boundary-button {
@@ -1289,8 +1294,16 @@ svg {
 }
 
 .boundary-button.selected {
-  color: #d9efdf;
-  border-color: #a5cfae;
+  color: #fff7f0;
+  background: #8a4f36;
+  border-color: var(--selection);
+  outline: 1px solid var(--selection);
+}
+
+/* Other selected transitions: dashed, so the solid one stays the one Track → Transitions shows. */
+.boundary-button.selected.grouped {
+  border-style: dashed;
+  outline: none;
 }
 
 .timeline-transition-slot {

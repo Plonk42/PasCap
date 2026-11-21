@@ -596,8 +596,9 @@ boundary, else its outgoing one) is expanded; only explicitly selected transitio
 highlighted on the timeline. No earlier choice sticks when the
 selection changes. **Ctrl-click** (Cmd-click) on a boundary button or list row adds that
 transition of the same track to the selection or takes it out (a transition of another track
-starts a new selection), and **Select all transitions** selects the whole list. The last one
-added stays expanded and a change there gives every selected transition the same type and
+starts a new selection), and **Select all transitions** selects the whole list. Selected clips
+and transitions are outlined in orange, like a time range. The last one added (solid outline;
+the others are dashed) stays expanded and a change there gives every selected transition the same type and
 lengths, applied in order as one Undo step; if any of them is refused, none changes. A type
 they do not share reads **Mixed** and hides the length fields; a length they do not share
 reads **Mixed** beside its field. Exactly one record joins each adjacent pair. Cut permits a

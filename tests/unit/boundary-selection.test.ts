@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createClip, createLayer, createProject, projectSchema, type ProjectDocument } from '../../src/shared/model.js';
-import { followedBoundary, toggleBoundary, trackRange } from '../../src/web/boundary-selection.js';
+import { boundaryClass, followedBoundary, toggleBoundary, trackRange } from '../../src/web/boundary-selection.js';
 
 /** Track 1 joins a→b→c→d, Track 2 joins e→f. */
 function project(): ProjectDocument {
@@ -66,6 +66,12 @@ describe('Shift-click ranges', () => {
     expect(trackRange(document, transition('e'), clip('b'))).toBeNull();
     expect(trackRange(document, null, clip('b'))).toBeNull();
     expect(trackRange(document, clip('gone'), clip('b'))).toBeNull();
+  });
+
+  it('marks the primary transition solid and the others grouped', () => {
+    expect(boundaryClass(['a', 'b'], 'b')).toBe('selected');
+    expect(boundaryClass(['a', 'b'], 'a')).toBe('selected grouped');
+    expect(boundaryClass(['a', 'b'], 'c')).toBe('');
   });
 
   it('a lone clip opens its incoming transition, else its outgoing one', () => {

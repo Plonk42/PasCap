@@ -630,7 +630,11 @@ function SequenceControls({
         >
           <ol className="boundary-list" aria-label={`Transitions on ${layer.name}`}>
             {layer.transitions.map((item) => (
-              <li key={`${item.leftId}:${item.rightId}`} data-selected={selected.includes(item)}>
+              <li
+                key={`${item.leftId}:${item.rightId}`}
+                data-selected={selected.includes(item)}
+                data-primary={item === boundary}
+              >
                 <button
                   type="button"
                   className="boundary-choice"
